@@ -88,6 +88,8 @@ It clears the entered bearer after success. The old Kotoba sign-in and gateway c
 
 Keep GitHub Actions disabled on this public source repository and publish no binary or updater feed until the desktop and website cutover gates pass.
 
+The inherited stable and beta release jobs also have a source-level false gate; migrate those workflows before intentionally enabling them.
+
 `scripts/check-mithril-packaging.mjs` blocks every npm packaging command while legacy runtime origins or credentials remain. The old origin-plane publisher and release manifest were removed from this repository; their history remains in Git. The new update feed has no published files yet.
 
 The main-process service supervisor remains internal. Its three unused renderer IPC handlers were removed because the preload API did not expose them; future service controls need a designed renderer API and authorization boundary.

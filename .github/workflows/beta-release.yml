@@ -34,6 +34,8 @@ concurrency:
 jobs:
   prepare:
     name: Prepare Beta Release
+    # Source preview: the inherited release path must be migrated before use.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     outputs:
       base_version: ${{ steps.version.outputs.base_version }}

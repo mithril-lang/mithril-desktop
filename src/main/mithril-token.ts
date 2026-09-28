@@ -26,7 +26,11 @@ function errorCode(body: unknown, fallback: string): string {
   return fallback;
 }
 
-async function getJson(path: string, token: string, fetchImpl: typeof fetch) {
+async function getJson(
+  path: string,
+  token: string,
+  fetchImpl: typeof fetch,
+): Promise<{ status: number; body: unknown }> {
   const response = await fetchImpl(`${MITHRIL_API_ORIGIN}${path}`, {
     headers: { authorization: `Bearer ${token}`, accept: "application/json" },
     credentials: "omit",
@@ -43,19 +47,27 @@ export async function inspectMithrilToken(
 ): Promise<MithrilTokenInspection> {
   const token = rawToken.trim();
   // In particular, never send a legacy credential to Mithril.
-  if (!MITHRIL_TOKEN.test(token)) return { ok: false, error: "invalid_mithril_token" };
+  if (!MITHRIL_TOKEN.test(token))
+    return { ok: false, error: "invalid_mithril_token" };
   try {
     const identity = await getJson("/v1/me", token, fetchImpl);
     if (identity.status !== 200) {
-      return { ok: false, error: errorCode(identity.body, `HTTP ${identity.status}`) };
+      return {
+        ok: false,
+        error: errorCode(identity.body, `HTTP ${identity.status}`),
+      };
     }
     const me = identity.body as {
       user?: { id?: unknown } | null;
       via?: unknown;
       scopes?: unknown;
     } | null;
-    if (me?.via !== "api_token" || typeof me.user?.id !== "string" ||
-        !Array.isArray(me.scopes) || !me.scopes.every((scope) => typeof scope === "string")) {
+    if (
+      me?.via !== "api_token" ||
+      typeof me.user?.id !== "string" ||
+      !Array.isArray(me.scopes) ||
+      !me.scopes.every((scope) => typeof scope === "string")
+    ) {
       return { ok: false, error: "malformed_identity" };
     }
     const result: Extract<MithrilTokenInspection, { ok: true }> = {
@@ -87,10 +99,12 @@ export async function inspectMithrilToken(
       ledgerSum?: unknown;
       consistent?: unknown;
     } | null;
-    if (typeof balance?.balanceMicroUsd !== "number" ||
-        !Number.isSafeInteger(balance.balanceMicroUsd) ||
-        balance.consistent !== true ||
-        balance.ledgerSum !== balance.balanceMicroUsd) {
+    if (
+      typeof balance?.balanceMicroUsd !== "number" ||
+      !Number.isSafeInteger(balance.balanceMicroUsd) ||
+      balance.consistent !== true ||
+      balance.ledgerSum !== balance.balanceMicroUsd
+    ) {
       result.billingError = "ledger_mismatch_or_malformed_balance";
       return result;
     }

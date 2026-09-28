@@ -60,12 +60,14 @@ The global packaging product name supplies Electron Builder's Linux install-dire
 
 The Kotoba fork (`cloud-kotoba/org-hermesone-hermes-desktop`) does not use GitHub releases or GitHub Actions: its feed is electron-updater's `generic` provider at `https://app.kotoba.cloud/download/`, and builds are made on a mac-mini.
 
-The old fork used `publish.provider: generic` at that URL so it could not update to upstream Hermes One. The Mithril repo points its generic feed to `https://app.mithril.fund/download/`. Version `0.8.0-preview.1` publishes an Apple silicon DMG, ZIP, checksum manifest, and `latest-mac.yml` from a locally verified build. GitHub Actions remain disabled in the new repo.
+The old fork used `publish.provider: generic` at that URL so it could not update to upstream Hermes One. The Mithril repo reserves `https://app.mithril.fund/download/` for its future stable feed. Version `0.8.0-preview.1` publishes an Apple silicon DMG, ZIP, and checksum manifest from a locally verified build, but no updater metadata. GitHub Actions remain disabled in the new repo.
 
 The old fork published content-addressed artifacts through `scripts/publish-release.cljk`, `kotoba.app.edn`, and `app-kotoba-cloud.desktop-releases`. Those old-account publisher files were removed from the Mithril repo. They remain in Git history as provenance; Mithril releases use GitHub release assets exposed through the app download route.
 
 ### Unsigned macOS builds
 
-No Developer ID Application certificate exists in the workspace, so fork builds are ad-hoc signed and `notarize` is off; Gatekeeper asks the user to confirm on first launch.
+The Apple silicon preview is ad-hoc signed and not notarized, so Gatekeeper asks the user to confirm on first launch.
+
+No Developer ID Application certificate exists in the workspace. The preview does not poll an updater feed at startup. Its explicit update actions open the verified App download page, avoiding both an unpublished-feed error and an impossible Squirrel.Mac replacement.
 
 `build/afterPack.js` is wired as `afterPack` and re-signs the packed bundle inside-out with the ad-hoc identity — every Mach-O leaf first (dylibs, `Helpers/chrome_crashpad_handler`, the `.node` addons under `app.asar.unpacked`), then the frameworks and helper apps, then the outer `.app`. Without it electron-builder leaves Electron's stock signature over replaced resources, `codesign --verify --deep --strict` fails with "code has no resources but signature indicates they must be present", and Apple Silicon refuses to launch the app. A framework whose signing fails now fails the build instead of being silently skipped.

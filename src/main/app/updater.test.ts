@@ -1,9 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("electron", () => ({ app: {}, ipcMain: {}, shell: {} }));
+const electronState = vi.hoisted(() => ({
+  handlers: new Map<string, (...args: unknown[]) => unknown>(),
+  openExternal: vi.fn(async (): Promise<void> => {}),
+}));
+
+vi.mock("electron", () => ({
+  app: { getVersion: () => "0.8.0-preview.1" },
+  ipcMain: {
+    handle: (
+      channel: string,
+      handler: (...args: unknown[]) => unknown,
+    ): void => {
+      electronState.handlers.set(channel, handler);
+    },
+  },
+  shell: { openExternal: electronState.openExternal },
+}));
 vi.mock("../updater-log", () => ({ updaterLogger: { info: () => {} } }));
 
-import { macManualUpdateReason } from "./updater";
+import type { AppUpdater } from "electron-updater";
+import { macManualUpdateReason, setupManualUpdater } from "./updater";
 
 // Verbatim `codesign -dv` output of the two bundles that produced the
 // "Update failed" in updater.log: the installed 0.7.10 (Apple Development
@@ -54,5 +71,30 @@ describe("macManualUpdateReason", () => {
     expect(macManualUpdateReason("win32", read)).toBeNull();
     expect(macManualUpdateReason("linux", read)).toBeNull();
     expect(read).not.toHaveBeenCalled();
+  });
+
+  it("does not poll an unpublished feed for an ad-hoc preview", async () => {
+    electronState.handlers.clear();
+    electronState.openExternal.mockClear();
+    const checkForUpdates = vi.fn();
+    const updater = {
+      autoDownload: true,
+      autoInstallOnAppQuit: true,
+      checkForUpdates,
+    } as unknown as AppUpdater;
+
+    setupManualUpdater(updater, "ad-hoc code signature", () => null);
+
+    expect(updater.autoDownload).toBe(false);
+    expect(updater.autoInstallOnAppQuit).toBe(false);
+    expect(checkForUpdates).not.toHaveBeenCalled();
+    const check = electronState.handlers.get("check-for-updates") as
+      | (() => Promise<string>)
+      | undefined;
+    await expect(check?.()).resolves.toBe("0.8.0-preview.1");
+    expect(electronState.openExternal).toHaveBeenCalledWith(
+      "https://app.mithril.fund/",
+    );
+    expect(checkForUpdates).not.toHaveBeenCalled();
   });
 });

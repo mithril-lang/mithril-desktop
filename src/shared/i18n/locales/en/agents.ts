@@ -92,8 +92,7 @@ export default {
   sync: "Sync",
   syncing: "Syncing…",
   syncSignedOut: "Not synced",
-  syncSignedOutHint:
-    "Cloud agent sync is unavailable in this Mithril preview.",
+  syncSignedOutHint: "Cloud agent sync is unavailable in this Mithril preview.",
   syncUpToDate: "Cloud agent sync unavailable",
   syncSummary: "Synced — {{pushed}} pushed, {{pulled}} pulled, {{created}} new",
   syncErrors: "Sync finished with {{count}} error(s)",
@@ -108,8 +107,7 @@ export default {
   syncLinked: "Linked",
   syncNotLinked: "Not linked yet — sync to create it",
   syncLastResult: "Last sync",
-  syncSignInHint:
-    "Cloud agent sync is unavailable in this Mithril preview.",
+  syncSignInHint: "Cloud agent sync is unavailable in this Mithril preview.",
   syncAction: {
     "up-to-date": "Up to date",
     pushed: "Pushed to cloud",

@@ -1,24 +1,41 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import MithrilAccountSection from "./MithrilAccountSection";
 
 vi.mock("./useI18n", () => ({ useI18n: () => ({ locale: "en" }) }));
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe("Mithril account card", () => {
   // @lat: [[mithril-migration#Mithril desktop migration#Native Mithril account#Desktop account card]]
   it("connects a profile without retaining the entered bearer in the input", async () => {
     const connect = vi.fn().mockResolvedValue({
       status: "connected",
-      account: { userId: "u1", accountUrl: "https://console.mithril.fund/account", live: true,
-        scopes: ["billing:read"], balanceMicroUsd: 1_500_000 },
+      account: {
+        userId: "u1",
+        accountUrl: "https://console.mithril.fund/account",
+        live: true,
+        scopes: ["billing:read"],
+        balanceMicroUsd: 1_500_000,
+      },
     });
-    Object.defineProperty(window, "hermesAPI", { configurable: true, value: {
-      getMithrilAccount: vi.fn().mockResolvedValue(null),
-      connectMithrilAccount: connect,
-      disconnectMithrilAccount: vi.fn().mockResolvedValue({ success: true }),
-      openExternal: vi.fn(),
-    } });
+    Object.defineProperty(window, "hermesAPI", {
+      configurable: true,
+      value: {
+        getMithrilAccount: vi.fn().mockResolvedValue(null),
+        connectMithrilAccount: connect,
+        disconnectMithrilAccount: vi.fn().mockResolvedValue({ success: true }),
+        openExternal: vi.fn(),
+      },
+    });
     render(<MithrilAccountSection profile="alice" />);
     const input = screen.getByLabelText("Connection token") as HTMLInputElement;
     fireEvent.change(input, { target: { value: `mf_${"a".repeat(43)}` } });

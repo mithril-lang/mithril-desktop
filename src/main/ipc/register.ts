@@ -1024,8 +1024,13 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("mithril-account-get", (_event, profile?: string) =>
     mithrilAccount(profile?.trim() || getActiveProfileNameSync()),
   );
-  ipcMain.handle("mithril-account-connect", (_event, token: string, profile?: string) =>
-    connectMithrilAccount(token, profile?.trim() || getActiveProfileNameSync()),
+  ipcMain.handle(
+    "mithril-account-connect",
+    (_event, token: string, profile?: string) =>
+      connectMithrilAccount(
+        token,
+        profile?.trim() || getActiveProfileNameSync(),
+      ),
   );
   ipcMain.handle("mithril-account-disconnect", (_event, profile?: string) =>
     disconnectMithrilAccount(profile?.trim() || getActiveProfileNameSync()),

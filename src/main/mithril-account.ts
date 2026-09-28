@@ -1,7 +1,14 @@
 // @lat: [[mithril-migration#Mithril desktop migration#Native Mithril account]]
 import { MITHRIL_ACCOUNT_URL, inspectMithrilToken } from "./mithril-token";
-import { clearMithrilToken, readMithrilToken, writeMithrilToken } from "./mithril-token-store";
-import type { MithrilAccount, MithrilAccountConnectResult } from "../shared/account";
+import {
+  clearMithrilToken,
+  readMithrilToken,
+  writeMithrilToken,
+} from "./mithril-token-store";
+import type {
+  MithrilAccount,
+  MithrilAccountConnectResult,
+} from "../shared/account";
 
 export async function connectMithrilAccount(
   rawToken: string,
@@ -55,7 +62,9 @@ export async function mithrilAccount(
   };
 }
 
-export function disconnectMithrilAccount(profile?: string): { success: boolean } {
+export function disconnectMithrilAccount(profile?: string): {
+  success: boolean;
+} {
   clearMithrilToken(profile);
   return { success: true };
 }

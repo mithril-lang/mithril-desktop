@@ -4,13 +4,13 @@ import { extname, join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const files = [];
-for (const dir of ["src/main", "src/renderer/src"]) {
+for (const dir of ["src/main", "src/renderer", "src/shared"]) {
   const walk = (at) => {
     for (const entry of readdirSync(join(root, at), { withFileTypes: true })) {
       const path = join(at, entry.name);
       if (entry.isDirectory()) walk(path);
       else if (
-        [".ts", ".tsx"].includes(extname(path)) &&
+        [".ts", ".tsx", ".css", ".html"].includes(extname(path)) &&
         !/\.(test|spec)\.[jt]sx?$/.test(path)
       )
         files.push(path);
@@ -20,12 +20,35 @@ for (const dir of ["src/main", "src/renderer/src"]) {
 }
 
 const forbidden =
-  /kotoba\.cloud|app\.kotoba\.cloud|api\.kotoba\.cloud|KOTOBA_API_KEY|kc_pat_|Kotoba Cloud|["'`]Kotoba["'`]/i;
+  /kotoba\.cloud|app\.kotoba\.cloud|api\.kotoba\.cloud|KOTOBA_API_KEY|kc_pat_|Kotoba Cloud|["'`]Kotoba["'`]|\*\*Kotoba:/i;
 const failures = [];
+const quarantined = new Set([
+  "src/main/agent-sync.ts",
+  "src/main/kotoba-cloud-account.ts",
+  "src/main/kotoba-cloud-orgs.ts",
+  "src/main/kotoba-cloud-token-store.ts",
+  "src/main/wallet-actions.ts",
+  "src/main/wallet-sync.ts",
+  "src/shared/account.ts",
+  "src/shared/wallets.ts",
+]);
 for (const path of files) {
+  if (quarantined.has(path)) continue;
   const lines = readFileSync(join(root, path), "utf8").split("\n");
   lines.forEach((line, index) => {
     if (forbidden.test(line)) failures.push(`${path}:${index + 1}`);
+    for (const legacyPath of path.startsWith("src/main/") ? quarantined : []) {
+      const moduleName = legacyPath
+        .replace(/^src\/main\//, "")
+        .replace(/\.ts$/, "");
+      if (
+        new RegExp(
+          `(?:from\\s+|import\\s*\\()["'][^"']*${moduleName}["']`,
+        ).test(line)
+      ) {
+        failures.push(`runtime import: ${path}:${index + 1}`);
+      }
+    }
   });
 }
 
@@ -63,6 +86,6 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Mithril packaging identity and ${files.length} runtime files checked.`,
+    `Mithril packaging identity and ${files.length - quarantined.size} active runtime files checked.`,
   );
 }

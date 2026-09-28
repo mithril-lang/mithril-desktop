@@ -2,8 +2,8 @@
 /**
  * Don't restart a profile's gateway out from under its own cron job.
  *
- * Writing a credential — an API key in Settings, this fork's Kotoba Cloud
- * sign-in — restarts the local gateway so it picks the value up. That is a
+ * Writing a credential — such as an API key in Settings — restarts the local
+ * gateway so it picks the value up. That is a
  * convenience, not something the person asked for, and it kills whatever the
  * gateway is running: Hermes reports it as
  * `Gateway shutdown (<phase>) killed the job's tool subprocess before the

@@ -2,9 +2,7 @@ import { Suspense, memo, useMemo } from "react";
 import { useGLTF, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import woodenTableGlbUrl from "../assets/wooden_table.glb?url";
-// This fork: the KOTOBA HQ decal (same 870x170 canvas as upstream's
-// hermes-one-hq.webp, which stays in the tree for upstream merges).
-import hermesHqLogoUrl from "../assets/images/kotoba-hq.webp";
+import mithrilHqLogoUrl from "../assets/images/mithril-hq.svg";
 import { WORLD_W, WORLD_H, SCALE } from "../core/constants";
 import { OFFICE_DOOR_X, OFFICE_DOOR_W } from "../core/cityPlan";
 import { toWorld } from "../core/geometry";
@@ -77,9 +75,9 @@ function NorthWall({ palette }: { palette: WorldPalette }): React.JSX.Element {
   );
 }
 
-/** KOTOBA HQ logo decal on the office's south wall. */
+/** Mithril logo decal on the office's south wall. */
 function OfficeLogo(): React.JSX.Element {
-  const texture = useTexture(hermesHqLogoUrl, (t) => {
+  const texture = useTexture(mithrilHqLogoUrl, (t) => {
     t.colorSpace = THREE.SRGBColorSpace;
   });
   // Logo aspect ratio ≈ 4.3 : 1

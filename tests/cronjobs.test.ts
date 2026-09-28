@@ -10,17 +10,6 @@ import { tmpdir } from "os";
 import { join } from "path";
 
 const profileHomeRef = vi.hoisted(() => ({ value: "C:/hermes" }));
-const keychainToken = vi.hoisted(() => ({ value: null as string | null }));
-
-// The Kotoba Cloud token lives in the keychain store, not in .env.
-vi.mock("../src/main/kotoba-cloud-token-store", () => ({
-  readStoredKotobaToken: () => keychainToken.value,
-  hasStoredKotobaToken: () => keychainToken.value !== null,
-  kotobaSecureStorageAvailable: () => true,
-  writeStoredKotobaToken: () => {},
-  clearStoredKotobaToken: () => {},
-}));
-
 const { execFileSpy } = vi.hoisted(() => ({
   execFileSpy: vi.fn(
     (
@@ -91,20 +80,15 @@ describe("createCronJob", () => {
     // the first test pays the cold import of the config graph
   }, 20_000);
 
-  // @lat: [[kotoba-cloud-account#Kotoba Cloud account#Tests]]
-  it("injects the keychain-held KOTOBA_API_KEY into the cron child env", async () => {
-    keychainToken.value = "kc_pat_p.d5cc449fa4d5.mac";
-    try {
-      vi.resetModules(); // readEnv caches the profile env for 5s
-      const { createCronJob } = await import("../src/main/cronjobs");
-      await createCronJob("0 9 * * *", "hello", "n", "origin");
-      const options = execFileSpy.mock.calls[0][2] as {
-        env?: Record<string, string>;
-      };
-      expect(options.env?.KOTOBA_API_KEY).toBe("kc_pat_p.d5cc449fa4d5.mac");
-    } finally {
-      keychainToken.value = null;
-    }
+  // @lat: [[mithril-migration#Legacy inference isolation]]
+  it("does not inject a quarantined cloud credential into the cron child env", async () => {
+    vi.resetModules();
+    const { createCronJob } = await import("../src/main/cronjobs");
+    await createCronJob("0 9 * * *", "hello", "n", "origin");
+    const options = execFileSpy.mock.calls[0][2] as {
+      env?: Record<string, string>;
+    };
+    expect(options.env?.KOTOBA_API_KEY).toBeUndefined();
   });
 });
 

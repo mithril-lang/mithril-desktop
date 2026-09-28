@@ -17,12 +17,17 @@ export function isTransientAuditFailure(output) {
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function runAudit() {
   const executable = process.platform === "win32" ? "npm.cmd" : "npm";
+  // npm forwards its install-script allowlist through npm_config_allow_scripts
+  // when this wrapper itself runs as an npm script. A nested npm 11 command
+  // interprets that value as a forbidden project-scoped CLI option.
+  const env = { ...process.env };
+  delete env.npm_config_allow_scripts;
 
   return new Promise((resolveResult, reject) => {
     const child = spawn(
       executable,
       ["audit", "--omit=dev", "--audit-level=high"],
-      { stdio: ["ignore", "pipe", "pipe"] },
+      { stdio: ["ignore", "pipe", "pipe"], env },
     );
     let output = "";
 

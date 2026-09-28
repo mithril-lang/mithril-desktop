@@ -60,9 +60,9 @@ The global packaging product name supplies Electron Builder's Linux install-dire
 
 The Kotoba fork (`cloud-kotoba/org-hermesone-hermes-desktop`) does not use GitHub releases or GitHub Actions: its feed is electron-updater's `generic` provider at `https://app.kotoba.cloud/download/`, and builds are made on a mac-mini.
 
-The old fork used `publish.provider: generic` at that URL so it could not update to upstream Hermes One. The new Mithril repo points its unpublished feed to `https://app.mithril.fund/download/`; packaging is blocked while old runtime endpoints remain. GitHub Actions are disabled in the new repo.
+The old fork used `publish.provider: generic` at that URL so it could not update to upstream Hermes One. The Mithril repo points its generic feed to `https://app.mithril.fund/download/`. Version `0.8.0-preview.1` publishes an Apple silicon DMG, ZIP, checksum manifest, and `latest-mac.yml` from a locally verified build. GitHub Actions remain disabled in the new repo.
 
-The old fork published content-addressed artifacts through `scripts/publish-release.cljk`, `kotoba.app.edn`, and `app-kotoba-cloud.desktop-releases`. Those old-account publisher files were removed from the Mithril repo. They remain in Git history as provenance; the Mithril binary storage, checksums, and updater feed still need implementation.
+The old fork published content-addressed artifacts through `scripts/publish-release.cljk`, `kotoba.app.edn`, and `app-kotoba-cloud.desktop-releases`. Those old-account publisher files were removed from the Mithril repo. They remain in Git history as provenance; Mithril releases use GitHub release assets exposed through the app download route.
 
 ### Unsigned macOS builds
 

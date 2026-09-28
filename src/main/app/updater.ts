@@ -179,11 +179,12 @@ export function setupUpdater({ getMainWindow }: UpdaterDeps): void {
 }
 
 /**
- * The feed is still read — a newer version still surfaces the sidebar's
- * "Update available" button — but nothing is downloaded or handed to
- * Squirrel.Mac. Pressing the button opens the download page instead.
+ * Ad-hoc previews have no usable Squirrel channel: a successor cannot satisfy
+ * the running bundle's cdhash-pinned requirement. Do not poll an unpublished
+ * feed or emit a startup error. Every explicit update action opens the verified
+ * download page instead.
  */
-function setupManualUpdater(
+export function setupManualUpdater(
   autoUpdater: AppUpdater,
   reason: string,
   getMainWindow: () => BrowserWindow | null,
@@ -194,30 +195,18 @@ function setupManualUpdater(
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
 
-  let latest: { version: string; releaseNotes: unknown } | null = null;
-  autoUpdater.on("update-available", (info) => {
-    latest = { version: info.version, releaseNotes: info.releaseNotes };
-    getMainWindow()?.webContents.send("update-available", latest);
-  });
-  autoUpdater.on("error", (err) => {
-    getMainWindow()?.webContents.send("update-error", err.message);
-  });
-
   const openDownloadPage = async (): Promise<void> => {
     updaterLogger.info(`Opening ${DOWNLOAD_PAGE_URL} for a manual update`);
     await shell.openExternal(DOWNLOAD_PAGE_URL);
-    // The renderer moved to "downloading" before invoking and only leaves it on
-    // an event; put it back on "available" so the button stays usable.
-    if (latest) getMainWindow()?.webContents.send("update-available", latest);
+    getMainWindow()?.webContents.send("update-available", {
+      version: app.getVersion(),
+      releaseNotes: "Manual preview downloads",
+    });
   };
 
   ipcMain.handle("check-for-updates", async () => {
-    try {
-      const result = await autoUpdater.checkForUpdates();
-      return result?.updateInfo?.version || null;
-    } catch {
-      return null;
-    }
+    await openDownloadPage();
+    return app.getVersion();
   });
   ipcMain.handle("download-update", async () => {
     try {
@@ -230,8 +219,4 @@ function setupManualUpdater(
     }
   });
   ipcMain.handle("install-update", () => openDownloadPage());
-
-  setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(() => {});
-  }, 5000);
 }

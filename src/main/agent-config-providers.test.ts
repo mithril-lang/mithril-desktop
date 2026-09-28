@@ -89,7 +89,10 @@ describe("agent-config providers (config.yaml bridge)", () => {
   // @lat: [[mithril-migration#Mithril desktop migration#Legacy inference isolation]]
   it("does not auto-register a legacy Kotoba token as an inference provider", async () => {
     writeConfig("providers: {}\n");
-    writeFileSync(join(mockState.hermesHome, ".env"), "KOTOBA_API_KEY=kc_pat_legacy\n");
+    writeFileSync(
+      join(mockState.hermesHome, ".env"),
+      "KOTOBA_API_KEY=kc_pat_legacy\n",
+    );
     const m = await mod();
     m.mirrorFirstPartyAgentProviders();
     expect(m.listAgentUserProviders()).toEqual([]);

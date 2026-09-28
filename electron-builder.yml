@@ -1,0 +1,113 @@
+appId: fund.mithril.desktop
+# Keep productName space-free so the Linux .deb installs under /opt/Mithril.
+# An earlier space-containing product path crashed Chromium's zygote because
+# argv[0] containing whitespace is forwarded verbatim into execvp and
+# fails with EINVAL (SIGTRAP). See issue #877.
+productName: Mithril
+directories:
+  buildResources: build
+# Without a Developer ID identity electron-builder leaves the packed bundle
+# carrying Electron's stock ad-hoc signature over replaced resources, which
+# `codesign --verify` rejects ("code has no resources but signature indicates
+# they must be present") and Apple Silicon refuses to launch. The hook re-signs
+# ad-hoc inside-out (measured 2026-09-22 on the first Kotoba build).
+afterPack: build/afterPack.js
+files:
+  - "!**/.vscode/*"
+  - "!src/*"
+  - "!electron.vite.config.{js,ts,mjs,cjs}"
+  - "!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}"
+  - "!{.env,.env.*,.npmrc,pnpm-lock.yaml}"
+  - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
+asarUnpack:
+  - resources/**
+  - node_modules/better-sqlite3/prebuilds/*.node
+win:
+  executableName: mithril
+  target:
+    - nsis
+    - portable
+portable:
+  artifactName: ${name}-${version}-portable.${ext}
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  # Set the installer and shortcut display name explicitly.
+  shortcutName: Mithril
+  uninstallDisplayName: Mithril
+  createDesktopShortcut: always
+  oneClick: true
+  perMachine: false
+mac:
+  # Give the new Mithril bundle its own executable identity.
+  executableName: Mithril
+  artifactName: ${name}-${version}-${arch}-${os}.${ext}
+  icon: build/icon.icns
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+  extendInfo:
+    - NSCameraUsageDescription: Application requests access to the device's camera.
+    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
+    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
+    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
+    - CFBundleDisplayName: Mithril
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # No Developer ID Application certificate exists in this workspace yet
+  # (only App Store distribution certs; see the fork README). Builds are
+  # unsigned until one is obtained -- stated on the download page.
+  #
+  # `identity: null` is what MAKES that true, and it is here because the
+  # comment above was not enough. 0.7.10 shipped signed with `Apple
+  # Development: Created via API (62BW4Q57AB)`: electron-builder
+  # auto-discovers any codesigning identity in the login keychain, and four
+  # of them appeared on the build host after 0.7.9. It signed OVER
+  # build/afterPack.js's ad-hoc signature, so the published app carried a
+  # DEVELOPMENT certificate -- not a distribution identity, and worse on
+  # someone else's Mac than the ad-hoc build it replaced. Null makes
+  # electron-builder skip signing entirely, leaving afterPack's ad-hoc
+  # signature as the one that ships, whatever is in the keychain.
+  #
+  # Removing this line is only correct together with a real Developer ID
+  # Application certificate AND notarize: true.
+  identity: null
+  notarize: false
+dmg:
+  artifactName: ${name}-${version}-${arch}.${ext}
+linux:
+  # snap / rpm need snapcraft / rpmbuild, which the macOS build hosts
+  # (murakumo fleet) do not have; AppImage + deb build anywhere.
+  target:
+    - AppImage
+    - deb
+  maintainer: Mithril <support@mithril.fund>
+  vendor: Mithril
+  category: Utility
+  synopsis: Mithril desktop app for Hermes Agent
+  description: >-
+    Mithril is a native desktop app for installing, configuring, and chatting
+    with Hermes Agent. A fork of Hermes One (fathah/hermes-desktop).
+  # Set the user-facing .desktop display name explicitly.
+  desktop:
+    entry:
+      Name: Mithril
+      Comment: Mithril — Hermes Agent desktop app
+appImage:
+  artifactName: ${name}-${version}-${arch}.${ext}
+deb:
+  # Run chmod 4755 on chrome-sandbox so Electron's setuid sandbox helper
+  # works on modern Linux distros that disable unprivileged user
+  # namespaces (Ubuntu 24.04+, etc.). Closes #395.
+  afterInstall: build/linux-after-install.sh
+rpm:
+  artifactName: ${name}-${version}.${ext}
+  # Same SUID fix for .rpm consumers (Fedora 40+ also restricts userns).
+  afterInstall: build/linux-after-install.sh
+npmRebuild: false
+# Auto-update feed: electron-updater's generic provider reads latest-mac.yml /
+# latest-linux.yml / latest.yml next to the artifacts, all served from
+# app.mithril.fund/download/ after a verified Mithril release is published.
+# Pointing this at upstream's GitHub releases would make the fork update
+# itself back into Hermes One.
+publish:
+  provider: generic
+  url: https://app.mithril.fund/download/

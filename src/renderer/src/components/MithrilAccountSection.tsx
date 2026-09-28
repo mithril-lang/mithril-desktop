@@ -88,7 +88,7 @@ export default function MithrilAccountSection({ profile }: { profile?: string })
         {label("Disconnect", "接続を解除")}
       </button>
     </div>}
-    <form onSubmit={(event) => { void connect(event); }} className="kotoba-signin-form">
+    <form onSubmit={(event) => { void connect(event); }} className="mithril-signin-form">
       <label className="hermes-account-email" htmlFor="mithril-token">{label("Connection token", "接続トークン")}</label>
       <input id="mithril-token" type="password" autoComplete="off" spellCheck={false} value={token}
         onChange={(event) => setToken(event.target.value)} disabled={busy} placeholder="mf_…" />

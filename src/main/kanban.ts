@@ -128,7 +128,7 @@ async function runKanban(
   const execOpts: ExecFileOptions = {
     cwd: join(HERMES_HOME, "hermes-agent"),
     timeout: opts.timeoutMs ?? KANBAN_TIMEOUT_MS,
-    // keychain-held keys (KOTOBA_API_KEY) the agent can no longer read from .env
+    // keychain-held credentials the agent can no longer read from .env
     env: {
       ...process.env,
       PATH: getEnhancedPath(),

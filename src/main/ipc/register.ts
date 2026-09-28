@@ -112,12 +112,6 @@ import {
 } from "../mithril-account";
 import { restartGatewayWhenIdle } from "../gateway-restart-defer";
 import {
-  syncAgents,
-  deleteProfileWithSync,
-  getAgentSyncStatus,
-  getLinkedAgentId,
-} from "../agent-sync";
-import {
   getAccount,
   clearAllAccounts,
   findAccountProfile,
@@ -280,7 +274,12 @@ import {
   readConfigFixLog,
   type IssueCode,
 } from "../config-health";
-import { listProfiles, createProfile, setActiveProfile } from "../profiles";
+import {
+  listProfiles,
+  createProfile,
+  deleteProfile,
+  setActiveProfile,
+} from "../profiles";
 import {
   setProfileColor,
   setProfileAvatar,
@@ -299,8 +298,6 @@ import {
   removeCustomProvider,
   upsertCustomProvider,
 } from "../providers-store";
-import { syncWalletsForProfile } from "../wallet-sync";
-import { getWalletPortfolio, provisionAgentWallet } from "../wallet-actions";
 import { getTokenBalances } from "../wallet-balances";
 import type { ImportWalletInput } from "../../shared/wallets";
 import {
@@ -1034,22 +1031,27 @@ export function registerIpcHandlers(context: IpcContext): void {
     disconnectMithrilAccount(profile?.trim() || getActiveProfileNameSync()),
   );
 
-  // Cloud agent sync — reconciles local profiles with the signed-in Hermes One
-  // account's cloud agents. `agent-sync-updated` tells the renderer to reload
-  // its profile list (pull-created profiles appear without a manual refresh).
+  // Legacy cloud sync is intentionally unavailable in the Mithril preview.
+  // Keep the IPC contract so older renderer state fails closed and clearly.
   ipcMain.handle("agent-sync-run", async (event) => {
-    const result = await syncAgents();
+    const result = {
+      status: "signed-out" as const,
+      error: "Cloud agent sync is unavailable in this Mithril preview.",
+      outcomes: [],
+      finishedAt: Date.now(),
+    };
     if (!event.sender.isDestroyed()) {
       event.sender.send("agent-sync-updated", result);
     }
     return result;
   });
-  ipcMain.handle("agent-sync-status", () => getAgentSyncStatus());
-  // The cloud agent id a profile is currently linked to (null when unlinked),
-  // for the per-profile Sync tab.
-  ipcMain.handle("agent-sync-linked-id", (_event, profile: string) =>
-    getLinkedAgentId(profile),
-  );
+  ipcMain.handle("agent-sync-status", () => ({
+    signedIn: false,
+    accountLabel: null,
+    running: false,
+    lastResult: null,
+  }));
+  ipcMain.handle("agent-sync-linked-id", () => null);
 
   // Configuration (profile-aware)
   ipcMain.handle("get-locale", () => getAppLocale());
@@ -2588,7 +2590,7 @@ export function registerIpcHandlers(context: IpcContext): void {
           "Profile deletion is unavailable for this connection. Use the connected server's profile controls.",
       };
     }
-    return deleteProfileWithSync(name);
+    return deleteProfile(name);
   });
   ipcMain.handle("set-active-profile", async (_event, name: string) => {
     // Persist the selection LOCALLY in every mode (incl. SSH) — the desktop
@@ -2686,21 +2688,21 @@ export function registerIpcHandlers(context: IpcContext): void {
       notifyCustomProvidersChanged();
     },
   );
-  // Cloud wallets provisioned by the backend for the profile's linked agent.
-  // Read-only here; the desktop no longer mints wallets locally.
-  ipcMain.handle("wallet-sync", (_event, profile?: string) =>
-    syncWalletsForProfile(profile),
-  );
-  // Backend-driven wallet ops used by the Office's space representatives
-  // (bank tellers): balances and provisioning both live server-side.
-  ipcMain.handle(
-    "wallet-portfolio",
-    (_event, profile: string | undefined, walletId: string) =>
-      getWalletPortfolio(profile, walletId),
-  );
-  ipcMain.handle("wallet-provision", (_event, profile?: string) =>
-    provisionAgentWallet(profile),
-  );
+  const walletUnavailable =
+    "Cloud wallet services are unavailable in this Mithril preview.";
+  ipcMain.handle("wallet-sync", () => ({
+    status: "signed-out" as const,
+    wallets: [],
+    error: walletUnavailable,
+  }));
+  ipcMain.handle("wallet-portfolio", () => ({
+    status: "signed-out" as const,
+    error: walletUnavailable,
+  }));
+  ipcMain.handle("wallet-provision", () => ({
+    status: "signed-out" as const,
+    error: walletUnavailable,
+  }));
   ipcMain.handle("get-token-balances", (_event, address: string) =>
     getTokenBalances(address),
   );

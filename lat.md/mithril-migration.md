@@ -1,6 +1,6 @@
 # Mithril desktop migration
 
-The public `mithril-lang/mithril-desktop` repository is a source preview of the future Mithril desktop app. Version 0.8.0 has staged package identity, but its account and inference runtime is still a legacy baseline.
+The public `mithril-lang/mithril-desktop` repository contains the Mithril desktop app. Version `0.8.0-preview.1` is the first Apple silicon preview installer.
 
 ## Repository ownership
 
@@ -10,9 +10,9 @@ Preserve the upstream MIT license and commit history. Do not push Mithril change
 
 ## Runtime compatibility
 
-A Mithril-branded binary needs Mithril app identity and working Mithril login, provider, billing, organization, and sandbox routes.
+A Mithril-branded binary needs Mithril app identity and explicit service boundaries.
 
-The app ID, package name, platform icons, display name, and unpublished updater URL now point to Mithril. The runtime still uses `kotoba.cloud`, `api.kotoba.cloud`, `app.kotoba.cloud`, `KOTOBA_API_KEY`, and `kc_pat_` credentials. A visual rename cannot make these protocols compatible. Implement and verify token migration explicitly; never send a legacy token to a new origin by changing a URL alone.
+The app ID, package name, platform icons, display name, and updater URL point to Mithril. Legacy account, sync, and wallet modules remain only as quarantined migration material. The active main process does not import them: cloud agent sync and cloud wallet IPC return an unavailable result, profile deletion remains local, and startup does not migrate or inject old credentials. A visual rename cannot make old protocols compatible; any future migration must be explicit and separately verified.
 
 ## Legacy inference isolation
 
@@ -86,18 +86,18 @@ It clears the entered bearer after success. The old Kotoba sign-in and gateway c
 
 ## Desktop release gate
 
-Keep GitHub Actions disabled on this public source repository and publish no binary or updater feed until the desktop and website cutover gates pass.
+GitHub Actions remain disabled on this public source repository. The preview is built locally after its packaging, type, signature, and launch checks, then published as a GitHub prerelease with checksums and update metadata.
 
 The inherited stable and beta release jobs also have a source-level false gate; migrate those workflows before intentionally enabling them.
 
-`scripts/check-mithril-packaging.mjs` blocks every npm packaging command while legacy runtime origins or credentials remain. The old origin-plane publisher and release manifest were removed from this repository; their history remains in Git. The new update feed has no published files yet.
+`scripts/check-mithril-packaging.mjs` blocks packaging when an active runtime file contains a legacy origin or credential, or imports one of the quarantined migration modules. The old publisher and release manifest were removed; their history remains in Git.
 
 The main-process service supervisor remains internal. Its three unused renderer IPC handlers were removed because the preload API did not expose them; future service controls need a designed renderer API and authorization boundary.
 
-Verify packaging, first run, sign-in, provider, billing, sandbox, upgrade, and supported platforms. Rebuild installers from Mithril source and publish real bytes with checksums; do not rename the old `kotoba-desktop` artifacts. Coordinate with `mithril-lang/mithril-fund` so its `app.mithril.fund` route, 39 public sites, and 22 locales pass its cutover gate before the app/site release.
+The preview gate verifies packaging, type safety, the DMG, the app bundle signature, and an Apple silicon launch. It publishes real Mithril bytes with checksums rather than renaming an old artifact. The download page and updater feed must point to those exact verified files.
 
 ## Legacy installation continuity
 
 Changing the Electron app ID, executable, and update feed creates a distinct application identity.
 
-Determine whether existing profile data can be imported safely, and retain an explicit path for users of the old installed app. Signed macOS upgrades need a Developer ID identity; the imported fork's macOS artifacts were ad-hoc signed and require manual installation. Keep release notes accurate about that limit.
+Existing legacy profile data is not automatically imported by the preview. Signed macOS upgrades need a Developer ID identity; this preview is ad-hoc signed, requires manual installation, and routes update prompts to the download page.

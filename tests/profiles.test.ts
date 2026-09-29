@@ -283,7 +283,7 @@ describe("listProfiles", () => {
     );
   });
 
-  // @lat: [[agent-sync#Tests#Rejects incomplete CLI deletion]]
+  // @lat: [[mithril-migration#Mithril desktop migration#First-run connect]]
   it("reports failure if the CLI exits successfully but leaves the profile directory", () => {
     mkdirSync(join(PROFILES_DIR, "still-here"), { recursive: true });
     execFileSyncMock.mockReturnValue(Buffer.from("Could not remove profile"));

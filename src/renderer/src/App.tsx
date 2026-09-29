@@ -7,13 +7,20 @@ import { SettingsModalProvider } from "./components/settings/SettingsModalProvid
 import { ChatPreferencesProvider } from "./components/ChatPreferencesProvider";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Welcome from "./screens/Welcome/Welcome";
+import MithrilStart from "./screens/MithrilStart/MithrilStart";
 import Install from "./screens/Install/Install";
 import Setup from "./screens/Setup/Setup";
 import Layout from "./screens/Layout/Layout";
 import SplashScreen from "./screens/SplashScreen/SplashScreen";
 import { captureScreenView } from "./utils/analytics";
 
-type Screen = "splash" | "welcome" | "installing" | "setup" | "main";
+type Screen =
+  | "splash"
+  | "mithril"
+  | "welcome"
+  | "installing"
+  | "setup"
+  | "main";
 
 // Minimum time the splash stays visible so the background video plays
 // through. Gateway / config checks happen during this window.
@@ -38,6 +45,8 @@ function App(): React.JSX.Element {
   const [setupProfile, setSetupProfile] = useState<string | undefined>(
     undefined,
   );
+  // Whether an mf_ token is stored (local check only; no network at launch).
+  const [mithrilConnected, setMithrilConnected] = useState(false);
   const isMac = window.electron?.process?.platform === "darwin";
   // Bumped on every runInstallCheck so a superseded run (e.g. the user hit
   // "Switch to local mode" while an SSH tunnel attempt was still in flight)
@@ -47,7 +56,7 @@ function App(): React.JSX.Element {
   const runInstallCheck = useCallback(async () => {
     const myRun = ++runIdRef.current;
     const startedAt = Date.now();
-    let next: Screen = "welcome";
+    let next: Screen = "mithril";
     const error: string | null = null;
     let isRemote = false;
     let nextSetupProfile = "default";
@@ -77,11 +86,17 @@ function App(): React.JSX.Element {
           next = "main";
         }
       } else {
-        setSplashStatus("Checking local install…");
+        setSplashStatus("Checking Mithril account…");
         const status = await window.hermesAPI.checkInstall();
         nextSetupProfile = status.activeProfile || "default";
-        if (!status.installed) {
-          next = "welcome";
+        const first = await window.hermesAPI
+          .getMithrilFirstRunState(nextSetupProfile)
+          .catch(() => ({ connected: false }));
+        setMithrilConnected(first.connected);
+        if (!first.connected || !status.installed) {
+          // First run: Mithril connect, never the Hermes install prompt. The
+          // local agent runtime is an explicit opt-in from that screen.
+          next = "mithril";
         } else if (!status.hasApiKey) {
           next = "setup";
         } else {
@@ -109,7 +124,7 @@ function App(): React.JSX.Element {
         }
       }
     } catch {
-      next = "welcome";
+      next = "mithril";
     }
 
     // Abandoned by a newer run (the user switched modes mid-connect) — leave
@@ -172,6 +187,13 @@ function App(): React.JSX.Element {
     setScreen("setup");
   }
 
+  async function openWorkspace(): Promise<void> {
+    // Explicit opt-in to the local Hermes agent runtime (large download).
+    const status = await window.hermesAPI.checkInstall().catch(() => null);
+    if (!status?.installed) setScreen("welcome");
+    else setScreen(status.hasApiKey ? "main" : "setup");
+  }
+
   function handleInstallFailed(error: string): void {
     setInstallError(error);
     setScreen("welcome");
@@ -217,6 +239,14 @@ function App(): React.JSX.Element {
             onSwitchToLocal={
               connectionMode !== "local" ? handleSwitchToLocal : undefined
             }
+          />
+        );
+      case "mithril":
+        return (
+          <MithrilStart
+            initiallyConnected={mithrilConnected}
+            profile={setupProfile}
+            onOpenWorkspace={() => void openWorkspace()}
           />
         );
       case "welcome":

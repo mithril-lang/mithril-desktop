@@ -70,12 +70,15 @@ function stubHermesAPI(opts: {
       getWalletPortfolio:
         opts.getWalletPortfolio ??
         (async () => ({ status: "ok", totalUsd: 0, tokens: [] })),
-      getAccount: async () =>
+      getMithrilAccount: async () =>
         accountId === null
           ? null
           : {
-              apiUrl: "https://api.example",
-              user: { id: accountId, email: null, name: null, avatarUrl: null },
+              userId: accountId,
+              accountUrl: "https://console.mithril.fund/account",
+              live: true,
+              scopes: [],
+              balanceMicroUsd: null,
             },
     },
     writable: true,

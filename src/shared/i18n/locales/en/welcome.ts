@@ -1,9 +1,9 @@
 export default {
-  title: "Welcome to Kotoba",
+  title: "Welcome to Mithril",
   subtitle:
-    "Your self-improving AI assistant that runs locally on your machine. Private, powerful, and always learning.",
+    "Optional: run the Hermes agent locally on this machine. This is separate from your Mithril account.",
   installIssueTitle: "Installation Issue",
-  getStarted: "Get Started",
+  getStarted: "Install local agent runtime",
   retryInstall: "Retry Installation",
   terminalInstallHint: "Install via terminal, then come back:",
   recheck: "I've installed it — check again",

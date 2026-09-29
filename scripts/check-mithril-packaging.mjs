@@ -22,16 +22,7 @@ for (const dir of ["src/main", "src/renderer", "src/shared"]) {
 const forbidden =
   /kotoba\.cloud|app\.kotoba\.cloud|api\.kotoba\.cloud|KOTOBA_API_KEY|kc_pat_|Kotoba Cloud|["'`]Kotoba["'`]|\*\*Kotoba:/i;
 const failures = [];
-const quarantined = new Set([
-  "src/main/agent-sync.ts",
-  "src/main/kotoba-cloud-account.ts",
-  "src/main/kotoba-cloud-orgs.ts",
-  "src/main/kotoba-cloud-token-store.ts",
-  "src/main/wallet-actions.ts",
-  "src/main/wallet-sync.ts",
-  "src/shared/account.ts",
-  "src/shared/wallets.ts",
-]);
+const quarantined = new Set();
 for (const path of files) {
   if (quarantined.has(path)) continue;
   const lines = readFileSync(join(root, path), "utf8").split("\n");

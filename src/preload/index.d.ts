@@ -14,14 +14,11 @@ import type {
 import type { TokenBalancesResponse } from "../shared/tokens";
 import type { CustomProviderRecord } from "../shared/custom-providers";
 import type {
-  DeviceCodeInfo,
-  EnsureHermesOneKeyResult,
-  HermesAccount,
-  HermesAccountUser,
-  HermesOneCreditsResult,
   MithrilAccount,
   MithrilDeviceCode,
   MithrilAccountConnectResult,
+  MithrilChatResult,
+  MithrilFirstRunState,
 } from "../shared/account";
 import type { AgentSyncResult, AgentSyncStatus } from "../shared/agent-sync";
 import type { ConnectionStatusSnapshot } from "../shared/connection-status";
@@ -318,17 +315,6 @@ interface HermesAPI {
   ) => Promise<Record<string, boolean>>;
   onOAuthLoginProgress: (callback: (chunk: string) => void) => () => void;
 
-  // Hermes account sign-in (device authorization grant)
-  accountLogin: (
-    profile?: string,
-  ) => Promise<{ success: boolean; user?: HermesAccountUser; error?: string }>;
-  cancelAccountLogin: () => Promise<boolean>;
-  onAccountLoginCode: (callback: (info: DeviceCodeInfo) => void) => () => void;
-  onAccountLoginProgress: (callback: (chunk: string) => void) => () => void;
-  getAccount: (profile?: string) => Promise<HermesAccount | null>;
-  accountLogout: (profile?: string) => Promise<{ success: boolean }>;
-  ensureHermesOneKey: (profile?: string) => Promise<EnsureHermesOneKeyResult>;
-  getHermesOneCredits: () => Promise<HermesOneCreditsResult>;
   getMithrilAccount: (profile?: string) => Promise<MithrilAccount | null>;
   connectMithrilAccount: (
     token: string,
@@ -342,6 +328,11 @@ interface HermesAPI {
     callback: (info: MithrilDeviceCode) => void,
   ) => () => void;
   disconnectMithrilAccount: (profile?: string) => Promise<{ success: boolean }>;
+  getMithrilFirstRunState: (profile?: string) => Promise<MithrilFirstRunState>;
+  mithrilChat: (
+    messages: { role: "user" | "assistant"; content: string }[],
+    profile?: string,
+  ) => Promise<MithrilChatResult>;
   // Cloud agent sync (profiles ↔ signed-in Hermes One account)
   syncAgents: () => Promise<AgentSyncResult>;
   getAgentSyncStatus: () => Promise<AgentSyncStatus>;

@@ -10,15 +10,7 @@ Profile wallets are stored per-profile in `wallets.json` alongside profile metad
 
 Wallet metadata types live in [[src/shared/wallets.ts]]: `ProfileWallet` (public shape), `WalletMutationResult` (one-time recovery phrase on create/import), and `ImportWalletInput`.
 
-Local **creation/import is being retired** in favour of backend-provisioned wallets (see [[wallet-token-balances#Wallet Sync]]). The store's `createWallet`/`importWallet` and their IPC channels are retained for now, but the wallet pane no longer exposes a create/import UI.
-
-## Wallet Sync
-
-Wallets registered on the owner's Kotoba Cloud account are fetched and shown read-only alongside local ones, so the desktop stops minting wallets itself.
-
-[[src/main/wallet-sync.ts#syncWalletsForProfile]] resolves the account and the profile's linked cloud-agent id through [[src/main/wallet-sync.ts#resolveLinkedAgent]] — the account comes from [[src/main/agent-sync.ts#cloudAccount]] (the Kotoba Cloud personal API token, read from the keychain store — see [[kotoba-cloud-account#Kotoba Cloud account#Token at rest]]), the agent id from [[src/main/agent-sync.ts#getLinkedAgentId]], auto-running [[src/main/agent-sync.ts#syncAgents]] once when the profile has never synced — then GETs `https://kotoba.cloud/v1/wallets` with that token as bearer. Kotoba Cloud's wallets belong to the account, not to one agent, so the request carries no agent id. Rows are mapped by the pure [[src/main/wallet-sync.ts#mapCloudWallet]] into the shared `WalletView`; rows without an EVM address are dropped. No wallet secret ever reaches the device — these are receive/tracked addresses. `resolveLinkedAgent` is shared with the Office's backend wallet actions ([[office-interactions#Office Space Interactions#Backend Wallet Actions]]). It also enforces link ownership ([[src/main/agent-sync.ts#getLinkedAgentAccountId]] and [[src/main/agent-sync.ts#getLinkedAgentApiUrl]]): a link recording a different account or normalized backend URL resolves as `foreign` without any backend call, and a legacy link missing either ownership field first gets one sync pass — which stamps the account and backend when the agent belongs there — then resolves as `foreign` unless both fields match. The stamp and the check both come from `cloudAccount()`, so a link is never read as foreign merely because another account store exists. The wallet pane / bank panel show a "linked to a different account" note — see [[agent-sync#Cloud agent sync#Sync engine]].
-
-The `wallet-sync` IPC channel (registered in [[src/main/ipc/register.ts#registerIpcHandlers]]) exposes it as `syncWallets` on `window.hermesAPI`. [[src/renderer/src/components/profile/ProfileWalletPane.tsx]] renders local (`wallets.json`) and cloud wallets in one list, each tagged with a Local/Cloud badge; delete is offered only for local wallets, copy/balance for both. Signed-out, never-synced, or foreign-linked profiles show a hint instead of an error.
+Local **creation/import is being retired** in favour of backend-provisioned wallets. The store's `createWallet`/`importWallet` and their IPC channels are retained for now, but the wallet pane no longer exposes a create/import UI.
 
 ## Token Balances
 
@@ -45,6 +37,5 @@ Balance data is cached at module level (keyed by wallet address) so it survives 
 Vitest test suites for wallet store and balance reads.
 
 - [[src/main/wallet-store.test.ts]] — wallet CRUD, rename/delete, encryption, dedup, caps, and import error distinction (invalid phrase vs. secure-storage failure)
-- [[src/main/wallet-sync.test.ts]] — `mapCloudWallet` mapping (default name, addressless drop) and `syncWalletsForProfile` paths: signed-out, linked-agent fetch, auto-sync-then-fetch when unlinked, HTTP error, and the ownership gate (foreign link refused with no backend call; matching owner proceeds; legacy untagged links adopt via one sync pass or refuse as foreign)
 - [[src/main/wallet-balances.test.ts]] — formatTokenBalance edge cases and big-balance precision, `withTimeout`, getTokenBalances with mocked RPC including timeout handling
 - [[src/renderer/src/components/profile/ProfileWalletPane.test.tsx]] — balance-chip rendering: one symbol label per token, icon only for known tokens

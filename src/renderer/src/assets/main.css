@@ -5170,6 +5170,18 @@ body:has(.shell-vibrant),
   white-space: pre-wrap;
 }
 
+.chat-error-mithril {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.chat-error-mithril span {
+  color: var(--text-secondary, inherit);
+  font-weight: 400;
+}
+
 .chat-bubble-agent pre,
 .chat-bubble-agent code {
   /* Restore preserved whitespace inside code blocks and inline code. */

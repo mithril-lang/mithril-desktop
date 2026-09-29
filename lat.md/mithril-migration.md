@@ -100,10 +100,10 @@ The preview gate verifies packaging, type safety, the DMG, the app bundle signat
 
 The manual preview workflow builds Windows x64, Linux x64/ARM64, and Intel Mac packages on native GitHub runners, then updates the existing prerelease only when every job succeeds.
 
-Windows publishes NSIS and portable executables with `preview.yml`. Each Linux architecture publishes AppImage and Debian packages plus its architecture-specific preview feed. Intel Mac publishes DMG and ZIP packages; both Mac architectures remain manual-update builds while the app is ad-hoc signed. The publish job preserves existing assets and replaces the consolidated SHA-256 manifest.
+Windows publishes NSIS and portable executables with `preview.yml`. Each Linux architecture publishes AppImage and Debian packages plus its architecture-specific preview feed. Intel Mac publishes DMG and ZIP packages; both Mac architectures remain manual-update builds while using Developer ID signing and Apple notarization. The publish job preserves existing assets and replaces the consolidated SHA-256 manifest.
 
 ## Legacy installation continuity
 
 Changing the Electron app ID, executable, and update feed creates a distinct application identity.
 
-Existing legacy profile data is not automatically imported by the preview. Signed macOS upgrades need a Developer ID identity; this preview is ad-hoc signed, requires manual installation, and routes update prompts to the download page.
+Existing legacy profile data is not automatically imported by the preview. The macOS preview uses Mithril's Developer ID identity and Apple notarization, remains manually installed, and routes update prompts to the download page.

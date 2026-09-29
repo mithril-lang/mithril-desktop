@@ -66,13 +66,44 @@ jobs:
         run: npx electron-builder install-app-deps --arch=x64
       - name: Build app
         run: npm run build
+      - name: Stage App Store Connect API key
+        env:
+          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ASC_API_KEY_BASE64:-}" ]; then
+            echo "ASC_API_KEY secret is missing — notarization will fail." >&2
+            exit 1
+          fi
+          KEY_DIR="$RUNNER_TEMP/appstore"
+          mkdir -p "$KEY_DIR"
+          KEY_PATH="$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s' "$ASC_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+      - name: Import macOS signing certificate
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: bash scripts/import-macos-certificate.sh
       - name: Package Intel Mac artifacts
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.ASC_ISSUER_ID }}
         run: npx electron-builder --mac dmg zip --x64 --publish never
+      - name: Remove macOS signing keychain
+        if: always()
+        run: |
+          if [ -n "${CSC_KEYCHAIN:-}" ]; then
+            security delete-keychain "$CSC_KEYCHAIN" || true
+          fi
       - name: Verify Intel package
         run: |
           set -euo pipefail
           bash scripts/verify-native-module-architecture.sh x64
           codesign --verify --deep --strict --verbose=2 dist/mac/Mithril.app
+          spctl --assess --type execute --verbose=4 dist/mac/Mithril.app
           file dist/mac/Mithril.app/Contents/MacOS/Mithril | grep -q 'x86_64'
           test -f "dist/mithril-desktop-${{ needs.prepare.outputs.version }}-x64.dmg"
           test -f "dist/mithril-desktop-${{ needs.prepare.outputs.version }}-x64-mac.zip"

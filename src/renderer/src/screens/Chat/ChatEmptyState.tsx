@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Search, Clock, Mail, Code, ChartLine, Bell } from "lucide-react";
-import titleLine from "../../assets/mithril-hex.svg";
+import mithrilMark from "../../assets/mithril-mark.svg";
 import { useI18n } from "../../components/useI18n";
 
 interface Suggestion {
@@ -54,15 +54,7 @@ export const ChatEmptyState = memo(function ChatEmptyState({
   return (
     <div className="chat-empty">
       <div className="chat-empty-icon">
-        <span
-          className="chat-empty-logo"
-          role="img"
-          aria-label="Mithril"
-          style={{
-            maskImage: `url(${titleLine})`,
-            WebkitMaskImage: `url(${titleLine})`,
-          }}
-        />
+        <img className="chat-empty-logo" src={mithrilMark} alt="Mithril" />
       </div>
       <div className="chat-empty-text">{t("chat.emptyTitle")}</div>
       <div className="chat-empty-hint">{t("chat.emptyHint")}</div>

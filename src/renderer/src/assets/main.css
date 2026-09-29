@@ -4898,13 +4898,7 @@ body:has(.shell-vibrant),
 .chat-empty-logo {
   width: 44px;
   height: 44px;
-  background-color: #fff;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  -webkit-mask-size: contain;
+  border-radius: 10px;
 }
 
 .chat-empty-text {

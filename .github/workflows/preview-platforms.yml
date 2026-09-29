@@ -1,0 +1,228 @@
+name: Publish Preview Platforms
+
+# Adds native Windows, Linux, and Intel Mac packages to an existing Mithril
+# preview release. Publishing happens only after every platform build and
+# package inspection succeeds.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing prerelease tag to receive the platform installers"
+        type: string
+        required: true
+        default: "v0.8.0-preview.1"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: preview-platforms-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Validate preview release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate tag and existing prerelease
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "Tag $TAG does not match package version v$VERSION" >&2
+            exit 1
+          fi
+          IS_PRERELEASE=$(gh release view "$TAG" --json isPrerelease --jq .isPrerelease)
+          if [ "$IS_PRERELEASE" != "true" ]; then
+            echo "$TAG must already exist as a prerelease" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  mac_intel:
+    name: Build Intel Mac
+    needs: prepare
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Rebuild native dependencies for Intel
+        run: npx electron-builder install-app-deps --arch=x64
+      - name: Build app
+        run: npm run build
+      - name: Package Intel Mac artifacts
+        run: npx electron-builder --mac dmg zip --x64 --publish never
+      - name: Verify Intel package
+        run: |
+          set -euo pipefail
+          bash scripts/verify-native-module-architecture.sh x64
+          codesign --verify --deep --strict --verbose=2 dist/mac-x64/Mithril.app
+          file dist/mac-x64/Mithril.app/Contents/MacOS/Mithril | grep -q 'x86_64'
+          test -f "dist/mithril-desktop-${{ needs.prepare.outputs.version }}-x64.dmg"
+          test -f "dist/mithril-desktop-${{ needs.prepare.outputs.version }}-x64-mac.zip"
+      - name: Upload Intel Mac artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-mac-x64-artifacts
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.blockmap
+            dist/preview-mac.yml
+
+  windows:
+    name: Build Windows x64
+    needs: prepare
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build app
+        run: npm run build
+      - name: Package Windows artifacts
+        run: npx electron-builder --win nsis portable --x64 --publish never
+      - name: Inspect Windows packages
+        shell: pwsh
+        run: |
+          $version = "${{ needs.prepare.outputs.version }}"
+          $setup = "dist/mithril-desktop-$version-setup.exe"
+          $portable = "dist/mithril-desktop-$version-portable.exe"
+          if (!(Test-Path $setup) -or !(Test-Path $portable) -or !(Test-Path "dist/preview.yml")) {
+            throw "Expected Windows installer, portable app, and preview.yml"
+          }
+          $extractDir = Join-Path $env:RUNNER_TEMP "mithril-installer"
+          7z x -y "-o$extractDir" $setup | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "NSIS installer extraction failed" }
+          $appArchive = Get-ChildItem $extractDir -Filter "app-64.7z" -Recurse | Select-Object -First 1
+          if (!$appArchive) { throw "The x64 application archive is missing from the installer" }
+          $listing = 7z l $appArchive.FullName
+          if ($listing -notmatch "mithril.exe") { throw "mithril.exe is missing from the NSIS installer" }
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-windows-x64-artifacts
+          path: |
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/preview.yml
+
+  linux:
+    name: Build Linux ${{ matrix.arch }}
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Rebuild native dependencies
+        run: npx electron-builder install-app-deps --arch=${{ matrix.arch }}
+      - name: Build app
+        run: npm run build
+      - name: Package Linux artifacts
+        run: npx electron-builder --linux AppImage deb --${{ matrix.arch }} --publish never
+      - name: Inspect Linux packages
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          APPIMAGE="dist/mithril-desktop-$VERSION-$ARCH.AppImage"
+          test -x "$APPIMAGE"
+          DEB_ARCH=amd64
+          ELF_ARCH='x86-64'
+          FEED=dist/preview-linux.yml
+          if [ "$ARCH" = arm64 ]; then
+            DEB_ARCH=arm64
+            ELF_ARCH='aarch64'
+            FEED=dist/preview-linux-arm64.yml
+          fi
+          DEB=$(find dist -maxdepth 1 -name "mithril-desktop_${VERSION}_${DEB_ARCH}.deb" -print -quit)
+          test -n "$DEB"
+          test -f "$FEED"
+          rm -rf appimage-root deb-root squashfs-root
+          "$APPIMAGE" --appimage-extract >/dev/null
+          mv squashfs-root appimage-root
+          file appimage-root/mithril | grep -q "$ELF_ARCH"
+          mkdir deb-root
+          dpkg-deb -x "$DEB" deb-root
+          file deb-root/opt/Mithril/mithril | grep -q "$ELF_ARCH"
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-linux-${{ matrix.arch }}-artifacts
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/preview-linux*.yml
+
+  publish:
+    name: Add installers to prerelease
+    needs: [prepare, mac_intel, windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download new artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: new-artifacts
+          merge-multiple: true
+      - name: Download existing release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          mkdir -p all-artifacts
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir all-artifacts
+          cp new-artifacts/* all-artifacts/
+      - name: Generate consolidated checksums
+        run: |
+          set -euo pipefail
+          rm -f all-artifacts/SHA256SUMS
+          find all-artifacts -maxdepth 1 -type f \
+            \( -name '*.dmg' -o -name '*.zip' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.exe' \) \
+            -printf '%f\n' | sort | while read -r name; do
+              sha256sum "all-artifacts/$name"
+            done | sed 's#  all-artifacts/#  #' > SHA256SUMS
+      - name: Publish platform artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release upload "$TAG" new-artifacts/* SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --clobber

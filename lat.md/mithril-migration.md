@@ -1,6 +1,6 @@
 # Mithril desktop migration
 
-The public `mithril-lang/mithril-desktop` repository contains the Mithril desktop app. Version `0.8.0-preview.1` is the first Apple silicon preview installer.
+The public `mithril-lang/mithril-desktop` repository contains the Mithril desktop app. Version `0.8.0-preview.1` provides native preview installers for Windows, Linux, Apple silicon, and Intel Macs.
 
 ## Repository ownership
 
@@ -95,6 +95,12 @@ The inherited stable and beta release jobs also have a source-level false gate; 
 The main-process service supervisor remains internal. Its three unused renderer IPC handlers were removed because the preload API did not expose them; future service controls need a designed renderer API and authorization boundary.
 
 The preview gate verifies packaging, type safety, the DMG, the app bundle signature, and an Apple silicon launch. It publishes real Mithril bytes with checksums rather than renaming an old artifact. The download page and updater feed must point to those exact verified files.
+
+### Cross-platform preview
+
+The manual preview workflow builds Windows x64, Linux x64/ARM64, and Intel Mac packages on native GitHub runners, then updates the existing prerelease only when every job succeeds.
+
+Windows publishes NSIS and portable executables with `preview.yml`. Each Linux architecture publishes AppImage and Debian packages plus its architecture-specific preview feed. Intel Mac publishes DMG and ZIP packages; both Mac architectures remain manual-update builds while the app is ad-hoc signed. The publish job preserves existing assets and replaces the consolidated SHA-256 manifest.
 
 ## Legacy installation continuity
 

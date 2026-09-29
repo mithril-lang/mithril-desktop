@@ -56,8 +56,8 @@ export default {
   // Settings field labels
   aimlapiApiKey: "AIML API Key",
   aimlapiHint: "API key for AIML API",
-  hermesoneApiKey: "Hermes One API Key",
-  hermesoneHint: "Hermes One Inference — fast, credit-based gateway",
+  mithrilApiKey: "Mithril API Key",
+  mithrilHint: "Mithril Inference — credit-based gateway (mf_… token)",
   openrouterApiKey: "OpenRouter API Key",
   openrouterHint: "200+ models via OpenRouter (recommended)",
   openaiApiKey: "OpenAI API Key",

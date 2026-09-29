@@ -5,6 +5,7 @@ import {
   readMithrilToken,
   writeMithrilToken,
 } from "./mithril-token-store";
+import { syncMithrilKey, unsyncMithrilKey } from "./mithril-sync";
 import type {
   MithrilAccount,
   MithrilAccountConnectResult,
@@ -21,6 +22,11 @@ export async function connectMithrilAccount(
     writeMithrilToken(profile, rawToken.trim());
   } catch {
     return { status: "refused", error: "secure_storage_unavailable" };
+  }
+  try {
+    syncMithrilKey(profile, rawToken.trim());
+  } catch {
+    /* the token is stored; the agent env is re-synced on next start */
   }
   return {
     status: "connected",
@@ -66,5 +72,10 @@ export function disconnectMithrilAccount(profile?: string): {
   success: boolean;
 } {
   clearMithrilToken(profile);
+  try {
+    unsyncMithrilKey(profile);
+  } catch {
+    /* nothing synced */
+  }
   return { success: true };
 }

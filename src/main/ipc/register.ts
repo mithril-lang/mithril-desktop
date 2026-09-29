@@ -107,6 +107,10 @@ import {
 } from "../mithril-account";
 import { mithrilFirstRunState } from "../first-run";
 import { mithrilChat } from "../mithril-chat";
+import {
+  cancelMithrilDeviceLogin,
+  startMithrilDeviceLogin,
+} from "../mithril-device-login";
 import { restartGatewayWhenIdle } from "../gateway-restart-defer";
 import {
   isRemoteMode,
@@ -976,6 +980,20 @@ export function registerIpcHandlers(context: IpcContext): void {
         token,
         profile?.trim() || getActiveProfileNameSync(),
       ),
+  );
+  // Device sign-in: the console approves a short code, no token copy/paste.
+  ipcMain.handle("mithril-device-login", (event, profile?: string) =>
+    startMithrilDeviceLogin(
+      profile?.trim() || getActiveProfileNameSync(),
+      (info) => {
+        if (event.sender.isDestroyed()) return;
+        event.sender.send("mithril-device-login-code", info);
+        openExternalUrl(info.verificationUriComplete);
+      },
+    ),
+  );
+  ipcMain.handle("mithril-device-login-cancel", () =>
+    cancelMithrilDeviceLogin(),
   );
   ipcMain.handle("mithril-account-disconnect", (_event, profile?: string) =>
     disconnectMithrilAccount(profile?.trim() || getActiveProfileNameSync()),

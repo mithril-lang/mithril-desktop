@@ -38,6 +38,33 @@ export default function MithrilAccountSection({
           "Connected. Balance needs verification in the console.",
           "接続済みです。残高は Console で確認してください。",
         );
+      case "device_denied":
+        return label(
+          "Sign-in was denied in the browser.",
+          "ブラウザで拒否されました。",
+        );
+      case "device_expired":
+        return label(
+          "The code expired. Try again.",
+          "コードの有効期限が切れました。もう一度お試しください。",
+        );
+      case "device_cancelled":
+        return label("Sign-in cancelled.", "サインインを中止しました。");
+      case "device_in_progress":
+        return label(
+          "Another sign-in is already in progress.",
+          "別のサインインが進行中です。",
+        );
+      case "device_unavailable":
+        return label(
+          "Device sign-in is not available yet. Paste a token instead.",
+          "デバイスサインインはまだ利用できません。トークンを貼り付けてください。",
+        );
+      case "device_start_failed":
+        return label(
+          "Could not start sign-in. Check your connection.",
+          "サインインを開始できません。接続を確認してください。",
+        );
       case "unauthenticated":
         return label(
           "The token is invalid or expired. Create a new one in the console.",
@@ -54,6 +81,7 @@ export default function MithrilAccountSection({
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [deviceCode, setDeviceCode] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -89,6 +117,30 @@ export default function MithrilAccountSection({
     } catch {
       setError("account_unavailable");
     } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(
+    () =>
+      window.hermesAPI.onMithrilDeviceCode((info) =>
+        setDeviceCode(info.userCode),
+      ),
+    [],
+  );
+
+  const deviceLogin = async (): Promise<void> => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await window.hermesAPI.mithrilDeviceLogin(profile);
+      if (result.status === "connected") setAccount(result.account);
+      else setError(result.error);
+    } catch {
+      setError("account_unavailable");
+    } finally {
+      setDeviceCode(null);
       setBusy(false);
     }
   };
@@ -160,6 +212,34 @@ export default function MithrilAccountSection({
           </button>
         </div>
       )}
+      <div className="mithril-signin-form">
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={busy}
+          onClick={() => void deviceLogin()}
+        >
+          {label("Sign in with browser", "ブラウザでサインイン")}
+        </button>
+        {deviceCode && (
+          <>
+            <span className="hermes-account-email">
+              {label(
+                "Confirm this code in the browser",
+                "ブラウザでこのコードを確認",
+              )}
+              : <strong>{deviceCode}</strong>
+            </span>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => void window.hermesAPI.cancelMithrilDeviceLogin()}
+            >
+              {label("Cancel", "キャンセル")}
+            </button>
+          </>
+        )}
+      </div>
       <form
         onSubmit={(event) => {
           void connect(event);

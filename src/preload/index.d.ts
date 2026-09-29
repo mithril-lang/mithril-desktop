@@ -15,6 +15,7 @@ import type { TokenBalancesResponse } from "../shared/tokens";
 import type { CustomProviderRecord } from "../shared/custom-providers";
 import type {
   MithrilAccount,
+  MithrilDeviceCode,
   MithrilAccountConnectResult,
   MithrilChatResult,
   MithrilFirstRunState,
@@ -319,6 +320,13 @@ interface HermesAPI {
     token: string,
     profile?: string,
   ) => Promise<MithrilAccountConnectResult>;
+  mithrilDeviceLogin: (
+    profile?: string,
+  ) => Promise<MithrilAccountConnectResult>;
+  cancelMithrilDeviceLogin: () => Promise<boolean>;
+  onMithrilDeviceCode: (
+    callback: (info: MithrilDeviceCode) => void,
+  ) => () => void;
   disconnectMithrilAccount: (profile?: string) => Promise<{ success: boolean }>;
   getMithrilFirstRunState: (profile?: string) => Promise<MithrilFirstRunState>;
   mithrilChat: (

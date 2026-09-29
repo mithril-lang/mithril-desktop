@@ -33,6 +33,7 @@ describe("Mithril account card", () => {
         getMithrilAccount: vi.fn().mockResolvedValue(null),
         connectMithrilAccount: connect,
         disconnectMithrilAccount: vi.fn().mockResolvedValue({ success: true }),
+        onMithrilDeviceCode: vi.fn(() => () => {}),
         openExternal: vi.fn(),
       },
     });

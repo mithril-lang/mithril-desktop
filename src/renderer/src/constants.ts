@@ -87,7 +87,7 @@ export const PROVIDERS = {
   ],
 
   labels: {
-    hermesone: "Hermes One",
+    mithril: "Mithril",
     atlascloud: "AtlasCloud",
     novita: "NovitaAI",
     openrouter: "constants.openrouterName",
@@ -130,17 +130,17 @@ export const PROVIDERS = {
 
   setup: [
     {
-      // Hermes One's own inference gateway — OpenAI-compatible, so
+      // Mithril's own inference gateway — OpenAI-compatible, so
       // it routes through `custom` + base_url (like the `openai` card); the key
-      // is stored/host-derived as HERMESONE_API_KEY (see url-key-map.ts).
-      id: "hermesone",
-      name: "Hermes One",
-      desc: "Hermes One Inference — pay-per-token with AI Credits",
-      envKey: "HERMESONE_API_KEY",
-      url: "https://console.hermesone.org/credits",
-      placeholder: "hs-live-...",
+      // is stored/host-derived as MITHRIL_API_KEY (see url-key-map.ts).
+      id: "mithril",
+      name: "Mithril",
+      desc: "Mithril Inference — pay-per-token with Mithril credits",
+      envKey: "MITHRIL_API_KEY",
+      url: "https://console.mithril.fund/account",
+      placeholder: "mf_...",
       configProvider: "custom",
-      baseUrl: "https://inference.hermesone.org/v1",
+      baseUrl: "https://api.mithril.fund/v1",
       needsKey: true,
     },
     {
@@ -341,7 +341,7 @@ export interface LocalPreset {
 // OPENAI_COMPATIBLE_BASE_URLS). Distinct from PROVIDERS.setup, which stays the
 // curated first-run set.
 export const PROVIDER_CARDS: { id: string; name: string }[] = [
-  { id: "hermesone", name: "Hermes One" },
+  { id: "mithril", name: "Mithril" },
   { id: "openrouter", name: "constants.openrouterName" },
   { id: "anthropic", name: "constants.anthropicName" },
   { id: "openai", name: "constants.openaiName" },
@@ -376,7 +376,7 @@ export const PROVIDER_CARDS: { id: string; name: string }[] = [
 // picker routes it consistently (autofill base_url + persist as `custom`).
 // Keep this in sync with LOCAL_PRESETS below.
 export const OPENAI_COMPATIBLE_BASE_URLS: Record<string, string> = {
-  hermesone: "https://inference.hermesone.org/v1",
+  mithril: "https://api.mithril.fund/v1",
   openai: "https://api.openai.com/v1",
   aimlapi: "https://api.aimlapi.com/v1",
   mistral: "https://api.mistral.ai/v1",
@@ -398,12 +398,12 @@ export const OPENAI_COMPATIBLE_BASE_URLS: Record<string, string> = {
 /**
  * Reverse-map a stored (provider, baseUrl) back to its display brand id.
  *
- * OpenAI-compatible providers (Hermes One, Groq, DeepSeek, …) are persisted as
+ * OpenAI-compatible providers (Mithril, Groq, DeepSeek, …) are persisted as
  * `provider: "custom"` + their base URL because the agent can't resolve their
  * brand id. For display — grouping in the chat model picker, the provider
  * summary/logo — map that base URL back to the brand id via
- * `OPENAI_COMPATIBLE_BASE_URLS`, so e.g. an `inference.hermesone.org` model shows
- * under "Hermes One" instead of the generic "OpenAI Compatible / Local" bucket.
+ * `OPENAI_COMPATIBLE_BASE_URLS`, so e.g. an `api.mithril.fund` model shows
+ * under "Mithril" instead of the generic "OpenAI Compatible / Local" bucket.
  *
  * Routing is unaffected: callers keep the raw `provider`/`baseUrl` for
  * `setModelConfig`; only the label/grouping uses the returned brand.
@@ -523,7 +523,7 @@ export const LOCAL_PRESETS: LocalPreset[] = [
 ];
 
 // How to persist a model saved "under" a given LLM-provider key. The env key
-// (a "LLM Providers" FieldDef `key`, e.g. HERMESONE_API_KEY) is the anchor the
+// (a "LLM Providers" FieldDef `key`, e.g. MITHRIL_API_KEY) is the anchor the
 // UI has; a saved model needs a routing pair instead: native providers keep
 // their agent slug (the gateway hardcodes the base URL), while OpenAI-compatible
 // providers route as `provider: "custom"` + explicit `baseUrl` (host-derives the
@@ -564,11 +564,11 @@ export const NATIVE_ENV_KEY_ROUTES: Record<
 // Display priority for the LLM-provider cards + Add-provider picker. The
 // `SETTINGS_SECTIONS` FieldDef order is grouped by how providers were added
 // over time, which surfaces niche endpoints (e.g. AIML API) above household
-// names. This front-loads the well-known providers — Hermes One first — and
+// names. This front-loads the well-known providers — Mithril first — and
 // anything not listed keeps its FieldDef order after them, ahead of the
 // explicitly demoted keys. Keys are env-var names (a FieldDef's `key`).
 export const PROVIDER_KEY_ORDER: readonly string[] = [
-  "HERMESONE_API_KEY",
+  "MITHRIL_API_KEY",
   "OPENAI_API_KEY",
   "ANTHROPIC_API_KEY",
   "OPENROUTER_API_KEY",
@@ -609,8 +609,8 @@ export function providerKeyRank(envKey: string): number {
 }
 
 /**
- * The plain provider name for an LLM-provider env key — "Hermes One", not
- * "Hermes One API Key". The provider cards/picker are a list of providers, so
+ * The plain provider name for an LLM-provider env key — "Mithril", not
+ * "Mithril API Key". The provider cards/picker are a list of providers, so
  * the "API Key" suffix in every FieldDef label is noise there (and the label
  * can't be suffix-stripped reliably across locales). Derives the display brand
  * via the same route mapping the active-model picker uses, then looks up
@@ -742,14 +742,14 @@ export const SETTINGS_SECTIONS: SectionDef[] = [
   {
     title: "constants.sectionLlmProviders",
     items: [
-      // Hermes One's own inference gateway. Custom under the hood
-      // (routes as `custom` + inference.hermesone.org), keyed by
-      // HERMESONE_API_KEY via URL_KEY_MAP.
+      // Mithril's own inference gateway. Custom under the hood
+      // (routes as `custom` + api.mithril.fund), keyed by
+      // MITHRIL_API_KEY via URL_KEY_MAP.
       {
-        key: "HERMESONE_API_KEY",
-        label: "constants.hermesoneApiKey",
+        key: "MITHRIL_API_KEY",
+        label: "constants.mithrilApiKey",
         type: "password",
-        hint: "constants.hermesoneHint",
+        hint: "constants.mithrilHint",
       },
       {
         key: "OPENROUTER_API_KEY",

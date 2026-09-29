@@ -1,3 +1,4 @@
+import { repairMithrilKey } from "../mithril-sync";
 import { app, BrowserWindow, nativeTheme, session, shell } from "electron";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
@@ -62,6 +63,16 @@ export function startMainProcess(): void {
       startServiceSupervisor();
     } catch (e) {
       console.error("[service-supervisor] failed to start:", e);
+    }
+
+    try {
+      if (repairMithrilKey() === "repaired") {
+        console.info(
+          "[mithril] restored MITHRIL_API_KEY from the stored token",
+        );
+      }
+    } catch (e) {
+      console.error("[mithril] could not restore MITHRIL_API_KEY:", e);
     }
 
     app.on("browser-window-created", (_, window) => {

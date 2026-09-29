@@ -23,6 +23,29 @@ describe("Linux release artifacts", () => {
   });
 });
 
+describe("Mithril preview platform release", () => {
+  // @lat: [[mithril-migration#Desktop release gate#Cross-platform preview]]
+  it("publishes inspected Windows, Linux, and Intel Mac artifacts together", () => {
+    const source = readFileSync(
+      join(ROOT, ".github/workflows/preview-platforms.yml"),
+      "utf-8",
+    );
+
+    expect(source).toContain("workflow_dispatch:");
+    expect(source).toContain("runs-on: windows-latest");
+    expect(source).toContain("runner: ubuntu-latest");
+    expect(source).toContain("runner: ubuntu-24.04-arm");
+    expect(source).toContain("electron-builder --mac dmg zip --x64");
+    expect(source).toContain("electron-builder --win nsis portable --x64");
+    expect(source).toContain(
+      "electron-builder --linux AppImage deb --${{ matrix.arch }}",
+    );
+    expect(source).toContain("needs: [prepare, mac_intel, windows, linux]");
+    expect(source).toContain("gh release upload");
+    expect(source).toContain("SHA256SUMS");
+  });
+});
+
 describe("Release quality gates", () => {
   // @lat: [[desktop-updates#Stable and beta release channels#Release security and quality gates]]
   it("blocks CI on high-severity production advisories and lint warnings", () => {

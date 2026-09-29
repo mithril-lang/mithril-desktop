@@ -4,7 +4,7 @@ Mithril Desktop is an Electron client for [Hermes Agent](https://github.com/Nous
 
 ## Release status
 
-`0.8.0-preview.1` is the first public Mithril Desktop preview for Apple silicon Macs. Download it from [app.mithril.fund/download](https://app.mithril.fund/download/?lang=en) or the repository's GitHub prerelease.
+`0.8.0-preview.1` is the first public Mithril Desktop preview. Native packages are available for Windows x64, Linux x64/ARM64, and Apple silicon/Intel Macs. Download the correct package from [app.mithril.fund/download](https://app.mithril.fund/download/?lang=en) or the repository's GitHub prerelease.
 
 The preview is ad-hoc signed because a Developer ID Application certificate is not available. macOS therefore requires a manual first-launch confirmation. Legacy cloud agent sync and wallet services are disabled; local Hermes Agent setup, profiles, chat, and the native Mithril account path remain available. See the [migration notes](lat.md/mithril-migration.md) for the exact boundary.
 
@@ -19,7 +19,7 @@ npm test
 npm run check:packaging
 ```
 
-`npm run dev` starts the local Electron development build. `npm run build:mac -- --arm64` creates the preview DMG after the packaging gate passes.
+`npm run dev` starts the local Electron development build. Platform packages are published by the manually dispatched `Publish Preview Platforms` workflow, which builds on native Windows, Linux, and macOS runners and adds artifacts only after every package inspection passes.
 
 ## Security and contributions
 

@@ -258,18 +258,24 @@ function ProviderModelsManager({
   // accepted the key and returned a model list, so "verified" is truthful;
   // providers that don't expose /models fall back to a plain "Connected".
   const hasKey = !!apiKey.trim();
+  // /models is public on api.mithril.fund, so discovery "succeeds" for any key;
+  // only an mf_ token can actually run inference.
+  const notMithrilToken =
+    envKey === "MITHRIL_API_KEY" && hasKey && !apiKey.trim().startsWith("mf_");
   const status: ProviderKeyStatus = !hasKey
     ? { tone: "muted", text: t("providers.keys.status.needsKey") }
-    : discovery.status === "loading"
-      ? { tone: "loading", text: t("providers.keys.status.verifying") }
-      : discovery.status === "ok"
-        ? { tone: "ok", text: t("providers.keys.status.verified") }
-        : discovery.status === "unsupported" ||
-            discovery.status === "unknown-host"
-          ? { tone: "ok", text: t("providers.keys.status.connected") }
-          : discovery.status === "error"
-            ? { tone: "muted", text: t("providers.keys.status.failed") }
-            : { tone: "ok", text: t("providers.keys.status.connected") };
+    : notMithrilToken
+      ? { tone: "muted", text: t("providers.keys.status.failed") }
+      : discovery.status === "loading"
+        ? { tone: "loading", text: t("providers.keys.status.verifying") }
+        : discovery.status === "ok"
+          ? { tone: "ok", text: t("providers.keys.status.verified") }
+          : discovery.status === "unsupported" ||
+              discovery.status === "unknown-host"
+            ? { tone: "ok", text: t("providers.keys.status.connected") }
+            : discovery.status === "error"
+              ? { tone: "muted", text: t("providers.keys.status.failed") }
+              : { tone: "ok", text: t("providers.keys.status.connected") };
 
   // Report status + model count up to the config-modal header (which shows the
   // verification pill + "used by N models"). Destructure to primitives so the

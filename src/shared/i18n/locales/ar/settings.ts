@@ -1,7 +1,7 @@
 export default {
   title: "الإعدادات",
   sections: {
-    hermesAgent: "Hermes Agent",
+    hermesAgent: "Mithril Agent",
     appearance: "المظهر",
     privacy: "الخصوصية",
     credentialPool: "مجموعة بيانات الاعتماد",
@@ -22,7 +22,7 @@ export default {
     logs: "السجلات والتشخيص",
   },
   agentSubtitle: "محرك الذكاء الاصطناعي المحلي",
-  desktopTitle: "Hermes One Desktop",
+  desktopTitle: "Mithril Desktop",
   desktopSubtitle: "تطبيق سطح المكتب هذا",
   statusUpToDate: "محدث",
   statusUpdateAvailable: "تحديث متاح",

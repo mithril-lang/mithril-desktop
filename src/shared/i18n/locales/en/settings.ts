@@ -1,7 +1,7 @@
 export default {
   title: "Settings",
   sections: {
-    hermesAgent: "Hermes Agent",
+    hermesAgent: "Mithril Agent",
     appearance: "Appearance",
     privacy: "Privacy",
     credentialPool: "Credential Pool",
@@ -23,7 +23,7 @@ export default {
     logs: "Logs & Diagnostics",
   },
   agentSubtitle: "The local AI engine",
-  desktopTitle: "Kotoba Desktop",
+  desktopTitle: "Mithril Desktop",
   desktopSubtitle: "This desktop app",
   statusUpToDate: "Up to date",
   statusUpdateAvailable: "Update available",
@@ -92,7 +92,7 @@ export default {
   },
   analytics: {
     label: "Send anonymous usage analytics",
-    hint: "Collected anonymously and used only to improve Kotoba — never your chats, files, prompts, or any personal data.",
+    hint: "Collected anonymously and used only to improve Mithril — never your chats, files, prompts, or any personal data.",
   },
   notDetected: "Not detected",
   updatedSuccessfully: "Updated successfully!",

@@ -1,7 +1,7 @@
 export default {
   title: "Ayarlar",
   sections: {
-    hermesAgent: "Hermes Agent",
+    hermesAgent: "Mithril Agent",
     appearance: "Görünüm",
     privacy: "Gizlilik",
     credentialPool: "Kimlik Bilgisi Havuzu",

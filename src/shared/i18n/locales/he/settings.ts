@@ -1,7 +1,7 @@
 export default {
   title: "הגדרות",
   sections: {
-    hermesAgent: "Hermes Agent",
+    hermesAgent: "Mithril Agent",
     appearance: "מראה",
     privacy: "פרטיות",
     credentialPool: "מאגר אישורים",

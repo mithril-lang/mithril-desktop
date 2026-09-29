@@ -1,7 +1,7 @@
 export default {
   title: "設定",
   sections: {
-    hermesAgent: "Hermes Agent",
+    hermesAgent: "Mithril Agent",
     appearance: "外観",
     privacy: "プライバシー",
     credentialPool: "認証情報プール",

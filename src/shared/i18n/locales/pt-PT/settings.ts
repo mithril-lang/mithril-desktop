@@ -1,7 +1,7 @@
 export default {
   title: "Definições",
   sections: {
-    hermesAgent: "Agente Hermes",
+    hermesAgent: "Mithril Agent",
     appearance: "Aparência",
     privacy: "Privacidade",
     credentialPool: "Pool de Credenciais",

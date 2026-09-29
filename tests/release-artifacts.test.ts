@@ -54,9 +54,7 @@ describe("Release quality gates", () => {
   it("requires the Mithril Developer ID identity and Apple notarization", () => {
     const config = readFileSync(join(ROOT, "electron-builder.yml"), "utf-8");
 
-    expect(config).toContain(
-      'identity: "Jun Kawasaki (3A5CBTEBFP)"',
-    );
+    expect(config).toContain('identity: "Jun Kawasaki (3A5CBTEBFP)"');
     expect(config).toContain("notarize: true");
     expect(config).not.toContain("identity: null");
     expect(config).not.toContain("notarize: false");

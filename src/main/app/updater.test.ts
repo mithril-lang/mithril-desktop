@@ -6,7 +6,7 @@ const electronState = vi.hoisted(() => ({
 }));
 
 vi.mock("electron", () => ({
-  app: { getVersion: () => "0.8.0-preview.1" },
+  app: { getVersion: () => "0.8.0-preview.2" },
   ipcMain: {
     handle: (
       channel: string,
@@ -91,7 +91,7 @@ describe("macManualUpdateReason", () => {
     const check = electronState.handlers.get("check-for-updates") as
       | (() => Promise<string>)
       | undefined;
-    await expect(check?.()).resolves.toBe("0.8.0-preview.1");
+    await expect(check?.()).resolves.toBe("0.8.0-preview.2");
     expect(electronState.openExternal).toHaveBeenCalledWith(
       "https://app.mithril.fund/",
     );

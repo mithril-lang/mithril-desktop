@@ -1,7 +1,7 @@
 export default {
   title: "Ustawienia",
   sections: {
-    hermesAgent: "Hermes Agent",
+    hermesAgent: "Mithril Agent",
     appearance: "Wygląd",
     privacy: "Prywatność",
     credentialPool: "Pula poświadczeń",

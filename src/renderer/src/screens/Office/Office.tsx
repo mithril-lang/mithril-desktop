@@ -11,6 +11,7 @@ import {
   DoorOpen,
   Footprints,
   LogOut,
+  MessageSquare,
   Move,
   RefreshCw,
   TriangleAlert,
@@ -19,7 +20,6 @@ import {
 } from "lucide-react";
 import type { GpuStatus } from "../../../../shared/gpu";
 import { useI18n } from "../../components/useI18n";
-import oneChatIcon from "../../assets/images/one-chat.svg";
 import OneChatModal from "./OneChatModal";
 import Office3D from "./office3d/Office3D";
 import RepInteractionPanel from "./RepInteractionPanel";
@@ -927,13 +927,13 @@ function Office({ visible, profile }: OfficeProps): React.JSX.Element {
         <button
           type="button"
           onClick={() => setChatOpen(true)}
-          className="absolute bottom-5 right-5 w-30 h-11 rounded-lg border-none bg-black cursor-pointer flex items-center justify-center px-3 gap-2 z-10"
+          aria-label="Mithril Chat"
+          className="absolute bottom-5 right-5 min-w-30 h-11 rounded-lg border-none bg-black cursor-pointer flex items-center justify-center px-3 gap-2 z-10"
         >
-          <img
-            src={oneChatIcon}
-            alt="Chat"
-            className="h-6 brightness-0 invert"
-          />
+          <MessageSquare size={20} className="text-white" aria-hidden="true" />
+          <span className="text-white font-extrabold tracking-wide whitespace-nowrap">
+            MITHRIL CHAT
+          </span>
         </button>
 
         <OneChatModal

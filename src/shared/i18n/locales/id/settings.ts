@@ -1,7 +1,7 @@
 export default {
   title: "Pengaturan",
   sections: {
-    hermesAgent: "Hermes Agent",
+    hermesAgent: "Mithril Agent",
     appearance: "Tampilan",
     privacy: "Privasi",
     credentialPool: "Kumpulan Kredensial",

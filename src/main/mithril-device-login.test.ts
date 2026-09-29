@@ -8,7 +8,9 @@ describe("interpretMithrilTokenResponse", () => {
     ).toEqual({ kind: "success", accessToken: "mf_x" });
   });
   it("maps RFC 8628 errors", () => {
-    const err = (error: string) =>
+    const err = (
+      error: string,
+    ): ReturnType<typeof interpretMithrilTokenResponse> =>
       interpretMithrilTokenResponse(false, 400, { error });
     expect(err("authorization_pending")).toEqual({ kind: "pending" });
     expect(err("slow_down")).toEqual({ kind: "slow_down" });

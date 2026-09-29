@@ -4,7 +4,7 @@ The public `mithril-lang/mithril-desktop` repository contains the Mithril deskto
 
 ## Repository ownership
 
-This public repository is the canonical Mithril Desktop. It started from a reviewed source snapshot and now also carries the action-approval contract that previously lived only on `mithril-lang/fund-mithril-app`. That private repository is no longer a release source. Do not continue migration work there.
+This public repository is the canonical Mithril Desktop; the private `mithril-lang/fund-mithril-app` is no longer a release source.
 
 Preserve the upstream MIT license and commit history. Do not push Mithril changes to `legacy` (`cloud-kotoba/org-hermesone-hermes-desktop`).
 
@@ -12,7 +12,7 @@ Preserve the upstream MIT license and commit history. Do not push Mithril change
 
 A Mithril-branded binary needs Mithril app identity and explicit service boundaries.
 
-The app ID, package name, platform icons, display name, and updater URL point to Mithril. Legacy account, sync, and wallet modules remain only as quarantined migration material. The active main process does not import them: cloud agent sync and cloud wallet IPC return an unavailable result, profile deletion remains local, and startup does not migrate or inject old credentials. A visual rename cannot make old protocols compatible; any future migration must be explicit and separately verified.
+The app ID, package name, platform icons, display name, and updater URL point to Mithril. The legacy Kotoba account, agent-sync, wallet-sync and Hermes One device-login modules are deleted, not quarantined: cloud agent sync and cloud wallet IPC return an unavailable result, profile deletion remains local, and startup does not migrate or inject old credentials. A visual rename cannot make old protocols compatible; any future migration must be explicit and separately verified.
 
 ## Legacy inference isolation
 
@@ -107,3 +107,13 @@ Windows publishes NSIS and portable executables with `preview.yml`. Each Linux a
 Changing the Electron app ID, executable, and update feed creates a distinct application identity.
 
 Existing legacy profile data is not automatically imported by the preview. The macOS preview uses Mithril's Developer ID identity and Apple notarization, remains manually installed, and routes update prompts to the download page.
+
+## First-run connect
+
+A first launch shows the Mithril connect screen, never the Hermes install prompt. The user pastes an `mf_` token; [[src/main/mithril-account.ts#connectMithrilAccount]] verifies it against `api.mithril.fund` and stores it with Electron `safeStorage`.
+
+[[src/main/first-run.ts#mithrilFirstRunState]] answers from the local encrypted store only, so an offline launch is not blocked. [[src/renderer/src/screens/MithrilStart/MithrilStart.tsx#MithrilStart]] is the screen. The local Hermes agent runtime (large download) is an explicit opt-in from it. Browser sign-in via auth.mithril.fund is a follow-up; the screen links to the console to issue a token.
+
+### In-app chat
+
+[[src/main/mithril-chat.ts#mithrilChat]] posts to `/v1/chat/completions` with only the stored `mf_` bearer and `max_tokens` of at least 512. It ignores unknown upstream fields and falls back to `reasoning` when `content` is empty.

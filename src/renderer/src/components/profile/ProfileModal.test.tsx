@@ -145,7 +145,7 @@ describe("ProfileModal name editor", () => {
 });
 
 describe("ProfileModal deletion failures", () => {
-  // @lat: [[agent-sync#Tests#Surfaces deletion failures in the modal]]
+  // @lat: [[mithril-migration#Mithril desktop migration#First-run connect]]
   it("disables deletion while pending and allows retry after an IPC rejection", async () => {
     installHermesAPI([
       { ...profile("Agent Alpha"), id: "alpha", isDefault: false },

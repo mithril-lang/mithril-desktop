@@ -71,3 +71,9 @@ The macOS preview is signed with the Mithril Developer ID Application identity a
 Release jobs import the encrypted signing identity into an isolated temporary keychain and stage an App Store Connect API key for notarization. Missing credentials fail packaging instead of falling back to a development or ad-hoc release. The preview still uses manual updates and opens the verified App download page.
 
 `build/afterPack.js` first repairs the packed bundle inside-out with an ad-hoc identity — every Mach-O leaf, framework, helper app, and the outer app. Electron Builder then replaces that preparatory signature with the configured Developer ID identity and submits the app for notarization. A missing leaf signature or failed framework sign blocks the build before publication.
+
+## Preview update feed naming
+
+Prerelease versions such as `0.8.0-preview.1` bake `channel: preview` into `app-update.yml`, so the generic provider requests `preview*.yml` and the preview workflow publishes those names.
+
+electron-updater requests `preview.yml` (Windows), `preview-mac.yml`, `preview-linux.yml` and `preview-linux-arm64.yml`. [[tests/first-run-mithril.test.ts]] pins this; the inherited `latest*.yml` names belong to the disabled stable workflow.

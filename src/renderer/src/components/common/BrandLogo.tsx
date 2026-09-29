@@ -2,7 +2,7 @@ import { Bot } from "../../assets/icons";
 import claudeLogo from "../../assets/logos/claude-color.svg";
 import geminiLogo from "../../assets/logos/gemini-color.svg";
 import nousLogo from "../../assets/logos/nousresearch.svg";
-import mithrilLogo from "../../assets/mithril-hex.svg";
+import mithrilLogo from "../../assets/mithril-mark.svg";
 import openaiLogo from "../../assets/logos/openai.svg";
 import openrouterLogo from "../../assets/logos/openrouter.svg";
 import moonshotLogo from "../../assets/logos/moonshot.svg";

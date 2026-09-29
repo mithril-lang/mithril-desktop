@@ -17,6 +17,19 @@ let autoUpdaterInstance: AppUpdater | null = null;
 const DOWNLOAD_PAGE_URL = "https://app.mithril.fund/";
 
 /**
+ * electron-updater reads its feed from `<resources>/app-update.yml`, which
+ * electron-builder writes into packaged release builds. A bundle assembled
+ * without it (a local `--dir` build) cannot check for updates; without this
+ * guard every startup logged ENOENT and the sidebar showed "Update failed".
+ */
+export function updateFeedAvailable(
+  resourcesPath: string = process.resourcesPath,
+  exists: (path: string) => boolean = existsSync,
+): boolean {
+  return exists(join(resourcesPath, "app-update.yml"));
+}
+
+/**
  * Why macOS auto-update cannot be used for this bundle, or null when it can.
  *
  * Squirrel.Mac only installs a successor that satisfies the RUNNING bundle's
@@ -124,6 +137,17 @@ export function setupUpdater({ getMainWindow }: UpdaterDeps): void {
   );
   if (manualReason) {
     setupManualUpdater(autoUpdater, manualReason, getMainWindow);
+    return;
+  }
+
+  if (!updateFeedAvailable()) {
+    updaterLogger.info(
+      "No app-update.yml in this bundle (not a published build); updates are disabled",
+    );
+    autoUpdaterInstance = null;
+    ipcMain.handle("check-for-updates", async () => null);
+    ipcMain.handle("download-update", () => true);
+    ipcMain.handle("install-update", () => {});
     return;
   }
 

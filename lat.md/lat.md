@@ -16,6 +16,7 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[desktop-updates]] — GitHub release checks, startup upgrade button behavior, and the Settings auto-upgrade preference.
 - [[office-cron-presence]] — cron activity and safe gateway restart timing in the Office.
 - [[mithril-migration]] — ownership, service compatibility, and release conditions for moving the old desktop fork into Mithril Fund.
+- [[mithril-action-plane]] — the versioned action envelope and bounded Desktop approval projection for the Mithril Agent fork.
 - [[desktop-security]] — verified Unix bootstrap execution and safe rendering of runtime provider names.
 - [[agent-capabilities]] — capability-based compatibility between the independent desktop and system-installed Hermes Agent, including bounded runtime evidence and update gating.
 - [[connections]] — the versioned main-process connection registry, stable active connection identity, and lossless migration from the legacy singleton configuration.

@@ -123,6 +123,80 @@ describe("chat approval normalization", () => {
       ).choices,
     ).toEqual(["once", "deny"]);
   });
+
+  // @lat: [[mithril-action-plane#Action envelope#Normalizes bounded action metadata]]
+  it("normalizes a Mithril action envelope without exposing arbitrary fields", () => {
+    expect(
+      normalizeApprovalRequest(
+        {
+          command: "deploy service",
+          choices: ["once", "session", "always"],
+          action_intent: {
+            version: "mithril.action/v1",
+            action_id: "action-123",
+            operation: "deploy",
+            target: "worker:mithril-web",
+            risk: "reversible",
+            evidence_count: 3,
+            maximum_cost_micro_usd: 1_250_000,
+            expires_at: "2026-09-29T12:00:00Z",
+            digest: "sha256:abc",
+            reversible: true,
+            ignored_secret: "must-not-cross",
+          },
+        },
+        "opaque-id",
+      ).action,
+    ).toEqual({
+      actionId: "action-123",
+      digest: "sha256:abc",
+      evidenceCount: 3,
+      expiresAt: "2026-09-29T12:00:00Z",
+      maximumCostMicroUsd: 1_250_000,
+      operation: "deploy",
+      receiptRequired: true,
+      reversible: true,
+      risk: "reversible",
+      target: "worker:mithril-web",
+      version: "mithril.action/v1",
+    });
+  });
+
+  // @lat: [[mithril-action-plane#Action envelope#Restricts consequential approval scope]]
+  it("restricts consequential actions to one-time approval or denial", () => {
+    expect(
+      normalizeApprovalRequest(
+        {
+          choices: ["always", "session", "deny"],
+          action: {
+            version: "mithril.action/v1",
+            actionId: "action-critical",
+            operation: "publish",
+            target: "site:mithril.fund",
+            risk: "critical",
+          },
+        },
+        "opaque-id",
+      ).choices,
+    ).toEqual(["once", "deny"]);
+  });
+
+  it("ignores incomplete or unknown action envelope versions", () => {
+    expect(
+      normalizeApprovalRequest(
+        {
+          action: {
+            version: "mithril.action/v2",
+            actionId: "future-action",
+            operation: "publish",
+            target: "site:mithril.fund",
+            risk: "critical",
+          },
+        },
+        "opaque-id",
+      ).action,
+    ).toBeUndefined();
+  });
 });
 
 describe("pending chat approvals", () => {

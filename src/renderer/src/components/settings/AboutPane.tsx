@@ -112,6 +112,14 @@ export default function AboutPane(): React.JSX.Element {
                 ? `v${agentCapabilities.desktopContract} / v${agentCapabilities.recommendedDesktopContract}`
                 : "—"}
             </Meta>
+            <Meta label="Runtime" loading={loading && !agentCapabilities}>
+              {agentCapabilities?.distribution || "—"}
+            </Meta>
+            <Meta label="Action API" loading={loading && !agentCapabilities}>
+              {agentCapabilities?.trustedActionRuntime
+                ? agentCapabilities.actionContract
+                : "Unavailable"}
+            </Meta>
             <Meta
               label="Python"
               loading={loading}

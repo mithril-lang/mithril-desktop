@@ -12,6 +12,8 @@ describe("sanitizeAgentRuntimeInfo", () => {
     expect(
       sanitizeAgentRuntimeInfo({
         desktop_contract: 6,
+        distribution: "mithril-agent",
+        action_contract: "mithril.action/v1",
         model: "secret-model",
         system_prompt: "private prompt",
         tools: { terminal: ["terminal"] },
@@ -19,7 +21,9 @@ describe("sanitizeAgentRuntimeInfo", () => {
         version: "0.20.5",
       }),
     ).toEqual({
+      action_contract: "mithril.action/v1",
       desktop_contract: 6,
+      distribution: "mithril-agent",
       update_command: "hermes update",
       version: "0.20.5",
     });
@@ -43,6 +47,8 @@ describe("buildAgentCapabilitySnapshot", () => {
       connectionMode: "local",
       runtimeInfo: {
         desktop_contract: 6,
+        distribution: "mithril-agent",
+        action_contract: "mithril.action/v1",
         release_date: "2026.08.20",
         update_behind: 0,
         update_command: "hermes update",
@@ -55,10 +61,13 @@ describe("buildAgentCapabilitySnapshot", () => {
       checkedAt: 123,
       compatibility: "compatible",
       desktopContract: RECOMMENDED_AGENT_DESKTOP_CONTRACT,
+      distribution: "mithril-agent",
+      actionContract: "mithril.action/v1",
       releaseDate: "2026.08.20",
       updateAvailable: false,
       updateCommand: "hermes update",
       version: "0.20.5",
+      trustedActionRuntime: true,
     });
     expect(
       Object.values(snapshot.features).every(
@@ -111,6 +120,7 @@ describe("buildAgentCapabilitySnapshot", () => {
     expect(snapshot.features.fileAttach.state).toBe("supported");
     expect(snapshot.features.approvalsMode.state).toBe("unsupported");
     expect(snapshot.features.runsTransport.state).toBe("unknown");
+    expect(snapshot.trustedActionRuntime).toBe(false);
 
     expect(
       buildAgentCapabilitySnapshot({

@@ -65,6 +65,51 @@ export const ApprovalCard = memo(function ApprovalCard({
     >
       <div className="chat-approval-heading">{t("chat.approval.title")}</div>
       <div className="chat-clarify-question">{msg.description}</div>
+      {/* @lat: [[mithril-action-plane#Desktop approval projection]] */}
+      {msg.action && (
+        <dl
+          className={`chat-action-summary chat-action-summary--${msg.action.risk}`}
+        >
+          <div>
+            <dt>{t("chat.approval.actionRisk")}</dt>
+            <dd>{t(`chat.approval.risk.${msg.action.risk}`)}</dd>
+          </div>
+          <div>
+            <dt>{t("chat.approval.actionOperation")}</dt>
+            <dd>{msg.action.operation}</dd>
+          </div>
+          <div>
+            <dt>{t("chat.approval.actionTarget")}</dt>
+            <dd>{msg.action.target}</dd>
+          </div>
+          <div>
+            <dt>{t("chat.approval.actionEvidence")}</dt>
+            <dd>{msg.action.evidenceCount}</dd>
+          </div>
+          {msg.action.maximumCostMicroUsd !== null && (
+            <div>
+              <dt>{t("chat.approval.actionMaximumCost")}</dt>
+              <dd>
+                ${(msg.action.maximumCostMicroUsd / 1_000_000).toFixed(6)}
+              </dd>
+            </div>
+          )}
+          {msg.action.expiresAt && (
+            <div>
+              <dt>{t("chat.approval.actionExpires")}</dt>
+              <dd>{msg.action.expiresAt}</dd>
+            </div>
+          )}
+          {msg.action.digest && (
+            <div className="chat-action-summary__wide">
+              <dt>{t("chat.approval.actionDigest")}</dt>
+              <dd className="chat-action-summary__digest">
+                {msg.action.digest}
+              </dd>
+            </div>
+          )}
+        </dl>
+      )}
       <pre className="chat-approval-command">
         <code>{msg.command}</code>
       </pre>

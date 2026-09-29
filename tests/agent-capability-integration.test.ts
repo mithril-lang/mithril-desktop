@@ -33,6 +33,8 @@ describe("Hermes Agent capability contract integration", () => {
     // @lat: [[agent-capabilities#Test specifications#Current Agent contract]]
     const runtimeInfo = sanitizeAgentRuntimeInfo({
       desktop_contract: 6,
+      distribution: "mithril-agent",
+      action_contract: "",
       model: "not-retained",
       release_date: "2026.08.20",
       update_behind: 0,
@@ -59,6 +61,7 @@ describe("Hermes Agent capability contract integration", () => {
     expect(snapshot).toMatchObject({
       compatibility: "compatible",
       desktopContract: 6,
+      trustedActionRuntime: false,
       updateAvailable: false,
       version: "0.20.5",
     });

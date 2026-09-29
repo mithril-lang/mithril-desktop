@@ -20,7 +20,11 @@ vi.mock("electron", () => ({
 vi.mock("../updater-log", () => ({ updaterLogger: { info: () => {} } }));
 
 import type { AppUpdater } from "electron-updater";
-import { macManualUpdateReason, setupManualUpdater } from "./updater";
+import {
+  macManualUpdateReason,
+  setupManualUpdater,
+  updateFeedAvailable,
+} from "./updater";
 
 // Verbatim `codesign -dv` output of the two bundles that produced the
 // "Update failed" in updater.log: the installed 0.7.10 (Apple Development
@@ -29,6 +33,14 @@ const SIGNED_0_7_10 =
   "Executable=/Applications/Kotoba.app/Contents/MacOS/Kotoba\nIdentifier=cloud.kotoba.desktop\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20500 size=448 flags=0x10000(runtime) hashes=3+7 location=embedded\nSignature size=9093\nTimestamp=Sep 23, 2026 at 7:45:30\nInfo.plist entries=38\nTeamIdentifier=3A5CBTEBFP\nRuntime Version=26.5.0\nSealed Resources version=2 rules=13 files=78\nInternal requirements count=1 size=184\n";
 const ADHOC_0_7_12 =
   "Executable=/Applications/Kotoba.app/Contents/MacOS/Kotoba\nIdentifier=cloud.kotoba.desktop\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20400 size=301 flags=0x2(adhoc) hashes=3+3 location=embedded\nSignature=adhoc\nInfo.plist entries=38\nTeamIdentifier=not set\nSealed Resources version=2 rules=13 files=78\nInternal requirements count=0 size=12\n";
+
+describe("updateFeedAvailable", () => {
+  it("needs app-update.yml next to the app resources", () => {
+    const exists = vi.fn((path: string) => path === "/r/app-update.yml");
+    expect(updateFeedAvailable("/r", exists)).toBe(true);
+    expect(updateFeedAvailable("/elsewhere", exists)).toBe(false);
+  });
+});
 
 describe("macManualUpdateReason", () => {
   it("routes an ad-hoc bundle to the download page", () => {

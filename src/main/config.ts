@@ -647,6 +647,15 @@ export function validateEnvEntry(key: string, value: string): void {
   if (/[\0\r\n]/.test(value)) {
     throw new Error("Environment variable values must be single-line strings.");
   }
+
+  // api.mithril.fund answers 401 to anything but an `mf_` token. The Providers
+  // screen and the account sign-in both write this variable, so a pasted
+  // OpenAI-style key would silently replace the signed-in token.
+  if (key === "MITHRIL_API_KEY" && value.trim() && !/^mf_/.test(value.trim())) {
+    throw new Error(
+      "Mithril API tokens start with mf_. Issue one at https://console.mithril.fund/account.",
+    );
+  }
 }
 
 function stripYamlQuotes(raw: string): string {

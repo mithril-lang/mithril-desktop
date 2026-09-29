@@ -84,4 +84,17 @@ describe("environment variable write validation", () => {
     expect(env.WITH_VALUE).toBe("present");
     expect(readEnvFile()).toContain("EMPTY_FLAG=\n");
   });
+
+  it("only accepts mf_ tokens for MITHRIL_API_KEY", async () => {
+    const { readEnv, setEnvValue } = await loadConfigModule();
+
+    setEnvValue("MITHRIL_API_KEY", "mf_signed_in");
+    expect(() =>
+      setEnvValue("MITHRIL_API_KEY", "sk-not-a-mithril-token"),
+    ).toThrow(/start with mf_/);
+    expect(readEnv().MITHRIL_API_KEY).toBe("mf_signed_in");
+
+    setEnvValue("MITHRIL_API_KEY", "");
+    expect(readEnv().MITHRIL_API_KEY).toBe("");
+  });
 });

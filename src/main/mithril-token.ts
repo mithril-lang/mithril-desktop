@@ -2,6 +2,25 @@
 /** Verify a manually issued Mithril API token before the desktop stores it. */
 
 export const MITHRIL_API_ORIGIN = "https://api.mithril.fund";
+
+/**
+ * Where API calls go. Always https://api.mithril.fund in a packaged build.
+ * Only an unpackaged dev/test run may point at a loopback mock via
+ * MITHRIL_DEV_API_ORIGIN (http://127.0.0.1:<port>); anything else is ignored.
+ */
+export function mithrilApiOrigin(): string {
+  const dev = process.env.MITHRIL_DEV_API_ORIGIN?.trim();
+  if (!dev || !/^http:\/\/127\.0\.0\.1:\d{2,5}$/.test(dev))
+    return MITHRIL_API_ORIGIN;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { app } = require("electron") as typeof import("electron");
+    if (app?.isPackaged !== false) return MITHRIL_API_ORIGIN;
+  } catch {
+    /* no Electron runtime (unit tests): allow loopback */
+  }
+  return dev;
+}
 export const MITHRIL_ACCOUNT_URL = "https://console.mithril.fund/account";
 
 // packages/server creates `mf_` followed by 32 random bytes in base64url.
@@ -31,7 +50,7 @@ async function getJson(
   token: string,
   fetchImpl: typeof fetch,
 ): Promise<{ status: number; body: unknown }> {
-  const response = await fetchImpl(`${MITHRIL_API_ORIGIN}${path}`, {
+  const response = await fetchImpl(`${mithrilApiOrigin()}${path}`, {
     headers: { authorization: `Bearer ${token}`, accept: "application/json" },
     credentials: "omit",
     cache: "no-store",

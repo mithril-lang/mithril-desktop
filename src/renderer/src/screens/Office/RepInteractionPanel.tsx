@@ -203,10 +203,10 @@ export default function RepInteractionPanel({
     }
     let alive = true;
     void window.hermesAPI
-      .getAccount()
+      .getMithrilAccount()
       .then((acc) => {
         if (alive) {
-          setAccountId(acc?.user.id ?? null);
+          setAccountId(acc?.live ? acc.userId : null);
           setAccountResolved(true);
         }
       })

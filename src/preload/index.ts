@@ -25,14 +25,11 @@ import type {
   ChatApprovalRequest,
 } from "../shared/chat-approval";
 import type {
-  DeviceCodeInfo,
-  EnsureHermesOneKeyResult,
-  HermesAccount,
-  HermesAccountUser,
-  HermesOneCreditsResult,
   MithrilAccount,
   MithrilDeviceCode,
   MithrilAccountConnectResult,
+  MithrilChatResult,
+  MithrilFirstRunState,
 } from "../shared/account";
 import type { AgentSyncResult, AgentSyncStatus } from "../shared/agent-sync";
 import type { GpuPreferenceMode, GpuStatus } from "../shared/gpu";
@@ -253,41 +250,6 @@ const hermesAPI = {
     return () => ipcRenderer.removeListener("oauth-login-progress", handler);
   },
 
-  // Hermes account sign-in (device authorization grant)
-  accountLogin: (
-    profile?: string,
-  ): Promise<{ success: boolean; user?: HermesAccountUser; error?: string }> =>
-    ipcRenderer.invoke("hermes-account-login", profile),
-  cancelAccountLogin: (): Promise<boolean> =>
-    ipcRenderer.invoke("hermes-account-login-cancel"),
-  onAccountLoginCode: (
-    callback: (info: DeviceCodeInfo) => void,
-  ): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, info: unknown): void =>
-      callback(info as DeviceCodeInfo);
-    ipcRenderer.on("hermes-account-login-code", handler);
-    return () =>
-      ipcRenderer.removeListener("hermes-account-login-code", handler);
-  },
-  onAccountLoginProgress: (callback: (chunk: string) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, chunk: unknown): void =>
-      callback(String(chunk));
-    ipcRenderer.on("hermes-account-login-progress", handler);
-    return () =>
-      ipcRenderer.removeListener("hermes-account-login-progress", handler);
-  },
-  getAccount: (profile?: string): Promise<HermesAccount | null> =>
-    ipcRenderer.invoke("hermes-account-get", profile),
-  accountLogout: (profile?: string): Promise<{ success: boolean }> =>
-    ipcRenderer.invoke("hermes-account-logout", profile),
-  // Auto-provision a Hermes One Inference key from the signed-in account
-  // (no-op when the profile already has one), and read the account's
-  // AI-credit balance for the Providers account card.
-  ensureHermesOneKey: (profile?: string): Promise<EnsureHermesOneKeyResult> =>
-    ipcRenderer.invoke("hermesone-ensure-key", profile),
-  getHermesOneCredits: (): Promise<HermesOneCreditsResult> =>
-    ipcRenderer.invoke("hermesone-credits"),
-
   getMithrilAccount: (profile?: string): Promise<MithrilAccount | null> =>
     ipcRenderer.invoke("mithril-account-get", profile),
   connectMithrilAccount: (
@@ -312,6 +274,13 @@ const hermesAPI = {
   },
   disconnectMithrilAccount: (profile?: string): Promise<{ success: boolean }> =>
     ipcRenderer.invoke("mithril-account-disconnect", profile),
+  getMithrilFirstRunState: (profile?: string): Promise<MithrilFirstRunState> =>
+    ipcRenderer.invoke("mithril-first-run-state", profile),
+  mithrilChat: (
+    messages: { role: "user" | "assistant"; content: string }[],
+    profile?: string,
+  ): Promise<MithrilChatResult> =>
+    ipcRenderer.invoke("mithril-chat", messages, profile),
 
   // Cloud agent sync (profiles ↔ signed-in Hermes One account)
   syncAgents: (): Promise<AgentSyncResult> =>

@@ -72,8 +72,8 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/verify-native-module-architecture.sh x64
-          codesign --verify --deep --strict --verbose=2 dist/mac-x64/Mithril.app
-          file dist/mac-x64/Mithril.app/Contents/MacOS/Mithril | grep -q 'x86_64'
+          codesign --verify --deep --strict --verbose=2 dist/mac/Mithril.app
+          file dist/mac/Mithril.app/Contents/MacOS/Mithril | grep -q 'x86_64'
           test -f "dist/mithril-desktop-${{ needs.prepare.outputs.version }}-x64.dmg"
           test -f "dist/mithril-desktop-${{ needs.prepare.outputs.version }}-x64-mac.zip"
       - name: Upload Intel Mac artifacts
@@ -113,13 +113,15 @@ jobs:
           if (!(Test-Path $setup) -or !(Test-Path $portable) -or !(Test-Path "dist/preview.yml")) {
             throw "Expected Windows installer, portable app, and preview.yml"
           }
-          $extractDir = Join-Path $env:RUNNER_TEMP "mithril-installer"
-          7z x -y "-o$extractDir" $setup | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw "NSIS installer extraction failed" }
-          $appArchive = Get-ChildItem $extractDir -Filter "app-64.7z" -Recurse | Select-Object -First 1
-          if (!$appArchive) { throw "The x64 application archive is missing from the installer" }
-          $listing = 7z l $appArchive.FullName
-          if ($listing -notmatch "mithril.exe") { throw "mithril.exe is missing from the NSIS installer" }
+          $app = "dist/win-unpacked/mithril.exe"
+          if (!(Test-Path $app)) { throw "The packaged x64 application executable is missing" }
+          if ([System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($app), 0, 2) -ne "MZ") {
+            throw "The packaged application does not have a Windows PE header"
+          }
+          7z t $setup | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "NSIS installer integrity test failed" }
+          7z t $portable | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Portable executable integrity test failed" }
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -163,8 +165,10 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          APPIMAGE="dist/mithril-desktop-$VERSION-$ARCH.AppImage"
-          test -x "$APPIMAGE"
+          APPIMAGE_ARCH=$ARCH
+          if [ "$ARCH" = x64 ]; then APPIMAGE_ARCH=x86_64; fi
+          APPIMAGE="dist/mithril-desktop-$VERSION-$APPIMAGE_ARCH.AppImage"
+          test -f "$APPIMAGE"
           DEB_ARCH=amd64
           ELF_ARCH='x86-64'
           FEED=dist/preview-linux.yml
@@ -177,6 +181,7 @@ jobs:
           test -n "$DEB"
           test -f "$FEED"
           rm -rf appimage-root deb-root squashfs-root
+          chmod +x "$APPIMAGE"
           "$APPIMAGE" --appimage-extract >/dev/null
           mv squashfs-root appimage-root
           file appimage-root/mithril | grep -q "$ELF_ARCH"

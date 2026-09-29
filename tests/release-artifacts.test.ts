@@ -36,6 +36,9 @@ describe("Mithril preview platform release", () => {
     expect(source).toContain("runner: ubuntu-latest");
     expect(source).toContain("runner: ubuntu-24.04-arm");
     expect(source).toContain("electron-builder --mac dmg zip --x64");
+    expect(source).toContain("run: bash scripts/import-macos-certificate.sh");
+    expect(source).toContain("APPLE_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}");
+    expect(source).toContain("spctl --assess --type execute");
     expect(source).toContain("electron-builder --win nsis portable --x64");
     expect(source).toContain(
       "electron-builder --linux AppImage deb --${{ matrix.arch }}",
@@ -47,6 +50,18 @@ describe("Mithril preview platform release", () => {
 });
 
 describe("Release quality gates", () => {
+  // @lat: [[desktop-updates#Kotoba fork release channel#Signed and notarized macOS builds]]
+  it("requires the Mithril Developer ID identity and Apple notarization", () => {
+    const config = readFileSync(join(ROOT, "electron-builder.yml"), "utf-8");
+
+    expect(config).toContain(
+      'identity: "Jun Kawasaki (3A5CBTEBFP)"',
+    );
+    expect(config).toContain("notarize: true");
+    expect(config).not.toContain("identity: null");
+    expect(config).not.toContain("notarize: false");
+  });
+
   // @lat: [[desktop-updates#Stable and beta release channels#Release security and quality gates]]
   it("blocks CI on high-severity production advisories and lint warnings", () => {
     const packageJson = JSON.parse(

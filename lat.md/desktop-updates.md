@@ -64,10 +64,10 @@ The old fork used `publish.provider: generic` at that URL so it could not update
 
 The old fork published content-addressed artifacts through `scripts/publish-release.cljk`, `kotoba.app.edn`, and `app-kotoba-cloud.desktop-releases`. Those old-account publisher files were removed from the Mithril repo. They remain in Git history as provenance; Mithril releases use GitHub release assets exposed through the app download route.
 
-### Unsigned macOS builds
+### Signed and notarized macOS builds
 
-The Apple silicon preview is ad-hoc signed and not notarized, so Gatekeeper asks the user to confirm on first launch.
+The macOS preview is signed with the Mithril Developer ID Application identity and notarized by Apple, so Gatekeeper can validate it without a manual security override.
 
-No Developer ID Application certificate exists in the workspace. The preview does not poll an updater feed at startup. Its explicit update actions open the verified App download page, avoiding both an unpublished-feed error and an impossible Squirrel.Mac replacement.
+Release jobs import the encrypted signing identity into an isolated temporary keychain and stage an App Store Connect API key for notarization. Missing credentials fail packaging instead of falling back to a development or ad-hoc release. The preview still uses manual updates and opens the verified App download page.
 
-`build/afterPack.js` is wired as `afterPack` and re-signs the packed bundle inside-out with the ad-hoc identity — every Mach-O leaf first (dylibs, `Helpers/chrome_crashpad_handler`, the `.node` addons under `app.asar.unpacked`), then the frameworks and helper apps, then the outer `.app`. Without it electron-builder leaves Electron's stock signature over replaced resources, `codesign --verify --deep --strict` fails with "code has no resources but signature indicates they must be present", and Apple Silicon refuses to launch the app. A framework whose signing fails now fails the build instead of being silently skipped.
+`build/afterPack.js` first repairs the packed bundle inside-out with an ad-hoc identity — every Mach-O leaf, framework, helper app, and the outer app. Electron Builder then replaces that preparatory signature with the configured Developer ID identity and submits the app for notarization. A missing leaf signature or failed framework sign blocks the build before publication.

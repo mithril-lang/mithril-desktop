@@ -133,9 +133,7 @@ describe("useModelConfig", () => {
       const groups = JSON.parse(
         screen.getByTestId("groups").textContent || "[]",
       );
-      const hs = groups.find(
-        (g: { label: string }) => g.label === "Mithril",
-      );
+      const hs = groups.find((g: { label: string }) => g.label === "Mithril");
       expect(hs).toBeTruthy();
       // Not lumped under the generic OpenAI-compatible bucket.
       expect(hs.provider).toBe("mithril");

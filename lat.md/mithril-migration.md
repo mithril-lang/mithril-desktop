@@ -4,7 +4,7 @@ The public `mithril-lang/mithril-desktop` repository contains the Mithril deskto
 
 ## Repository ownership
 
-This public repository starts from a reviewed source snapshot without importing the private migration repository's history. The private `mithril-lang/fund-mithril-app` repository and the old fork remain separate sources for ongoing migration work.
+This public repository is the canonical Mithril Desktop. It started from a reviewed source snapshot and now also carries the action-approval contract that previously lived only on `mithril-lang/fund-mithril-app`. That private repository is no longer a release source. Do not continue migration work there.
 
 Preserve the upstream MIT license and commit history. Do not push Mithril changes to `legacy` (`cloud-kotoba/org-hermesone-hermes-desktop`).
 

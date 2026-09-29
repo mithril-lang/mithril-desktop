@@ -5495,6 +5495,50 @@ body:has(.shell-vibrant),
   text-transform: uppercase;
 }
 
+.chat-action-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-base);
+}
+
+.chat-action-summary--consequential,
+.chat-action-summary--critical {
+  border-color: var(--warning, #d97706);
+}
+
+.chat-action-summary > div {
+  min-width: 0;
+}
+
+.chat-action-summary dt {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chat-action-summary dd {
+  margin: 3px 0 0;
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.chat-action-summary__wide {
+  grid-column: 1 / -1;
+}
+
+.chat-action-summary__digest {
+  font-family: var(--font-mono, monospace);
+}
+
 .chat-approval-command {
   max-height: 180px;
   margin: 0;
@@ -5544,6 +5588,14 @@ body:has(.shell-vibrant),
 @media (max-width: 720px) {
   .chat-approval-card {
     margin-left: 0;
+  }
+
+  .chat-action-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-action-summary__wide {
+    grid-column: auto;
   }
 }
 

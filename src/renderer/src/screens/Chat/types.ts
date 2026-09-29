@@ -4,7 +4,10 @@ export type {
 } from "../../../../shared/attachments";
 
 import type { Attachment } from "../../../../shared/attachments";
-import type { ApprovalChoice } from "../../../../shared/chat-approval";
+import type {
+  ApprovalChoice,
+  MithrilActionEnvelope,
+} from "../../../../shared/chat-approval";
 
 /**
  * Visible chat bubble (user or assistant). Used for live streaming and as
@@ -93,6 +96,7 @@ export interface ApprovalMessage {
   command: string;
   description: string;
   choices: ApprovalChoice[];
+  action?: MithrilActionEnvelope;
   choice?: ApprovalChoice;
   resolved?: boolean;
   unavailable?: boolean;

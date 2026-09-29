@@ -21,7 +21,7 @@ Command-specific features use the Agent's existing `commands.catalog` response i
 
 Only compatibility metadata from `session.info` crosses back into the main-process evidence cache.
 
-[[src/main/hermes.ts#recordAgentRuntimeInfo]] retains `desktop_contract`, `version`, `release_date`, `update_behind`, and `update_command`. Model state, tools, prompts, paths, and other session data are discarded by [[src/shared/agent-capabilities.ts#sanitizeAgentRuntimeInfo]].
+[[src/main/hermes.ts#recordAgentRuntimeInfo]] retains `desktop_contract`, `distribution`, `action_contract`, `version`, `release_date`, `update_behind`, and `update_command`. Model state, tools, prompts, paths, and other session data are discarded by [[src/shared/agent-capabilities.ts#sanitizeAgentRuntimeInfo]].
 
 [[src/main/hermes.ts#getAgentCapabilityEvidence]] combines the cached runtime evidence with the existing `/v1/capabilities` probe. Evidence is keyed by the run's stable connection ID plus profile, and missing reconnect evidence clears stale runtime and command claims.
 
@@ -42,6 +42,12 @@ Older Agents keep the existing experience while newer surfaces gate themselves o
 A missing desktop contract is `legacy`, not a hard failure. A contract below the recommended value suggests an Agent update, while direct Remote connections disable the local update action because that process is not owned by this desktop.
 
 [[src/main/ipc/register.ts#registerIpcHandlers]] exposes the snapshot plus bounded runtime-info and command-inventory recorders through preload. [[src/renderer/src/components/settings/AboutPane.tsx#AboutPane]] shows the observed and recommended desktop contracts alongside the independent Agent update action.
+
+## Mithril runtime identity
+
+Desktop compatibility and Action authority are separate decisions. An upstream Hermes Agent can remain usable for legacy chat while being ineligible to enforce Mithril actions.
+
+[[src/shared/agent-capabilities.ts#buildAgentCapabilitySnapshot]] sets `trustedActionRuntime` only when the gateway advertises both `distribution = mithril-agent` and `action_contract = mithril.action/v1`. Missing, legacy, or unknown values fail closed for Action execution. The About pane exposes the observed distribution and contract so operators can diagnose a mismatched runtime without disclosing session data.
 
 ## Test specifications
 

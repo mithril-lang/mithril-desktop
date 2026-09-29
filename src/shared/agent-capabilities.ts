@@ -1,5 +1,7 @@
 export const MIN_AGENT_DESKTOP_CONTRACT = 1;
 export const RECOMMENDED_AGENT_DESKTOP_CONTRACT = 6;
+export const MITHRIL_AGENT_DISTRIBUTION = "mithril-agent";
+export const MITHRIL_ACTION_CONTRACT = "mithril.action/v1";
 
 export type AgentCapabilityState = "supported" | "unsupported" | "unknown";
 export type AgentCapabilitySource =
@@ -31,10 +33,12 @@ export interface AgentFeatureCapabilities {
 }
 
 export interface AgentCapabilitySnapshot {
+  actionContract: string | null;
   canUpdate: boolean;
   checkedAt: number;
   compatibility: "compatible" | "legacy" | "unknown" | "update-recommended";
   desktopContract: number | null;
+  distribution: string | null;
   features: AgentFeatureCapabilities;
   minimumDesktopContract: number;
   recommendedDesktopContract: number;
@@ -44,6 +48,7 @@ export interface AgentCapabilitySnapshot {
   updateCommand: string | null;
   updateInfo: string | null;
   version: string | null;
+  trustedActionRuntime: boolean;
 }
 
 export interface AgentCapabilityEvidence {
@@ -56,7 +61,9 @@ export interface AgentCapabilityEvidence {
 }
 
 const RUNTIME_INFO_KEYS = [
+  "action_contract",
   "desktop_contract",
+  "distribution",
   "release_date",
   "update_behind",
   "update_command",
@@ -181,6 +188,8 @@ export function buildAgentCapabilitySnapshot(
   const runtime = record(evidence.runtimeInfo);
   const versionText = evidence.versionText?.trim() ?? "";
   const desktopContract = contractNumber(runtime.desktop_contract);
+  const distribution = text(runtime.distribution) || null;
+  const actionContract = text(runtime.action_contract) || null;
   const version = text(runtime.version) || versionFromText(versionText) || null;
   const releaseDate =
     text(runtime.release_date) || releaseDateFromText(versionText) || null;
@@ -204,10 +213,12 @@ export function buildAgentCapabilitySnapshot(
   }
 
   return {
+    actionContract,
     canUpdate: evidence.connectionMode !== "remote",
     checkedAt: evidence.checkedAt ?? Date.now(),
     compatibility,
     desktopContract,
+    distribution,
     features: {
       approvalsMode: contractFeature(desktopContract, 3),
       automationBlueprints: commandFeature(commands, "blueprint"),
@@ -238,5 +249,9 @@ export function buildAgentCapabilitySnapshot(
     updateCommand: text(runtime.update_command) || null,
     updateInfo,
     version,
+    // @lat: [[agent-capabilities#Mithril runtime identity]]
+    trustedActionRuntime:
+      distribution === MITHRIL_AGENT_DISTRIBUTION &&
+      actionContract === MITHRIL_ACTION_CONTRACT,
   };
 }

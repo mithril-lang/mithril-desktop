@@ -60,6 +60,35 @@ describe("ApprovalCard", () => {
     expect(document.querySelector("img")).toBeNull();
   });
 
+  // @lat: [[mithril-action-plane#Desktop approval projection#Shows normalized authority context]]
+  it("shows the Mithril action target, risk, evidence, cost, and digest", () => {
+    renderCard(
+      message({
+        choices: ["once", "deny"],
+        action: {
+          actionId: "action-123",
+          digest: "sha256:plan",
+          evidenceCount: 4,
+          expiresAt: "2026-09-29T12:00:00Z",
+          maximumCostMicroUsd: 1_250_000,
+          operation: "deploy",
+          receiptRequired: true,
+          reversible: true,
+          risk: "reversible",
+          target: "worker:mithril-web",
+          version: "mithril.action/v1",
+        },
+      }),
+    );
+
+    expect(screen.getByText("Reversible change")).toBeTruthy();
+    expect(screen.getByText("deploy")).toBeTruthy();
+    expect(screen.getByText("worker:mithril-web")).toBeTruthy();
+    expect(screen.getByText("4")).toBeTruthy();
+    expect(screen.getByText("$1.250000")).toBeTruthy();
+    expect(screen.getByText("sha256:plan")).toBeTruthy();
+  });
+
   it("requires a second explicit confirmation for always", async () => {
     const onRespond = vi.fn().mockResolvedValue(true);
     const onResolved = vi.fn();

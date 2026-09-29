@@ -31,6 +31,7 @@ import type {
   HermesAccountUser,
   HermesOneCreditsResult,
   MithrilAccount,
+  MithrilDeviceCode,
   MithrilAccountConnectResult,
 } from "../shared/account";
 import type { AgentSyncResult, AgentSyncStatus } from "../shared/agent-sync";
@@ -294,6 +295,21 @@ const hermesAPI = {
     profile?: string,
   ): Promise<MithrilAccountConnectResult> =>
     ipcRenderer.invoke("mithril-account-connect", token, profile),
+  mithrilDeviceLogin: (
+    profile?: string,
+  ): Promise<MithrilAccountConnectResult> =>
+    ipcRenderer.invoke("mithril-device-login", profile),
+  cancelMithrilDeviceLogin: (): Promise<boolean> =>
+    ipcRenderer.invoke("mithril-device-login-cancel"),
+  onMithrilDeviceCode: (
+    callback: (info: MithrilDeviceCode) => void,
+  ): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, info: unknown): void =>
+      callback(info as MithrilDeviceCode);
+    ipcRenderer.on("mithril-device-login-code", handler);
+    return () =>
+      ipcRenderer.removeListener("mithril-device-login-code", handler);
+  },
   disconnectMithrilAccount: (profile?: string): Promise<{ success: boolean }> =>
     ipcRenderer.invoke("mithril-account-disconnect", profile),
 

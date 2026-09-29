@@ -324,7 +324,7 @@ export function removeAgentUserProvider(
 // Hermes One's inference endpoint. Mirrored as a first-party user provider so
 // the agent can route it by slug; must match `OPENAI_COMPATIBLE_BASE_URLS`
 // (renderer constants) and the `URL_KEY_MAP` host pattern.
-const HERMESONE_BASE_URL = "https://inference.hermesone.org/v1";
+const MITHRIL_BASE_URL = "https://api.mithril.fund/v1";
 
 /**
  * Mirror first-party keyed brands into config.yaml `providers:` so the agent
@@ -343,13 +343,13 @@ export function mirrorFirstPartyAgentProviders(profile?: string): void {
   try {
     const { envFile } = profilePaths(profile);
     const env = existsSync(envFile) ? readFileSync(envFile, "utf-8") : "";
-    const match = env.match(/^\s*HERMESONE_API_KEY\s*=\s*(.+)\s*$/m);
+    const match = env.match(/^\s*MITHRIL_API_KEY\s*=\s*(.+)\s*$/m);
     if (!match || !match[1].trim()) return;
     upsertAgentUserProvider(profile, {
-      slug: "hermesone",
-      name: "Hermes One",
-      baseUrl: HERMESONE_BASE_URL,
-      keyEnv: "HERMESONE_API_KEY",
+      slug: "mithril",
+      name: "Mithril",
+      baseUrl: MITHRIL_BASE_URL,
+      keyEnv: "MITHRIL_API_KEY",
     });
   } catch {
     /* best-effort — chat still works once the entry can be written */

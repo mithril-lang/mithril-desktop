@@ -110,6 +110,10 @@ import {
   disconnectMithrilAccount,
   mithrilAccount,
 } from "../mithril-account";
+import {
+  cancelMithrilDeviceLogin,
+  startMithrilDeviceLogin,
+} from "../mithril-device-login";
 import { restartGatewayWhenIdle } from "../gateway-restart-defer";
 import {
   getAccount,
@@ -1031,6 +1035,20 @@ export function registerIpcHandlers(context: IpcContext): void {
         token,
         profile?.trim() || getActiveProfileNameSync(),
       ),
+  );
+  // Device sign-in: the console approves a short code, no token copy/paste.
+  ipcMain.handle("mithril-device-login", (event, profile?: string) =>
+    startMithrilDeviceLogin(
+      profile?.trim() || getActiveProfileNameSync(),
+      (info) => {
+        if (event.sender.isDestroyed()) return;
+        event.sender.send("mithril-device-login-code", info);
+        openExternalUrl(info.verificationUriComplete);
+      },
+    ),
+  );
+  ipcMain.handle("mithril-device-login-cancel", () =>
+    cancelMithrilDeviceLogin(),
   );
   ipcMain.handle("mithril-account-disconnect", (_event, profile?: string) =>
     disconnectMithrilAccount(profile?.trim() || getActiveProfileNameSync()),

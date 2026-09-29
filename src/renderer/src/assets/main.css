@@ -4896,8 +4896,8 @@ body:has(.shell-vibrant),
 /* The wordmark SVG ships with a black fill; recolour it to white via masking so
    it reads on the black circle, regardless of the source artwork's colours. */
 .chat-empty-logo {
-  width: 52px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   background-color: #fff;
   mask-repeat: no-repeat;
   mask-position: center;

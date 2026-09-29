@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useI18n } from "./useI18n";
 
-const STORAGE_KEY = "hermes-follow-x-dismissed";
-const X_URL = "https://x.com/HermesOneApp";
+const STORAGE_KEY = "mithril-follow-x-dismissed";
+const X_URL = "https://x.com/fund_mithril";
 
 /** Inline X (Twitter) logo — lucide-react removed the Twitter icon. */
 function XLogo({

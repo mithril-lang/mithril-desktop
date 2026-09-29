@@ -115,14 +115,14 @@ describe("useModelConfig", () => {
     });
   });
 
-  it("groups a custom Hermes One model under the Hermes One brand while keeping custom routing", async () => {
+  it("groups a custom Mithril model under the Mithril brand while keeping custom routing", async () => {
     savedModels = [
       {
         id: "hs-swift",
         name: "hermesone-swift",
         provider: "custom",
         model: "hermesone-swift",
-        baseUrl: "https://inference.hermesone.org/v1",
+        baseUrl: "https://api.mithril.fund/v1",
         createdAt: 1,
       },
     ];
@@ -134,11 +134,11 @@ describe("useModelConfig", () => {
         screen.getByTestId("groups").textContent || "[]",
       );
       const hs = groups.find(
-        (g: { label: string }) => g.label === "Hermes One",
+        (g: { label: string }) => g.label === "Mithril",
       );
       expect(hs).toBeTruthy();
       // Not lumped under the generic OpenAI-compatible bucket.
-      expect(hs.provider).toBe("hermesone");
+      expect(hs.provider).toBe("mithril");
       // Routing stays on `custom` + the base URL so the request still resolves.
       expect(hs.models[0]).toEqual({
         model: "hermesone-swift",

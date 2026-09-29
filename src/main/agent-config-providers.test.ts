@@ -149,10 +149,10 @@ describe("agent-config providers (config.yaml bridge)", () => {
     );
     const m = await mod();
     m.upsertAgentUserProvider("default", {
-      name: "Hermes One",
-      slug: "hermesone",
-      baseUrl: "https://inference.hermesone.org/v1",
-      keyEnv: "HERMESONE_API_KEY",
+      name: "Mithril",
+      slug: "mithril",
+      baseUrl: "https://api.mithril.fund/v1",
+      keyEnv: "MITHRIL_API_KEY",
     });
     const content = readConfig();
     // Exactly one providers key, now in block form, siblings untouched.
@@ -160,10 +160,10 @@ describe("agent-config providers (config.yaml bridge)", () => {
     expect(content).toContain("fallback_providers: []");
     expect(m.listAgentUserProviders("default")).toEqual([
       {
-        slug: "hermesone",
-        name: "Hermes One",
-        baseUrl: "https://inference.hermesone.org/v1",
-        keyEnv: "HERMESONE_API_KEY",
+        slug: "mithril",
+        name: "Mithril",
+        baseUrl: "https://api.mithril.fund/v1",
+        keyEnv: "MITHRIL_API_KEY",
       },
     ]);
   });
@@ -176,9 +176,9 @@ describe("agent-config providers (config.yaml bridge)", () => {
     writeConfig(before);
     const m = await mod();
     m.upsertAgentUserProvider("default", {
-      name: "Hermes One",
-      baseUrl: "https://inference.hermesone.org/v1",
-      keyEnv: "HERMESONE_API_KEY",
+      name: "Mithril",
+      baseUrl: "https://api.mithril.fund/v1",
+      keyEnv: "MITHRIL_API_KEY",
     });
     expect(readConfig()).toBe(before);
   });

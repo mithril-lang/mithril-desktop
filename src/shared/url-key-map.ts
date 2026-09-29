@@ -23,7 +23,7 @@ export interface UrlKeyMapping {
 }
 
 export const URL_KEY_MAP: ReadonlyArray<UrlKeyMapping> = [
-  { pattern: /inference\.hermesone\.org/i, envKey: "HERMESONE_API_KEY" },
+  { pattern: /api\.mithril\.fund/i, envKey: "MITHRIL_API_KEY" },
   { pattern: /openrouter\.ai/i, envKey: "OPENROUTER_API_KEY" },
   { pattern: /anthropic\.com/i, envKey: "ANTHROPIC_API_KEY" },
   { pattern: /openai\.com/i, envKey: "OPENAI_API_KEY" },
@@ -112,8 +112,8 @@ export function isLocalBaseUrl(url: string | null | undefined): boolean {
 export const OPENAI_COMPAT_PROVIDERS: ReadonlySet<string> = new Set([
   // Generic
   "custom",
-  // Hermes One's own gateway (OpenAI-compatible)
-  "hermesone",
+  // Mithril's own gateway (OpenAI-compatible)
+  "mithril",
   // Local LLMs
   "lmstudio",
   "ollama",

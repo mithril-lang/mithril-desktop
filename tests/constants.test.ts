@@ -293,7 +293,7 @@ describe("providerRouteForEnvKey", () => {
 
     expect(ordered).not.toContain("KOTOBA_API_KEY");
     expect(PROVIDERS.setup.some((entry) => entry.id === "kotoba")).toBe(false);
-    expect(ordered[0]).toBe("HERMESONE_API_KEY");
+    expect(ordered[0]).toBe("MITHRIL_API_KEY");
     expect(ordered[ordered.length - 1]).toBe("AIMLAPI_API_KEY");
     // A well-known provider outranks a niche one it followed in FieldDef order.
     expect(ordered.indexOf("ANTHROPIC_API_KEY")).toBeLessThan(
@@ -311,7 +311,7 @@ describe("providerRouteForEnvKey", () => {
     });
   });
 
-  // The provider cards/picker show plain provider names ("Hermes One"), not
+  // The provider cards/picker show plain provider names ("Mithril"), not
   // the FieldDef's "… API Key" label. Every LLM-section key must resolve to a
   // name so no card falls back to the noisy label.
   it("resolves a plain provider name for every LLM-provider key", () => {

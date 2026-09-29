@@ -20,6 +20,7 @@ import type {
   HermesAccountUser,
   HermesOneCreditsResult,
   MithrilAccount,
+  MithrilDeviceCode,
   MithrilAccountConnectResult,
 } from "../shared/account";
 import type { AgentSyncResult, AgentSyncStatus } from "../shared/agent-sync";
@@ -333,6 +334,13 @@ interface HermesAPI {
     token: string,
     profile?: string,
   ) => Promise<MithrilAccountConnectResult>;
+  mithrilDeviceLogin: (
+    profile?: string,
+  ) => Promise<MithrilAccountConnectResult>;
+  cancelMithrilDeviceLogin: () => Promise<boolean>;
+  onMithrilDeviceCode: (
+    callback: (info: MithrilDeviceCode) => void,
+  ) => () => void;
   disconnectMithrilAccount: (profile?: string) => Promise<{ success: boolean }>;
   // Cloud agent sync (profiles ↔ signed-in Hermes One account)
   syncAgents: () => Promise<AgentSyncResult>;

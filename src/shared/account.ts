@@ -22,6 +22,14 @@ export interface MithrilAccount {
   error?: string;
 }
 
+export interface MithrilDeviceCode {
+  userCode: string;
+  verificationUri: string;
+  verificationUriComplete: string;
+  expiresIn: number;
+  interval: number;
+}
+
 export type MithrilAccountConnectResult =
   | { status: "connected"; account: MithrilAccount }
   | { status: "refused"; error: string };

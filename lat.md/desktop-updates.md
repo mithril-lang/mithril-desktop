@@ -72,6 +72,12 @@ Release jobs import the encrypted signing identity into an isolated temporary ke
 
 `build/afterPack.js` first repairs the packed bundle inside-out with an ad-hoc identity — every Mach-O leaf, framework, helper app, and the outer app. Electron Builder then replaces that preparatory signature with the configured Developer ID identity and submits the app for notarization. A missing leaf signature or failed framework sign blocks the build before publication.
 
+### Windows preview signing
+
+Windows preview packages support Azure Artifact Signing or SSL.com eSigner, with signature verification required before publication when either route is enabled.
+
+The `WIN_SIGNING` repository variable selects `azure`, `esigner`, or the backward-compatible unsigned mode. Unknown values fail the job. Signed builds must give the setup executable, portable executable, and unpacked app a valid timestamped Authenticode signature. [[tests/release-artifacts.test.ts]] protects the route selection and publication gate; `docs/windows-signing.md` documents the credentials and setup.
+
 ## Preview update feed naming
 
 Prerelease versions such as `0.8.0-preview.1` bake `channel: preview` into `app-update.yml`, so the generic provider requests `preview*.yml` and the preview workflow publishes those names.

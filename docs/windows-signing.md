@@ -40,7 +40,8 @@ Setup, in order:
 Signature budget: one release signs about 6 files (app exe, helper exe, uninstaller, installer, portable). Tier 1 (240 a month) is enough.
 
 ## What the workflow does
-> **Pending:** the workflow edit is not in this PR because the automation token lacks GitHub's `workflow` scope. It is a ready patch (`git apply windows-signing-workflow.patch`, attached to the PR description) that needs one push from someone with that scope. Until then the workflow still builds unsigned.
+
+The preview workflow includes the signing switch. It still builds unsigned, with a warning, until the repository variable and credentials for one route are configured.
 
 `.github/workflows/preview-platforms.yml`, job `windows`:
 1. Resolves `WIN_SIGNING` (unset means unsigned plus a warning; unknown values fail).

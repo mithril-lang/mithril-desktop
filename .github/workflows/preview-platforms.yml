@@ -133,8 +133,79 @@ jobs:
         run: npm ci
       - name: Build app
         run: npm run build
-      - name: Package Windows artifacts
+      # Windows signing is selected by the repository variable WIN_SIGNING:
+      #   azure   - Azure Artifact Signing (secrets: AZURE_TENANT_ID,
+      #             AZURE_CLIENT_ID, AZURE_CLIENT_SECRET; variables:
+      #             AZURE_SIGN_ENDPOINT, AZURE_SIGN_ACCOUNT, AZURE_SIGN_PROFILE,
+      #             AZURE_SIGN_PUBLISHER)
+      #   esigner - SSL.com OV certificate on eSigner cloud HSM (secrets:
+      #             ES_USERNAME, ES_PASSWORD, ES_CREDENTIAL_ID, ES_TOTP_SECRET;
+      #             variable: WIN_PUBLISHER_NAME)
+      #   (unset) - unsigned build with a loud warning, as before.
+      # See docs/windows-signing.md.
+      - name: Resolve Windows signing mode
+        id: winsign
+        shell: bash
+        env:
+          MODE: ${{ vars.WIN_SIGNING }}
+        run: |
+          set -euo pipefail
+          case "${MODE:-}" in
+            azure|esigner) echo "mode=$MODE" >> "$GITHUB_OUTPUT" ;;
+            "") echo "mode=none" >> "$GITHUB_OUTPUT"
+                echo "::warning::WIN_SIGNING is not set; the Windows installer will be UNSIGNED." ;;
+            *) echo "Unknown WIN_SIGNING value: $MODE" >&2; exit 1 ;;
+          esac
+      - name: Install CodeSignTool (eSigner)
+        if: steps.winsign.outputs.mode == 'esigner'
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "codesigntool.zip"
+          $dir = Join-Path $env:RUNNER_TEMP "codesigntool"
+          Invoke-WebRequest "https://www.ssl.com/download/codesigntool-for-windows/" -OutFile $zip
+          Expand-Archive $zip -DestinationPath $dir -Force
+          $bat = Get-ChildItem $dir -Recurse -Filter CodeSignTool.bat | Select-Object -First 1
+          if (-not $bat) { throw "CodeSignTool.bat not found in the download" }
+          "CODESIGNTOOL_DIR=$($bat.DirectoryName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Package Windows artifacts (unsigned)
+        if: steps.winsign.outputs.mode == 'none'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npx electron-builder --win nsis portable --x64 --publish never
+      - name: Package Windows artifacts (Azure Artifact Signing)
+        if: steps.winsign.outputs.mode == 'azure'
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: >
+          npx electron-builder --win nsis portable --x64 --publish never
+          -c.win.azureSignOptions.endpoint="${{ vars.AZURE_SIGN_ENDPOINT }}"
+          -c.win.azureSignOptions.codeSigningAccountName="${{ vars.AZURE_SIGN_ACCOUNT }}"
+          -c.win.azureSignOptions.certificateProfileName="${{ vars.AZURE_SIGN_PROFILE }}"
+          -c.win.azureSignOptions.publisherName="${{ vars.AZURE_SIGN_PUBLISHER }}"
+      - name: Package Windows artifacts (SSL.com eSigner)
+        if: steps.winsign.outputs.mode == 'esigner'
+        env:
+          ES_USERNAME: ${{ secrets.ES_USERNAME }}
+          ES_PASSWORD: ${{ secrets.ES_PASSWORD }}
+          ES_CREDENTIAL_ID: ${{ secrets.ES_CREDENTIAL_ID }}
+          ES_TOTP_SECRET: ${{ secrets.ES_TOTP_SECRET }}
+        run: >
+          npx electron-builder --win nsis portable --x64 --publish never
+          -c.win.sign=scripts/win-sign-esigner.cjs
+          -c.win.signtoolOptions.publisherName="${{ vars.WIN_PUBLISHER_NAME }}"
+      - name: Verify Windows signatures
+        if: steps.winsign.outputs.mode != 'none'
+        shell: pwsh
+        run: |
+          $version = "${{ needs.prepare.outputs.version }}"
+          foreach ($f in @("dist/mithril-desktop-$version-setup.exe", "dist/mithril-desktop-$version-portable.exe", "dist/win-unpacked/mithril.exe")) {
+            $sig = Get-AuthenticodeSignature $f
+            Write-Host "$f : $($sig.Status) | $($sig.SignerCertificate.Subject) | timestamp: $($sig.TimeStamperCertificate.Subject)"
+            if ($sig.Status -ne "Valid") { throw "$f is not validly signed ($($sig.Status))" }
+            if (-not $sig.TimeStamperCertificate) { throw "$f has no countersignature timestamp" }
+          }
       - name: Inspect Windows packages
         shell: pwsh
         run: |

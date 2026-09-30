@@ -478,8 +478,8 @@ export default function Office3D({
             onClick={isCity && !devMode ? focusBuilding("office") : undefined}
           >
             <Room palette={palette} />
-            {/* The office block is the Los Angeles Convention Center: its
-                exterior skin exists only in the city view. */}
+            {/* City view only: South Hall, West Hall and the glass drum.
+                Entering the office unmounts the skin. */}
             {isCity && <ConventionCenterExterior />}
             {/* Glass roof: always in the city view; kept indoors in walk mode
                 (looking up shows the skylight grid), dropped in orbit-interior

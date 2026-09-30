@@ -122,9 +122,9 @@ The preview gate verifies packaging, type safety, the DMG, the app bundle signat
 
 ### Cross-platform preview
 
-The manual preview workflow builds Windows x64, Linux x64/ARM64, and Intel Mac packages on native GitHub runners, then updates the existing prerelease only when every job succeeds.
+The manual preview workflow builds Windows x64, Linux x64/ARM64, and both Mac architectures on native GitHub runners, then updates the existing prerelease only when every job succeeds.
 
-Windows publishes NSIS and portable executables with `preview.yml`. Each Linux architecture publishes AppImage and Debian packages plus its architecture-specific preview feed. Intel Mac publishes DMG and ZIP packages; both Mac architectures remain manual-update builds while using Developer ID signing and Apple notarization. The publish job preserves existing assets and replaces the consolidated SHA-256 manifest.
+Windows publishes NSIS and portable executables with `preview.yml`. Each Linux architecture publishes AppImage and Debian packages plus its architecture-specific preview feed. Both Mac architectures publish notarized DMG and ZIP packages. The publish job preserves existing assets and replaces the consolidated SHA-256 manifest.
 
 ## Legacy installation continuity
 

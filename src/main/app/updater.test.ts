@@ -22,6 +22,7 @@ vi.mock("../updater-log", () => ({ updaterLogger: { info: () => {} } }));
 import type { AppUpdater } from "electron-updater";
 import {
   macManualUpdateReason,
+  offeredUpdateVersion,
   setupManualUpdater,
   updateFeedAvailable,
 } from "./updater";
@@ -33,6 +34,32 @@ const SIGNED_0_7_10 =
   "Executable=/Applications/Kotoba.app/Contents/MacOS/Kotoba\nIdentifier=cloud.kotoba.desktop\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20500 size=448 flags=0x10000(runtime) hashes=3+7 location=embedded\nSignature size=9093\nTimestamp=Sep 23, 2026 at 7:45:30\nInfo.plist entries=38\nTeamIdentifier=3A5CBTEBFP\nRuntime Version=26.5.0\nSealed Resources version=2 rules=13 files=78\nInternal requirements count=1 size=184\n";
 const ADHOC_0_7_12 =
   "Executable=/Applications/Kotoba.app/Contents/MacOS/Kotoba\nIdentifier=cloud.kotoba.desktop\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20400 size=301 flags=0x2(adhoc) hashes=3+3 location=embedded\nSignature=adhoc\nInfo.plist entries=38\nTeamIdentifier=not set\nSealed Resources version=2 rules=13 files=78\nInternal requirements count=0 size=12\n";
+
+describe("offeredUpdateVersion", () => {
+  it("offers nothing when the feed is not newer than the running build", () => {
+    // electron-updater still returns the feed's info in this case; reporting
+    // it as an update made the download fail with "Please check update first".
+    expect(
+      offeredUpdateVersion({
+        isUpdateAvailable: false,
+        updateInfo: { version: "0.8.0-preview.3" },
+      }),
+    ).toBeNull();
+  });
+
+  it("offers the feed version when an update is available", () => {
+    expect(
+      offeredUpdateVersion({
+        isUpdateAvailable: true,
+        updateInfo: { version: "0.8.0-preview.4" },
+      }),
+    ).toBe("0.8.0-preview.4");
+  });
+
+  it("offers nothing when the check returned no result", () => {
+    expect(offeredUpdateVersion(null)).toBeNull();
+  });
+});
 
 describe("updateFeedAvailable", () => {
   it("needs app-update.yml next to the app resources", () => {

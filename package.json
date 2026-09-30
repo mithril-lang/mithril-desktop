@@ -1,6 +1,6 @@
 {
   "name": "mithril-desktop",
-  "version": "0.8.0-preview.3",
+  "version": "0.8.0-preview.4",
   "description": "Mithril desktop app — Hermes Agent client for Mithril Fund (fork of fathah/hermes-desktop)",
   "main": "./out/main/index.js",
   "author": "Mithril",

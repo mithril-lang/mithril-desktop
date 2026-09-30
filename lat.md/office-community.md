@@ -22,6 +22,8 @@ Joined users who are in [[office-3d-walk-mode|walk mode]] appear to everyone els
 
 ## Untrusted input
 
-Every inbound frame is rebuilt field by field by [[src/renderer/src/screens/Office/community/protocol.ts#parseFrame]]: control characters stripped, lengths clamped, future timestamps clamped to now, malformed frames dropped. Message bodies render as plain text, never markdown or HTML. Only `ws:`/`wss:` relay URLs are accepted by `normalizeRelayUrl`.
+Every inbound frame is rebuilt field by field by [[src/renderer/src/screens/Office/community/protocol.ts#parseFrame]], and message bodies render only as plain text.
+
+Control characters are stripped, lengths are clamped, future timestamps are clamped to now, and malformed frames are dropped. Only `ws:`/`wss:` relay URLs are accepted by `normalizeRelayUrl`.
 
 Identity is a display name plus a random per-install peer id, both in localStorage. There is no authentication yet: anyone who can reach the relay can join and choose any name.

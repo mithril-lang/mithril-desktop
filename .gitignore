@@ -44,3 +44,4 @@ release/
 
 # Local lat.md semantic-search index
 lat.md/.cache/vectors.db
+.codex

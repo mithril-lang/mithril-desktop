@@ -8,6 +8,7 @@
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache --max-warnings=0 .",
+    "lat:check": "lat check",
     "audit:prod": "node scripts/audit-production-dependencies.mjs",
     "test": "vitest run --maxWorkers=4",
     "test:coverage": "vitest run --coverage",
@@ -83,6 +84,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "fast-check": "^4.8.0",
     "jsdom": "^26.1.0",
+    "lat.md": "0.12.2",
     "playwright": "^1.60.0",
     "prettier": "^3.7.4",
     "react": "^19.2.1",

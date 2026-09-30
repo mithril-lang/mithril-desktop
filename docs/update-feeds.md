@@ -1,0 +1,18 @@
+# Update feed naming
+
+electron-builder derives the update channel from the version's prerelease tag, so the feed file names follow from `package.json`:
+
+| Version | Channel | Feed files on the GitHub release |
+| --- | --- | --- |
+| `0.8.0-preview.N` | `preview` | `preview.yml` (Windows), `preview-mac.yml`, `preview-linux.yml`, `preview-linux-arm64.yml` |
+| `0.8.0` (stable) | `latest` | `latest.yml`, `latest-mac.yml`, `latest-linux.yml`, `latest-linux-arm64.yml` |
+
+A preview build requests `preview*.yml`; a stable build requests `latest*.yml`. Both are consistent with what `tests/first-run-mithril.test.ts` pins. Prereleases must stay marked as prerelease on GitHub so stable clients never see them.
+
+## Known gaps (measured on v0.8.0-preview.3)
+- `preview-mac.yml` is written by two separate builds (arm64 and Intel); only one set of entries can win unless the files are merged. Check that both `arm64-mac.zip` and `x64-mac.zip` appear in it before publishing, or auto-update on one architecture will fail.
+- The `x86_64.AppImage` has no separate `.blockmap` asset (an embedded block map exists), so differential updates fall back to a full download.
+- The workflow and release-asset changes for these need the `workflow` token scope and a Mac for verification; see the release report.
+
+## Signing and notarization
+See [windows-signing.md](windows-signing.md) for Windows. macOS builds are Developer ID signed and notarized on a Mac; verify a downloaded DMG with `spctl -a -t open --context context:primary-signature -v <dmg>`, `xcrun stapler validate <dmg>` and `codesign --verify --deep --strict <app>`. These need macOS and cannot be run on Linux.

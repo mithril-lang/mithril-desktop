@@ -48,7 +48,7 @@ A revoked token is refused, and a ledger mismatch never appears as a trustworthy
 
 ## Secure Mithril token storage
 
-[[src/main/mithril-token-store.ts]] keeps each profile's Mithril bearer in a separate Electron `safeStorage` encrypted file. It refuses plaintext fallback and never reads the old Kotoba token file.
+[[src/main/mithril-token-store.ts]] keeps each profile's Mithril bearer in a separate Electron `safeStorage` encrypted file. Without a system keyring it falls back to a weaker, disclosed AES-256-GCM file. It never writes plaintext or reads the old Kotoba token file.
 
 ### Profile isolation
 
@@ -56,7 +56,13 @@ The encrypted Mithril file is scoped to one Hermes profile and can be cleared wi
 
 ### No plaintext fallback
 
-If Electron cannot encrypt, the new Mithril token is not written to disk.
+The new Mithril token is never written to disk as plaintext. With a real keyring (`gnome_libsecret`, `kwallet*`, macOS, Windows) it uses the v1 `safeStorage` format.
+
+### Reduced-protection file fallback
+
+Used when no system keyring is found; weaker than a keyring and disclosed in the UI.
+
+If `safeStorage` is unavailable or reports `basic_text` (Chromium's fixed public key), the token is sealed as v2: AES-256-GCM, key from HKDF-SHA256 over a random 32-byte per-install secret in a 0600 `mithril-install-secret` file under `userData` (outside the profile directory), with a random salt and IV per write. Anyone running as the same OS user can read both files, so this is weaker than a keyring; the connect screen and account card say so and point to gnome-keyring or KWallet. `--password-store=basic` is not used because it protects with a known key. Tampering or a missing secret makes the token unreadable, which reads as disconnected.
 
 ### Failed replacement
 

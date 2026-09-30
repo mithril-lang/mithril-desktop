@@ -81,6 +81,9 @@ export default function MithrilAccountSection({
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [protection, setProtection] = useState<"keychain" | "reduced">(
+    "keychain",
+  );
   const [deviceCode, setDeviceCode] = useState<string | null>(null);
 
   useEffect(() => {
@@ -97,6 +100,19 @@ export default function MithrilAccountSection({
       active = false;
     };
   }, [profile]);
+
+  useEffect(() => {
+    let active = true;
+    void window.hermesAPI
+      .getMithrilFirstRunState(profile)
+      .then((state) => {
+        if (active && state.protection) setProtection(state.protection);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [profile, account]);
 
   const connect = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
@@ -170,6 +186,17 @@ export default function MithrilAccountSection({
           "Mithril Console で接続トークンを発行し、このデスクトップのプロフィールに接続してください。推論とホスト型セッションは移行中です。",
         )}
       </p>
+      {protection === "reduced" && (
+        <p
+          role="note"
+          className="settings-section-hint"
+          data-testid="mithril-reduced-protection"
+        >
+          {ja
+            ? "システムのキーリングが見つからないため、トークンは保護が弱い方式（アプリ管理の暗号化ファイル）で保存されます。gnome-keyring または KWallet を有効にして再接続すると強化されます。"
+            : "Stored with reduced protection because no system keyring was found. Install and unlock gnome-keyring or KWallet, then reconnect for stronger protection."}
+        </p>
+      )}
       {account && (
         <div className="hermes-account-card">
           <span className="hermes-account-avatar hermes-account-avatar-fallback">

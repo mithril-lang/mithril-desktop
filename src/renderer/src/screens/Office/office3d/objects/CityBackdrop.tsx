@@ -31,6 +31,12 @@ import {
   SHOWROOM_X,
   SHOWROOM_Z,
   VIEW_BLOCKER_SPOTS,
+  HYPERLOOP_Z,
+  HYPERLOOP_CLEAR_HALF,
+  HYPERLOOP_STATION_X,
+  HYPERLOOP_STATION_W,
+  HYPERLOOP_STATION_D,
+  HYPERLOOP_STATION_Z,
 } from "../core/cityPlan";
 
 // ── Shared geometry / materials ────────────────────────────────────────────
@@ -376,6 +382,16 @@ function generateBackdrop(): {
         x < SHOWROOM_X + SHOWROOM_W / 2 + showroomClear &&
         z > SHOWROOM_Z - SHOWROOM_D / 2 - showroomClear &&
         z < SHOWROOM_Z + SHOWROOM_D / 2 + showroomClear
+      ) {
+        continue;
+      }
+
+      // Hyperloop corridor: pylon legs along the tube's road, plus the
+      // terminal lot to its north.
+      if (Math.abs(z - HYPERLOOP_Z) < HYPERLOOP_CLEAR_HALF) continue;
+      if (
+        Math.abs(x - HYPERLOOP_STATION_X) < HYPERLOOP_STATION_W / 2 + 4 &&
+        Math.abs(z - HYPERLOOP_STATION_Z) < HYPERLOOP_STATION_D / 2 + 4
       ) {
         continue;
       }

@@ -19,6 +19,7 @@ describe("Mithril account card", () => {
   it("connects a profile without retaining the entered bearer in the input", async () => {
     const connect = vi.fn().mockResolvedValue({
       status: "connected",
+      protection: "keychain",
       account: {
         userId: "u1",
         accountUrl: "https://console.mithril.fund/account",
@@ -31,6 +32,9 @@ describe("Mithril account card", () => {
       configurable: true,
       value: {
         getMithrilAccount: vi.fn().mockResolvedValue(null),
+        getMithrilFirstRunState: vi
+          .fn()
+          .mockResolvedValue({ connected: false, protection: "keychain" }),
         connectMithrilAccount: connect,
         disconnectMithrilAccount: vi.fn().mockResolvedValue({ success: true }),
         onMithrilDeviceCode: vi.fn(() => () => {}),

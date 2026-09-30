@@ -29,7 +29,12 @@ import {
 import { Workstations, FurniturePieces } from "./objects/furniture";
 import { AgentsLayer } from "./objects/AgentsLayer";
 import { PedestriansLayer } from "./objects/Pedestrians";
+import { RemoteAvatarsLayer } from "./objects/RemoteAvatars";
+import type { CommunityPeer, PeerPose } from "../community/types";
+import type { PeerLiveStore } from "../community/useCommunity";
 import { GlassRoof } from "./objects/Roofs";
+import { ConventionCenterExterior } from "./objects/ConventionCenter";
+import { HyperloopLine } from "./objects/Hyperloop";
 import { PlayerLayer, PLAYER_SPAWN, PLAYER_LOOK_Y } from "./objects/Player";
 import { buildWorkstations, REST_FURNITURE, EXECUTIVE_DECOR } from "./layout";
 import { DAY_PALETTE } from "./core/palette";
@@ -180,6 +185,9 @@ export default function Office3D({
   onNearbyInteraction,
   devMode = false,
   onDevLog,
+  remotePeers,
+  remoteLive,
+  onPlayerPose,
 }: {
   agents: OfficeAgent[];
   selectedId: string | null;
@@ -208,6 +216,11 @@ export default function Office3D({
   onNearbyInteraction?: (p: PlayerInteraction | null) => void;
   devMode?: boolean;
   onDevLog?: (msg: string) => void;
+  /** Community members to draw as walking avatars (with their live poses). */
+  remotePeers?: CommunityPeer[];
+  remoteLive?: React.RefObject<PeerLiveStore>;
+  /** Walk mode: the user's avatar pose, throttled, for publishing. */
+  onPlayerPose?: (pose: PeerPose) => void;
 }): React.JSX.Element {
   // Clicking the selected agent again clears the selection. Memoized so agent
   // status polling (which re-renders Office3D with a new `agents` array but an
@@ -454,6 +467,7 @@ export default function Office3D({
             <TrafficLayer />
           </Suspense>
           <ConnectingStreet />
+          <HyperloopLine />
         </>
       )}
       {(isCity || inOffice) && (
@@ -464,6 +478,9 @@ export default function Office3D({
             onClick={isCity && !devMode ? focusBuilding("office") : undefined}
           >
             <Room palette={palette} />
+            {/* The office block is the Los Angeles Convention Center: its
+                exterior skin exists only in the city view. */}
+            {isCity && <ConventionCenterExterior />}
             {/* Glass roof: always in the city view; kept indoors in walk mode
                 (looking up shows the skylight grid), dropped in orbit-interior
                 mode so the top-down camera stays unobstructed. */}
@@ -558,6 +575,15 @@ export default function Office3D({
           visiblePlace={location === "city" ? null : location}
         />
       </Suspense>
+      {remotePeers && remoteLive && remotePeers.length > 0 && (
+        <Suspense fallback={null}>
+          <RemoteAvatarsLayer
+            peers={remotePeers}
+            live={remoteLive}
+            visiblePlace={location === "city" ? null : location}
+          />
+        </Suspense>
+      )}
       {/* Walk mode: the user's avatar. Always mounted while walking (like
           AgentsLayer) so doorway transitions never unmount the player. */}
       {walkMode && (
@@ -569,6 +595,7 @@ export default function Office3D({
             label={playerLabel ?? "You"}
             onPlaceChange={onPlayerPlaceChange}
             onNearbyChange={onNearbyInteraction}
+            onPose={onPlayerPose}
           />
         </Suspense>
       )}

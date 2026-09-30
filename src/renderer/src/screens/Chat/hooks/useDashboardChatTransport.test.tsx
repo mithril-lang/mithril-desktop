@@ -585,10 +585,86 @@ describe("useDashboardChatTransport recovery", () => {
     });
 
     const methods = dashboardMock.request.mock.calls.map(([method]) => method);
-    expect(methods.filter((method) => method === "slash.exec")).toHaveLength(1);
+    expect(methods.filter((method) => method === "slash.exec")).toHaveLength(0);
     expect(methods.filter((method) => method === "model.options")).toHaveLength(
-      3,
+      2,
     );
+  });
+
+  it("does not invoke slash.exec when Hermes already reports the selected Mithril model", async () => {
+    dashboardMock.request.mockImplementation(async (method) => {
+      if (method === "session.create") {
+        return { session_id: "live", stored_session_id: "stored" };
+      }
+      if (method === "model.options") {
+        return {
+          model: "qwen/qwen3.8-27b",
+          provider: "custom:mithril",
+          providers: [],
+        };
+      }
+      return {};
+    });
+    const api: HarnessApi = {};
+    render(<Harness api={api} />);
+
+    await act(async () => {
+      api.setProvider?.("mithril");
+      api.setModel?.("qwen/qwen3.8-27b");
+    });
+    await act(async () => {
+      await api.send?.("Search the web for today's top tech news");
+    });
+
+    const methods = dashboardMock.request.mock.calls.map(([method]) => method);
+    expect(methods).toContain("prompt.submit");
+    expect(methods).not.toContain("slash.exec");
+  });
+
+  it("resumes the stored session before model inspection after dashboard restart", async () => {
+    const requests: Array<{ method: string; params: unknown }> = [];
+    dashboardMock.request.mockImplementation(async (method, params) => {
+      requests.push({ method, params });
+      if (method === "session.create") {
+        return { session_id: "live-old", stored_session_id: "stored-chat" };
+      }
+      if (method === "session.resume") {
+        return { session_id: "live-new", stored_session_id: "stored-chat" };
+      }
+      if (method === "model.options") {
+        return { model: "bad-model", provider: "bad-provider", providers: [] };
+      }
+      return {};
+    });
+    const api: HarnessApi = {};
+    render(<Harness api={api} />);
+
+    await act(async () => {
+      await api.send?.("before restart");
+    });
+    await act(async () => {
+      dashboardMock.onClose?.();
+      await api.send?.("after restart");
+    });
+
+    expect(requests).toContainEqual({
+      method: "session.resume",
+      params: { session_id: "stored-chat", cols: 96 },
+    });
+    const resumeIndex = requests.findIndex(
+      ({ method }) => method === "session.resume",
+    );
+    const postRestartModelIndex = requests.findIndex(
+      ({ method, params }, index) =>
+        index > resumeIndex &&
+        method === "model.options" &&
+        params &&
+        typeof params === "object" &&
+        "session_id" in params &&
+        params.session_id === "live-new",
+    );
+    expect(resumeIndex).toBeGreaterThan(-1);
+    expect(postRestartModelIndex).toBeGreaterThan(resumeIndex);
   });
 
   it("surfaces OAuth login requirements without legacy fallback", async () => {

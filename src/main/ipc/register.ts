@@ -116,7 +116,20 @@ import {
   cancelMithrilDeviceLogin,
   startMithrilDeviceLogin,
 } from "../mithril-device-login";
-import { restartGatewayWhenIdle } from "../gateway-restart-defer";
+import {
+  cronBusyStrict,
+  dashboardTurnBusy,
+  restartGatewayWhenIdle,
+  restartMithrilRuntimeWhenIdle,
+} from "../gateway-restart-defer";
+import {
+  multiplexerServes,
+  multiplexedSecondaries,
+} from "../gateway-multiplex";
+import {
+  createMithrilRuntimeLifecycle,
+  planMithrilRuntimeRefresh,
+} from "../mithril-runtime-lifecycle";
 import {
   isRemoteMode,
   isRemoteOnlyMode,
@@ -141,6 +154,7 @@ import {
 import {
   freshDashboardWebSocketUrl,
   getDashboardStatus,
+  restartDashboardIfRunning,
   startDashboard,
   stopDashboard,
 } from "../dashboard";
@@ -740,6 +754,65 @@ export function registerIpcHandlers(context: IpcContext): void {
     openExternalUrl,
   } = context;
   const mainWindow = getMainWindow();
+  const mithrilRuntime = createMithrilRuntimeLifecycle({
+    connect: connectMithrilAccount,
+    deviceLogin: startMithrilDeviceLogin,
+    disconnect: disconnectMithrilAccount,
+    refreshRuntime: async (profile) => {
+      const requestedProfile = profile?.trim() || "default";
+      const multiplexed = multiplexerServes(requestedProfile);
+      const plan = planMithrilRuntimeRefresh(
+        requestedProfile,
+        multiplexed,
+        multiplexedSecondaries(),
+      );
+      const result = await restartMithrilRuntimeWhenIdle(
+        requestedProfile,
+        async (targetProfile) => {
+          // A named profile served by the default multiplexer has no process
+          // that can inherit its Electron-only secure token. Recreating the
+          // managed, profile-scoped dashboard fixes Desktop chat; do not
+          // disrupt every gateway profile while pretending it refreshed the
+          // named credential.
+          if (
+            plan.restartGateway &&
+            !isRemoteMode() &&
+            isGatewayRunning(plan.gatewayProfile)
+          ) {
+            const gatewayReady = await restartGateway(plan.gatewayProfile);
+            if (!gatewayReady) throw new Error("gateway restart failed");
+          }
+          const dashboard = await restartDashboardIfRunning(targetProfile);
+          if (dashboard?.error) throw new Error("dashboard restart failed");
+        },
+        {
+          // Credential application is eventual and must never cut off a turn.
+          // Keep waiting until idle instead of dropping the saved mutation at
+          // an arbitrary deadline.
+          maxWaitMs: Number.POSITIVE_INFINITY,
+          // activeRuns spans local connections but carries no profile metadata;
+          // waiting for any active Desktop turn is conservative and prevents
+          // another profile's response from being cut off.
+          busy: () =>
+            activeRuns.size > 0 ||
+            (plan.restartGateway
+              ? plan.affectedProfiles
+              : [requestedProfile]
+            ).some(
+              (affectedProfile) =>
+                cronBusyStrict(affectedProfile) ||
+                dashboardTurnBusy(affectedProfile),
+            ),
+        },
+      );
+      if (!result.restarted) throw new Error("runtime remained busy");
+    },
+    onRefreshError: (profile) =>
+      console.error(
+        "[mithril] runtime credential refresh failed for profile",
+        profile?.trim() || "default",
+      ),
+  });
   // Installation
   ipcMain.handle("check-install", () => {
     return checkInstallStatus();
@@ -982,14 +1055,14 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle(
     "mithril-account-connect",
     (_event, token: string, profile?: string) =>
-      connectMithrilAccount(
+      mithrilRuntime.connect(
         token,
         profile?.trim() || getActiveProfileNameSync(),
       ),
   );
   // Device sign-in: the console approves a short code, no token copy/paste.
   ipcMain.handle("mithril-device-login", (event, profile?: string) =>
-    startMithrilDeviceLogin(
+    mithrilRuntime.deviceLogin(
       profile?.trim() || getActiveProfileNameSync(),
       (info) => {
         if (event.sender.isDestroyed()) return;
@@ -1002,7 +1075,7 @@ export function registerIpcHandlers(context: IpcContext): void {
     cancelMithrilDeviceLogin(),
   );
   ipcMain.handle("mithril-account-disconnect", (_event, profile?: string) =>
-    disconnectMithrilAccount(profile?.trim() || getActiveProfileNameSync()),
+    mithrilRuntime.disconnect(profile?.trim() || getActiveProfileNameSync()),
   );
   // First-run gate: local-only (no network) so an offline launch never blocks.
   ipcMain.handle("mithril-first-run-state", (_event, profile?: string) =>
@@ -1117,14 +1190,13 @@ export function registerIpcHandlers(context: IpcContext): void {
         if (value.trim()) {
           // A token pasted into Providers is verified and stored securely,
           // exactly like the account screen, never written to `.env`.
-          const result = await connectMithrilAccount(value, profile);
+          const result = await mithrilRuntime.connect(value, profile);
           if (result.status === "refused") throw new Error(result.error);
-          void restartGatewayWhenIdle(profile, restartGateway);
           return true;
         }
         // Clearing the field disconnects: the secure store holds the only copy.
-        disconnectMithrilAccount(profile);
         removeEnvKey("MITHRIL_API_KEY", profile);
+        await mithrilRuntime.disconnect(profile);
         return true;
       }
       setEnvValue(key, value, profile);

@@ -607,8 +607,9 @@ export function dashboardModelMatches(
 
   // Hermes reports a named provider from config.yaml as custom:<slug>
   // (custom:mithril) after /model --provider mithril. Same model, same endpoint.
-  const bare = (value: string) => value.replace(/^custom:/, "");
-  if (bare(provider) !== "custom" && bare(liveProvider) === bare(provider)) return true;
+  const bare = (value: string): string => value.replace(/^custom:/, "");
+  if (bare(provider) !== "custom" && bare(liveProvider) === bare(provider))
+    return true;
 
   // Named custom providers can be reported by Hermes Agent as custom:<slug>
   // while Hermes One's older model config still treats them as custom rows.
@@ -1442,6 +1443,12 @@ export function useDashboardChatTransport({
                 expirePendingClarifyRef.current(true);
                 expirePendingApprovalsRef.current(true);
                 clientRef.current = null;
+                // A replacement dashboard process cannot resolve the old
+                // process-local runtime id. Preserve the stored id so the next
+                // connection resumes it before model.options or prompt.submit.
+                runtimeSessionIdRef.current = null;
+                appliedModelRef.current = null;
+                lastSyncedCwdRef.current = null;
               }
             },
           });
@@ -1620,6 +1627,15 @@ export function useDashboardChatTransport({
           modelBaseUrl,
           before,
         );
+
+        // Do not run `/model` just to re-apply the model Hermes already owns.
+        // Besides needless work, slash.exec starts a separate HermesCLI worker;
+        // on a slow provider probe the Desktop's RPC deadline can expire while
+        // the live session was already correctly configured.
+        if (dashboardModelMatches(dashboardProvider, model, before)) {
+          appliedModelRef.current = `${targetSessionId}\n${dashboardProvider}\n${model}`;
+          return targetSessionId;
+        }
 
         if (
           storedSessionIdRef.current &&

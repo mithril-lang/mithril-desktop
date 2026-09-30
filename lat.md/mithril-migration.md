@@ -102,6 +102,16 @@ If secure storage is unavailable, connecting fails and no plaintext token is sav
 
 Each account read verifies the stored token again, and a revoked token is shown as inactive.
 
+### Runtime credential refresh
+
+Browser approval, device-code approval, manual provider entry, and disconnect all await one profile-scoped refresh through [[src/main/mithril-runtime-lifecycle.ts#createMithrilRuntimeLifecycle]].
+
+Refused or cancelled flows leave running processes alone. Each profile serializes the credential mutation and refresh together, preserving the user's order across slow Connect, repeated Connect, and Disconnect operations.
+
+The refresh waits for active Desktop turns, dashboard turn leases, and profile cron work without a forced timeout, then recreates the profile's gateway and any managed dashboard so their child environment is rebuilt from the secure token store. An unreadable lease or cron database is treated as busy to preserve unknown work. A named profile served by the default gateway multiplexer refreshes its managed dashboard without disrupting the shared gateway, whose process environment cannot represent multiple profile-specific values for the same secret name.
+
+Before each dashboard send, the Desktop compares the requested model with the live session. Hermes's `custom:mithril` and the Desktop's `mithril` are the same provider when the model matches; that already-correct state bypasses `/model` and its separate `slash.exec` worker. A dashboard disconnect clears the process-local runtime session ID while retaining the stored session ID, so reconnect resumes before model inspection.
+
 ### Desktop account card
 
 [[src/renderer/src/components/MithrilAccountSection.tsx]] connects a profile through IPC and shows the verified identity and balance.

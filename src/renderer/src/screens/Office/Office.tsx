@@ -9,6 +9,7 @@ import {
 import {
   Crown,
   DoorOpen,
+  Globe,
   Footprints,
   LogOut,
   MessageSquare,
@@ -21,6 +22,9 @@ import {
 import type { GpuStatus } from "../../../../shared/gpu";
 import { useI18n } from "../../components/useI18n";
 import OneChatModal from "./OneChatModal";
+import CommunityPanel from "./community/CommunityPanel";
+import { useCommunity } from "./community/useCommunity";
+import { useCommunitySettings } from "./community/useCommunitySettings";
 import Office3D from "./office3d/Office3D";
 import RepInteractionPanel from "./RepInteractionPanel";
 import { officeAgentsChanged, profilesToOfficeAgents } from "./office3d/agents";
@@ -84,6 +88,17 @@ function Office({ visible, profile }: OfficeProps): React.JSX.Element {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [ceoId, setCeoId] = useState<string | null>(readStoredCeo);
   const [chatOpen, setChatOpen] = useState(false);
+  const [communityOpen, setCommunityOpen] = useState(false);
+  const communitySettings = useCommunitySettings(profile);
+  // Joined users stay connected while the Office tab is showing, panel open or
+  // not, so other members' avatars are visible in the world.
+  const community = useCommunity({
+    enabled:
+      communitySettings.joined && !!communitySettings.name && (visible ?? true),
+    relayUrl: communitySettings.relayUrl,
+    name: communitySettings.name,
+    roomId: communitySettings.roomId,
+  });
   // Enterable buildings: clicking one in the city view focuses it (shows the
   // Enter prompt); entering switches the whole screen to that interior and
   // unmounts the rest of the city.
@@ -103,6 +118,11 @@ function Office({ visible, profile }: OfficeProps): React.JSX.Element {
   // walking through doorways and interactions fire with E near their points.
   const [walkMode, setWalkMode] = useState(false);
   const [nearby, setNearby] = useState<PlayerInteraction | null>(null);
+  // Your avatar is only in the shared world while you are walking it.
+  const { publishPose } = community;
+  useEffect(() => {
+    if (!walkMode) publishPose(null);
+  }, [walkMode, publishPose]);
   // Developer building-mover: click a building, then click ground to reposition
   // it; positions are logged to the console so the cityPlan constants can be
   // updated to match.
@@ -616,6 +636,9 @@ function Office({ visible, profile }: OfficeProps): React.JSX.Element {
           onNearbyInteraction={setNearby}
           devMode={devMode}
           onDevLog={setDevLog}
+          remotePeers={community.others}
+          remoteLive={community.live}
+          onPlayerPose={community.publishPose}
         />
 
         {/* Walk-mode toggle: drop in as an avatar / return to the sky view. */}
@@ -935,6 +958,26 @@ function Office({ visible, profile }: OfficeProps): React.JSX.Element {
             MITHRIL CHAT
           </span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setCommunityOpen((o) => !o)}
+          aria-label={t("office.community")}
+          aria-pressed={communityOpen}
+          className="absolute bottom-5 right-40 min-w-30 h-11 rounded-lg border-none bg-blue-600 cursor-pointer flex items-center justify-center px-3 gap-2 z-10"
+        >
+          <Globe size={20} className="text-white" aria-hidden="true" />
+          <span className="text-white font-extrabold tracking-wide whitespace-nowrap uppercase">
+            {t("office.community")}
+          </span>
+        </button>
+
+        <CommunityPanel
+          open={communityOpen}
+          onClose={() => setCommunityOpen(false)}
+          settings={communitySettings}
+          api={community}
+        />
 
         <OneChatModal
           open={chatOpen}

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/explicit-function-return-type -- JavaScript entry point uses JSDoc return types. */
 /**
  * Build or merge a macOS electron-updater feed (preview-mac.yml / latest-mac.yml).
  *
@@ -167,12 +168,16 @@ export function buildMacUpdateFeedFromArtifacts(
       `no ${product}-${version}-*-mac.zip (or arch .dmg) in ${artifactsDir}`,
     );
   }
-  const hasX64 = names.some((n) => n.includes("-x64-") && n.endsWith("-mac.zip"));
+  const hasX64 = names.some(
+    (n) => n.includes("-x64-") && n.endsWith("-mac.zip"),
+  );
   const hasArm64 = names.some(
     (n) => n.includes("-arm64-") && n.endsWith("-mac.zip"),
   );
   if (!hasX64 && !hasArm64) {
-    throw new Error(`expected at least one arch *-mac.zip, found: ${names.join(", ")}`);
+    throw new Error(
+      `expected at least one arch *-mac.zip, found: ${names.join(", ")}`,
+    );
   }
   const files = sortFeedFiles(
     names.map((name) => {
@@ -254,7 +259,9 @@ function main(argv) {
   let feed;
   if (mergePaths.length > 0) {
     feed = mergeMacUpdateFeeds(
-      mergePaths.map((p) => parseMacUpdateFeed(readFileSync(resolve(p), "utf8"))),
+      mergePaths.map((p) =>
+        parseMacUpdateFeed(readFileSync(resolve(p), "utf8")),
+      ),
     );
   } else if (artifactsDir && version) {
     feed = buildMacUpdateFeedFromArtifacts(resolve(artifactsDir), version, {

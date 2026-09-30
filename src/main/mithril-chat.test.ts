@@ -39,7 +39,9 @@ describe("Mithril in-app chat", () => {
     vi.mocked(readMithrilToken).mockReturnValue(token);
     const empty = {
       status: 200,
-      headers: new Headers({ "x-mithril-notice": "reasoning_budget_exhausted" }),
+      headers: new Headers({
+        "x-mithril-notice": "reasoning_budget_exhausted",
+      }),
       json: async () => ({
         model: "qwen/qwen3.8-27b",
         choices: [{ message: { content: "" }, finish_reason: "length" }],
@@ -49,27 +51,46 @@ describe("Mithril in-app chat", () => {
       model: "qwen/qwen3.8-27b",
       choices: [{ message: { content: "ok after retry" } }],
     });
-    const fetcher = vi.fn().mockResolvedValueOnce(empty).mockResolvedValueOnce(recovered);
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(empty)
+      .mockResolvedValueOnce(recovered);
     expect(
-      await mithrilChat([{ role: "user", content: "hi" }], "p", fetcher as typeof fetch),
+      await mithrilChat(
+        [{ role: "user", content: "hi" }],
+        "p",
+        fetcher as typeof fetch,
+      ),
     ).toMatchObject({ ok: true, text: "ok after retry" });
     expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(JSON.parse((fetcher.mock.calls[0]![1] as RequestInit).body as string).max_tokens).toBe(4096);
-    expect(JSON.parse((fetcher.mock.calls[1]![1] as RequestInit).body as string).max_tokens).toBe(8192);
+    expect(
+      JSON.parse((fetcher.mock.calls[0]![1] as RequestInit).body as string)
+        .max_tokens,
+    ).toBe(4096);
+    expect(
+      JSON.parse((fetcher.mock.calls[1]![1] as RequestInit).body as string)
+        .max_tokens,
+    ).toBe(8192);
   });
 
   it("surfaces reasoning_budget_exhausted instead of a silent empty reply after a failed recovery", async () => {
     vi.mocked(readMithrilToken).mockReturnValue(token);
     const empty = {
       status: 200,
-      headers: new Headers({ "x-mithril-notice": "reasoning_budget_exhausted" }),
+      headers: new Headers({
+        "x-mithril-notice": "reasoning_budget_exhausted",
+      }),
       json: async () => ({
         choices: [{ message: { content: "" }, finish_reason: "length" }],
       }),
     } as Response;
     const fetcher = vi.fn().mockResolvedValue(empty);
     expect(
-      await mithrilChat([{ role: "user", content: "hi" }], "p", fetcher as typeof fetch),
+      await mithrilChat(
+        [{ role: "user", content: "hi" }],
+        "p",
+        fetcher as typeof fetch,
+      ),
     ).toEqual({ ok: false, error: "reasoning_budget_exhausted" });
     expect(fetcher).toHaveBeenCalledTimes(2);
   });

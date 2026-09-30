@@ -71,9 +71,7 @@ describe("merge-mac-update-feed", () => {
     const armZip = merged.files.find((f) => f.url.endsWith("arm64-mac.zip"));
 
     expect(armZip?.sha512).toBe("newarmzipsha==");
-    expect(
-      merged.files.some((f) => f.url.endsWith("x64-mac.zip")),
-    ).toBe(true);
+    expect(merged.files.some((f) => f.url.endsWith("x64-mac.zip"))).toBe(true);
     assertBothMacArches(merged);
   });
 

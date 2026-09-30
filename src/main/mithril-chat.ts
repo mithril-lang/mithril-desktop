@@ -51,7 +51,9 @@ export function isReasoningBudgetExhausted(
   response: Response,
   body: unknown,
 ): boolean {
-  if (response.headers.get("x-mithril-notice") === "reasoning_budget_exhausted") {
+  if (
+    response.headers.get("x-mithril-notice") === "reasoning_budget_exhausted"
+  ) {
     return true;
   }
   const choice = (

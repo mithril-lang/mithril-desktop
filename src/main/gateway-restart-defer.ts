@@ -20,8 +20,10 @@
  * a deliberate restart happens when it is asked for.
  */
 import { countRunningExecutions } from "./profile-cron";
-import { profilePaths } from "./utils";
+import { activeStateDbPath, profilePaths } from "./utils";
 import { join } from "path";
+import Database from "better-sqlite3";
+import { existsSync } from "fs";
 
 /** How long an incidental restart waits for the profile to go idle. */
 export const DEFAULT_MAX_WAIT_MS = 10 * 60_000;
@@ -32,13 +34,22 @@ export interface DeferResult {
   restarted: boolean;
   /** "idle" — nothing was running; "waited" — a job finished first;
    *  "timeout" — the cap expired and it restarted anyway. */
-  reason: "idle" | "waited" | "timeout";
+  reason: "idle" | "waited" | "timeout" | "busy";
   waitedMs: number;
 }
 
 /** One pending deferral per profile: a burst of env writes must not queue
  *  a restart each. */
 const pending = new Map<string, Promise<DeferResult>>();
+type RestartScope = "gateway" | "mithril-runtime";
+type RestartOptions = {
+  maxWaitMs?: number;
+  pollMs?: number;
+  busy?: (profile: string | undefined) => boolean;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
+  forceAfterTimeout?: boolean;
+};
 
 export function cronBusy(
   profile: string | undefined,
@@ -54,22 +65,85 @@ export function cronBusy(
   }
 }
 
+/** A fail-closed cron probe for credential-triggered process recreation. */
+export function cronBusyStrict(
+  profile: string | undefined,
+  count: (dbPath: string) => number = (dbPath) => {
+    const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    try {
+      const row = db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM executions WHERE status IN ('claimed','running')",
+        )
+        .get() as { count?: number } | undefined;
+      return Number(row?.count ?? 0);
+    } finally {
+      db.close();
+    }
+  },
+  exists: (dbPath: string) => boolean = existsSync,
+): boolean {
+  const dbPath = join(profilePaths(profile).home, "cron", "executions.db");
+  if (!exists(dbPath)) return false;
+  try {
+    return count(dbPath) > 0;
+  } catch (error) {
+    return /no such table:\s*executions/i.test(
+      error instanceof Error ? error.message : String(error),
+    )
+      ? false
+      : true;
+  }
+}
+
+/** Active dashboard turns hold a short, renewable lease in state.db. */
+export function dashboardTurnBusy(
+  profile: string | undefined,
+  count: (dbPath: string, nowSeconds: number) => number = (
+    dbPath,
+    nowSeconds,
+  ) => {
+    const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    try {
+      const row = db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM session_turn_leases WHERE expires_at > ?",
+        )
+        .get(nowSeconds) as { count?: number } | undefined;
+      return Number(row?.count ?? 0);
+    } finally {
+      db.close();
+    }
+  },
+  exists: (dbPath: string) => boolean = existsSync,
+): boolean {
+  const dbPath = activeStateDbPath(profile);
+  if (!exists(dbPath)) return false;
+  try {
+    return count(dbPath, Date.now() / 1000) > 0;
+  } catch (error) {
+    // Older Hermes versions may not have the lease table yet. Any other read
+    // failure is an unknown safety state, so preserve running work.
+    return /no such table:\s*session_turn_leases/i.test(
+      error instanceof Error ? error.message : String(error),
+    )
+      ? false
+      : true;
+  }
+}
+
 /**
  * Restart `profile`'s gateway once its cron scheduler is idle. Returns what
  * happened, so the caller can log it by name rather than guessing.
  */
-export function restartGatewayWhenIdle(
+function restartWhenIdle(
+  scope: RestartScope,
   profile: string | undefined,
   restart: (profile?: string) => Promise<unknown>,
-  opts: {
-    maxWaitMs?: number;
-    pollMs?: number;
-    busy?: (profile: string | undefined) => boolean;
-    sleep?: (ms: number) => Promise<void>;
-    now?: () => number;
-  } = {},
+  opts: RestartOptions = {},
 ): Promise<DeferResult> {
-  const key = profile?.trim() || "default";
+  const profileKey = profile?.trim() || "default";
+  const key = `${scope}:${profileKey}`;
   const existing = pending.get(key);
   if (existing) return existing;
 
@@ -79,6 +153,7 @@ export function restartGatewayWhenIdle(
   const sleep =
     opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const now = opts.now ?? Date.now;
+  const forceAfterTimeout = opts.forceAfterTimeout ?? true;
 
   const run = (async (): Promise<DeferResult> => {
     const t0 = now();
@@ -88,7 +163,7 @@ export function restartGatewayWhenIdle(
     }
     console.log(
       "gateway-restart-deferred",
-      key,
+      profileKey,
       "a cron attempt is in flight; waiting up to",
       maxWaitMs,
       "ms",
@@ -97,15 +172,31 @@ export function restartGatewayWhenIdle(
       await sleep(pollMs);
       if (!busy(profile)) {
         const waitedMs = now() - t0;
-        console.log("gateway-restart-resumed", key, "after", waitedMs, "ms");
+        console.log(
+          "gateway-restart-resumed",
+          profileKey,
+          "after",
+          waitedMs,
+          "ms",
+        );
         await restart(profile);
         return { restarted: true, reason: "waited", waitedMs };
       }
     }
     const waitedMs = now() - t0;
+    if (!forceAfterTimeout) {
+      console.warn(
+        "gateway-restart-still-busy",
+        profileKey,
+        "after",
+        waitedMs,
+        "ms — leaving the running work intact",
+      );
+      return { restarted: false, reason: "busy", waitedMs };
+    }
     console.warn(
       "gateway-restart-forced",
-      key,
+      profileKey,
       "still busy after",
       waitedMs,
       "ms — restarting anyway so the new value takes effect",
@@ -119,6 +210,26 @@ export function restartGatewayWhenIdle(
   });
   pending.set(key, tracked);
   return tracked;
+}
+
+export function restartGatewayWhenIdle(
+  profile: string | undefined,
+  restart: (profile?: string) => Promise<unknown>,
+  opts: RestartOptions = {},
+): Promise<DeferResult> {
+  return restartWhenIdle("gateway", profile, restart, opts);
+}
+
+/** Coalesce secure-account refreshes without colliding with gateway-only writes. */
+export function restartMithrilRuntimeWhenIdle(
+  profile: string | undefined,
+  restart: (profile?: string) => Promise<unknown>,
+  opts: RestartOptions = {},
+): Promise<DeferResult> {
+  return restartWhenIdle("mithril-runtime", profile, restart, {
+    ...opts,
+    forceAfterTimeout: opts.forceAfterTimeout ?? false,
+  });
 }
 
 /** Test hook: forget any pending deferral. */

@@ -755,6 +755,54 @@ export function stopDashboard(profile?: string): boolean {
   return true;
 }
 
+/** Restart only a dashboard already managed for this profile. */
+export async function restartDashboardIfRunning(
+  profile?: string,
+): Promise<DashboardStatus | null> {
+  const key = profileKey(profile);
+  const managed = getManagedDashboard(profile);
+  if (!managed) return null;
+  dashboards.delete(key);
+  const stopped = new Promise<boolean>((resolve) => {
+    if (managed.proc.exitCode !== null) {
+      resolve(true);
+      return;
+    }
+    const timer = setTimeout(() => resolve(false), 5_000);
+    timer.unref?.();
+    managed.proc.once("exit", () => {
+      clearTimeout(timer);
+      resolve(true);
+    });
+  });
+  try {
+    if (!managed.proc.kill("SIGTERM")) {
+      dashboards.set(key, managed);
+      return {
+        supported: true,
+        running: true,
+        error: "Could not signal the existing dashboard process.",
+      };
+    }
+  } catch {
+    dashboards.set(key, managed);
+    return {
+      supported: true,
+      running: true,
+      error: "Could not stop the existing dashboard process.",
+    };
+  }
+  if (!(await stopped)) {
+    if (managed.proc.exitCode === null) dashboards.set(key, managed);
+    return {
+      supported: true,
+      running: true,
+      error: "Dashboard did not stop cleanly; it was not force-terminated.",
+    };
+  }
+  return startDashboard(profile);
+}
+
 export function stopAllDashboards(): void {
   for (const key of [...dashboards.keys()]) {
     stopDashboard(key === "default" ? undefined : key);

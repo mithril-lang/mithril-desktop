@@ -9,12 +9,17 @@ vi.mock("./utils", () => ({
     envFile: "",
     configFile: "",
   }),
+  activeStateDbPath: (profile?: string) =>
+    `/tmp/hermes/${profile ?? "default"}/state.db`,
 }));
 
 import {
   cronBusy,
+  cronBusyStrict,
+  dashboardTurnBusy,
   resetGatewayRestartDeferrals,
   restartGatewayWhenIdle,
+  restartMithrilRuntimeWhenIdle,
 } from "./gateway-restart-defer";
 
 beforeEach(() => resetGatewayRestartDeferrals());
@@ -53,6 +58,75 @@ describe("cronBusy", () => {
         throw new Error("EACCES");
       }),
     ).toBe(false);
+  });
+});
+
+describe("cronBusyStrict", () => {
+  it("treats a missing database or legacy missing table as idle", () => {
+    expect(cronBusyStrict("work", vi.fn(), () => false)).toBe(false);
+    expect(
+      cronBusyStrict(
+        "work",
+        () => {
+          throw new Error("no such table: executions");
+        },
+        () => true,
+      ),
+    ).toBe(false);
+  });
+
+  it("treats an unreadable database as busy and preserves work", () => {
+    expect(
+      cronBusyStrict(
+        "work",
+        () => {
+          throw new Error("database is locked");
+        },
+        () => true,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("dashboardTurnBusy", () => {
+  it("checks unexpired leases in the profile's state database", () => {
+    const seen: string[] = [];
+    expect(
+      dashboardTurnBusy(
+        "work",
+        (path, nowSeconds) => {
+          seen.push(path);
+          expect(nowSeconds).toBeGreaterThan(0);
+          return 1;
+        },
+        () => true,
+      ),
+    ).toBe(true);
+    expect(seen).toEqual(["/tmp/hermes/work/state.db"]);
+  });
+
+  it("does not freeze refreshes when an old database lacks the lease table", () => {
+    expect(
+      dashboardTurnBusy(
+        "work",
+        () => {
+          throw new Error("no such table: session_turn_leases");
+        },
+        () => true,
+      ),
+    ).toBe(false);
+  });
+
+  it("treats an unreadable existing lease database as busy", () => {
+    expect(
+      dashboardTurnBusy(
+        "work",
+        () => {
+          throw new Error("database is locked");
+        },
+        () => true,
+      ),
+    ).toBe(true);
   });
 });
 
@@ -146,6 +220,47 @@ describe("restartGatewayWhenIdle", () => {
       restartGatewayWhenIdle("b", restart, { busy: () => false }),
     ]);
     expect(restarts.sort()).toEqual(["a", "b"]);
+  });
+
+  it("does not let an overlapping gateway-only write omit a Mithril dashboard refresh", async () => {
+    const restarts: string[] = [];
+    await Promise.all([
+      restartGatewayWhenIdle(
+        "work",
+        async () => {
+          restarts.push("gateway");
+        },
+        { busy: () => false },
+      ),
+      restartMithrilRuntimeWhenIdle(
+        "work",
+        async () => {
+          restarts.push("mithril-runtime");
+        },
+        { busy: () => false },
+      ),
+    ]);
+    expect(restarts.sort()).toEqual(["gateway", "mithril-runtime"]);
+  });
+
+  it("never force-restarts a Mithril runtime that remains busy", async () => {
+    const clock = fakeClock();
+    let restarted = 0;
+    const result = await restartMithrilRuntimeWhenIdle(
+      "work",
+      async () => {
+        restarted += 1;
+      },
+      {
+        busy: () => true,
+        pollMs: 10,
+        maxWaitMs: 30,
+        sleep: clock.sleep,
+        now: clock.now,
+      },
+    );
+    expect(result).toEqual({ restarted: false, reason: "busy", waitedMs: 30 });
+    expect(restarted).toBe(0);
   });
 
   it("lets the next write defer again once the first finished", async () => {

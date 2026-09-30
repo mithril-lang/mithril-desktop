@@ -1,6 +1,7 @@
 // @lat: [[provider-setup#Provider setup#Agent config sync for named providers]]
 import { existsSync, readFileSync } from "fs";
 import { profilePaths, safeWriteFile } from "./utils";
+import { secureEnvFor } from "./secure-env";
 
 /**
  * Bridge between hermes-agent's config.yaml provider sections and the
@@ -341,10 +342,8 @@ const MITHRIL_BASE_URL = "https://api.mithril.fund/v1";
  */
 export function mirrorFirstPartyAgentProviders(profile?: string): void {
   try {
-    const { envFile } = profilePaths(profile);
-    const env = existsSync(envFile) ? readFileSync(envFile, "utf-8") : "";
-    const match = env.match(/^\s*MITHRIL_API_KEY\s*=\s*(.+)\s*$/m);
-    if (!match || !match[1].trim()) return;
+    // The token lives in the secure store, so presence is asked of that.
+    if (!secureEnvFor(profile).MITHRIL_API_KEY?.trim()) return;
     upsertAgentUserProvider(profile, {
       slug: "mithril",
       name: "Mithril",

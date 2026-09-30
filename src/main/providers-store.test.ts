@@ -184,14 +184,13 @@ describe("providers store", () => {
 
   // @lat: [[provider-setup#Provider setup#Agent config sync for named providers#First-party brands mirror as user providers]]
   it("mirrors a keyed Mithril into config.yaml providers: without a custom card", async () => {
-    const { writeFileSync } = await import("fs");
-    writeFileSync(
-      join(mockState.hermesHome, ".env"),
-      "MITHRIL_API_KEY=mf_abc\n",
-    );
+    // The token comes from the secure store, not from a `.env` file.
+    const { registerSecureEnvSource } = await import("./secure-env");
+    registerSecureEnvSource(() => ({ MITHRIL_API_KEY: "mf_abc" }));
     const s = await store();
     // No custom-provider card — Mithril owns a dedicated brand card.
     expect(s.listCustomProviders("default")).toEqual([]);
+    registerSecureEnvSource(null);
     const config = readFileSync(
       join(mockState.hermesHome, "config.yaml"),
       "utf-8",

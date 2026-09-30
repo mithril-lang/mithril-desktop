@@ -85,16 +85,39 @@ describe("environment variable write validation", () => {
     expect(readEnvFile()).toContain("EMPTY_FLAG=\n");
   });
 
-  it("only accepts mf_ tokens for MITHRIL_API_KEY", async () => {
-    const { readEnv, setEnvValue } = await loadConfigModule();
+  it("validates MITHRIL_API_KEY as an mf_ token and never stores it", async () => {
+    const { setEnvValue, validateEnvEntry } = await loadConfigModule();
 
-    setEnvValue("MITHRIL_API_KEY", "mf_signed_in");
+    expect(() => validateEnvEntry("MITHRIL_API_KEY", "mf_ok")).not.toThrow();
     expect(() =>
       setEnvValue("MITHRIL_API_KEY", "sk-not-a-mithril-token"),
     ).toThrow(/start with mf_/);
-    expect(readEnv().MITHRIL_API_KEY).toBe("mf_signed_in");
+    // Clearing is allowed (no secret involved).
+    expect(() => setEnvValue("MITHRIL_API_KEY", "")).not.toThrow();
+  });
+});
 
-    setEnvValue("MITHRIL_API_KEY", "");
-    expect(readEnv().MITHRIL_API_KEY).toBe("");
+describe("Mithril token is never written to .env", () => {
+  beforeEach(() => {
+    testHome = mkdtempSync(join(tmpdir(), "hermes-env-mithril-"));
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    rmSync(testHome, { recursive: true, force: true });
+  });
+
+  // @lat: [[mithril-migration#Mithril desktop migration#Token-only-in-secure-store#No plaintext written]]
+  it("refuses to persist an mf_ token, overlays the secure value in memory only", async () => {
+    const { readEnv, setEnvValue } = await loadConfigModule();
+    const { registerSecureEnvSource } = await import("../src/main/secure-env");
+    expect(() => setEnvValue("MITHRIL_API_KEY", "mf_secret")).toThrow(
+      /secure store/,
+    );
+    expect(existsSync(join(testHome, ".env"))).toBe(false);
+
+    registerSecureEnvSource(() => ({ MITHRIL_API_KEY: "mf_from_keychain" }));
+    expect(readEnv().MITHRIL_API_KEY).toBe("mf_from_keychain");
+    expect(existsSync(join(testHome, ".env"))).toBe(false);
+    registerSecureEnvSource(null);
   });
 });

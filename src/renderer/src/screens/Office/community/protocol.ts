@@ -11,6 +11,14 @@ import {
   type CommunityPeer,
 } from "./types";
 
+/** Single-line variant for display names: newlines collapse to spaces. */
+export function sanitizeName(raw: unknown, max: number): string {
+  return sanitizeText(raw, max * 4)
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+}
+
 /** Strips control characters and clamps length; returns "" for blank input. */
 export function sanitizeText(raw: unknown, max: number): string {
   if (typeof raw !== "string") return "";
@@ -66,7 +74,7 @@ export function parseFrame(
   if (raw.type === "chat" && isRecord(raw.message)) {
     const m = raw.message;
     const text = sanitizeText(m.text, MAX_MESSAGE_LENGTH);
-    const senderName = sanitizeText(m.senderName, MAX_NAME_LENGTH);
+    const senderName = sanitizeName(m.senderName, MAX_NAME_LENGTH);
     const id = sanitizeText(m.id, 64);
     const roomId = sanitizeText(m.roomId, 64);
     const senderId = sanitizeText(m.senderId, 64);
@@ -88,7 +96,7 @@ export function parseFrame(
   if (raw.type === "presence" && isRecord(raw.peer)) {
     const p = raw.peer;
     const id = sanitizeText(p.id, 64);
-    const name = sanitizeText(p.name, MAX_NAME_LENGTH);
+    const name = sanitizeName(p.name, MAX_NAME_LENGTH);
     const roomId = sanitizeText(p.roomId, 64);
     if (!id || !name || !roomId) return null;
     const pose = parsePose(p.pose);

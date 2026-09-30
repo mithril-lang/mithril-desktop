@@ -100,4 +100,12 @@ describe("community protocol", () => {
       expect(f?.type === "presence" && f.peer.pose).toBeUndefined();
     }
   });
+
+  it("collapses newlines in display names", () => {
+    const f = parseFrame({
+      type: "presence",
+      peer: { id: "a", name: "Al\nice\n\nB", roomId: "r" },
+    });
+    expect(f?.type === "presence" && f.peer.name).toBe("Al ice B");
+  });
 });

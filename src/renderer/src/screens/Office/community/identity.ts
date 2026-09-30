@@ -1,7 +1,6 @@
 import { MAX_NAME_LENGTH, DEFAULT_ROOM_ID } from "./types";
 import { normalizeRelayUrl, sanitizeText } from "./protocol";
 
-const PEER_ID_KEY = "mithril:office:community:peer-id";
 const NAME_KEY = "mithril:office:community:name";
 const RELAY_KEY = "mithril:office:community:relay";
 const ROOM_KEY = "mithril:office:community:room";
@@ -30,12 +29,13 @@ export function randomId(): string {
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+// One id per app session (window), deliberately NOT persisted: windows of the
+// same install share localStorage and would otherwise all be "you" — each
+// would drop the others' frames as its own echo.
+let sessionPeerId: string | null = null;
 export function getPeerId(): string {
-  const existing = read(PEER_ID_KEY);
-  if (existing) return existing;
-  const id = randomId();
-  write(PEER_ID_KEY, id);
-  return id;
+  sessionPeerId ??= randomId();
+  return sessionPeerId;
 }
 
 export function getStoredName(): string {

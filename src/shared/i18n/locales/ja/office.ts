@@ -28,7 +28,7 @@ export default {
   setupDesc2:
     "下のボタンで Claw3D を自動ダウンロード・セットアップします。リポジトリをクローンし、依存関係をすべてインストールします。",
   // Enterable building interiors
-  enter_office: "オフィスに入る",
+  enter_office: "コンベンションセンターに入る",
   enter_bank: "銀行に入る",
   enter_showroom: "ショールームに入る",
   exitToCity: "街に戻る",
@@ -86,8 +86,8 @@ export default {
   communityRelayUrl: "リレー URL (wss://…、空欄 = この端末のみ)",
   communityRelayInvalid: "ws:// または wss:// の URL を入力してください。",
   communitySave: "保存",
-  communityRoom_exhibition: "展示フロア",
-  "communityRoom_main-hall": "メインホール",
+  communityRoom_exhibition: "ウェストホール",
+  "communityRoom_main-hall": "サウスホール",
   communityRoom_hyperloop: "ハイパーループ・ラウンジ",
   communityOnline_other: "{{count}} 人が参加中",
   communityYou: "あなた",

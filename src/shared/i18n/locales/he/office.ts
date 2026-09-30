@@ -48,7 +48,7 @@ export default {
   makeCeo: 'מינוי למנכ"ל',
   removeCeo: 'הסרה מתפקיד מנכ"ל',
   // Enterable building interiors
-  enter_office: "כניסה למשרד",
+  enter_office: "כניסה למרכז הכנסים",
   enter_bank: "כניסה לבנק",
   enter_showroom: "כניסה לאולם התצוגה",
   exitToCity: "יציאה לעיר",

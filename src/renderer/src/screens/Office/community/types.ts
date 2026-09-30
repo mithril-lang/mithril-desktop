@@ -11,8 +11,8 @@ export interface CommunityRoom {
 }
 
 export const COMMUNITY_ROOMS: readonly CommunityRoom[] = [
-  { id: "main-hall", label: "Main Hall" },
-  { id: "exhibition", label: "Exhibition Floor" },
+  { id: "main-hall", label: "South Hall" },
+  { id: "exhibition", label: "West Hall" },
   { id: "hyperloop", label: "Hyperloop Lounge" },
 ];
 

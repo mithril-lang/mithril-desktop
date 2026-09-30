@@ -27,7 +27,7 @@ export default {
   setupDesc2:
     "Claw3D'yi otomatik olarak indirip kurmak için aşağıya tıklayın. Bu, depoyu kopyalayacak ve tüm bağımlılıkları yükleyecektir.",
   // Enterable building interiors
-  enter_office: "Ofise gir",
+  enter_office: "Kongre merkezine gir",
   enter_bank: "Bankaya gir",
   enter_showroom: "Galeriye gir",
   exitToCity: "Şehre çık",

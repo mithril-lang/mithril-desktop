@@ -28,7 +28,7 @@ export default {
   setupDesc2:
     "Clique abaixo para baixar e configurar automaticamente o Claw3D. Isso clonará o repositório e instalará todas as dependências.",
   // Enterable building interiors
-  enter_office: "Entrar no escritório",
+  enter_office: "Entrar no centro de convenções",
   enter_bank: "Entrar no banco",
   enter_showroom: "Entrar na concessionária",
   exitToCity: "Sair para a cidade",

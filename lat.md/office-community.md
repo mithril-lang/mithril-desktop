@@ -2,7 +2,7 @@
 
 The Office tab doubles as a shared place where users talk to each other: a Community panel of chat rooms, one per hall of the convention center, with live presence. It is separate from One Chat, which talks to the user's own agents.
 
-The panel ([[src/renderer/src/screens/Office/community/CommunityPanel.tsx#CommunityPanel]]) opens from the Community button beside Mithril Chat in [[src/renderer/src/screens/Office/Office.tsx]]. Rooms are listed in `COMMUNITY_ROOMS` (Main Hall, Exhibition Floor, Hyperloop Lounge).
+The panel ([[src/renderer/src/screens/Office/community/CommunityPanel.tsx#CommunityPanel]]) opens from the Community button beside Mithril Chat in [[src/renderer/src/screens/Office/Office.tsx]]. Rooms are listed in `COMMUNITY_ROOMS` (South Hall, West Hall, Hyperloop Lounge). Room ids stay `main-hall` and `exhibition`, so existing relays keep the same channels.
 
 ## Connection model
 

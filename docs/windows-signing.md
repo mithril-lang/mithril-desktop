@@ -21,7 +21,7 @@ Never paste these into chat or commit them. Set them under GitHub, repository Se
 
 ### Route `azure`
 Secrets: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` (an app registration granted the **Artifact Signing Certificate Profile Signer** role on the account).
-Variables: `WIN_SIGNING=azure`, `AZURE_SIGN_ENDPOINT` (for example `https://jpe.codesigning.azure.net` if the account is in Japan East), `AZURE_SIGN_ACCOUNT`, `AZURE_SIGN_PROFILE`, `AZURE_SIGN_PUBLISHER` (exactly the certificate's CN, the legal entity name).
+Variables: `WIN_SIGNING=azure`, `AZURE_SIGN_ENDPOINT` (for example `https://eus.codesigning.azure.net` for East US), `AZURE_SIGN_ACCOUNT`, `AZURE_SIGN_PROFILE`, `AZURE_SIGN_PUBLISHER` (exactly the certificate's CN, the legal entity name).
 Setup, in order (steps 1-3 need a human with the company's Azure login and ID):
 1. Azure portal: paid subscription (free/trial is refused), register resource provider `Microsoft.CodeSigning`.
 2. Create an Artifact Signing account (Basic), region as listed in the quickstart.

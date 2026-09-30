@@ -2,6 +2,7 @@
 import { MITHRIL_ACCOUNT_URL, inspectMithrilToken } from "./mithril-token";
 import {
   clearMithrilToken,
+  mithrilStorageProtection,
   readMithrilToken,
   writeMithrilToken,
 } from "./mithril-token-store";
@@ -30,6 +31,7 @@ export async function connectMithrilAccount(
   }
   return {
     status: "connected",
+    protection: mithrilStorageProtection(profile),
     account: {
       userId: inspection.userId,
       accountUrl: MITHRIL_ACCOUNT_URL,

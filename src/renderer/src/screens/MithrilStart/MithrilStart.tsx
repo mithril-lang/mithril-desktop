@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import OnboardHero from "../../components/common/OnboardHero";
 import { ArrowRight, Spinner } from "../../assets/icons";
 import { useI18n } from "../../components/useI18n";
-import type { MithrilAccount } from "../../../../shared/account";
+import type {
+  MithrilAccount,
+  MithrilStorageProtection,
+} from "../../../../shared/account";
 
 const CONSOLE_TOKEN_URL = "https://console.mithril.fund/account";
 
@@ -27,8 +30,8 @@ export function issueText(code: string, ja: boolean): string {
       );
     case "secure_storage_unavailable":
       return l(
-        "Secure storage (OS keychain) is unavailable, so the token was not saved. Unlock or install a keyring (libsecret / KWallet) and try again.",
-        "安全な保存領域（OS キーチェーン）を利用できないためトークンを保存しませんでした。キーリングを有効にして再試行してください。",
+        "The token could not be saved: neither the OS keychain nor the app's encrypted token file is writable. Check that your user data folder is writable, or install and unlock a keyring (libsecret / KWallet), then try again.",
+        "トークンを保存できませんでした。OS キーチェーンもアプリの暗号化ファイルも利用できません。ユーザーデータフォルダの書き込み権限を確認するか、キーリング（libsecret / KWallet）を有効にして再試行してください。",
       );
     case "unauthenticated":
       return l(
@@ -50,6 +53,13 @@ export function issueText(code: string, ja: boolean): string {
   }
 }
 
+/** Shown whenever no system keyring backs the stored token. */
+export function reducedProtectionNotice(ja: boolean): string {
+  return ja
+    ? "システムのキーリングが見つからないため、トークンは保護が弱い方式（アプリ管理の暗号化ファイル）で保存されます。同じ OS ユーザーで動くプログラムからは読み取れる可能性があります。より安全にするには gnome-keyring または KWallet（libsecret）をインストールして有効にし、再接続してください。"
+    : "Stored with reduced protection because no system keyring was found. The token is encrypted in an app-managed file, but any program running as your OS user could read it. For stronger protection, install and unlock gnome-keyring or KWallet (libsecret), then reconnect.";
+}
+
 function MithrilStart({
   initiallyConnected,
   profile,
@@ -63,10 +73,25 @@ function MithrilStart({
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [protection, setProtection] =
+    useState<MithrilStorageProtection>("keychain");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [prompt, setPrompt] = useState("");
   const [sending, setSending] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    void window.hermesAPI
+      .getMithrilFirstRunState(profile)
+      .then((state) => {
+        if (active && state.protection) setProtection(state.protection);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [profile]);
 
   useEffect(() => {
     if (!connected) return;
@@ -99,6 +124,7 @@ function MithrilStart({
       if (result.status === "connected") {
         setToken("");
         setAccount(result.account);
+        setProtection(result.protection);
         setConnected(true);
       } else {
         setError(result.error);
@@ -149,10 +175,19 @@ function MithrilStart({
       >
         <p className="onboard-subtitle">
           {l(
-            "Paste a connection token (mf_…) from the Mithril console. It is checked against api.mithril.fund and stored in your OS keychain.",
-            "Mithril Console で発行した接続トークン（mf_…）を貼り付けてください。api.mithril.fund で確認し、OS キーチェーンに保存します。",
+            "Paste a connection token (mf_…) from the Mithril console. It is checked against api.mithril.fund and stored in your OS keychain when one is available.",
+            "Mithril Console で発行した接続トークン（mf_…）を貼り付けてください。api.mithril.fund で確認し、利用可能な場合は OS キーチェーンに保存します。",
           )}
         </p>
+        {protection === "reduced" && (
+          <p
+            role="note"
+            className="onboard-subtitle"
+            data-testid="mithril-reduced-protection"
+          >
+            {reducedProtectionNotice(ja)}
+          </p>
+        )}
         <form
           onSubmit={(e) => void connect(e)}
           className="onboard-cta-row"
@@ -230,6 +265,15 @@ function MithrilStart({
         {account?.balanceMicroUsd != null &&
           ` · ${l("Balance", "残高")} $${(account.balanceMicroUsd / 1_000_000).toFixed(2)}`}
       </p>
+      {protection === "reduced" && (
+        <p
+          role="note"
+          className="onboard-subtitle"
+          data-testid="mithril-reduced-protection"
+        >
+          {reducedProtectionNotice(ja)}
+        </p>
+      )}
       <div
         ref={logRef}
         className="onboard-terminal"

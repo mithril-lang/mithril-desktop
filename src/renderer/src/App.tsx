@@ -91,7 +91,7 @@ function App(): React.JSX.Element {
         nextSetupProfile = status.activeProfile || "default";
         const first = await window.hermesAPI
           .getMithrilFirstRunState(nextSetupProfile)
-          .catch(() => ({ connected: false }));
+          .catch(() => ({ connected: false, protection: "keychain" as const }));
         setMithrilConnected(first.connected);
         if (!first.connected || !status.installed) {
           // First run: Mithril connect, never the Hermes install prompt. The

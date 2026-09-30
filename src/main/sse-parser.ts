@@ -62,6 +62,69 @@ export interface SseDataResult {
   error?: string;
 }
 
+export interface SseParseState {
+  hasContent: boolean;
+  hasToolCallDelta?: boolean;
+  lastError: string;
+}
+
+export function hasOpenAiToolCallDelta(delta: unknown): boolean {
+  if (delta === null || typeof delta !== "object" || Array.isArray(delta)) {
+    return false;
+  }
+  const toolCalls = (delta as Record<string, unknown>).tool_calls;
+  return Array.isArray(toolCalls) && toolCalls.length > 0;
+}
+
+export function emptySseTerminalError(
+  lastError: string,
+  hasToolCallDelta: boolean,
+): string {
+  if (lastError) return lastError;
+  return hasToolCallDelta
+    ? "The provider stream ended before a tool call completed. The incomplete tool call was not executed."
+    : "";
+}
+
+function safeDiagnosticField(value: unknown): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text && text.length <= 256 && !/[\r\n]/.test(text) ? text : "";
+}
+
+/** Preserve correlation metadata without serializing an entire provider error
+ * object, which can include request bodies or other unsafe diagnostic fields. */
+export function formatSseError(payload: unknown): string {
+  const row =
+    payload !== null && typeof payload === "object" && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : {};
+  const error =
+    row.error !== null &&
+    typeof row.error === "object" &&
+    !Array.isArray(row.error)
+      ? (row.error as Record<string, unknown>)
+      : {};
+  const message =
+    safeDiagnosticField(error.message) ||
+    safeDiagnosticField(row.error) ||
+    safeDiagnosticField(row.message) ||
+    "Provider stream failed";
+  const code = safeDiagnosticField(error.code || error.type || row.code);
+  const requestId = safeDiagnosticField(
+    error.request_id ||
+      error.requestId ||
+      row.request_id ||
+      row.requestId ||
+      row.upstream_request_id,
+  );
+  const codeSuffix = code && !message.includes(code) ? ` [${code}]` : "";
+  const requestSuffix =
+    requestId && !message.includes(requestId)
+      ? ` (Request ID: ${requestId})`
+      : "";
+  return `${message}${codeSuffix}${requestSuffix}`;
+}
+
 /**
  * Process a single SSE data payload (after `data: ` prefix is stripped).
  * Returns parsing result.
@@ -69,11 +132,16 @@ export interface SseDataResult {
 export function processSseData(
   data: string,
   cb: SseCallbacks,
-  state: { hasContent: boolean; lastError: string },
+  state: SseParseState,
 ): SseDataResult {
   if (data === "[DONE]") {
     if (state.hasContent) {
       cb.onDone?.();
+    } else if (state.lastError) {
+      cb.onError?.(state.lastError);
+    } else if (state.hasToolCallDelta) {
+      state.lastError = emptySseTerminalError("", true);
+      cb.onError?.(state.lastError);
     }
     return { done: true, hasContent: state.hasContent, error: state.lastError };
   }
@@ -83,11 +151,17 @@ export function processSseData(
 
     // Capture error responses forwarded through SSE
     if (parsed.error) {
-      state.lastError = parsed.error.message || JSON.stringify(parsed.error);
+      state.lastError = formatSseError(parsed);
       return { done: false, hasContent: state.hasContent };
     }
 
     const delta = parsed.choices?.[0]?.delta;
+    // Observe raw OpenAI tool-call fragments so a tool-only/partial stream is
+    // never mistaken for an empty response and replayed by a diagnostic probe.
+    // Desktop deliberately does not parse or execute these arguments.
+    if (hasOpenAiToolCallDelta(delta)) {
+      state.hasToolCallDelta = true;
+    }
 
     // Extract usage from final chunk
     if (parsed.usage && cb.onUsage) {

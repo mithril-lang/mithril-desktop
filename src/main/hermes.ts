@@ -74,6 +74,11 @@ import {
   type ChatToolEvent,
 } from "../shared/chat-stream";
 import {
+  emptySseTerminalError,
+  formatSseError,
+  hasOpenAiToolCallDelta,
+} from "./sse-parser";
+import {
   chatToolEventFromRunEvent,
   parseRunSseBlock,
   runCompletedUsage,
@@ -1543,6 +1548,7 @@ function sendMessageViaApi(
   }
 
   let hasContent = false;
+  let hasToolCallDelta = false;
   let finished = false; // guard against double callbacks
   let lastError = ""; // capture embedded error messages
   // Tool progress pattern: `emoji tool_name` or `emoji description`
@@ -1644,6 +1650,8 @@ function sendMessageViaApi(
         finish();
       } else if (lastError) {
         finish(lastError);
+      } else if (hasToolCallDelta) {
+        finish(emptySseTerminalError(lastError, hasToolCallDelta));
       } else {
         // Streaming returned empty — probe non-streaming to get the real error
         probeRealError();
@@ -1655,12 +1663,18 @@ function sendMessageViaApi(
 
       // Capture error responses forwarded through SSE
       if (parsed.error) {
-        lastError = parsed.error.message || JSON.stringify(parsed.error);
+        lastError = formatSseError(parsed);
         return false;
       }
 
       const choice = parsed.choices?.[0];
       const delta = choice?.delta;
+      // A raw OpenAI tool-call delta is observation only: the Desktop does not
+      // parse or execute it. Remember it solely to prevent the empty-stream
+      // diagnostic probe from replaying this turn after a partial call/EOF.
+      if (hasOpenAiToolCallDelta(delta)) {
+        hasToolCallDelta = true;
+      }
 
       // Extract usage from final chunk (with optional cost + rate limit info)
       if (parsed.usage && cb.onUsage) {
@@ -1784,11 +1798,15 @@ function sendMessageViaApi(
           }
         }
         // Signal completion — even when no content was received
-        if (!hasContent && !lastError) {
+        if (!hasContent && !lastError && !hasToolCallDelta) {
           probeRealError();
           return;
         }
-        finish(hasContent ? undefined : lastError);
+        finish(
+          hasContent
+            ? undefined
+            : emptySseTerminalError(lastError, hasToolCallDelta),
+        );
       });
 
       res.on("error", (err) => {

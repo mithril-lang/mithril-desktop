@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  formatSseError,
   processCustomEvent,
   processSseData,
   parseSseBlock,
@@ -249,6 +250,118 @@ describe("processSseData", () => {
     });
     processSseData(data, { onChunk: vi.fn() }, state);
     expect(state.lastError).toBe("Rate limit exceeded");
+  });
+
+  it("retains safe structured error correlation fields", () => {
+    expect(
+      formatSseError({
+        error: {
+          message: "upstream stream closed",
+          code: "stream_closed_tool_call",
+          request_id: "chat:008af2dd",
+          unsafe_body: "must not appear",
+        },
+      }),
+    ).toBe(
+      "upstream stream closed [stream_closed_tool_call] (Request ID: chat:008af2dd)",
+    );
+  });
+
+  it("does not replay a partial tool stream and emits one terminal error", () => {
+    // @lat: [[chat-commands#Incomplete streamed tool calls#Legacy SSE partial tool EOF]]
+    const onError = vi.fn();
+    const onDone = vi.fn();
+    const state = {
+      hasContent: false,
+      hasToolCallDelta: false,
+      lastError: "",
+    };
+    const callbacks = { onChunk: vi.fn(), onError, onDone };
+
+    processSseData(
+      JSON.stringify({
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: "call-write",
+                  function: {
+                    name: "write_file",
+                    arguments: '{"path":"profile.',
+                  },
+                },
+              ],
+            },
+            finish_reason: "length",
+          },
+        ],
+        usage: { completion_tokens: 4096 },
+      }),
+      callbacks,
+      state,
+    );
+    processSseData(
+      JSON.stringify({
+        error: {
+          message: "upstream stream closed",
+          code: "stream_closed_tool_call",
+          request_id: "chat:008af2dd",
+        },
+      }),
+      callbacks,
+      state,
+    );
+    const terminal = processSseData("[DONE]", callbacks, state);
+
+    expect(state.hasToolCallDelta).toBe(true);
+    expect(terminal.done).toBe(true);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith(
+      "upstream stream closed [stream_closed_tool_call] (Request ID: chat:008af2dd)",
+    );
+    expect(onDone).not.toHaveBeenCalled();
+    expect(callbacks.onChunk).not.toHaveBeenCalled();
+  });
+
+  it("treats clean EOF after partial tool arguments as an error, not success", () => {
+    const onError = vi.fn();
+    const onDone = vi.fn();
+    const state = {
+      hasContent: false,
+      hasToolCallDelta: false,
+      lastError: "",
+    };
+    const callbacks = { onChunk: vi.fn(), onError, onDone };
+
+    processSseData(
+      JSON.stringify({
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  function: {
+                    name: "write_file",
+                    arguments: '{"content":"unfinished',
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+      callbacks,
+      state,
+    );
+    processSseData("[DONE]", callbacks, state);
+
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith(
+      "The provider stream ended before a tool call completed. The incomplete tool call was not executed.",
+    );
+    expect(onDone).not.toHaveBeenCalled();
   });
 
   it("detects legacy inline tool progress pattern", () => {

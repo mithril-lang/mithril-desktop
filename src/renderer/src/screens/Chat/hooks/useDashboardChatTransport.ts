@@ -20,6 +20,10 @@ import {
   normalizeApprovalRequest,
   type ApprovalChoice,
 } from "../../../../../shared/chat-approval";
+import {
+  dashboardCompletionFailure,
+  failIncompleteToolCalls,
+} from "../completionFailure";
 
 interface SessionResponse {
   info?: unknown;
@@ -780,9 +784,7 @@ export function completionFailed(payload: unknown): boolean {
 }
 
 function completionErrorMessage(payload: unknown): string {
-  const row = asRecord(payload);
-  const raw = String(row.error || row.text || row.rendered || "").trim();
-  return raw.replace(/^error\s*:\s*/i, "") || "Hermes reported an error";
+  return dashboardCompletionFailure(payload).message;
 }
 
 function userContentById(
@@ -1228,7 +1230,10 @@ export function useDashboardChatTransport({
       reasoningSegmentClosedRef.current = next.reasoningSegmentClosed;
       const nextMessages = failed
         ? markActiveTurnFailed(
-            next.messages,
+            failIncompleteToolCalls(
+              next.messages,
+              dashboardCompletionFailure(event.payload).droppedToolNames,
+            ),
             completionErrorMessage(event.payload),
             activeTurnRef.current,
           )

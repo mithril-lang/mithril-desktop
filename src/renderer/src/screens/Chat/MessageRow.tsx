@@ -8,6 +8,7 @@ import { AttachmentChip } from "../../components/AttachmentChip";
 import { MediaSegmentView } from "../../components/MediaImage";
 import { useI18n } from "../../components/useI18n";
 import { parseMediaTokens, cleanLeakedToolTags } from "./mediaUtils";
+import { classifyMithrilError } from "../../../../shared/mithril-errors";
 import type { ChatBubbleMessage, ChatMessage } from "./types";
 
 export const APPROVAL_RE =
@@ -177,8 +178,12 @@ export const MessageRow = memo(function MessageRow({
   showAvatar = true,
   agent,
 }: MessageRowProps): React.JSX.Element {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [copied, setCopied] = useState(false);
+  const mithrilError = useMemo(
+    () => classifyMithrilError("error" in msg ? msg.error : undefined),
+    [msg],
+  );
 
   // MessageRow is wrapped in memo() but still re-renders on any prop change
   // (e.g. isLoading toggling at the end of a stream), and `parseMediaTokens`
@@ -313,10 +318,36 @@ export const MessageRow = memo(function MessageRow({
             msg.content
           ))
         )}
-        {msg.error && (
-          <div className="chat-error-message" role="alert">
-            {msg.error}
+        {msg.error && mithrilError ? (
+          <div className="chat-error-message chat-error-mithril" role="alert">
+            <strong>
+              {(locale === "ja" ? mithrilError.ja : mithrilError.en).title}
+            </strong>
+            <span>
+              {(locale === "ja" ? mithrilError.ja : mithrilError.en).hint}
+            </span>
+            {mithrilError.action === "open_console" && (
+              <button
+                type="button"
+                className="btn btn-secondary chat-error-action"
+                onClick={() =>
+                  void window.hermesAPI.openExternal(
+                    "https://console.mithril.fund/account",
+                  )
+                }
+              >
+                {locale === "ja"
+                  ? "Mithril Console を開く"
+                  : "Open Mithril Console"}
+              </button>
+            )}
           </div>
+        ) : (
+          msg.error && (
+            <div className="chat-error-message" role="alert">
+              {msg.error}
+            </div>
+          )
         )}
       </div>
       {bubbleTime && isTimeValid && (

@@ -10,7 +10,7 @@ When GitHub reports a newer release, [[src/renderer/src/screens/Layout/Layout.ts
 
 ## Up-to-date check
 
-An up-to-date app reports no update rather than offering its own version. electron-updater's `checkForUpdates()` resolves with the feed's info even when it is not newer than the running build, so [[src/main/app/updater.ts#offeredUpdateVersion]] returns a version only when `isUpdateAvailable` is true.
+An up-to-date app reports no update rather than offering its own version. Because `checkForUpdates()` can return the current feed, [[src/main/app/updater.ts#offeredUpdateVersion]] returns a version only when `isUpdateAvailable` is true.
 
 Before that fix the renderer treated the feed version as "update available", the download then threw electron-updater's "Please check update first", and the sidebar showed "Update failed". The download handler also runs a check first when none has found an update, and reports "No update is available" instead of the library's error.
 

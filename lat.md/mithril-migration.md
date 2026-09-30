@@ -141,3 +141,13 @@ A first launch shows the Mithril connect screen, never the Hermes install prompt
 ### In-app chat
 
 [[src/main/mithril-chat.ts#mithrilChat]] posts to `/v1/chat/completions` with only the stored `mf_` bearer and `max_tokens` of at least 512. It ignores unknown upstream fields and falls back to `reasoning` when `content` is empty.
+
+## Mithril API error surfacing
+
+Chat failures caused by the Mithril API are explained in plain language instead of the raw agent error text.
+
+[[src/shared/mithril-errors.ts#classifyMithrilError]] maps API error codes (`free_tier_exhausted`, `insufficient_credit`, `input_too_large`, token and scope errors, `inference_unavailable`) to a bilingual title and hint. The chat bubble shows them, with an "Open Mithril Console" button when adding credit fixes the problem, and the main process logs one `[mithril-api] chat failed kind=… status=…` line and uses the short title in the OS notification. Unknown errors keep the raw text.
+
+### Classifier never echoes raw errors
+
+The classifier returns only fixed strings, so bearer tokens embedded in an error cannot reach the UI or logs. Covered by `src/shared/mithril-errors.test.ts`.

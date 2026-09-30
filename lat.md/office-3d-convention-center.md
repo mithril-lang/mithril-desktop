@@ -4,7 +4,9 @@ The Office tab's city view is themed as Los Angeles: the office block wears the 
 
 ## Convention center exterior
 
-[[src/renderer/src/screens/Office/office3d/objects/ConventionCenter.tsx#ConventionCenterExterior]] adds exterior skin only — a teal parapet ring, the LOS ANGELES CONVENTION CENTER fascia sign (canvas texture), a steel entrance canopy over the south door, instanced aluminium fins on the flanks, rooftop plant, corner flagpoles and a palm-lined forecourt. The interior walls, glass roof, collision and routing are untouched.
+[[src/renderer/src/screens/Office/office3d/objects/ConventionCenter.tsx#ConventionCenterExterior]] adds an exterior skin while leaving the interior walls, glass roof, collision and routing untouched.
+
+The skin includes a teal parapet ring, the LOS ANGELES CONVENTION CENTER fascia sign, a steel entrance canopy, aluminium fins, rooftop plant, corner flagpoles and a palm-lined forecourt.
 
 It mounts only in the city view (see [[office-3d-interiors#Locations & conditional rendering]]); entering the office unmounts it like the rest of the city.
 

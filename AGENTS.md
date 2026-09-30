@@ -105,3 +105,21 @@ Details about this child topic.
 
 The second example is invalid because `Bad Section` has no leading paragraph. `lat check` validates this rule and reports errors for missing or overly long leading paragraphs.
 %% lat:end %%
+
+# Shipping
+
+When jun asks for a change, take it through publication. A local edit is not the end of the task.
+
+## Packaged app
+
+A change that ships inside the desktop app is done only when it is on `main` and a GitHub prerelease carries the installers. The release gate is `lat.md/mithril-migration.md` under "Desktop release gate".
+
+1. If `package.json`'s version already has a GitHub release, bump it to the next `0.8.0-preview.N` and the matching `package-lock.json` version fields. Never reuse a tag that already has installers.
+2. Commit and push to `main`.
+3. Create the prerelease with `gh release create v<version> --prerelease`. The tag must equal `v` plus the version in `package.json`.
+4. Run **Publish Preview Platforms** (`gh workflow run "Publish Preview Platforms" --ref main -f tag=v<version>`). It builds Windows x64, Linux x64/ARM64, and both Mac architectures, notarizes the Mac packages, and uploads them onto that prerelease. Wait until the run succeeds, then confirm the release assets.
+5. https://app.mithril.fund/download/ lists the GitHub prerelease. Confirm the new version is on that page.
+
+## Not a new installer
+
+`AGENTS.md`, `lat.md/` prose, and other files the packager excludes do not by themselves need a new preview. Commit and push them to `main`. Cut a preview when the packaged app changed, or when jun asks for a release anyway.

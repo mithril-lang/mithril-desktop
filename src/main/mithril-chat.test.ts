@@ -10,7 +10,7 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("Mithril in-app chat", () => {
   // @lat: [[mithril-migration#Mithril desktop migration#First-run connect#In-app chat]]
-  it("posts to api.mithril.fund with the stored mf_ bearer and max_tokens >= 512", async () => {
+  it("posts to api.mithril.fund with the stored mf_ bearer and max_tokens >= 4096", async () => {
     vi.mocked(readMithrilToken).mockReturnValue(token);
     const fetcher = vi.fn().mockResolvedValue(
       reply(200, {
@@ -31,8 +31,47 @@ describe("Mithril in-app chat", () => {
       `Bearer ${token}`,
     );
     expect(JSON.parse(init.body as string).max_tokens).toBeGreaterThanOrEqual(
-      512,
+      4096,
     );
+  });
+
+  it("retries once with a larger budget when reasoning_budget_exhausted leaves content empty", async () => {
+    vi.mocked(readMithrilToken).mockReturnValue(token);
+    const empty = {
+      status: 200,
+      headers: new Headers({ "x-mithril-notice": "reasoning_budget_exhausted" }),
+      json: async () => ({
+        model: "qwen/qwen3.8-27b",
+        choices: [{ message: { content: "" }, finish_reason: "length" }],
+      }),
+    } as Response;
+    const recovered = reply(200, {
+      model: "qwen/qwen3.8-27b",
+      choices: [{ message: { content: "ok after retry" } }],
+    });
+    const fetcher = vi.fn().mockResolvedValueOnce(empty).mockResolvedValueOnce(recovered);
+    expect(
+      await mithrilChat([{ role: "user", content: "hi" }], "p", fetcher as typeof fetch),
+    ).toMatchObject({ ok: true, text: "ok after retry" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(JSON.parse((fetcher.mock.calls[0]![1] as RequestInit).body as string).max_tokens).toBe(4096);
+    expect(JSON.parse((fetcher.mock.calls[1]![1] as RequestInit).body as string).max_tokens).toBe(8192);
+  });
+
+  it("surfaces reasoning_budget_exhausted instead of a silent empty reply after a failed recovery", async () => {
+    vi.mocked(readMithrilToken).mockReturnValue(token);
+    const empty = {
+      status: 200,
+      headers: new Headers({ "x-mithril-notice": "reasoning_budget_exhausted" }),
+      json: async () => ({
+        choices: [{ message: { content: "" }, finish_reason: "length" }],
+      }),
+    } as Response;
+    const fetcher = vi.fn().mockResolvedValue(empty);
+    expect(
+      await mithrilChat([{ role: "user", content: "hi" }], "p", fetcher as typeof fetch),
+    ).toEqual({ ok: false, error: "reasoning_budget_exhausted" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
   it("refuses to call the API without a stored token", async () => {

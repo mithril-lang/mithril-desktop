@@ -46,6 +46,9 @@ describe("Mithril preview platform release", () => {
     expect(source).toContain("needs: [prepare, mac_intel, windows, linux]");
     expect(source).toContain("gh release upload");
     expect(source).toContain("SHA256SUMS");
+    expect(source).toContain("scripts/merge-mac-update-feed.mjs");
+    expect(source).toContain("--require-both");
+    expect(source).toContain("new-artifacts/preview-mac.yml");
   });
 
   // @lat: [[desktop-updates#Kotoba fork release channel#Windows preview signing]]

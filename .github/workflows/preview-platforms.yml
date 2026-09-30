@@ -304,6 +304,8 @@ jobs:
     needs: [prepare, mac_intel, windows, linux]
     runs-on: ubuntu-latest
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
       - name: Download new artifacts
         uses: actions/download-artifact@v4
         with:
@@ -317,6 +319,20 @@ jobs:
           mkdir -p all-artifacts
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir all-artifacts
           cp new-artifacts/* all-artifacts/
+      - name: Merge macOS update feed across architectures
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Rebuild preview-mac.yml from every arch zip/dmg already on the
+          # release plus this run's Intel artifacts so --clobber cannot drop
+          # arm64 (or a later arm64 publish cannot drop x64).
+          node scripts/merge-mac-update-feed.mjs \
+            --artifacts all-artifacts \
+            --version "$VERSION" \
+            --product mithril-desktop \
+            --require-both \
+            -o new-artifacts/preview-mac.yml
       - name: Generate consolidated checksums
         run: |
           set -euo pipefail

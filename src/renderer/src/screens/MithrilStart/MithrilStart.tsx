@@ -48,6 +48,11 @@ export function issueText(code: string, ja: boolean): string {
         "The model returned an empty reply.",
         "モデルの応答が空でした。",
       );
+    case "reasoning_budget_exhausted":
+      return l(
+        "The model used its reply budget on internal reasoning and returned no text. Try a shorter question, or try again.",
+        "モデルが応答予算を内部推論に使い切り、本文がありませんでした。質問を短くするか、もう一度送ってください。",
+      );
     default:
       return l(`Request failed (${code}).`, `失敗しました (${code})。`);
   }

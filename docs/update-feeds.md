@@ -9,8 +9,10 @@ electron-builder derives the update channel from the version's prerelease tag, s
 
 A preview build requests `preview*.yml`; a stable build requests `latest*.yml`. Both are consistent with what `tests/first-run-mithril.test.ts` pins. Prereleases must stay marked as prerelease on GitHub so stable clients never see them.
 
-## Known gaps (measured on v0.8.0-preview.3)
-- `preview-mac.yml` is written by two separate builds (arm64 and Intel); only one set of entries can win unless the files are merged. Check that both `arm64-mac.zip` and `x64-mac.zip` appear in it before publishing, or auto-update on one architecture will fail.
+## macOS preview feed merge
+`preview-platforms.yml` builds Intel Mac only, while Apple silicon installers are usually already on the prerelease. Before `gh release upload --clobber`, the publish job rebuilds `preview-mac.yml` from every `mithril-desktop-<ver>-{x64,arm64}-mac.zip` (and matching `.dmg` when present) in the combined artifact set via `scripts/merge-mac-update-feed.mjs --require-both`. A later Intel publish therefore cannot drop arm64 entries, and an arm64-only feed merged with a new Intel feed keeps both. `tests/merge-mac-update-feed.test.ts` pins that union.
+
+## Known gaps
 - The `x86_64.AppImage` has no separate `.blockmap` asset (an embedded block map exists), so differential updates fall back to a full download.
 - The workflow and release-asset changes for these need the `workflow` token scope and a Mac for verification; see the release report.
 

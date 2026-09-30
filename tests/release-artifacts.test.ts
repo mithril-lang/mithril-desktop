@@ -47,6 +47,23 @@ describe("Mithril preview platform release", () => {
     expect(source).toContain("gh release upload");
     expect(source).toContain("SHA256SUMS");
   });
+
+  // @lat: [[desktop-updates#Kotoba fork release channel#Windows preview signing]]
+  it("selects a Windows signing route and verifies signatures before publication", () => {
+    const source = readFileSync(
+      join(ROOT, ".github/workflows/preview-platforms.yml"),
+      "utf-8",
+    );
+
+    expect(source).toContain("MODE: ${{ vars.WIN_SIGNING }}");
+    expect(source).toContain("azure|esigner");
+    expect(source).toContain("Unknown WIN_SIGNING value");
+    expect(source).toContain("-c.win.azureSignOptions.endpoint=");
+    expect(source).toContain("-c.win.sign=scripts/win-sign-esigner.cjs");
+    expect(source).toContain("Get-AuthenticodeSignature");
+    expect(source).toContain('if ($sig.Status -ne "Valid")');
+    expect(source).toContain("if (-not $sig.TimeStamperCertificate)");
+  });
 });
 
 describe("Release quality gates", () => {

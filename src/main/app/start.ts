@@ -1,4 +1,7 @@
-import { repairMithrilKey } from "../mithril-sync";
+import {
+  migrateAllMithrilEnvKeys,
+  registerMithrilSecureEnv,
+} from "../mithril-sync";
 import { app, BrowserWindow, nativeTheme, session, shell } from "electron";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
@@ -65,14 +68,17 @@ export function startMainProcess(): void {
       console.error("[service-supervisor] failed to start:", e);
     }
 
+    // The Mithril token is read from the secure store, never from `.env`.
+    // Register the in-memory overlay first, then move any token that an
+    // earlier preview left in a plaintext `.env` into the store.
     try {
-      if (repairMithrilKey() === "repaired") {
-        console.info(
-          "[mithril] restored MITHRIL_API_KEY from the stored token",
-        );
+      registerMithrilSecureEnv();
+      const migrated = migrateAllMithrilEnvKeys();
+      for (const [profile, result] of Object.entries(migrated)) {
+        console.info(`[mithril] .env MITHRIL_API_KEY (${profile}): ${result}`);
       }
     } catch (e) {
-      console.error("[mithril] could not restore MITHRIL_API_KEY:", e);
+      console.error("[mithril] secure env setup failed:", e);
     }
 
     app.on("browser-window-created", (_, window) => {

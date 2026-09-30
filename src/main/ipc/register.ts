@@ -106,6 +106,7 @@ import {
   mithrilAccount,
 } from "../mithril-account";
 import { mithrilFirstRunState } from "../first-run";
+import { MITHRIL_TOKEN_PLACEHOLDER } from "../secure-env";
 import { mithrilChat } from "../mithril-chat";
 import {
   cancelMithrilDeviceLogin,
@@ -174,6 +175,7 @@ import {
 import { startOfficeStack } from "../office-start";
 import {
   readEnv,
+  removeEnvKey,
   setEnvValue,
   getConfigValue,
   setConfigValue,
@@ -1042,7 +1044,12 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("get-env", (_event, profile?: string) => {
     const conn = getConnectionConfig();
     if (conn.mode === "ssh" && conn.ssh) return sshReadEnv(conn.ssh, profile);
-    return readEnv(profile);
+    const env = { ...readEnv(profile) };
+    // The renderer only needs to know a Mithril token is connected, not the
+    // secret itself, which lives in the secure store.
+    if (env.MITHRIL_API_KEY?.startsWith("mf_"))
+      env.MITHRIL_API_KEY = MITHRIL_TOKEN_PLACEHOLDER;
+    return env;
   });
 
   // Pre-send chat readiness — answers "if Send is clicked right now,
@@ -1098,6 +1105,22 @@ export function registerIpcHandlers(context: IpcContext): void {
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh) {
         await sshSetEnvValue(conn.ssh, key, value, profile);
+        return true;
+      }
+      // Echoing the redacted placeholder back (a Providers autosave) is a no-op.
+      if (key === "MITHRIL_API_KEY") {
+        if (value === MITHRIL_TOKEN_PLACEHOLDER) return true;
+        if (value.trim()) {
+          // A token pasted into Providers is verified and stored securely,
+          // exactly like the account screen, never written to `.env`.
+          const result = await connectMithrilAccount(value, profile);
+          if (result.status === "refused") throw new Error(result.error);
+          void restartGatewayWhenIdle(profile, restartGateway);
+          return true;
+        }
+        // Clearing the field disconnects: the secure store holds the only copy.
+        disconnectMithrilAccount(profile);
+        removeEnvKey("MITHRIL_API_KEY", profile);
         return true;
       }
       setEnvValue(key, value, profile);

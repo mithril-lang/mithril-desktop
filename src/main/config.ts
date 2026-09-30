@@ -31,6 +31,7 @@ import {
 } from "../shared/url-key-map";
 import { readModelsRaw } from "./models";
 import { normalizeModelEndpointUrl } from "../shared/model-endpoint";
+import { secureEnvFor } from "./secure-env";
 
 // ── Connection Config (local / remote / ssh) ─────────────
 
@@ -520,7 +521,9 @@ export function readEnv(profile?: string): Record<string, string> {
   const cached = getCached<Record<string, string>>(cacheKey);
   if (cached) return cached;
 
-  const result = readEnvFile(profile);
+  // Secure-store values (the Mithril token) are overlaid in memory only; they
+  // are never written to the `.env` file and `readEnvFile` stays file-only.
+  const result = { ...readEnvFile(profile), ...secureEnvFor(profile) };
 
   setCache(cacheKey, result);
   return result;
@@ -533,8 +536,8 @@ export function readEnv(profile?: string): Record<string, string> {
  * rely on the agent loading `.env` (dashboard, cron, kanban, the CLI chat
  * fallback) spread this.
  */
-export function secureSpawnEnv(_profile?: string): Record<string, string> {
-  return {};
+export function secureSpawnEnv(profile?: string): Record<string, string> {
+  return secureEnvFor(profile);
 }
 
 /** The `.env` file as written on disk — no keychain overlay, not cached. */
@@ -604,6 +607,12 @@ export function setEnvValue(
   profile?: string,
 ): void {
   validateEnvEntry(key, value);
+  if (key === "MITHRIL_API_KEY" && value.trim()) {
+    // The Mithril token lives only in the keychain / encrypted file.
+    throw new Error(
+      "The Mithril token is stored in the secure store, not in .env. Connect it from the Mithril account screen.",
+    );
+  }
   writeEnvLine(key, value, profile);
 }
 

@@ -68,6 +68,24 @@ If `safeStorage` is unavailable or reports `basic_text` (Chromium's fixed public
 
 A token replacement that cannot be read back restores the previous encrypted file.
 
+## Token-only-in-secure-store
+
+The Mithril token exists only in the keychain or the encrypted fallback file; [[src/main/mithril-sync.ts]] no longer copies it into any `.env`.
+
+### No plaintext written
+
+`setEnvValue` refuses to persist an `mf_` value for `MITHRIL_API_KEY`, and a token typed into Providers is verified and stored securely instead.
+
+### Agent env is in-memory
+
+[[src/main/secure-env.ts]] overlays the stored token onto `readEnv` and spawn environments in memory, so the agent and gateway receive it without a file; the renderer only sees a redacted placeholder.
+
+### Startup migration
+
+A leftover `.env` `MITHRIL_API_KEY=` moves into the secure store at startup, then only that line is removed.
+
+Other lines and the file mode are kept, and the file is deleted only if it becomes empty. If the store refuses the token, `.env` is left untouched so nothing is lost.
+
 ## Native Mithril account
 
 [[src/main/mithril-account.ts#connectMithrilAccount]] verifies the new bearer before storing it. A stored account is rechecked on read so revocation is visible. The provider screen now presents this account path in place of the legacy account card.

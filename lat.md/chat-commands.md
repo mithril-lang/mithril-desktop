@@ -86,6 +86,8 @@ The legacy SSE parser observes raw tool-call deltas without parsing, executing, 
 
 A later structured error ends once with `onError`; `[DONE]` never reports success, and a tool-only stream never triggers the non-stream diagnostic probe.
 
+Visible prefix text does not override a later stream error or raw tool call. Terminal priority is structured error, raw tool call, visible content, then diagnostic probe. A syntactically complete raw call (`finish_reason=tool_calls`) gets a distinct unsupported-transport error and is not executed.
+
 ## Reasoning & tool activity rows
 
 Streamed reasoning and tool calls are folded into compact, collapsible transcript rows rather than stacked bubbles, so a turn with heavy thinking or many tool calls stays scannable.

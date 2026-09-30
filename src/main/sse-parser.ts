@@ -65,8 +65,14 @@ export interface SseDataResult {
 export interface SseParseState {
   hasContent: boolean;
   hasToolCallDelta?: boolean;
+  toolCallFinished?: boolean;
   lastError: string;
 }
+
+export type SseTerminalDisposition =
+  | { kind: "done" }
+  | { kind: "error"; error: string }
+  | { kind: "probe" };
 
 export function hasOpenAiToolCallDelta(delta: unknown): boolean {
   if (delta === null || typeof delta !== "object" || Array.isArray(delta)) {
@@ -76,14 +82,53 @@ export function hasOpenAiToolCallDelta(delta: unknown): boolean {
   return Array.isArray(toolCalls) && toolCalls.length > 0;
 }
 
+export function hasOpenAiToolCallFinishReason(choice: unknown): boolean {
+  return (
+    choice !== null &&
+    typeof choice === "object" &&
+    !Array.isArray(choice) &&
+    (choice as Record<string, unknown>).finish_reason === "tool_calls"
+  );
+}
+
 export function emptySseTerminalError(
   lastError: string,
   hasToolCallDelta: boolean,
+  toolCallFinished = false,
 ): string {
   if (lastError) return lastError;
+  if (hasToolCallDelta && toolCallFinished) {
+    return "The provider returned a raw tool call that this transport does not execute. No tool was run.";
+  }
   return hasToolCallDelta
     ? "The provider stream ended before a tool call completed. The incomplete tool call was not executed."
     : "";
+}
+
+/** Decide exactly one terminal action. Errors and observed raw tool calls must
+ * outrank prefix text, otherwise a partial tool stream can be reported as a
+ * successful answer and trigger unsafe follow-up behavior. */
+export function sseTerminalDisposition(
+  state: SseParseState,
+): SseTerminalDisposition {
+  const error = emptySseTerminalError(
+    state.lastError,
+    !!state.hasToolCallDelta,
+    !!state.toolCallFinished,
+  );
+  if (error) return { kind: "error", error };
+  if (state.hasContent) return { kind: "done" };
+  return { kind: "probe" };
+}
+
+export function completeSseStream(
+  state: SseParseState,
+  cb: Pick<SseCallbacks, "onDone" | "onError">,
+): SseTerminalDisposition {
+  const disposition = sseTerminalDisposition(state);
+  if (disposition.kind === "error") cb.onError?.(disposition.error);
+  if (disposition.kind === "done") cb.onDone?.();
+  return disposition;
 }
 
 function safeDiagnosticField(value: unknown): string {
@@ -135,14 +180,8 @@ export function processSseData(
   state: SseParseState,
 ): SseDataResult {
   if (data === "[DONE]") {
-    if (state.hasContent) {
-      cb.onDone?.();
-    } else if (state.lastError) {
-      cb.onError?.(state.lastError);
-    } else if (state.hasToolCallDelta) {
-      state.lastError = emptySseTerminalError("", true);
-      cb.onError?.(state.lastError);
-    }
+    const disposition = completeSseStream(state, cb);
+    if (disposition.kind === "error") state.lastError = disposition.error;
     return { done: true, hasContent: state.hasContent, error: state.lastError };
   }
 
@@ -161,6 +200,9 @@ export function processSseData(
     // Desktop deliberately does not parse or execute these arguments.
     if (hasOpenAiToolCallDelta(delta)) {
       state.hasToolCallDelta = true;
+    }
+    if (hasOpenAiToolCallFinishReason(parsed.choices?.[0])) {
+      state.toolCallFinished = true;
     }
 
     // Extract usage from final chunk

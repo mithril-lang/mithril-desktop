@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  completeSseStream,
   formatSseError,
   processCustomEvent,
   processSseData,
@@ -325,6 +326,84 @@ describe("processSseData", () => {
     expect(callbacks.onChunk).not.toHaveBeenCalled();
   });
 
+  it("lets a structured partial-tool error outrank streamed prefix content on DONE", () => {
+    const onError = vi.fn();
+    const onDone = vi.fn();
+    const state = {
+      hasContent: false,
+      hasToolCallDelta: false,
+      lastError: "",
+    };
+    const callbacks = { onChunk: vi.fn(), onError, onDone };
+
+    processSseData(
+      JSON.stringify({ choices: [{ delta: { content: "I will write it." } }] }),
+      callbacks,
+      state,
+    );
+    processSseData(
+      JSON.stringify({
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  function: {
+                    name: "write_file",
+                    arguments: '{"path":"profile.',
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+      callbacks,
+      state,
+    );
+    processSseData(
+      JSON.stringify({
+        error: {
+          message: "upstream stream closed",
+          code: "stream_closed_tool_call",
+          request_id: "chat:prefix-partial",
+        },
+      }),
+      callbacks,
+      state,
+    );
+    processSseData("[DONE]", callbacks, state);
+
+    expect(callbacks.onChunk).toHaveBeenCalledWith("I will write it.");
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith(
+      "upstream stream closed [stream_closed_tool_call] (Request ID: chat:prefix-partial)",
+    );
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it("lets a structured partial-tool error outrank prefix content on clean EOF without probing", () => {
+    const onError = vi.fn();
+    const onDone = vi.fn();
+    const state = {
+      hasContent: true,
+      hasToolCallDelta: true,
+      lastError:
+        "upstream stream closed [stream_closed_tool_call] (Request ID: chat:eof-partial)",
+    };
+
+    const disposition = completeSseStream(state, { onError, onDone });
+
+    expect(disposition).toEqual({
+      kind: "error",
+      error:
+        "upstream stream closed [stream_closed_tool_call] (Request ID: chat:eof-partial)",
+    });
+    expect(disposition.kind).not.toBe("probe");
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
   it("treats clean EOF after partial tool arguments as an error, not success", () => {
     const onError = vi.fn();
     const onDone = vi.fn();
@@ -362,6 +441,48 @@ describe("processSseData", () => {
       "The provider stream ended before a tool call completed. The incomplete tool call was not executed.",
     );
     expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it("reports a complete raw tool-only response without executing or probing it", () => {
+    const onError = vi.fn();
+    const onDone = vi.fn();
+    const state = {
+      hasContent: false,
+      hasToolCallDelta: false,
+      toolCallFinished: false,
+      lastError: "",
+    };
+    const callbacks = { onChunk: vi.fn(), onError, onDone };
+
+    processSseData(
+      JSON.stringify({
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  function: {
+                    name: "write_file",
+                    arguments: '{"path":"profile.json","content":"{}"}',
+                  },
+                },
+              ],
+            },
+            finish_reason: "tool_calls",
+          },
+        ],
+      }),
+      callbacks,
+      state,
+    );
+    processSseData("[DONE]", callbacks, state);
+
+    expect(state.toolCallFinished).toBe(true);
+    expect(onError).toHaveBeenCalledWith(
+      "The provider returned a raw tool call that this transport does not execute. No tool was run.",
+    );
+    expect(onDone).not.toHaveBeenCalled();
+    expect(callbacks.onChunk).not.toHaveBeenCalled();
   });
 
   it("detects legacy inline tool progress pattern", () => {

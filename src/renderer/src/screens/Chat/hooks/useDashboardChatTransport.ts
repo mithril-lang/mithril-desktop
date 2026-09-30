@@ -605,6 +605,11 @@ export function dashboardModelMatches(
   if (liveModel !== model) return false;
   if (liveProvider === provider) return true;
 
+  // Hermes reports a named provider from config.yaml as custom:<slug>
+  // (custom:mithril) after /model --provider mithril. Same model, same endpoint.
+  const bare = (value: string) => value.replace(/^custom:/, "");
+  if (bare(provider) !== "custom" && bare(liveProvider) === bare(provider)) return true;
+
   // Named custom providers can be reported by Hermes Agent as custom:<slug>
   // while Hermes One's older model config still treats them as custom rows.
   return provider === "custom" && liveProvider.startsWith("custom:");

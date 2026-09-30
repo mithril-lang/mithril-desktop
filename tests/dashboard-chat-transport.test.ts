@@ -231,6 +231,27 @@ describe("dashboardModelMatches", () => {
     ).toBe(true);
   });
 
+  it("accepts Hermes custom:mithril as the mithril provider for the same model", () => {
+    expect(
+      dashboardModelMatches("mithril", "qwen/qwen3.8-27b", {
+        provider: "custom:mithril",
+        model: "qwen/qwen3.8-27b",
+      }),
+    ).toBe(true);
+    expect(
+      dashboardModelMatches("custom:mithril", "qwen/qwen3.8-27b", {
+        provider: "mithril",
+        model: "qwen/qwen3.8-27b",
+      }),
+    ).toBe(true);
+    expect(
+      dashboardModelMatches("mithril", "qwen/qwen3.8-27b", {
+        provider: "custom:openrouter",
+        model: "qwen/qwen3.8-27b",
+      }),
+    ).toBe(false);
+  });
+
   it("accepts Hermes Agent custom provider slugs for Hermes One custom rows", () => {
     expect(
       dashboardModelMatches("custom", "deepseek-v4-pro", {

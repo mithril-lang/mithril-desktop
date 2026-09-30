@@ -77,6 +77,23 @@ function readBundleSignature(): string {
   return output;
 }
 
+/**
+ * The version to offer, or null when the running build is current.
+ * `checkForUpdates()` resolves with the FEED's version even when it is not
+ * newer than ours, so returning `updateInfo.version` unconditionally made an
+ * up-to-date app report "update available"; the follow-up download then
+ * failed with electron-updater's "Please check update first".
+ */
+export function offeredUpdateVersion(
+  result: {
+    isUpdateAvailable?: boolean;
+    updateInfo?: { version?: string };
+  } | null,
+): string | null {
+  if (!result?.isUpdateAvailable) return null;
+  return result.updateInfo?.version || null;
+}
+
 function updatePreferencesPath(): string {
   return join(app.getPath("userData"), "update-preferences.json");
 }
@@ -154,7 +171,9 @@ export function setupUpdater({ getMainWindow }: UpdaterDeps): void {
   autoUpdater.autoDownload = getAutoUpgradeEnabled();
   autoUpdater.autoInstallOnAppQuit = true;
 
+  let updateChecked = false;
   autoUpdater.on("update-available", (info) => {
+    updateChecked = true;
     getMainWindow()?.webContents.send("update-available", {
       version: info.version,
       releaseNotes: info.releaseNotes,
@@ -174,14 +193,31 @@ export function setupUpdater({ getMainWindow }: UpdaterDeps): void {
 
   ipcMain.handle("check-for-updates", async () => {
     try {
+      updateChecked = false;
       const result = await autoUpdater.checkForUpdates();
-      return result?.updateInfo?.version || null;
+      const version = offeredUpdateVersion(result);
+      updateChecked = version !== null;
+      return version;
     } catch {
       return null;
     }
   });
   ipcMain.handle("download-update", async () => {
     try {
+      // downloadUpdate() throws "Please check update first" unless a check
+      // found an update; the startup check may not have finished (or found
+      // nothing), so make sure one has before downloading.
+      if (!updateChecked) {
+        const result = await autoUpdater.checkForUpdates();
+        if (offeredUpdateVersion(result) === null) {
+          getMainWindow()?.webContents.send(
+            "update-error",
+            "No update is available",
+          );
+          return false;
+        }
+        updateChecked = true;
+      }
       await autoUpdater.downloadUpdate();
       return true;
     } catch (err) {

@@ -8,6 +8,12 @@ When GitHub reports a newer release, [[src/renderer/src/screens/Layout/Layout.ts
 
 [[src/renderer/src/components/settings/AboutPane.tsx#AboutPane]] (the About & Updates pane of the settings modal) presents the desktop app as its own card, separate from the Hermes Agent engine card — the two update on independent channels. The card shows the app version, the auto-upgrade toggle, and an explicit update action: [[src/renderer/src/components/settings/useSettingsData.ts#useSettingsData]] subscribes to the same `onUpdateAvailable`/`onUpdateDownloadProgress`/`onUpdateDownloaded`/`onUpdateError` events as the footer button and adds a manual `checkDesktopUpdate` (via `checkForUpdates`) plus a `handleDesktopUpdate` that downloads, then restarts via `installUpdate`. When auto-upgrade is enabled the startup release check downloads automatically; when disabled, downloading waits for the user's click (footer button or this card's action).
 
+## Up-to-date check
+
+An up-to-date app reports no update rather than offering its own version. electron-updater's `checkForUpdates()` resolves with the feed's info even when it is not newer than the running build, so [[src/main/app/updater.ts#offeredUpdateVersion]] returns a version only when `isUpdateAvailable` is true.
+
+Before that fix the renderer treated the feed version as "update available", the download then threw electron-updater's "Please check update first", and the sidebar showed "Update failed". The download handler also runs a check first when none has found an update, and reports "No update is available" instead of the library's error.
+
 ## Stable and beta release channels
 
 Two GitHub Actions workflows publish builds; only the stable channel reaches end users' auto-update, so a beta can be tested without risking their devices.

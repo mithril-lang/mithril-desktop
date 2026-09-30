@@ -12,6 +12,7 @@ import {
 
 vi.mock("./mithril-token-store", () => ({
   clearMithrilToken: vi.fn(),
+  mithrilStorageProtection: vi.fn(() => "reduced"),
   readMithrilToken: vi.fn(),
   writeMithrilToken: vi.fn(),
 }));
@@ -45,6 +46,7 @@ describe("native Mithril account", () => {
       await connectMithrilAccount(token, "profile-a", fetcher as typeof fetch),
     ).toMatchObject({
       status: "connected",
+      protection: "reduced",
       account: { userId: "u1", balanceMicroUsd: 100_000 },
     });
     expect(writeMithrilToken).toHaveBeenCalledWith("profile-a", token);

@@ -28,6 +28,7 @@ import {
 } from "../core/collision";
 import { TRAFFIC_OBSTACLES } from "./Traffic";
 import type { AgentPlace } from "../core/types";
+import type { PeerPose } from "../../community/types";
 import {
   nearestInteraction,
   type PlayerInteraction,
@@ -59,6 +60,7 @@ const PLAYER_ID = "player";
 const WALK_SPEED = 2.1;
 const RUN_SPEED = 4.6;
 const TURN_RATE = 14;
+const POSE_INTERVAL_S = 0.2;
 
 /** Which building footprint (if any) contains this world position. */
 function placeAt(x: number, z: number): AgentPlace {
@@ -93,6 +95,7 @@ export function PlayerLayer({
   label,
   onPlaceChange,
   onNearbyChange,
+  onPose,
 }: {
   controlsRef: React.RefObject<FollowControls | null>;
   /** Office static colliders (walls + desks), built by Office3D. */
@@ -103,6 +106,8 @@ export function PlayerLayer({
   label: string;
   onPlaceChange?: (place: AgentPlace) => void;
   onNearbyChange?: (p: PlayerInteraction | null) => void;
+  /** Throttled (~5 Hz, on change) avatar pose, for the Community world. */
+  onPose?: (pose: PeerPose) => void;
 }): React.JSX.Element {
   const { scene, animations } = useGLTF(CHAR_MAN.url);
   const camera = useThree((s) => s.camera);
@@ -113,6 +118,8 @@ export function PlayerLayer({
   onPlaceRef.current = onPlaceChange;
   const onNearbyRef = useRef(onNearbyChange);
   onNearbyRef.current = onNearbyChange;
+  const onPoseRef = useRef(onPose);
+  onPoseRef.current = onPose;
   const interactionsRef = useRef(interactions);
   interactionsRef.current = interactions;
   const officeCollidersRef = useRef(officeColliders);
@@ -124,6 +131,8 @@ export function PlayerLayer({
     facing: Math.PI, // face south, toward the camera's spawn framing
     place: "outside" as AgentPlace,
     nearbyId: null as string | null,
+    poseClock: 0,
+    sent: { x: 1e9, z: 1e9, ry: 0, mv: false },
   });
 
   // Pressed movement keys (by KeyboardEvent.code). Window-level listeners:
@@ -305,6 +314,27 @@ export function PlayerLayer({
 
     g.position.set(s.x, 0, s.z);
     g.rotation.y = s.facing;
+
+    // ── Community pose: ≤5 Hz, and only when something changed ──────────
+    s.poseClock += step;
+    if (s.poseClock >= POSE_INTERVAL_S && onPoseRef.current) {
+      const last = s.sent;
+      const changed =
+        moving !== last.mv ||
+        Math.hypot(s.x - last.x, s.z - last.z) > 0.05 ||
+        Math.abs(s.facing - last.ry) > 0.1;
+      if (changed) {
+        s.poseClock = 0;
+        s.sent = { x: s.x, z: s.z, ry: s.facing, mv: moving };
+        onPoseRef.current({
+          x: s.x,
+          z: s.z,
+          ry: s.facing,
+          mv: moving,
+          place: s.place,
+        });
+      }
+    }
 
     // ── Animation blend: idle ↔ walk ↔ run ──────────────────────────────
     const { walk, idle, run } = actionsRef.current;

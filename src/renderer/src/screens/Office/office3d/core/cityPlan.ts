@@ -85,3 +85,21 @@ export const VIEW_BLOCKER_SPOTS: Array<[number, number]> = [
   [-12.5, -17.5],
   [-7.5, 27.5],
 ];
+
+// ── Hyperloop ─────────────────────────────────────────────────────────────
+// An elevated evacuated tube running east-west above the north inner road
+// (visible from the default camera), with a passenger terminal on its north
+// side. Pylons straddle the carriageway, so traffic passes underneath.
+export const HYPERLOOP_Z = ROAD_NORTH_Z;
+export const HYPERLOOP_Y = 8.5; // tube centre-line height
+export const HYPERLOOP_R = 1.25; // tube radius
+export const HYPERLOOP_HALF_LEN = 170; // tube spans x ∈ [-170, 170]
+export const HYPERLOOP_PYLON_GAP = 20;
+export const HYPERLOOP_PYLON_HALF_SPAN = ROAD_WIDTH / 2 + 0.6;
+// Backdrop buildings keep clear of the corridor (pylon legs + terminal lot).
+export const HYPERLOOP_CLEAR_HALF = 7.5;
+export const HYPERLOOP_STATION_X = 0;
+export const HYPERLOOP_STATION_W = 26;
+export const HYPERLOOP_STATION_D = 10;
+export const HYPERLOOP_STATION_H = 6.5;
+export const HYPERLOOP_STATION_Z = HYPERLOOP_Z - 14; // terminal centre (north of the road)

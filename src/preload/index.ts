@@ -1814,6 +1814,10 @@ const hermesAPI = {
     background?: boolean;
     action?: string;
   }> => ipcRenderer.invoke("install-mcp-catalog-entry", name, env, profile),
+  installMithrilEvidenceMcp: (
+    profile?: string,
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke("install-mithril-evidence-mcp", profile),
 
   // Discover marketplace (community registry)
   fetchRegistry: (force?: boolean) =>

@@ -1,4 +1,8 @@
 import {
+  classifyMithrilError,
+  describeMithrilError,
+} from "../../shared/mithril-errors";
+import {
   app,
   shell,
   BrowserWindow,
@@ -1858,11 +1862,20 @@ export function registerIpcHandlers(context: IpcContext): void {
                 activeRuns.delete(chatRunKey);
               safeSend("chat-error", error);
               rejectChat(new Error(error));
+              const mithrilError = classifyMithrilError(error);
+              // One greppable, secret-free line instead of the raw error text.
+              if (mithrilError) {
+                console.warn(
+                  `[mithril-api] chat failed kind=${mithrilError.kind} status=${mithrilError.status}`,
+                );
+              }
               // Notify on error too if window not focused
               if (mainWindow && !mainWindow.isFocused()) {
                 new Notification({
                   title: `${APP_NAME} — Error`,
-                  body: error.slice(0, 100),
+                  body: mithrilError
+                    ? describeMithrilError(mithrilError, getAppLocale())
+                    : error.slice(0, 100),
                 }).show();
               }
             },

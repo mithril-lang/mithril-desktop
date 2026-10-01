@@ -1348,27 +1348,6 @@ export const GATEWAY_PLATFORMS: PlatformDef[] = [
   },
 ];
 
-// ── Install ─────────────────────────────────────────────
-
-export const UNIX_INSTALL_CMD =
-  "HERMES_REPO_URL=https://github.com/mithril-lang/mithril-agent.git bash -c 'curl -fsSL https://raw.githubusercontent.com/mithril-lang/mithril-agent/4fda47e0bfa9595066608ea02de934e46ff32074/scripts/install.sh | bash -s -- --skip-setup --branch main --commit 4fda47e0bfa9595066608ea02de934e46ff32074'";
-export const INSTALL_CMD_UNIX = UNIX_INSTALL_CMD;
-export const WINDOWS_INSTALL_CMD =
-  "powershell -NoProfile -ExecutionPolicy Bypass -c \"$env:HERMES_REPO_URL = 'https://github.com/mithril-lang/mithril-agent.git'; $hermesHome = Join-Path $env:USERPROFILE '.hermes'; $installDir = Join-Path $hermesHome 'hermes-agent'; $installer = [ScriptBlock]::Create((irm https://raw.githubusercontent.com/mithril-lang/mithril-agent/4fda47e0bfa9595066608ea02de934e46ff32074/scripts/install.ps1 -UseBasicParsing)); & $installer -SkipSetup -HermesHome $hermesHome -InstallDir $installDir -Branch main -Commit 4fda47e0bfa9595066608ea02de934e46ff32074\"";
-export const INSTALL_CMD =
-  typeof window !== "undefined" &&
-  window.electron?.process?.platform === "win32"
-    ? WINDOWS_INSTALL_CMD
-    : UNIX_INSTALL_CMD;
-
-export const INSTALL_CMD_WIN = WINDOWS_INSTALL_CMD;
-
-export function getInstallCmd(): string {
-  return window.electron?.process?.platform === "win32"
-    ? WINDOWS_INSTALL_CMD
-    : UNIX_INSTALL_CMD;
-}
-
 // Helper to resolve i18n key or return as-is
 export function tk(t: (key: string) => string, value: string): string {
   if (value.startsWith("constants.")) {

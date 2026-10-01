@@ -755,6 +755,30 @@ export function stopDashboard(profile?: string): boolean {
   return true;
 }
 
+/** Stop a managed dashboard and wait for the captured child, not the map entry
+ * that stopDashboard intentionally removes before the process exits. */
+export async function stopDashboardAndWait(
+  profile?: string,
+  timeoutMs = 5_000,
+): Promise<boolean> {
+  const managed = getManagedDashboard(profile);
+  if (!managed) return true;
+  const exited = new Promise<boolean>((resolve) => {
+    if (managed.proc.exitCode !== null) {
+      resolve(true);
+      return;
+    }
+    const timer = setTimeout(() => resolve(false), timeoutMs);
+    timer.unref?.();
+    managed.proc.once("exit", () => {
+      clearTimeout(timer);
+      resolve(true);
+    });
+  });
+  if (!stopDashboard(profile)) return false;
+  return exited;
+}
+
 export function isDashboardRunning(profile?: string): boolean {
   return Boolean(getManagedDashboard(profile));
 }

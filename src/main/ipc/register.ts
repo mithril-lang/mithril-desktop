@@ -138,6 +138,7 @@ import {
   startGatewayDetailed,
   stopGateway,
   isGatewayRunning,
+  stopGatewayAndWait,
   testRemoteConnection,
   restartGateway,
   notifyProfileSwitched,
@@ -154,6 +155,7 @@ import {
   freshDashboardWebSocketUrl,
   getDashboardStatus,
   isDashboardRunning,
+  stopDashboardAndWait,
   restartDashboardIfRunning,
   startDashboard,
   stopDashboard,
@@ -759,72 +761,79 @@ export function registerIpcHandlers(context: IpcContext): void {
   } = context;
   const mainWindow = getMainWindow();
   let agentInstallInProgress = false;
+  let agentInstallAbort: AbortController | null = null;
 
   async function runLocalAgentInstallWhenIdle(
     event: Electron.IpcMainInvokeEvent,
   ): Promise<void> {
-    const profiles = await listProfiles();
-    event.sender.send("install-progress", {
-      step: 1,
-      totalSteps: 7,
-      title: "Waiting for Hermes Agent to become idle",
-      detail: "Active chats and scheduled work will finish before the update.",
-      log: "Waiting for active Hermes work to finish before updating...\n",
-    } satisfies InstallProgress);
-    const result = await restartMithrilRuntimeWhenIdle(
-      "desktop-agent-install",
-      async () => {
-        agentInstallInProgress = true;
-        try {
-          await installAgentAndRestoreRuntimes(profiles, {
-            isGatewayRunning,
-            isDashboardRunning,
-            stopGateway: async (profile) => {
-              stopGateway(profile, true);
-              for (let attempt = 0; attempt < 20; attempt += 1) {
-                if (!isGatewayRunning(profile)) return;
-                await new Promise((resolve) => setTimeout(resolve, 250));
-              }
-              throw new Error(
-                "Gateway did not stop before Hermes Agent update",
-              );
-            },
-            stopDashboard: async (profile) => {
-              stopDashboard(profile);
-              for (let attempt = 0; attempt < 20; attempt += 1) {
-                if (!isDashboardRunning(profile)) return;
-                await new Promise((resolve) => setTimeout(resolve, 250));
-              }
-              throw new Error(
-                "Dashboard did not stop before Hermes Agent update",
-              );
-            },
-            install: () =>
-              runInstall((progress: InstallProgress) => {
-                event.sender.send("install-progress", progress);
-              }, mainWindow),
-            restartGateway,
-            // stopDashboard removes the managed-process entry, so restoration
-            // must create a new dashboard rather than ask for an in-place
-            // restart of an entry that intentionally no longer exists.
-            restartDashboard: startDashboard,
-          });
-        } finally {
-          agentInstallInProgress = false;
-        }
-      },
-      {
-        maxWaitMs: Number.POSITIVE_INFINITY,
-        busy: () =>
-          agentInstallBusy(
-            profiles,
-            activeRuns.size,
-            cronBusyStrict,
-            dashboardTurnBusy,
-          ),
-      },
-    );
-    if (!result.restarted) throw new Error("Hermes Agent remained busy");
+    if (agentInstallAbort || agentInstallInProgress) {
+      throw new Error("A Hermes Agent install or update is already running.");
+    }
+    const controller = new AbortController();
+    agentInstallAbort = controller;
+    try {
+      const profiles = await listProfiles();
+      event.sender.send("install-progress", {
+        step: 1,
+        totalSteps: 7,
+        title: "Waiting for Hermes Agent to become idle",
+        detail:
+          "Active chats and scheduled work will finish before the update.",
+        log: "Waiting for active Hermes work to finish before updating...\n",
+        cancellable: true,
+      } satisfies InstallProgress);
+      const result = await restartMithrilRuntimeWhenIdle(
+        "desktop-agent-install",
+        async () => {
+          agentInstallInProgress = true;
+          event.sender.send("install-progress", {
+            step: 1,
+            totalSteps: 7,
+            title: "Preparing Hermes Agent update",
+            detail: "Stopping idle runtimes safely before updating.",
+            log: "Hermes Agent is idle; beginning verified update...\n",
+            cancellable: false,
+          } satisfies InstallProgress);
+          try {
+            await installAgentAndRestoreRuntimes(profiles, {
+              isGatewayRunning,
+              isDashboardRunning,
+              stopGateway: stopGatewayAndWait,
+              stopDashboard: stopDashboardAndWait,
+              install: () =>
+                runInstall((progress: InstallProgress) => {
+                  event.sender.send("install-progress", {
+                    ...progress,
+                    cancellable: false,
+                  });
+                }, mainWindow),
+              restartGateway,
+              restartDashboard: async (profile) =>
+                (await startDashboard(profile)).running,
+            });
+          } finally {
+            agentInstallInProgress = false;
+          }
+        },
+        {
+          maxWaitMs: Number.POSITIVE_INFINITY,
+          signal: controller.signal,
+          busy: () =>
+            agentInstallBusy(
+              profiles,
+              activeRuns.size,
+              cronBusyStrict,
+              dashboardTurnBusy,
+            ),
+        },
+      );
+      if (result.reason === "cancelled") {
+        throw new Error("Hermes Agent installation was cancelled.");
+      }
+      if (!result.restarted) throw new Error("Hermes Agent remained busy");
+    } finally {
+      if (agentInstallAbort === controller) agentInstallAbort = null;
+    }
   }
   const mithrilRuntime = createMithrilRuntimeLifecycle({
     connect: connectMithrilAccount,
@@ -899,6 +908,12 @@ export function registerIpcHandlers(context: IpcContext): void {
     } catch (err) {
       return { success: false, error: (err as Error).message };
     }
+  });
+
+  ipcMain.handle("cancel-install", () => {
+    if (!agentInstallAbort || agentInstallInProgress) return false;
+    agentInstallAbort.abort();
+    return true;
   });
 
   // Pre-install inspection + "use an existing installation" (issue #272).

@@ -34,6 +34,8 @@ The confirm view (eyebrow "SETUP", title "Before installing") shows the target p
 
 The progress view (`wide`) shows a step + percent header with a progress bar, then a **fixed-size** terminal log window (`.onboard-terminal`): its body has a constant height and scrolls internally, so streaming log lines never reflow the surrounding layout. The log auto-scrolls to the newest line.
 
+Cancel aborts a request while it is only waiting for active work to become idle. Once runtime shutdown begins, the button is disabled and the lifecycle must finish installation or failure recovery before navigation.
+
 Unix execution follows the [[desktop-security#Runtime security#Verified Agent bootstraps|verified bootstrap boundary]] before running downloaded code.
 
 ### Existing-install environment handoff

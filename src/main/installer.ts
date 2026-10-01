@@ -242,6 +242,7 @@ export interface InstallProgress {
   title: string;
   detail: string;
   log: string;
+  cancellable?: boolean;
 }
 
 export function getEnhancedPath(): string {

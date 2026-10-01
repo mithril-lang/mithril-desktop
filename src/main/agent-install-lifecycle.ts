@@ -7,11 +7,11 @@ export interface AgentInstallProfile {
 export interface AgentInstallLifecycleDeps {
   isGatewayRunning: (profile?: string) => boolean;
   isDashboardRunning: (profile?: string) => boolean;
-  stopGateway: (profile?: string) => Promise<void>;
-  stopDashboard: (profile?: string) => Promise<void>;
+  stopGateway: (profile?: string) => Promise<boolean>;
+  stopDashboard: (profile?: string) => Promise<boolean>;
   install: () => Promise<void>;
-  restartGateway: (profile?: string) => Promise<unknown>;
-  restartDashboard: (profile?: string) => Promise<unknown>;
+  restartGateway: (profile?: string) => Promise<boolean>;
+  restartDashboard: (profile?: string) => Promise<boolean>;
 }
 
 export function agentInstallBusy(
@@ -52,25 +52,69 @@ export async function installAgentAndRestoreRuntimes(
 
   const stoppedGateways: AgentInstallProfile[] = [];
   const stoppedDashboards: AgentInstallProfile[] = [];
+  let operationError: unknown;
   try {
     for (const profile of dashboards) {
-      await deps.stopDashboard(profileArg(profile.id));
+      // Once stop is signalled, restoration is required even if the bounded
+      // exit wait times out: the process may exit immediately afterward.
       stoppedDashboards.push(profile);
+      if (!(await deps.stopDashboard(profileArg(profile.id)))) {
+        throw new Error(`Dashboard ${profile.id} did not stop`);
+      }
     }
     for (const profile of gateways) {
-      await deps.stopGateway(profileArg(profile.id));
       stoppedGateways.push(profile);
+      if (!(await deps.stopGateway(profileArg(profile.id)))) {
+        throw new Error(`Gateway ${profile.id} did not stop`);
+      }
     }
     await deps.install();
-  } finally {
-    // Restore the pre-maintenance topology even when installation fails. The
-    // installer guarantees it does not claim success for a partial checkout;
-    // leaving previously-running agents stopped would compound that failure.
-    for (const profile of stoppedGateways) {
-      await deps.restartGateway(profileArg(profile.id));
+  } catch (error) {
+    operationError = error;
+  }
+
+  // Restore every captured process even when one restoration fails. The
+  // original installer/stop error stays first and as `cause` so recovery
+  // diagnostics cannot mask why maintenance failed.
+  const restoreErrors: Error[] = [];
+  for (const profile of stoppedGateways) {
+    try {
+      if (!(await deps.restartGateway(profileArg(profile.id)))) {
+        throw new Error(`Gateway ${profile.id} did not restart`);
+      }
+    } catch (error) {
+      restoreErrors.push(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
-    for (const profile of stoppedDashboards) {
-      await deps.restartDashboard(profileArg(profile.id));
+  }
+  for (const profile of stoppedDashboards) {
+    try {
+      if (!(await deps.restartDashboard(profileArg(profile.id)))) {
+        throw new Error(`Dashboard ${profile.id} did not restart`);
+      }
+    } catch (error) {
+      restoreErrors.push(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
+  }
+
+  if (operationError && restoreErrors.length === 0) throw operationError;
+  if (operationError || restoreErrors.length > 0) {
+    const primary =
+      operationError instanceof Error
+        ? operationError
+        : operationError
+          ? new Error(String(operationError))
+          : null;
+    const combined = new AggregateError(
+      [...(primary ? [primary] : []), ...restoreErrors],
+      primary
+        ? `${primary.message}; runtime restoration also failed: ${restoreErrors.map((error) => error.message).join("; ")}`
+        : `Hermes Agent installed, but runtime restoration failed: ${restoreErrors.map((error) => error.message).join("; ")}`,
+    );
+    if (primary) Object.defineProperty(combined, "cause", { value: primary });
+    throw combined;
   }
 }

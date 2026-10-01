@@ -34,7 +34,7 @@ export interface DeferResult {
   restarted: boolean;
   /** "idle" — nothing was running; "waited" — a job finished first;
    *  "timeout" — the cap expired and it restarted anyway. */
-  reason: "idle" | "waited" | "timeout" | "busy";
+  reason: "idle" | "waited" | "timeout" | "busy" | "cancelled";
   waitedMs: number;
 }
 
@@ -49,7 +49,30 @@ type RestartOptions = {
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
   forceAfterTimeout?: boolean;
+  signal?: AbortSignal;
 };
+
+async function sleepUnlessAborted(
+  sleep: (ms: number) => Promise<void>,
+  ms: number,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  if (!signal) {
+    await sleep(ms);
+    return false;
+  }
+  if (signal.aborted) return true;
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<true>((resolve) => {
+    onAbort = () => resolve(true);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  try {
+    return await Promise.race([sleep(ms).then(() => false as const), aborted]);
+  } finally {
+    if (onAbort) signal.removeEventListener("abort", onAbort);
+  }
+}
 
 export function cronBusy(
   profile: string | undefined,
@@ -154,10 +177,17 @@ function restartWhenIdle(
     opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const now = opts.now ?? Date.now;
   const forceAfterTimeout = opts.forceAfterTimeout ?? true;
+  const signal = opts.signal;
 
   const run = (async (): Promise<DeferResult> => {
     const t0 = now();
+    if (signal?.aborted) {
+      return { restarted: false, reason: "cancelled", waitedMs: 0 };
+    }
     if (!busy(profile)) {
+      if (signal?.aborted) {
+        return { restarted: false, reason: "cancelled", waitedMs: 0 };
+      }
       await restart(profile);
       return { restarted: true, reason: "idle", waitedMs: 0 };
     }
@@ -169,7 +199,13 @@ function restartWhenIdle(
       "ms",
     );
     while (now() - t0 < maxWaitMs) {
-      await sleep(pollMs);
+      if (await sleepUnlessAborted(sleep, pollMs, signal)) {
+        return {
+          restarted: false,
+          reason: "cancelled",
+          waitedMs: now() - t0,
+        };
+      }
       if (!busy(profile)) {
         const waitedMs = now() - t0;
         console.log(
@@ -179,6 +215,9 @@ function restartWhenIdle(
           waitedMs,
           "ms",
         );
+        if (signal?.aborted) {
+          return { restarted: false, reason: "cancelled", waitedMs };
+        }
         await restart(profile);
         return { restarted: true, reason: "waited", waitedMs };
       }

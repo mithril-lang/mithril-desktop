@@ -32,6 +32,7 @@ interface InstallProgress {
   title: string;
   detail: string;
   log: string;
+  cancellable?: boolean;
 }
 
 interface InstallTarget {
@@ -72,6 +73,7 @@ function Install({
   const [copied, setCopied] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
   const translateRef = useRef(t);
+  const cancellableRef = useRef(true);
 
   useEffect(() => {
     translateRef.current = t;
@@ -99,6 +101,7 @@ function Install({
     if (phase !== "running") return;
     let isMounted = true;
     const cleanup = window.hermesAPI.onInstallProgress((p) => {
+      cancellableRef.current = p.cancellable !== false;
       if (isMounted) setProgress(p);
     });
 
@@ -125,6 +128,7 @@ function Install({
     return () => {
       isMounted = false;
       cleanup();
+      if (cancellableRef.current) void window.hermesAPI.cancelInstall();
     };
   }, [phase]);
 
@@ -139,6 +143,13 @@ function Install({
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleCancelInstall(): Promise<void> {
+    if (await window.hermesAPI.cancelInstall()) {
+      cancellableRef.current = false;
+      onCancel();
+    }
   }
 
   // "Use an existing installation": let the user point the app at a Hermes
@@ -343,7 +354,11 @@ function Install({
       )}
 
       {!done && !failed && (
-        <button className="onboard-btn onboard-btn-text" onClick={onCancel}>
+        <button
+          className="onboard-btn onboard-btn-text"
+          onClick={handleCancelInstall}
+          disabled={progress.cancellable === false}
+        >
           {t("install.cancelInstallation")}
         </button>
       )}

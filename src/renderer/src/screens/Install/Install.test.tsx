@@ -43,6 +43,7 @@ describe("Install", () => {
         }),
         onInstallProgress: vi.fn(() => removeProgressListener),
         startInstall,
+        cancelInstall: vi.fn().mockResolvedValue(true),
       },
     });
 
@@ -71,5 +72,67 @@ describe("Install", () => {
     expect(props.onFailed).toHaveBeenCalledWith(
       "fr:install.installationFailedHint",
     );
+  });
+
+  it("cancels a deferred idle wait, but disables cancel after maintenance begins", async () => {
+    let progressListener!: (progress: {
+      step: number;
+      totalSteps: number;
+      title: string;
+      detail: string;
+      log: string;
+      cancellable?: boolean;
+    }) => void;
+    const cancelInstall = vi.fn().mockResolvedValue(true);
+    Object.defineProperty(window, "hermesAPI", {
+      configurable: true,
+      value: {
+        inspectInstallTarget: vi.fn().mockResolvedValue({
+          hermesHome: "/tmp/hermes",
+          repoPath: "/tmp/hermes/hermes-agent",
+          state: "update",
+        }),
+        onInstallProgress: vi.fn((listener) => {
+          progressListener = listener;
+          return vi.fn();
+        }),
+        startInstall: vi.fn(() => new Promise(() => undefined)),
+        cancelInstall,
+      },
+    });
+    const props = {
+      onComplete: vi.fn(),
+      onFailed: vi.fn(),
+      onCancel: vi.fn(),
+    };
+    render(<Install {...props} />);
+    fireEvent.click(screen.getByText("en:install.confirmInstallBtn"));
+    await waitFor(() => expect(progressListener).toBeDefined());
+
+    act(() => {
+      progressListener({
+        step: 1,
+        totalSteps: 7,
+        title: "waiting",
+        detail: "waiting",
+        log: "waiting",
+        cancellable: true,
+      });
+    });
+    fireEvent.click(screen.getByText("en:install.cancelInstallation"));
+    await waitFor(() => expect(cancelInstall).toHaveBeenCalledOnce());
+    expect(props.onCancel).toHaveBeenCalledOnce();
+
+    act(() => {
+      progressListener({
+        step: 1,
+        totalSteps: 7,
+        title: "installing",
+        detail: "installing",
+        log: "installing",
+        cancellable: false,
+      });
+    });
+    expect(screen.getByText("en:install.cancelInstallation")).toBeDisabled();
   });
 });

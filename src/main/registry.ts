@@ -138,6 +138,15 @@ function authorName(author: IndexEntry["author"]): string | undefined {
 
 function toItem(e: IndexEntry, registry: RegistrySource): RegistryItem {
   const location = REGISTRIES[registry];
+  const platforms = e.platforms ?? e.compatibility?.platforms;
+  const currentPlatform =
+    process.platform === "darwin"
+      ? "macos"
+      : process.platform === "win32"
+        ? "windows"
+        : process.platform;
+  const platformCompatible =
+    !platforms?.length || platforms.includes(currentPlatform);
   return {
     id: e.id,
     name: e.name || e.id,
@@ -147,7 +156,7 @@ function toItem(e: IndexEntry, registry: RegistrySource): RegistryItem {
     tags: e.tags,
     version: e.version,
     license: e.license,
-    platforms: e.platforms ?? e.compatibility?.platforms,
+    platforms,
     path: e.path,
     homepage: e.path ? `${location.repoBase}/${e.path}` : undefined,
     // Resolve the repo-relative icon path to the registry service's icon URL,
@@ -160,6 +169,7 @@ function toItem(e: IndexEntry, registry: RegistrySource): RegistryItem {
     installable:
       e.type !== "tool" &&
       e.installable !== false &&
+      platformCompatible &&
       (e.type !== "plugin" || e.artifact?.format === "git"),
     permissions: e.permissions,
     artifact: e.artifact,

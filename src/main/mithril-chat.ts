@@ -5,10 +5,10 @@ import { readMithrilToken } from "./mithril-token-store";
 import type { MithrilChatResult } from "../shared/account";
 
 export const MITHRIL_CHAT_MODEL = "qwen/qwen3.8-27b";
-// Leave room for visible text after hidden reasoning (API floors small budgets too).
-export const MITHRIL_CHAT_MAX_TOKENS = 4096;
+// Qwen3.8-27B's native context. A smaller cap is spent on hidden reasoning.
+export const MITHRIL_CHAT_MAX_TOKENS = 262144;
 /** One recovery attempt when the first reply is empty because reasoning ate the budget. */
-export const MITHRIL_CHAT_RETRY_MAX_TOKENS = 8192;
+export const MITHRIL_CHAT_RETRY_MAX_TOKENS = 262144;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 

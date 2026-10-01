@@ -19,6 +19,8 @@ describe("contextWindowForModel", () => {
     expect(contextWindowForModel("deepseek-ai/deepseek-v4-pro")).toBe(1048576);
     expect(contextWindowForModel("deepseek-v4-flash-vision-exp")).toBe(1048576);
     expect(contextWindowForModel("moonshotai/Kimi-K2-Instruct")).toBe(262144);
+    expect(contextWindowForModel("qwen/qwen3.8-27b")).toBe(262144);
+    expect(contextWindowForModel("qwen3.8-27b-whitehacker")).toBe(262144);
   });
 
   it("is case-insensitive", () => {

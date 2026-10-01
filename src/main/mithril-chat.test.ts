@@ -66,11 +66,11 @@ describe("Mithril in-app chat", () => {
     expect(
       JSON.parse((fetcher.mock.calls[0]![1] as RequestInit).body as string)
         .max_tokens,
-    ).toBe(4096);
+    ).toBe(262144);
     expect(
       JSON.parse((fetcher.mock.calls[1]![1] as RequestInit).body as string)
         .max_tokens,
-    ).toBe(8192);
+    ).toBe(262144);
   });
 
   it("surfaces reasoning_budget_exhausted instead of a silent empty reply after a failed recovery", async () => {

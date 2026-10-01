@@ -31,7 +31,7 @@ vi.mock("./process-options", () => ({ HIDDEN_SUBPROCESS_OPTIONS: {} }));
 import {
   fetchRegistry,
   installRegistryItem,
-  validateGitPluginArtifact,
+  validateGitPluginEntry,
 } from "./registry";
 
 const artifact = {
@@ -143,12 +143,30 @@ describe("registry federation", () => {
 
 describe("Git plugin artifact validation", () => {
   it("requires HTTPS and an immutable full commit", () => {
-    expect(validateGitPluginArtifact(artifact)).toBe(true);
-    expect(validateGitPluginArtifact({ ...artifact, commit: "main" })).toBe(
-      false,
-    );
-    expect(
-      validateGitPluginArtifact({ ...artifact, url: "http://example.com/x" }),
-    ).toBe(false);
+    const entry = {
+      id: "hermes-zap-proxy",
+      type: "plugin" as const,
+      name: "ZAP Proxy DAST",
+      source: artifact.url,
+      artifact,
+    };
+    expect(validateGitPluginEntry(entry)).toEqual({
+      id: entry.id,
+      source: artifact.url,
+      commit: artifact.commit,
+    });
+    expect(() =>
+      validateGitPluginEntry({
+        ...entry,
+        artifact: { ...artifact, commit: "main" },
+      }),
+    ).toThrow("full reviewed commit");
+    expect(() =>
+      validateGitPluginEntry({
+        ...entry,
+        source: "http://example.com/x",
+        artifact: { ...artifact, url: "http://example.com/x" },
+      }),
+    ).toThrow("reviewed public GitHub");
   });
 });

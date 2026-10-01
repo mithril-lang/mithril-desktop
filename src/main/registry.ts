@@ -771,28 +771,6 @@ async function installAgent(item: RegistryItem): Promise<InstallResult> {
   return { success: true };
 }
 
-export function validateGitPluginArtifact(
-  artifact: RegistryArtifact | undefined,
-): artifact is RegistryArtifact & { format: "git"; commit: string } {
-  if (
-    artifact?.format !== "git" ||
-    !/^[0-9a-f]{40}$/.test(artifact.commit || "")
-  ) {
-    return false;
-  }
-  try {
-    const url = new URL(artifact.url);
-    return (
-      url.protocol === "https:" &&
-      !url.username &&
-      !url.password &&
-      url.hostname === "github.com"
-    );
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Install/"set up" a catalog item into the active profile.
  *   - skill    → download the entry folder into <profile>/skills/<category>/<id>/

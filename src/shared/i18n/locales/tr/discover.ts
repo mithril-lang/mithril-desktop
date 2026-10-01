@@ -1,12 +1,13 @@
 export default {
   title: "Keşfet",
   subtitle:
-    "Topluluk yeteneklerine, MCP sunucularına, ajanlara ve iş akışlarına göz atın — bunları tek tıkla kurun",
+    "Topluluk yeteneklerine, MCP sunucularına, ajanlara, iş akışlarına ve eklentilere göz atın",
   tabs: {
     skills: "Yetenekler",
     mcps: "MCP'ler",
     agents: "Ajanlar",
     workflows: "İş Akışları",
+    plugins: "Eklentiler",
   },
   searchPlaceholder: "{{kind}} ara...",
   refresh: "Yenile",

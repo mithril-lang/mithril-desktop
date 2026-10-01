@@ -1,11 +1,13 @@
 export default {
   title: "Discover",
-  subtitle: "Browse community skills, MCP servers, agents, and workflows.",
+  subtitle:
+    "Browse community skills, MCP servers, agents, workflows, and plugins.",
   tabs: {
     skills: "Skills",
     mcps: "MCPs",
     agents: "Agents",
     workflows: "Workflows",
+    plugins: "Plugins",
   },
   searchPlaceholder: "Search {{kind}}...",
   refresh: "Refresh",

@@ -27,6 +27,7 @@ import type {
   RegistryItem,
   RegistryCatalog,
   RegistryDetail,
+  InstalledRegistry,
   ModelRegistry,
 } from "../shared/registry";
 import type {
@@ -1373,9 +1374,7 @@ interface HermesAPI {
     force?: boolean,
   ) => Promise<RegistryCatalog & { error?: string }>;
   fetchModelRegistry: (force?: boolean) => Promise<ModelRegistry>;
-  listInstalledRegistry: (
-    profile?: string,
-  ) => Promise<{ skills: string[]; mcps: string[]; workflows: string[] }>;
+  listInstalledRegistry: (profile?: string) => Promise<InstalledRegistry>;
   fetchRegistryDetail: (
     kind: RegistryKind,
     item: RegistryItem,

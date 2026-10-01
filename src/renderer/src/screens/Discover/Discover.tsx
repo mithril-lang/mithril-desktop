@@ -12,6 +12,7 @@ import {
   Plug,
   Bot,
   Workflow as WorkflowIcon,
+  ApprovalIcon,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
 import { AgentMarkdown } from "../../components/AgentMarkdown";
@@ -38,6 +39,7 @@ const KINDS: { key: RegistryKind; icon: LucideIcon }[] = [
   { key: "mcps", icon: Plug },
   { key: "agents", icon: Bot },
   { key: "workflows", icon: WorkflowIcon },
+  { key: "plugins", icon: ApprovalIcon },
 ];
 
 // Per-kind setup action: distinct icon + i18n group so each card reads clearly
@@ -47,6 +49,7 @@ const ACTION: Record<RegistryKind, { icon: LucideIcon; i18n: string }> = {
   mcps: { icon: Download, i18n: "install" },
   agents: { icon: Plus, i18n: "create" },
   workflows: { icon: Download, i18n: "install" },
+  plugins: { icon: Download, i18n: "install" },
 };
 
 const EMPTY: RegistryCatalog = {
@@ -54,6 +57,7 @@ const EMPTY: RegistryCatalog = {
   mcps: [],
   agents: [],
   workflows: [],
+  plugins: [],
 };
 
 type ActionState = "idle" | "working" | "done" | "error";
@@ -81,7 +85,8 @@ export default function Discover({
     mcps: string[];
     workflows: string[];
     agents: string[];
-  }>({ skills: [], mcps: [], workflows: [], agents: [] });
+    plugins: string[];
+  }>({ skills: [], mcps: [], workflows: [], agents: [], plugins: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -109,6 +114,7 @@ export default function Discover({
         mcps: reg.mcps,
         workflows: reg.workflows,
         agents: profiles.map((p) => p.id),
+        plugins: reg.plugins,
       });
     } catch {
       /* leave as-is */
@@ -130,6 +136,7 @@ export default function Discover({
           mcps: data.mcps ?? [],
           agents: data.agents ?? [],
           workflows: data.workflows ?? [],
+          plugins: data.plugins ?? [],
         });
         // `source: name` so the existing install path runs
         // `hermes skills install <name>`.
@@ -187,6 +194,8 @@ export default function Discover({
           return installed.agents.includes(item.id);
         case "workflows":
           return installed.workflows.includes(item.id);
+        case "plugins":
+          return installed.plugins.includes(item.id);
       }
     },
     [installed],
@@ -344,6 +353,7 @@ export default function Discover({
           const itemKey = `${kind}:${item.id}`;
           const itemState = actions[itemKey] ?? "idle";
           const done = itemState === "done" || isInstalled(kind, item);
+          const canInstall = item.installable !== false;
           const act = ACTION[kind];
           const ActionIcon = act.icon;
           const KindIcon = KINDS.find((k) => k.key === kind)?.icon ?? Puzzle;
@@ -411,7 +421,7 @@ export default function Discover({
                             </button>
                           ))}
                       </>
-                    ) : (
+                    ) : canInstall ? (
                       <button
                         className="btn btn-primary btn-sm"
                         onClick={() => handleInstall(kind, item)}
@@ -423,7 +433,7 @@ export default function Discover({
                           ? t(`discover.actions.${act.i18n}.working`)
                           : t(`discover.actions.${act.i18n}.setup`)}
                       </button>
-                    )}
+                    ) : null}
                     {item.homepage && (
                       <a
                         className="btn-ghost discover-modal-close"
@@ -513,7 +523,7 @@ export default function Discover({
           <p className="discover-subtitle">{t("discover.subtitle")}</p>
         </div>
         <a
-          href="https://github.com/hermesonehq/hermes-registry"
+          href="https://github.com/mithril-lang/mithril-registry"
           target="_blank"
           rel="noreferrer"
           className="btn btn-secondary btn-sm"
@@ -591,6 +601,7 @@ export default function Discover({
             const key = `${tab}:${item.id}`;
             const state = actions[key] ?? "idle";
             const done = state === "done" || isInstalled(tab, item);
+            const canInstall = item.installable !== false;
             const action = ACTION[tab];
             const ActionIcon = action.icon;
             const meta = [
@@ -642,7 +653,7 @@ export default function Discover({
                       <Check size={14} />
                       {t(`discover.actions.${action.i18n}.done`)}
                     </span>
-                  ) : (
+                  ) : canInstall ? (
                     <button
                       type="button"
                       className="btn btn-primary btn-sm discover-install-btn"
@@ -658,7 +669,7 @@ export default function Discover({
                         ? t(`discover.actions.${action.i18n}.working`)
                         : t(`discover.actions.${action.i18n}.setup`)}
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             );

@@ -36,6 +36,8 @@ const CONTEXT_WINDOWS: Array<[RegExp, number]> = [
   [/agnes/i, 262144],
   // Moonshot's Kimi K2 family — 256K context.
   [/kimi|moonshot/i, 262144],
+  // Qwen3.8-27B's native context. Must come before the generic Qwen rule.
+  [/qwen3\.8-27b/i, 262144],
   [/qwen/i, 32768],
   [/mistral/i, 32768],
 ];

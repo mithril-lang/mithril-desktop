@@ -2,15 +2,25 @@
 
 Desktop runtime values and downloaded bootstrap code cross explicit trust boundaries before rendering or execution.
 
-## Verified Unix bootstrap
+## Verified Agent bootstraps
 
-Unix installation downloads a commit-pinned Agent bootstrap script, verifies its SHA-256, then executes it with `--skip-setup`. Download and verification failures always fail installation, including when older binaries already exist.
+Desktop verifies commit-pinned Mithril Agent bootstraps on Unix and Windows before executing the tested revision. Any download, checksum, or installer failure fails the operation even when older binaries exist.
 
-[[src/main/installer-download.ts#verifiedInstallerCommand]] stages the file under a unique temporary path and removes it on success, download failure, checksum mismatch, or installer failure. [[src/main/installer.ts#runInstall]] preserves verification failures instead of applying its legacy installed-binary warning fallback.
+[[src/main/installer-download.ts#verifiedInstallerCommand]] stages the Unix file under a unique temporary path and removes it on success, download failure, checksum mismatch, or installer failure. [[src/main/installer-download.ts#verifiedWindowsInstallerScript]] verifies the raw Windows bytes before making the UTF-8-BOM copy required by Windows PowerShell 5.1. [[src/main/installer.ts#runInstall]] treats every nonzero bootstrap exit as a failure rather than accepting an older surviving binary tree.
 
-The pin is upstream commit `503d863fcd2cbfc0be5a6d6c536fae2e98aa4204`, whose `scripts/install.sh` hash is `0582d9b1562efcb6e0ac62f4451021667830b830a72ce7d91eaea9fee8b6c09b`. Bump the commit and digest together after reviewing upstream bootstrap changes and compatibility with the Agent it installs. This pins the bootstrap only; its Agent/dependency updates and the Windows bootstrap retain their separate update behavior.
+The pin is Mithril Agent commit `4fda47e0bfa9595066608ea02de934e46ff32074`. Its `scripts/install.sh` SHA-256 is `0fbf2969c12b9ef9c90b81519814865faa9ee4e22056e2a9a4d0b1d5e59966e8`; `scripts/install.ps1` is `5204fb92ced8b94af58e9ce37151cbbbc489b3b03ca81830a57362362d3d20da`. Bump the commit and both digests together after review.
 
-[[tests/installer-download.test.ts]] executes the shell pipeline with real checksum tools and a harmless downloaded fixture. [[tests/installer-verification-result.test.ts]] checks that verification failure cannot become a successful install result merely because binaries already exist.
+[[tests/installer-download.test.ts]] executes the Unix pipeline with real checksum tools and a harmless downloaded fixture, and inspects the Windows verification order. [[tests/installer-source.test.ts]] keeps manual fallbacks on the same revision. [[tests/installer-verification-result.test.ts]] checks that verification failure cannot become success merely because binaries exist.
+
+## Agent checkout migration
+
+Fresh install and explicit local Update use the same pinned Mithril Agent bootstrap. Existing Nous checkouts move once through the Agent installer's source-aware, idempotent update path instead of a Desktop-authored git rewrite.
+
+Desktop supplies `HERMES_REPO_URL=https://github.com/mithril-lang/mithril-agent.git`, `main`, the exact commit, `HERMES_HOME`, and the checkout directory on both platforms. The Agent installer changes `origin` before fetch, includes untracked files in its autostash, and writes rescue refs before replacing divergent or orphaned commits. Profile auth and configuration remain outside the checkout under `HERMES_HOME`.
+
+[[src/main/agent-install-lifecycle.ts#installAgentAndRestoreRuntimes]] snapshots running gateways and managed dashboards after the idle gate, stops them, runs the installer, and restores only that prior topology even when installation fails. [[src/main/ipc/register.ts#registerIpcHandlers]] waits indefinitely for active Desktop turns, profile cron executions, and dashboard leases, and refuses new local chat/audio while checkout maintenance is in progress. A failed installer never claims migration success.
+
+[[src/main/agent-install-lifecycle.test.ts]] covers all busy signals, shared gateway exclusion, restart-only-previously-running behavior, and restoration after failure. The Agent repository owns platform-parity integration tests for stash and rescue mechanics; Desktop verifies its pinned invocation contract rather than duplicating that git implementation.
 
 ## Memory provider HTML boundary
 

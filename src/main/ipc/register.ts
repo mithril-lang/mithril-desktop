@@ -73,7 +73,6 @@ import {
   getHermesVersion,
   clearVersionCache,
   runHermesDoctor,
-  runHermesUpdate,
   checkOpenClawExists,
   runClawMigrate,
   runHermesBackup,
@@ -154,10 +153,15 @@ import {
 import {
   freshDashboardWebSocketUrl,
   getDashboardStatus,
+  isDashboardRunning,
   restartDashboardIfRunning,
   startDashboard,
   stopDashboard,
 } from "../dashboard";
+import {
+  agentInstallBusy,
+  installAgentAndRestoreRuntimes,
+} from "../agent-install-lifecycle";
 import {
   clearRemoteOAuthSession,
   connectionConfigAfterRemoteOAuthLogin,
@@ -754,6 +758,74 @@ export function registerIpcHandlers(context: IpcContext): void {
     openExternalUrl,
   } = context;
   const mainWindow = getMainWindow();
+  let agentInstallInProgress = false;
+
+  async function runLocalAgentInstallWhenIdle(
+    event: Electron.IpcMainInvokeEvent,
+  ): Promise<void> {
+    const profiles = await listProfiles();
+    event.sender.send("install-progress", {
+      step: 1,
+      totalSteps: 7,
+      title: "Waiting for Hermes Agent to become idle",
+      detail: "Active chats and scheduled work will finish before the update.",
+      log: "Waiting for active Hermes work to finish before updating...\n",
+    } satisfies InstallProgress);
+    const result = await restartMithrilRuntimeWhenIdle(
+      "desktop-agent-install",
+      async () => {
+        agentInstallInProgress = true;
+        try {
+          await installAgentAndRestoreRuntimes(profiles, {
+            isGatewayRunning,
+            isDashboardRunning,
+            stopGateway: async (profile) => {
+              stopGateway(profile, true);
+              for (let attempt = 0; attempt < 20; attempt += 1) {
+                if (!isGatewayRunning(profile)) return;
+                await new Promise((resolve) => setTimeout(resolve, 250));
+              }
+              throw new Error(
+                "Gateway did not stop before Hermes Agent update",
+              );
+            },
+            stopDashboard: async (profile) => {
+              stopDashboard(profile);
+              for (let attempt = 0; attempt < 20; attempt += 1) {
+                if (!isDashboardRunning(profile)) return;
+                await new Promise((resolve) => setTimeout(resolve, 250));
+              }
+              throw new Error(
+                "Dashboard did not stop before Hermes Agent update",
+              );
+            },
+            install: () =>
+              runInstall((progress: InstallProgress) => {
+                event.sender.send("install-progress", progress);
+              }, mainWindow),
+            restartGateway,
+            // stopDashboard removes the managed-process entry, so restoration
+            // must create a new dashboard rather than ask for an in-place
+            // restart of an entry that intentionally no longer exists.
+            restartDashboard: startDashboard,
+          });
+        } finally {
+          agentInstallInProgress = false;
+        }
+      },
+      {
+        maxWaitMs: Number.POSITIVE_INFINITY,
+        busy: () =>
+          agentInstallBusy(
+            profiles,
+            activeRuns.size,
+            cronBusyStrict,
+            dashboardTurnBusy,
+          ),
+      },
+    );
+    if (!result.restarted) throw new Error("Hermes Agent remained busy");
+  }
   const mithrilRuntime = createMithrilRuntimeLifecycle({
     connect: connectMithrilAccount,
     deviceLogin: startMithrilDeviceLogin,
@@ -822,9 +894,7 @@ export function registerIpcHandlers(context: IpcContext): void {
 
   ipcMain.handle("start-install", async (event) => {
     try {
-      await runInstall((progress: InstallProgress) => {
-        event.sender.send("install-progress", progress);
-      }, mainWindow);
+      await runLocalAgentInstallWhenIdle(event);
       return { success: true };
     } catch (err) {
       return { success: false, error: (err as Error).message };
@@ -937,9 +1007,13 @@ export function registerIpcHandlers(context: IpcContext): void {
         clearAgentCapabilityEvidence(getActiveConnection().connectionId);
         return { success: true };
       }
-      await runHermesUpdate((progress: InstallProgress) => {
-        event.sender.send("install-progress", progress);
-      });
+      if (!checkInstallStatus().installed) {
+        return {
+          success: false,
+          error: "Hermes is not installed. Please install it first.",
+        };
+      }
+      await runLocalAgentInstallWhenIdle(event);
       const compat = ensureLocalDashboardCompatibility();
       if (!compat.ok) {
         event.sender.send("install-progress", {
@@ -1771,7 +1845,13 @@ export function registerIpcHandlers(context: IpcContext): void {
       audio: Uint8Array,
       mimeType: string,
       profile?: string,
-    ): Promise<string> => transcribeAudio(audio, mimeType, profile),
+    ): Promise<string> => {
+      if (agentInstallInProgress)
+        throw new Error(
+          "Hermes Agent is updating; try again when it finishes.",
+        );
+      return transcribeAudio(audio, mimeType, profile);
+    },
   );
 
   ipcMain.handle(
@@ -1794,6 +1874,11 @@ export function registerIpcHandlers(context: IpcContext): void {
       const activeConnectionId = getActiveConnection().connectionId;
       const chatConnectionId = connectionId?.trim() || activeConnectionId;
       const conn = getConnectionConfig(chatConnectionId);
+      if (conn.mode === "local" && agentInstallInProgress) {
+        throw new Error(
+          "Hermes Agent is updating; try again when it finishes.",
+        );
+      }
       if (conn.mode === "ssh" && chatConnectionId !== activeConnectionId) {
         throw new Error(
           "Select this SSH connection before sending; Hermes Desktop uses one SSH tunnel at a time.",

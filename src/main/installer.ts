@@ -24,6 +24,7 @@ import { HIDDEN_SUBPROCESS_OPTIONS } from "./process-options";
 import {
   INSTALLER_VERIFICATION_FAILED,
   verifiedInstallerCommand,
+  verifiedWindowsInstallerScript,
 } from "./installer-download";
 
 const IS_WINDOWS = process.platform === "win32";
@@ -791,64 +792,6 @@ export async function runClawMigrate(
   });
 }
 
-export async function runHermesUpdate(
-  onProgress: (progress: InstallProgress) => void,
-): Promise<void> {
-  if (!existsSync(HERMES_PYTHON) || !existsSync(HERMES_SCRIPT)) {
-    throw new Error("Hermes is not installed. Please install it first.");
-  }
-
-  let log = "";
-  function emit(text: string): void {
-    log += text;
-    onProgress({
-      step: 1,
-      totalSteps: 1,
-      title: "Updating Hermes Agent",
-      detail: text.trim().slice(0, 120),
-      log,
-    });
-  }
-
-  emit("Running hermes update...\n");
-
-  return new Promise((resolve, reject) => {
-    const proc = spawn(HERMES_PYTHON, hermesCliArgs(["update"]), {
-      cwd: HERMES_REPO,
-      env: {
-        ...process.env,
-        PATH: getEnhancedPath(),
-        HOME: homedir(),
-        HERMES_HOME,
-        TERM: "dumb",
-      },
-      stdio: ["ignore", "pipe", "pipe"],
-      ...HIDDEN_SUBPROCESS_OPTIONS,
-    });
-
-    proc.stdout?.on("data", (data: Buffer) => {
-      emit(stripAnsi(data.toString()));
-    });
-
-    proc.stderr?.on("data", (data: Buffer) => {
-      emit(stripAnsi(data.toString()));
-    });
-
-    proc.on("close", (code) => {
-      if (code === 0) {
-        emit("\nUpdate complete!\n");
-        resolve();
-      } else {
-        reject(new Error(`Update failed (exit code ${code}).`));
-      }
-    });
-
-    proc.on("error", (err) => {
-      reject(new Error(`Failed to run update: ${err.message}`));
-    });
-  });
-}
-
 function getShellProfile(home: string): string | null {
   // Check for the user's shell profile to source their PATH
   const candidates = [
@@ -988,7 +931,10 @@ export async function runInstall(
 
       const installCmd = [
         shellProfile ? `source "${shellProfile}" 2>/dev/null;` : "",
-        verifiedInstallerCommand(),
+        verifiedInstallerCommand(undefined, undefined, {
+          hermesHome: HERMES_HOME,
+          installDir: HERMES_REPO,
+        }),
       ].join("\n");
 
       const basePath = getEnhancedPath();
@@ -1026,21 +972,11 @@ export async function runInstall(
           emit("\nInstallation complete!\n");
           resolve();
         } else {
-          // The install script can exit non-zero due to benign issues
-          // (e.g. git stash pop failure on already-clean repo).
-          // If Hermes is actually installed and working, treat as success.
-          if (existsSync(HERMES_PYTHON) && existsSync(HERMES_SCRIPT)) {
-            emit(
-              "\nInstall script exited with warnings, but Hermes is installed successfully.\n",
-            );
-            resolve();
-          } else {
-            reject(
-              new Error(
-                `Installation failed (exit code ${code}). You can try installing via terminal instead.`,
-              ),
-            );
-          }
+          reject(
+            new Error(
+              `Installation failed (exit code ${code}). Existing files were left in place; inspect the installer log before retrying.`,
+            ),
+          );
         }
       });
 
@@ -1052,11 +988,6 @@ export async function runInstall(
     askpass?.cleanup();
     sudoPrecache.stop();
   }
-}
-
-// PS single-quoted string escape: ' → ''
-function psQuote(s: string): string {
-  return `'${s.replace(/'/g, "''")}'`;
 }
 
 // Resolve a powershell executable. Prefer PowerShell 7 (`pwsh`) when present,
@@ -1094,45 +1025,10 @@ async function runInstallWindows(emit: (t: string) => void): Promise<void> {
 
   // The wrapper downloads install.ps1 to a sibling temp file and invokes it
   // with our parameters. This sidesteps the `iex`-can't-pass-args limitation.
-  const wrapperScript = [
-    "$ErrorActionPreference = 'Stop'",
-    `$hermesHome = ${psQuote(hermesHome)}`,
-    `$installDir = ${psQuote(installDir)}`,
-    // Force TLS 1.2 for older Windows PowerShell 5.1 hosts that still default
-    // to TLS 1.0 — github raw refuses TLS < 1.2.
-    "try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}",
-    "$url = 'https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1'",
-    `$installer = Join-Path $env:TEMP ("hermes-install-script-" + [guid]::NewGuid().ToString() + ".ps1")`,
-    // Windows PowerShell 5.1 parses BOM-less files as the legacy ANSI codepage,
-    // which mangles the non-ASCII glyphs in install.ps1 and produces parse
-    // errors (see issue #149). Re-save with a UTF-8 BOM so PS 5.1 reads it as
-    // UTF-8. Idempotent if upstream later adds its own BOM or switches to ASCII.
-    "$resp = Invoke-WebRequest -Uri $url -UseBasicParsing",
-    "$text = if ($resp.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($resp.Content) } else { [string]$resp.Content }",
-    "if ($text.Length -gt 0 -and $text[0] -eq [char]0xFEFF) { $text = $text.Substring(1) }",
-    "[System.IO.File]::WriteAllText($installer, $text, (New-Object System.Text.UTF8Encoding $true))",
-    "$exit = 1",
-    "try {",
-    "  & $installer -SkipSetup -NonInteractive -HermesHome $hermesHome -InstallDir $installDir",
-    "  $exit = $LASTEXITCODE",
-    "} finally {",
-    "  if ($env:HERMES_DESKTOP_SANDBOX -eq '1') {",
-    "    $sandboxVenv = Join-Path $installDir 'venv\\Scripts'",
-    "    $userHermesHome = [Environment]::GetEnvironmentVariable('HERMES_HOME', 'User')",
-    "    if ($userHermesHome -and ($userHermesHome.TrimEnd('\\') -ieq $hermesHome.TrimEnd('\\'))) {",
-    "      [Environment]::SetEnvironmentVariable('HERMES_HOME', $null, 'User')",
-    "    }",
-    "    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')",
-    "    if ($userPath) {",
-    "      $parts = $userPath -split ';' | Where-Object { $_ -and ($_.TrimEnd('\\') -ine $sandboxVenv.TrimEnd('\\')) }",
-    "      [Environment]::SetEnvironmentVariable('Path', ($parts -join ';'), 'User')",
-    "    }",
-    "  }",
-    "}",
-    "Remove-Item -Force -ErrorAction SilentlyContinue $installer",
-    "exit $exit",
-    "",
-  ].join("\r\n");
+  const wrapperScript = verifiedWindowsInstallerScript({
+    hermesHome,
+    installDir,
+  });
 
   try {
     writeFileSync(wrapperPath, wrapperScript, { encoding: "utf8" });
@@ -1190,19 +1086,19 @@ async function runInstallWindows(emit: (t: string) => void): Promise<void> {
         resolve();
         return;
       }
-      // Same tolerance as the bash path: if the binary tree exists, count it.
-      if (existsSync(HERMES_PYTHON) && existsSync(HERMES_SCRIPT)) {
-        emit(
-          "\nInstall script exited with warnings, but Hermes is installed successfully.\n",
-        );
-        resolve();
-      } else {
+      if (code === INSTALLER_VERIFICATION_FAILED) {
         reject(
           new Error(
-            `Installation failed (exit code ${code}). Open PowerShell and try: irm https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1 | iex`,
+            "Installer download or checksum verification failed. Installation was not run.",
           ),
         );
+        return;
       }
+      reject(
+        new Error(
+          `Installation failed (exit code ${code}). Existing files were left in place; inspect the installer log before retrying.`,
+        ),
+      );
     });
 
     proc.on("error", (err) => {

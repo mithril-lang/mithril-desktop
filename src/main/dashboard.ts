@@ -755,6 +755,10 @@ export function stopDashboard(profile?: string): boolean {
   return true;
 }
 
+export function isDashboardRunning(profile?: string): boolean {
+  return Boolean(getManagedDashboard(profile));
+}
+
 /** Restart only a dashboard already managed for this profile. */
 export async function restartDashboardIfRunning(
   profile?: string,

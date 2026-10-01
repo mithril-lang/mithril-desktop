@@ -15,11 +15,16 @@ import { join } from "path";
 import { describe, expect, it } from "vitest";
 import {
   verifiedInstallerCommand,
+  verifiedWindowsInstallerScript,
   INSTALLER_VERIFICATION_FAILED,
+  MITHRIL_AGENT_REPO_URL,
+  PINNED_INSTALL_COMMIT,
+  PINNED_INSTALL_URL,
+  PINNED_WINDOWS_INSTALL_URL,
 } from "../src/main/installer-download";
 
 describe.skipIf(process.platform === "win32")("verified Unix installer", () => {
-  // @lat: [[desktop-security#Runtime security#Verified Unix bootstrap]]
+  // @lat: [[desktop-security#Runtime security#Verified Agent bootstraps]]
   it.each(["valid", "tampered", "download-error", "installer-error"])(
     "%s downloads execute only after verification and always clean up",
     (scenario) => {
@@ -30,7 +35,7 @@ describe.skipIf(process.platform === "win32")("verified Unix installer", () => {
         mkdirSync(bin);
         mkdirSync(temporary);
         const script =
-          'printf "%s" "$1" > "$EXECUTION_MARKER"\nexit "${INSTALL_EXIT:-0}"\n';
+          'printf "%s\\n" "$HERMES_REPO_URL" "$@" > "$EXECUTION_MARKER"\nexit "${INSTALL_EXIT:-0}"\n';
         const fixture = join(directory, "fixture.sh");
         writeFileSync(
           fixture,
@@ -51,6 +56,10 @@ describe.skipIf(process.platform === "win32")("verified Unix installer", () => {
             verifiedInstallerCommand(
               "https://example.invalid/install.sh",
               createHash("sha256").update(script).digest("hex"),
+              {
+                hermesHome: "/tmp/hermes home",
+                installDir: "/tmp/hermes home/hermes-agent",
+              },
             ),
           ],
           {
@@ -76,11 +85,45 @@ describe.skipIf(process.platform === "win32")("verified Unix installer", () => {
             : INSTALLER_VERIFICATION_FAILED,
         );
         expect(existsSync(marker)).toBe(verified);
-        if (verified) expect(readFileSync(marker, "utf8")).toBe("--skip-setup");
+        if (verified) {
+          expect(readFileSync(marker, "utf8").split("\n")).toEqual([
+            MITHRIL_AGENT_REPO_URL,
+            "--skip-setup",
+            "--branch",
+            "main",
+            "--commit",
+            PINNED_INSTALL_COMMIT,
+            "--hermes-home",
+            "/tmp/hermes home",
+            "--dir",
+            "/tmp/hermes home/hermes-agent",
+            "",
+          ]);
+        }
         expect(readdirSync(temporary)).toEqual([]);
       } finally {
         rmSync(directory, { recursive: true, force: true });
       }
     },
   );
+
+  it("pins both platform bootstraps and the checkout to one Mithril Agent revision", () => {
+    expect(PINNED_INSTALL_URL).toContain(
+      `mithril-lang/mithril-agent/${PINNED_INSTALL_COMMIT}/scripts/install.sh`,
+    );
+    expect(PINNED_WINDOWS_INSTALL_URL).toContain(
+      `mithril-lang/mithril-agent/${PINNED_INSTALL_COMMIT}/scripts/install.ps1`,
+    );
+    const windows = verifiedWindowsInstallerScript({
+      hermesHome: "C:\\Hermes Home",
+      installDir: "C:\\Hermes Home\\hermes-agent",
+    });
+    expect(windows).toContain("Get-FileHash -Algorithm SHA256");
+    expect(windows).toContain(`$repoUrl = '${MITHRIL_AGENT_REPO_URL}'`);
+    expect(windows).toContain(`$commit = '${PINNED_INSTALL_COMMIT}'`);
+    expect(windows).toContain("-Branch main -Commit $commit");
+    expect(windows.indexOf("Get-FileHash")).toBeLessThan(
+      windows.indexOf("& $installer"),
+    );
+  });
 });

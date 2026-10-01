@@ -68,6 +68,7 @@ interface InstallProgress {
   title: string;
   detail: string;
   log: string;
+  cancellable?: boolean;
 }
 
 interface ConfigHealthIssue {
@@ -267,6 +268,7 @@ interface HermesAPI {
   checkInstall: () => Promise<InstallStatus>;
   verifyInstall: () => Promise<boolean>;
   startInstall: () => Promise<{ success: boolean; error?: string }>;
+  cancelInstall: () => Promise<boolean>;
   inspectInstallTarget: () => Promise<{
     hermesHome: string;
     repoPath: string;

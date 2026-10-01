@@ -3767,6 +3767,28 @@ export function stopGateway(
   stopTuiGatewayClient(profile);
 }
 
+/** Stop a gateway and wait for the exact process captured before its PID and
+ * in-memory tracking are cleared. This avoids treating bookkeeping removal as
+ * operating-system process termination. */
+export async function stopGatewayAndWait(
+  profile?: string,
+  timeoutMs = 5_000,
+  pollMs = 100,
+): Promise<boolean> {
+  const key = profileKey(profile);
+  const child = gatewayProcesses.get(key) ?? null;
+  const pid = child?.pid ?? readPidFile(profile);
+  stopGateway(profile, true);
+  if (!pid) return true;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const childAlive = child ? isChildProcessAlive(child) : false;
+    if (!childAlive && !pidIsAliveAs(pid, GATEWAY_IMAGE_PREFIXES)) return true;
+    await delay(pollMs);
+  }
+  return false;
+}
+
 // Python image prefixes covering both native Windows (pythonw.exe / python.exe)
 // and POSIX (python, python3, pythonw). Used to verify the PID we read from
 // gateway.pid actually belongs to a python process before reporting alive.

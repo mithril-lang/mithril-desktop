@@ -166,6 +166,29 @@ describe("restartGatewayWhenIdle", () => {
     expect(restarts).toEqual(["at 45000"]);
   });
 
+  it("cancels an unbounded idle wait without running the deferred mutation", async () => {
+    const controller = new AbortController();
+    let restarted = 0;
+    const resultPromise = restartMithrilRuntimeWhenIdle(
+      "installer-cancel",
+      async () => {
+        restarted += 1;
+      },
+      {
+        busy: () => true,
+        maxWaitMs: Number.POSITIVE_INFINITY,
+        pollMs: 60_000,
+        signal: controller.signal,
+      },
+    );
+    controller.abort();
+    await expect(resultPromise).resolves.toMatchObject({
+      restarted: false,
+      reason: "cancelled",
+    });
+    expect(restarted).toBe(0);
+  });
+
   it("restarts anyway once the cap expires — a stale credential is its own failure", async () => {
     const clock = fakeClock();
     let restarted = 0;

@@ -141,6 +141,8 @@ const hermesAPI = {
   startInstall: (): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke("start-install"),
 
+  cancelInstall: (): Promise<boolean> => ipcRenderer.invoke("cancel-install"),
+
   // Pre-install inspection + "use an existing installation" (issue #272)
   inspectInstallTarget: (): Promise<{
     hermesHome: string;
@@ -172,6 +174,7 @@ const hermesAPI = {
       title: string;
       detail: string;
       log: string;
+      cancellable?: boolean;
     }) => void,
   ): (() => void) => {
     const handler = (
@@ -185,6 +188,7 @@ const hermesAPI = {
           title: string;
           detail: string;
           log: string;
+          cancellable?: boolean;
         },
       );
     ipcRenderer.on("install-progress", handler);

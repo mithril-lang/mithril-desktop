@@ -231,7 +231,7 @@ export class CloudWorkspace {
   async authorizedRequest(
     path: string,
     body?: unknown,
-    extraScope?: string,
+    extraScope?: string | readonly string[],
   ): Promise<{ value: unknown; userId: string }> {
     const session = await this.session();
     const generation = this.generation;
@@ -240,8 +240,12 @@ export class CloudWorkspace {
       !session.scopes.includes(this.deps.writeScope ?? "workspace:write")
     )
       throw new Error("Explicit write authorization required");
-    if (extraScope && !session.scopes.includes(extraScope))
-      throw new Error(`Explicit ${extraScope} authorization required`);
+    for (const scope of typeof extraScope === "string"
+      ? [extraScope]
+      : (extraScope ?? [])) {
+      if (!session.scopes.includes(scope))
+        throw new Error(`Explicit ${scope} authorization required`);
+    }
     const value = await this.request(
       path,
       session.token,

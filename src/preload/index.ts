@@ -299,6 +299,7 @@ const hermesAPI = {
       ipcRenderer.invoke("cloud-chat-native-import", id, choices),
   } satisfies NativeSessionImportAPI,
   cloudChat: {
+    runtime: () => ipcRenderer.invoke("cloud-chat-runtime"),
     legacySnapshot: () => ipcRenderer.invoke("cloud-chat-legacy-snapshot"),
     status: () => ipcRenderer.invoke("cloud-chat-status"),
     enable: () => ipcRenderer.invoke("cloud-chat-enable"),

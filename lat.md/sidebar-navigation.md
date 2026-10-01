@@ -138,7 +138,7 @@ Long profile lists scroll within the Profiles page. The table keeps its full con
 
 The Office scene shows each profile's user-facing name while keeping profile ids stable for routing.
 
-[[src/renderer/src/screens/Office/Office.tsx]] loads profiles through `listProfiles()` and maps them with [[src/renderer/src/screens/Office/office3d/agents.ts#profileToOfficeAgent]]. The mapped Office agent keeps `id = profile.id` for selection, CEO persistence, and One Chat routing, but uses `profile.name` as `agent.name`, so the 3D speech bubble, details sidebar, and One Chat labels match the renamed agent. The visible-tab poll uses [[src/renderer/src/screens/Office/office3d/agents.ts#officeAgentsChanged]] so name changes refresh without requiring a manual Office reload.
+[[src/renderer/src/screens/Office/Office.tsx]] loads profiles through `listProfiles()` and maps them with [[src/renderer/src/screens/Office/office3d/agents.ts]]. The mapped Office agent keeps `id = profile.id` for selection, CEO persistence, and One Chat routing, but uses `profile.name` as `agent.name`, so the 3D speech bubble, details sidebar, and One Chat labels match the renamed agent. The visible-tab poll uses [[src/renderer/src/screens/Office/office3d/agents.ts]] so name changes refresh without requiring a manual Office reload.
 
 ## Profile detail modal
 

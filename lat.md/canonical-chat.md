@@ -6,7 +6,7 @@ Desktop opens the shared D1 Chat by default. This path only uses the authenticat
 
 [[src/main/cloud-chat.ts#CloudChat]] exposes fixed session list, events, operation, receipt and cached model-inventory routes. [[src/main/cloud-workspace.ts#CloudWorkspace#authorizedRequest]] verifies the secure-store identity and response owner for each request.
 
-Chat consent is independent from portable workspace consent, requires `chat:read` and `chat:write`, and paid turns additionally require `inference`. No token upgrade or persistent grant occurs.
+Chat consent is independent from portable workspace consent, requires `chat:read` and `chat:write`, and paid turns additionally require `inference`. Explicit remote-runtime inspection also requires `sandbox`; `runtime_turn` requires both `inference` and `sandbox`. No token upgrade or persistent grant occurs.
 
 The model inventory comes from `/v1/chat/models`, which reads cached availability without live probes. Refresh, checkpoint, receipt and resume do not start inference. Explicit turn operations preserve operation IDs through the shared client's ephemeral outbox, so reconnect does not silently create a second paid request. Expired active leases remain uncertain until a server checkpoint resolves them.
 

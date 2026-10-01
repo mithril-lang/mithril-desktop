@@ -9,11 +9,13 @@ export default function CloudWorkspace({
   locale = "en",
   active = true,
   onOpenNativeSection,
+  onOpenChat,
 }: {
   profile: string;
   locale?: string;
   active?: boolean;
   onOpenNativeSection?: (section: RuntimeSection) => void;
+  onOpenChat?: () => void;
 }): React.JSX.Element {
   const [identityEpoch, setIdentityEpoch] = useState(0);
   useEffect(
@@ -60,6 +62,7 @@ export default function CloudWorkspace({
       transport={window.hermesAPI.cloudWorkspace}
       runtimeAdapter={window.hermesAPI.nativeWorkspace}
       onOpenNativeSection={onOpenNativeSection}
+      onOpenChat={onOpenChat}
       beforeConnect={async () => {
         await window.hermesAPI.cloudWorkspace.enable();
       }}

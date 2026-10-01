@@ -1234,6 +1234,10 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudChat.auth.reset();
   });
+  ipcMain.handle("cloud-chat-runtime", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.runtime();
+  });
   ipcMain.handle("cloud-chat-models", (event) => {
     trustedWorkspaceSender(event);
     return cloudChat.models();

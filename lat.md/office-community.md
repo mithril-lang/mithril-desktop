@@ -16,9 +16,9 @@ The relay (`scripts/community-relay.mjs`) is a stateless fan-out: it forwards ea
 
 Joined users who are in [[office-3d-walk-mode|walk mode]] appear to everyone else as walking avatars. The connection lives in Office.tsx (not the panel), so avatars show with the panel closed; it is opt-in — nothing connects until the user presses Join, and Leave disconnects.
 
-[[src/renderer/src/screens/Office/office3d/objects/Player.tsx#PlayerLayer]] reports the user's pose (x, z, facing, moving, place) at most 5 Hz and only on change; leaving walk mode clears it. Poses ride on presence frames and are validated by `parsePose` (finite, within ±400 world units, known place). Pose updates go into a mutable store instead of React state, so a busy world does not re-render the tree; state changes only when someone arrives, leaves, renames or changes room.
+[[src/renderer/src/screens/Office/office3d/objects/Player.tsx]] reports the user's pose (x, z, facing, moving, place) at most 5 Hz and only on change; leaving walk mode clears it. Poses ride on presence frames and are validated by `parsePose` (finite, within ±400 world units, known place). Pose updates go into a mutable store instead of React state, so a busy world does not re-render the tree; state changes only when someone arrives, leaves, renames or changes room.
 
-[[src/renderer/src/screens/Office/office3d/objects/RemoteAvatars.tsx#RemoteAvatarsLayer]] draws each peer with a rig and shirt colour hashed from their id (so everyone sees the same look), glides toward the latest pose (snapping on teleports), blends idle/walk, and shows only avatars whose place matches the current view. Remote avatars are visual only: they do not collide with or block other people.
+[[src/renderer/src/screens/Office/office3d/objects/RemoteAvatars.tsx]] draws each peer with a rig and shirt colour hashed from their id (so everyone sees the same look), glides toward the latest pose (snapping on teleports), blends idle/walk, and shows only avatars whose place matches the current view. Remote avatars are visual only: they do not collide with or block other people.
 
 ## Untrusted input
 

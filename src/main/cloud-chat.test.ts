@@ -28,6 +28,16 @@ function fixture(scopes = ["chat:read", "chat:write"]): {
         user: { id: token.includes("bbbb") ? "b" : "a" },
         scopes,
       });
+    if (url.endsWith("/runtime"))
+      return response({
+        schemaVersion: 1,
+        userId: "a",
+        available: true,
+        reason: "Fixture owned runtime",
+        executionMode: "remote_runtime",
+        leaseProtocol: "mithril-single-attempt-v1",
+        deviceRequired: false,
+      });
     if (url.endsWith("/models"))
       return response({
         schemaVersion: 1,
@@ -139,6 +149,50 @@ describe("Canonical Desktop chat transport", () => {
       f.response({ schemaVersion: 1, userId: "other", sessions: [session] }),
     );
     await expect(f.client.list()).rejects.toThrow("owner/schema");
+  });
+  it("inspects existing owned runtime only explicitly and gates runtime turns with both inference and sandbox", async () => {
+    const noRuntime = fixture();
+    await noRuntime.auth.enable();
+    await expect(noRuntime.client.runtime()).rejects.toThrow("sandbox");
+    expect(
+      noRuntime.fetcher.mock.calls.every((call) => call[0].endsWith("/v1/me")),
+    ).toBe(true);
+    const runtime = fixture(["chat:read", "chat:write", "sandbox"]);
+    await runtime.auth.enable();
+    expect((await runtime.client.runtime()).available).toBe(true);
+    await expect(
+      runtime.client.apply("s1", {
+        operationId: "runtime-op",
+        baseRevision: 1,
+        type: "runtime_turn",
+        data: { content: "Explicit fixture prompt", model: "model1" },
+      }),
+    ).rejects.toThrow("inference");
+    expect(runtime.fetcher.mock.calls.every((call) => !call[1]?.body)).toBe(
+      true,
+    );
+    const authorized = fixture([
+      "chat:read",
+      "chat:write",
+      "sandbox",
+      "inference",
+    ]);
+    await authorized.auth.enable();
+    await authorized.client.apply("s1", {
+      operationId: "runtime-op",
+      baseRevision: 1,
+      type: "runtime_turn",
+      data: { content: "Explicit fixture prompt", model: "model1" },
+    });
+    expect(
+      authorized.fetcher.mock.calls.filter((call) => call[1]?.body),
+    ).toHaveLength(1);
+    expect(
+      authorized.fetcher.mock.calls.every(
+        (call) =>
+          !call[0].includes("launch") && !call[0].includes("execute-tool"),
+      ),
+    ).toBe(true);
   });
   it("discards late prior-account data without disabling a newly enabled account", async () => {
     const f = fixture();

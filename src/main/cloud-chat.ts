@@ -5,6 +5,8 @@ import {
   validateChatOperation,
   validateChatEvent,
   validateChatModel,
+  validateChatRuntimeAvailability,
+  type ChatRuntimeAvailability,
   type ChatOperation,
   type ChatOperationResponse,
   type ChatReceipt,
@@ -38,6 +40,16 @@ export class CloudChat implements SessionTransport {
     )
       throw new Error("Chat model inventory invalid");
     return models;
+  }
+  async runtime(): Promise<ChatRuntimeAvailability> {
+    const { value } = await this.auth.authorizedRequest(
+      "/v1/chat/runtime",
+      undefined,
+      "sandbox",
+    );
+    if (!validateChatRuntimeAvailability(value))
+      throw new Error("Chat runtime availability invalid");
+    return value;
   }
   async events(id: string, after = 0): Promise<ChatSessionSnapshot> {
     if (!chatId(id) || !Number.isSafeInteger(after) || after < 0)
@@ -74,7 +86,11 @@ export class CloudChat implements SessionTransport {
     const { value } = await this.auth.authorizedRequest(
       `/v1/chat/sessions/${encodeURIComponent(id)}/operations`,
       { schemaVersion: 1, ...operation },
-      operation.type === "turn" ? "inference" : undefined,
+      operation.type === "runtime_turn"
+        ? ["inference", "sandbox"]
+        : operation.type === "turn"
+          ? "inference"
+          : undefined,
     );
     const result = value as ChatOperationResponse;
     if (

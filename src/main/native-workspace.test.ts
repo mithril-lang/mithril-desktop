@@ -99,6 +99,130 @@ function fixture(): {
   };
 }
 describe("Native workspace boundary", () => {
+  it("returns the newest plugin intent and expires confirmation without executing", async () => {
+    const f = fixture();
+    let now = 1000000;
+    f.sources.now = () => now;
+    f.sources.plugins = async () =>
+      ["first", "second"].map((key) => ({
+        key,
+        name: key,
+        description: "Fixture",
+        version: "1",
+        installed: true,
+        source: "installed" as const,
+        deviceRequired: true as const,
+        reason: "Native review",
+      }));
+    const snapshot = await f.native.inspect("discover");
+    await f.native.apply({
+      action: "plugin.preview",
+      key: "first",
+      revision: snapshot.revision,
+    });
+    const second = await f.native.apply({
+      action: "plugin.preview",
+      key: "second",
+      revision: snapshot.revision,
+    });
+    if (second.section !== "discover") throw new Error("discover");
+    const plan = second.data.pluginPlan!;
+    expect(plan.key).toBe("second");
+    now += 300001;
+    await expect(
+      f.native.apply({
+        action: "plugin.confirm-plan",
+        key: plan.key,
+        revision: plan.revision,
+        planId: plan.planId,
+        confirm: true,
+      }),
+    ).rejects.toThrow();
+    expect(f.operations).not.toHaveBeenCalled();
+    expect(f.sources.setLocale).not.toHaveBeenCalled();
+  });
+  it("previews actual installed plugins and confirms owner-bound intent without installing or granting", async () => {
+    const f = fixture();
+    let version = "1";
+    f.sources.plugins = async () => [
+      {
+        key: "demo-plugin",
+        name: "Demo plugin",
+        description: "Fixture",
+        version,
+        installed: true,
+        source: "installed",
+        deviceRequired: true,
+        reason: "Native permissions required",
+      },
+    ];
+    const first = await f.native.inspect("capability");
+    const preview = await f.native.apply({
+      action: "plugin.preview",
+      key: "demo-plugin",
+      revision: first.revision,
+    });
+    if (preview.section !== "capability") throw new Error("capability");
+    expect(preview.data.plugins?.[0].enabled).toBeUndefined();
+    expect(preview.data.pluginPlan?.execution).toBe("device-required");
+    const plan = preview.data.pluginPlan!;
+    const confirmed = await f.native.apply({
+      action: "plugin.confirm-plan",
+      key: plan.key,
+      revision: plan.revision,
+      planId: plan.planId,
+      confirm: true,
+    });
+    if (confirmed.section !== "capability") throw new Error("capability");
+    expect(confirmed.data.pluginPlan?.status).toBe("confirmed");
+    expect(f.sources.setLocale).not.toHaveBeenCalled();
+    expect(f.operations).not.toHaveBeenCalled();
+    expect(f.update).not.toHaveBeenCalled();
+    version = "2";
+    await expect(
+      f.native.apply({
+        action: "plugin.confirm-plan",
+        key: plan.key,
+        revision: plan.revision,
+        planId: plan.planId,
+        confirm: true,
+      }),
+    ).rejects.toThrow("state changed");
+  });
+  it("rejects stale-account plugin plans without importing permissions", async () => {
+    const f = fixture();
+    f.sources.plugins = async () => [
+      {
+        key: "demo",
+        name: "Demo",
+        description: "",
+        version: "",
+        installed: true,
+        source: "installed",
+        deviceRequired: true,
+        reason: "Enabled state unknown",
+      },
+    ];
+    const snapshot = await f.native.inspect("capability");
+    const preview = await f.native.apply({
+      action: "plugin.preview",
+      key: "demo",
+      revision: snapshot.revision,
+    });
+    if (preview.section !== "capability") throw new Error("capability");
+    const plan = preview.data.pluginPlan!;
+    f.switch();
+    await expect(
+      f.native.apply({
+        action: "plugin.confirm-plan",
+        key: plan.key,
+        revision: plan.revision,
+        planId: plan.planId,
+        confirm: true,
+      }),
+    ).rejects.toThrow("changed");
+    expect(f.operations).not.toHaveBeenCalled();
+  });
   it("shows actual memory with limits while excluding paths and unsafe edits", async () => {
     const f = fixture();
     const snapshot = await f.native.inspect("memory");

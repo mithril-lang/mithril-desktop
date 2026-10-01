@@ -41,7 +41,13 @@ export default defineConfig({
       // Ensure a single Three.js instance across our code, @react-three/fiber,
       // drei and troika — multiple copies break `instanceof THREE.*` checks in
       // the ported office agent renderer.
-      dedupe: ["three", "react", "react-dom"],
+      dedupe: [
+        "three",
+        "react",
+        "react-dom",
+        "@react-three/fiber",
+        "@react-three/drei",
+      ],
     },
     plugins: [tailwindcss(), react()],
   },

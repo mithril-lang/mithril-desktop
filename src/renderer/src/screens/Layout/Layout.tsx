@@ -964,6 +964,7 @@ function Layout({
                 profile={activeProfile}
                 locale={locale}
                 active={view === "workspace"}
+                onOpenChat={() => goTo("mithril-chat")}
                 onOpenNativeSection={(section) => {
                   if (section === "settings") {
                     openSettings();

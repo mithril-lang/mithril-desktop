@@ -2,7 +2,7 @@
 
 The Office reads each profile's cron scheduler so a cron-driven bot's day of work — an attempt in flight, a run that failed, the next run — shows on its nameplate and in its details, instead of every bot standing idle.
 
-This fork's fleet is ~90 profiles that each run one daily Hermes cron job and hold no resident gateway. Upstream's rule ([[src/renderer/src/screens/Office/office3d/agents.ts#profileToOfficeAgent]]: a running Kanban card, else gateway liveness, else idle) drew all of them amber all day, and on 2026-09-22 drew the 57 whose morning run had failed (`screen-route-refused`, an api.kotoba.cloud outage) the same amber as the 25 that had succeeded. Measured that day.
+This fork's fleet is ~90 profiles that each run one daily Hermes cron job and hold no resident gateway. Upstream's rule ([[src/renderer/src/screens/Office/office3d/agents.ts]]: a running Kanban card, else gateway liveness, else idle) drew all of them amber all day, and on 2026-09-22 drew the 57 whose morning run had failed (`screen-route-refused`, an api.kotoba.cloud outage) the same amber as the 25 that had succeeded. Measured that day.
 
 ## Reading a profile's cron state
 
@@ -12,7 +12,7 @@ It reads `<profile>/cron/jobs.json` for the latest run and status, soonest next 
 
 ## Status rule
 
-[[src/renderer/src/screens/Office/office3d/agents.ts#cronStatus]] maps in-flight, failed, and successful cron jobs to working, error, and idle.
+[[src/renderer/src/screens/Office/office3d/agents.ts]] maps in-flight, failed, and successful cron jobs to working, error, and idle.
 
 A running Kanban card, or a live gateway when Kanban is unavailable, still wins. Cron speaks only when the prior rule would say idle; profiles without enabled jobs keep the prior rule. The sidebar in [[src/renderer/src/screens/Office/Office.tsx#Office]] shows counts, last run, error, and next run.
 

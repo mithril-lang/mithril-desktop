@@ -9,6 +9,8 @@ import {
   type NativeImportPreview,
   type NativeImportChoice,
   type WorkspaceRuntimeAdapter,
+  type RuntimePluginSummary,
+  type RuntimePluginPlan,
 } from "@mithril/workspace/runtime";
 import {
   validateData,
@@ -42,6 +44,7 @@ export interface NativeSources {
   toolsets(profile: string): ToolsetInfo[];
   servers(profile: string): Promise<McpServerInfo[]>;
   skills(profile: string): InstalledSkill[];
+  plugins?(profile: string): Promise<RuntimePluginSummary[]>;
   boards(profile: string): Promise<KanbanBoard[]>;
   tasks(profile: string): Promise<KanbanTask[]>;
   locale(): string;
@@ -98,9 +101,14 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
       inFlight?: Promise<WorkspaceOperationsResponse>;
     }
   >();
+  private pluginPlans = new Map<
+    string,
+    { context: NativeContext; plan: RuntimePluginPlan; expiresAt: number }
+  >();
   constructor(private sources: NativeSources) {}
   reset(): void {
     this.previews.clear();
+    this.pluginPlans.clear();
   }
   private async check(context: NativeContext): Promise<void> {
     if (!sameContext(context, await this.sources.context()))
@@ -243,9 +251,10 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
       };
     }
     if (section === "capability" || section === "discover") {
-      const [servers, skills] = await Promise.all([
+      const [servers, skills, plugins] = await Promise.all([
         this.sources.servers(context.profile),
         Promise.resolve(this.sources.skills(context.profile)),
+        this.sources.plugins?.(context.profile) ?? Promise.resolve([]),
       ]);
       await this.check(context);
       const safeServers = servers.map((server) => ({
@@ -263,12 +272,25 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
         const data = {
           installedSkills: safeSkills,
           installedServers: safeServers,
+          plugins,
         };
+        const revision = this.revision(context, section, data);
+        const currentPlan = [...this.pluginPlans.values()]
+          .reverse()
+          .find(
+            (stored) =>
+              stored.expiresAt > this.sources.now() &&
+              sameContext(context, stored.context) &&
+              stored.plan.revision === revision,
+          );
         return {
           ...base,
           section,
-          revision: this.revision(context, section, data),
-          data,
+          revision,
+          data: {
+            ...data,
+            ...(currentPlan ? { pluginPlan: currentPlan.plan } : {}),
+          },
           unavailable: [
             {
               operation: "discover.install",
@@ -284,13 +306,35 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
         description: text(tool.description),
         enabled: tool.enabled,
       }));
-      const data = { toolsets, servers: safeServers, skills: safeSkills };
+      const data = {
+        toolsets,
+        servers: safeServers,
+        skills: safeSkills,
+        plugins,
+      };
+      const revision = this.revision(context, section, data);
+      const currentPlan = [...this.pluginPlans.values()]
+        .reverse()
+        .find(
+          (stored) =>
+            stored.expiresAt > this.sources.now() &&
+            sameContext(context, stored.context) &&
+            stored.plan.revision === revision,
+        );
       return {
         ...base,
         section,
-        revision: this.revision(context, section, data),
-        data,
+        revision,
+        data: {
+          ...data,
+          ...(currentPlan ? { pluginPlan: currentPlan.plan } : {}),
+        },
         unavailable: [
+          {
+            operation: "plugins.install",
+            reason:
+              "Plugin preview/confirmation records intent only. Native reviewed installation and device permissions are required; nothing is installed here.",
+          },
           {
             operation: "capability.toggle",
             reason:
@@ -299,7 +343,7 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
           {
             operation: "capability.enable",
             reason:
-              "Enabling tools and changing MCP access require the native confirmation flow; this adapter only disables an existing toolset.",
+              "Enabling tools and changing MCP access require the native confirmation flow; this adapter never changes capability configuration.",
           },
           {
             operation: "capability.test",
@@ -387,6 +431,67 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
   async apply(operation: RuntimeOperation): Promise<RuntimeSnapshot> {
     if (!validateRuntimeOperation(operation))
       throw new Error("Invalid native operation");
+    if (
+      operation.action === "plugin.preview" ||
+      operation.action === "plugin.confirm-plan"
+    ) {
+      const context = await this.sources.context();
+      let snapshot = await this.inspect("capability");
+      if (snapshot.revision !== operation.revision)
+        snapshot = await this.inspect("discover");
+      await this.check(context);
+      if (
+        snapshot.revision !== operation.revision ||
+        (snapshot.section !== "capability" && snapshot.section !== "discover")
+      )
+        throw new Error("Plugin state changed; inspect and review again");
+      if (
+        !snapshot.data.plugins?.some((plugin) => plugin.key === operation.key)
+      )
+        throw new Error("Unknown plugin; no plan created");
+      if (operation.action === "plugin.preview") {
+        while (this.pluginPlans.size >= 4)
+          this.pluginPlans.delete(this.pluginPlans.keys().next().value!);
+        const plan: RuntimePluginPlan = {
+          schemaVersion: 1,
+          userId: context.userId,
+          key: operation.key,
+          planId: hash([
+            context,
+            operation.key,
+            operation.revision,
+            randomUUID(),
+          ]),
+          revision: operation.revision,
+          status: "preview",
+          execution: "device-required",
+          steps: [
+            "Review the exact plugin source and configuration in native Discover.",
+            "Review native device permissions separately; this plan grants no authority.",
+            "Run the native reviewed installation flow only after separate authorization; no code is installed by this plan.",
+          ],
+        };
+        this.pluginPlans.set(plan.planId, {
+          context,
+          plan,
+          expiresAt: this.sources.now() + 300000,
+        });
+      } else {
+        const stored = this.pluginPlans.get(operation.planId);
+        if (
+          !stored ||
+          stored.expiresAt <= this.sources.now() ||
+          !sameContext(stored.context, context) ||
+          stored.plan.key !== operation.key ||
+          stored.plan.revision !== operation.revision
+        )
+          throw new Error(
+            "Plugin plan expired or account/state changed; preview again",
+          );
+        stored.plan = { ...stored.plan, status: "confirmed" };
+      }
+      return this.inspect(snapshot.section);
+    }
     if (operation.action.startsWith("memory."))
       throw new Error(
         "Shared native Memory is read-only: the existing editor must coordinate external Agent writes; no cross-process lock is available here",

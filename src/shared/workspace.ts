@@ -17,6 +17,7 @@ export type NativeWorkspaceAPI = WorkspaceRuntimeAdapter;
 import type { SessionTransport } from "@mithril/workspace/session-sync";
 import type {
   ChatModel,
+  ChatRuntimeAvailability,
   SessionNativeImportAdapter,
 } from "@mithril/workspace/sessions";
 export interface CloudChatAPI extends SessionTransport {
@@ -24,6 +25,7 @@ export interface CloudChatAPI extends SessionTransport {
   enable(): Promise<CloudWorkspaceStatus>;
   disable(): Promise<void>;
   models(): Promise<ChatModel[]>;
+  runtime(): Promise<ChatRuntimeAvailability>;
   legacySnapshot(): Promise<LegacyProviderSnapshot>;
 }
 export type NativeSessionImportAPI = SessionNativeImportAdapter;

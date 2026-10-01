@@ -2,6 +2,8 @@
 
 Desktop starts with the shared Mithril D1 Chat. Models and inference use the Mithril API; retained local provider configuration is quarantined from this path. Connection, inventory, history and resume never start inference. Explicit turns additionally require the existing inference authorization. No grants, deploys, releases, paid inference or real data migration were performed.
 
+Canonical source: Fund commit `14be277a6fc3a61bdfa516c8411737490c620dce`, [paired draft PR317](https://github.com/mithril-lang/mithril-fund/pull/317).
+
 The canonical compiled workspace0.2 artifact includes Web/Desktop Chat and eight portable workspace views, plus explicit native runtime inspection and import. Its SHA256 is `171c37a0f8d8d9713fab13d73f808c58eb9f5cdfb09e83e16193b33c68b0d107`. The npm file dependency and SHA512 lock integrity match the artifact; npm verified the lock in an isolated temporary directory. Desktop does not copy shared UI source.
 
 Actual native content, memory limits, installed capabilities, profile state and Kanban sources are inspected through narrow main-process adapters. Links open existing native 3D Office and other screens. Shared Desktop native Memory/configuration writes are explicitly unavailable because the existing file helpers cannot guarantee cross-process Agent locking. The original native editor remains available. Web sandbox runtime support differs and unsupported Office/3D/Kanban operations are explicitly reported; this draft does not claim complete browser parity for device execution.

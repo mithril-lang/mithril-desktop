@@ -1,7 +1,7 @@
 # Shared Mithril workspace
 
 `mithril-workspace-0.2.0.tgz` is the compiled npm pack artifact of the canonical
-[`mithril-lang/mithril-fund/packages/workspace`](https://github.com/mithril-lang/mithril-fund/tree/main/packages/workspace)
+[`mithril-lang/mithril-fund/packages/workspace`](https://github.com/mithril-lang/mithril-fund/tree/14be277a6fc3a61bdfa516c8411737490c620dce/packages/workspace)
 package. It contains ESM, TypeScript declarations, CSS, the license and package
 documentation. Desktop does not maintain a separate copy of the workspace UI source.
 
@@ -16,3 +16,5 @@ This artifact is draft integration version 0.2.0. The coordinated API workspace
 migration and dedicated workspace/chat-scope authorization must be available before
 publishing a Desktop installer. No grants or production migration happen during
 installation of this dependency.
+
+Canonical source commit: `14be277a6fc3a61bdfa516c8411737490c620dce`, prepared in [Fund draft PR317](https://github.com/mithril-lang/mithril-fund/pull/317).

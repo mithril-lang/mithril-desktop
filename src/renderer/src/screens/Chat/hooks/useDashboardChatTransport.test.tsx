@@ -811,6 +811,87 @@ describe("useDashboardChatTransport recovery", () => {
     );
   });
 
+  it("surfaces a partial write_file stream close without another continuation or tool execution", async () => {
+    // @lat: [[chat-commands#Incomplete streamed tool calls#4096 continuation then partial tool EOF]]
+    dashboardMock.request.mockImplementation(async (method) => {
+      if (method === "session.create") {
+        return {
+          session_id: "live-partial",
+          stored_session_id: "stored-partial",
+        };
+      }
+      if (method === "model.options") {
+        return { model: "bad-model", provider: "bad-provider", providers: [] };
+      }
+      return {};
+    });
+    const api: HarnessApi = {};
+    render(<Harness api={api} />);
+
+    await act(async () => {
+      await api.send?.("create a bot profile");
+    });
+
+    await act(async () => {
+      // The Agent's first provider response reached the 4,096-token length
+      // boundary and continued internally. The next stream died while forming
+      // write_file arguments; only one terminal frame reaches Desktop.
+      dashboardMock.onEvent?.({
+        payload: {
+          name: "write_file",
+          tool_call_id: "write-partial-1",
+          arguments: '{"path":"profile.',
+        },
+        session_id: "live-partial",
+        type: "tool.generating",
+      });
+      dashboardMock.onEvent?.({
+        payload: {
+          status: "error",
+          error: "Response remained truncated after 4 continuation attempts",
+          error_surface: {
+            code: "stream_closed_tool_call",
+            request_id: "chat:008af2dd-9ca0-47e8-9930-1c861a88b279",
+          },
+          dropped_tool_names: ["write_file"],
+          output_tokens: 4096,
+        },
+        session_id: "live-partial",
+        type: "message.complete",
+      });
+    });
+
+    const partial = api.messages?.find(
+      (message) =>
+        message.kind === "tool_call" && message.name === "write_file",
+    );
+    expect(partial).toMatchObject({ status: "failed" });
+    expect(
+      api.messages?.filter((message) => message.kind === "tool_result"),
+    ).toEqual([]);
+    expect(
+      api.messages?.filter(
+        (message) =>
+          "error" in message &&
+          message.error?.includes("incomplete tool call was not executed"),
+      ),
+    ).toHaveLength(1);
+    expect(api.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          error: expect.stringContaining(
+            "chat:008af2dd-9ca0-47e8-9930-1c861a88b279",
+          ),
+        }),
+      ]),
+    );
+    expect(
+      dashboardMock.request.mock.calls.filter(
+        ([method]) => method === "prompt.submit",
+      ),
+    ).toHaveLength(1);
+  });
+
   it("discards an in-flight dashboard client after the connection mode changes", async () => {
     let releaseFirstConnect: (() => void) | null = null;
     const requests: Array<{ method: string; params: unknown }> = [];

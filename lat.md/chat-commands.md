@@ -62,6 +62,32 @@ The ref is the write-through transcript ref owned by [[src/renderer/src/screens/
 
 Delta commits are coalesced: high-frequency events (`message.delta`, `thinking.delta`, `reasoning.delta`, `tool.progress`, `tool.generating`) update the ref and schedule one `setMessages(messagesRef.current)` per animation frame, while lifecycle events (start/complete/clarify/tool boundaries) cancel any pending frame and commit immediately, so `isLoading`/approval state never observes a stale transcript. Because the flush publishes the ref rather than a pinned snapshot, a frame that fires after another writer took over republishes (or advances to) that newer state — it can never resurrect an older transcript. Nothing may call the raw state setter or re-adopt committed state into the ref. Specified by the delta-coalescing tests in [[src/renderer/src/screens/Chat/hooks/useDashboardChatTransport.test.tsx]].
 
+## Incomplete streamed tool calls
+
+An upstream stream that closes while tool arguments are incomplete is a transport failure, not evidence that reasoning consumed every output token.
+
+[[src/renderer/src/screens/Chat/completionFailure.ts#dashboardCompletionFailure]] reads the gateway's structured terminal metadata and replaces legacy continuation-ceiling copy with an accurate local error. It retains a supplied provider request ID for correlation. [[src/renderer/src/screens/Chat/completionFailure.ts#failIncompleteToolCalls]] marks only matching still-running tool rows failed; it never creates a tool result or changes a completed call.
+
+### Structured terminal failure
+
+A terminal payload with `stream_closed_tool_call` or dropped tool names reports that the provider stream closed before arguments completed, names the incomplete tool, and includes the request ID when supplied.
+
+### No partial execution or duplicate completion
+
+Incomplete calls have no result and are marked failed, while completed calls remain completed. Desktop does not submit a follow-up prompt in response to the terminal frame.
+
+### 4096 continuation then partial tool EOF
+
+A 4,096-token length continuation followed by EOF during partial `write_file` arguments produces one terminal failure, no tool result, and no duplicate `prompt.submit`.
+
+### Legacy SSE partial tool EOF
+
+The legacy SSE parser observes raw tool-call deltas without parsing, executing, or replaying them.
+
+A later structured error ends once with `onError`; `[DONE]` never reports success, and a tool-only stream never triggers the non-stream diagnostic probe.
+
+Visible prefix text does not override a later stream error or raw tool call. Terminal priority is structured error, raw tool call, visible content, then diagnostic probe. A syntactically complete raw call (`finish_reason=tool_calls`) gets a distinct unsupported-transport error and is not executed.
+
 ## Reasoning & tool activity rows
 
 Streamed reasoning and tool calls are folded into compact, collapsible transcript rows rather than stacked bubbles, so a turn with heavy thinking or many tool calls stays scannable.

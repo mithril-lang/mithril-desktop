@@ -74,6 +74,12 @@ import {
   type ChatToolEvent,
 } from "../shared/chat-stream";
 import {
+  formatSseError,
+  hasOpenAiToolCallDelta,
+  hasOpenAiToolCallFinishReason,
+  sseTerminalDisposition,
+} from "./sse-parser";
+import {
   chatToolEventFromRunEvent,
   parseRunSseBlock,
   runCompletedUsage,
@@ -1543,6 +1549,9 @@ function sendMessageViaApi(
   }
 
   let hasContent = false;
+  let hasToolCallDelta = false;
+  let toolCallFinished = false;
+  let streamTerminalSeen = false;
   let finished = false; // guard against double callbacks
   let lastError = ""; // capture embedded error messages
   // Tool progress pattern: `emoji tool_name` or `emoji description`
@@ -1619,6 +1628,18 @@ function sendMessageViaApi(
     probeReq.end();
   }
 
+  function settleSseStream(): void {
+    const disposition = sseTerminalDisposition({
+      hasContent,
+      hasToolCallDelta,
+      toolCallFinished,
+      lastError,
+    });
+    if (disposition.kind === "error") finish(disposition.error);
+    else if (disposition.kind === "done") finish();
+    else probeRealError();
+  }
+
   /** Handle a custom SSE event (non-data lines with `event:` prefix). */
   function processCustomEvent(eventType: string, data: string): void {
     if (eventType === "hermes.tool.progress") {
@@ -1640,14 +1661,8 @@ function sendMessageViaApi(
 
   function processSseData(data: string): boolean {
     if (data === "[DONE]") {
-      if (hasContent) {
-        finish();
-      } else if (lastError) {
-        finish(lastError);
-      } else {
-        // Streaming returned empty — probe non-streaming to get the real error
-        probeRealError();
-      }
+      streamTerminalSeen = true;
+      settleSseStream();
       return true; // signals done
     }
     try {
@@ -1655,12 +1670,21 @@ function sendMessageViaApi(
 
       // Capture error responses forwarded through SSE
       if (parsed.error) {
-        lastError = parsed.error.message || JSON.stringify(parsed.error);
+        lastError = formatSseError(parsed);
         return false;
       }
 
       const choice = parsed.choices?.[0];
       const delta = choice?.delta;
+      // A raw OpenAI tool-call delta is observation only: the Desktop does not
+      // parse or execute it. Remember it solely to prevent the empty-stream
+      // diagnostic probe from replaying this turn after a partial call/EOF.
+      if (hasOpenAiToolCallDelta(delta)) {
+        hasToolCallDelta = true;
+      }
+      if (hasOpenAiToolCallFinishReason(choice)) {
+        toolCallFinished = true;
+      }
 
       // Extract usage from final chunk (with optional cost + rate limit info)
       if (parsed.usage && cb.onUsage) {
@@ -1783,12 +1807,10 @@ function sendMessageViaApi(
             if (processSseBlock(part)) return;
           }
         }
-        // Signal completion — even when no content was received
-        if (!hasContent && !lastError) {
-          probeRealError();
-          return;
-        }
-        finish(hasContent ? undefined : lastError);
+        if (finished || streamTerminalSeen) return;
+        // A clean socket EOF is terminal too. Use the same priority as [DONE]
+        // so prefix text cannot hide a later structured/partial-tool failure.
+        settleSseStream();
       });
 
       res.on("error", (err) => {

@@ -62,6 +62,114 @@ export interface SseDataResult {
   error?: string;
 }
 
+export interface SseParseState {
+  hasContent: boolean;
+  hasToolCallDelta?: boolean;
+  toolCallFinished?: boolean;
+  lastError: string;
+}
+
+export type SseTerminalDisposition =
+  | { kind: "done" }
+  | { kind: "error"; error: string }
+  | { kind: "probe" };
+
+export function hasOpenAiToolCallDelta(delta: unknown): boolean {
+  if (delta === null || typeof delta !== "object" || Array.isArray(delta)) {
+    return false;
+  }
+  const toolCalls = (delta as Record<string, unknown>).tool_calls;
+  return Array.isArray(toolCalls) && toolCalls.length > 0;
+}
+
+export function hasOpenAiToolCallFinishReason(choice: unknown): boolean {
+  return (
+    choice !== null &&
+    typeof choice === "object" &&
+    !Array.isArray(choice) &&
+    (choice as Record<string, unknown>).finish_reason === "tool_calls"
+  );
+}
+
+export function emptySseTerminalError(
+  lastError: string,
+  hasToolCallDelta: boolean,
+  toolCallFinished = false,
+): string {
+  if (lastError) return lastError;
+  if (hasToolCallDelta && toolCallFinished) {
+    return "The provider returned a raw tool call that this transport does not execute. No tool was run.";
+  }
+  return hasToolCallDelta
+    ? "The provider stream ended before a tool call completed. The incomplete tool call was not executed."
+    : "";
+}
+
+/** Decide exactly one terminal action. Errors and observed raw tool calls must
+ * outrank prefix text, otherwise a partial tool stream can be reported as a
+ * successful answer and trigger unsafe follow-up behavior. */
+export function sseTerminalDisposition(
+  state: SseParseState,
+): SseTerminalDisposition {
+  const error = emptySseTerminalError(
+    state.lastError,
+    !!state.hasToolCallDelta,
+    !!state.toolCallFinished,
+  );
+  if (error) return { kind: "error", error };
+  if (state.hasContent) return { kind: "done" };
+  return { kind: "probe" };
+}
+
+export function completeSseStream(
+  state: SseParseState,
+  cb: Pick<SseCallbacks, "onDone" | "onError">,
+): SseTerminalDisposition {
+  const disposition = sseTerminalDisposition(state);
+  if (disposition.kind === "error") cb.onError?.(disposition.error);
+  if (disposition.kind === "done") cb.onDone?.();
+  return disposition;
+}
+
+function safeDiagnosticField(value: unknown): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text && text.length <= 256 && !/[\r\n]/.test(text) ? text : "";
+}
+
+/** Preserve correlation metadata without serializing an entire provider error
+ * object, which can include request bodies or other unsafe diagnostic fields. */
+export function formatSseError(payload: unknown): string {
+  const row =
+    payload !== null && typeof payload === "object" && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : {};
+  const error =
+    row.error !== null &&
+    typeof row.error === "object" &&
+    !Array.isArray(row.error)
+      ? (row.error as Record<string, unknown>)
+      : {};
+  const message =
+    safeDiagnosticField(error.message) ||
+    safeDiagnosticField(row.error) ||
+    safeDiagnosticField(row.message) ||
+    "Provider stream failed";
+  const code = safeDiagnosticField(error.code || error.type || row.code);
+  const requestId = safeDiagnosticField(
+    error.request_id ||
+      error.requestId ||
+      row.request_id ||
+      row.requestId ||
+      row.upstream_request_id,
+  );
+  const codeSuffix = code && !message.includes(code) ? ` [${code}]` : "";
+  const requestSuffix =
+    requestId && !message.includes(requestId)
+      ? ` (Request ID: ${requestId})`
+      : "";
+  return `${message}${codeSuffix}${requestSuffix}`;
+}
+
 /**
  * Process a single SSE data payload (after `data: ` prefix is stripped).
  * Returns parsing result.
@@ -69,12 +177,11 @@ export interface SseDataResult {
 export function processSseData(
   data: string,
   cb: SseCallbacks,
-  state: { hasContent: boolean; lastError: string },
+  state: SseParseState,
 ): SseDataResult {
   if (data === "[DONE]") {
-    if (state.hasContent) {
-      cb.onDone?.();
-    }
+    const disposition = completeSseStream(state, cb);
+    if (disposition.kind === "error") state.lastError = disposition.error;
     return { done: true, hasContent: state.hasContent, error: state.lastError };
   }
 
@@ -83,11 +190,20 @@ export function processSseData(
 
     // Capture error responses forwarded through SSE
     if (parsed.error) {
-      state.lastError = parsed.error.message || JSON.stringify(parsed.error);
+      state.lastError = formatSseError(parsed);
       return { done: false, hasContent: state.hasContent };
     }
 
     const delta = parsed.choices?.[0]?.delta;
+    // Observe raw OpenAI tool-call fragments so a tool-only/partial stream is
+    // never mistaken for an empty response and replayed by a diagnostic probe.
+    // Desktop deliberately does not parse or execute these arguments.
+    if (hasOpenAiToolCallDelta(delta)) {
+      state.hasToolCallDelta = true;
+    }
+    if (hasOpenAiToolCallFinishReason(parsed.choices?.[0])) {
+      state.toolCallFinished = true;
+    }
 
     // Extract usage from final chunk
     if (parsed.usage && cb.onUsage) {

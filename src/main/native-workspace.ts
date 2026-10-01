@@ -21,11 +21,16 @@ import {
   type WorkspaceOperationsResponse,
 } from "@mithril/workspace/protocol";
 import type { MemoryInfo } from "./memory";
+import type { MemoryMutation } from "./memory-file-lock";
 import type { ProfileInfo } from "./profiles";
 import type { ToolsetInfo } from "./tools";
 import type { McpServerInfo } from "./mcp-servers";
 import type { InstalledSkill } from "./skills";
 import type { KanbanBoard, KanbanTask } from "./kanban";
+import type {
+  NativeKanbanState,
+  NativeKanbanChange,
+} from "./native-kanban-store";
 
 export interface NativeContext {
   userId: string;
@@ -39,6 +44,11 @@ export interface NativeSources {
   namespace(): string;
   now(): number;
   memory(profile: string): MemoryInfo;
+  memoryApply?(
+    profile: string,
+    mutation: MemoryMutation,
+    expected: { memory: string; user: string },
+  ): { success: boolean; error?: string };
   provider(profile: string): string | null;
   profiles(): Promise<ProfileInfo[]>;
   toolsets(profile: string): ToolsetInfo[];
@@ -47,6 +57,12 @@ export interface NativeSources {
   plugins?(profile: string): Promise<RuntimePluginSummary[]>;
   boards(profile: string): Promise<KanbanBoard[]>;
   tasks(profile: string): Promise<KanbanTask[]>;
+  kanbanState?(): NativeKanbanState;
+  kanbanChange?(
+    revision: string,
+    taskId: string,
+    change: NativeKanbanChange,
+  ): void;
   locale(): string;
   locales: readonly string[];
   setLocale(locale: string): void;
@@ -172,16 +188,18 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
             : {}),
         },
         unavailable: [
-          ...[
-            "memory.add",
-            "memory.update",
-            "memory.remove",
-            "memory.user-profile",
-          ].map((operation) => ({
-            operation,
-            reason:
-              "Shared native Memory is read-only because an Agent cross-process lock is unavailable. Open native Memory to edit existing data.",
-          })),
+          ...(this.sources.memoryApply
+            ? []
+            : [
+                "memory.add",
+                "memory.update",
+                "memory.remove",
+                "memory.user-profile",
+              ].map((operation) => ({
+                operation,
+                reason:
+                  "Shared native Memory is read-only because an Agent cross-process lock is unavailable. Open native Memory to edit existing data.",
+              }))),
           {
             operation: "memory.provider",
             reason:
@@ -353,7 +371,10 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
         ],
       };
     }
-    const tasks = await this.sources.tasks(context.profile);
+    const tasks =
+      section === "office" || !this.sources.kanbanState
+        ? await this.sources.tasks(context.profile)
+        : [];
     await this.check(context);
     if (section === "office") {
       const profiles = await this.sources.profiles();
@@ -394,30 +415,54 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
     }
     const boards = await this.sources.boards(context.profile);
     await this.check(context);
+    const nativeState = this.sources.kanbanState?.();
+    const currentTasks = nativeState?.tasks ?? tasks;
     const data = {
       boards: boards.map((board) => ({
         id: hash(["board", board.slug]),
         name: text(board.name, 512),
+        current: nativeState
+          ? board.slug === nativeState.boardSlug
+          : board.is_current,
       })),
-      tasks: tasks.map((task) => ({
-        id: hash(["task", task.id]),
+      tasks: currentTasks.map((task) => ({
+        id: hash(["task", nativeState?.boardSlug ?? "current", task.id]),
         title: text(task.title, 512),
         body: text(task.body ?? ""),
         status: text(task.status, 80),
         priority: String(task.priority),
+        editable: Boolean(
+          nativeState &&
+          this.sources.kanbanChange &&
+          [
+            "triage",
+            "todo",
+            "scheduled",
+            "ready",
+            "blocked",
+            "review",
+            "done",
+          ].includes(task.status) &&
+          !("claim_lock" in task && task.claim_lock) &&
+          portableNativeText(task.title) &&
+          portableNativeText(task.body ?? ""),
+        ),
+        ...(nativeState
+          ? { boardId: hash(["board", nativeState.boardSlug]) }
+          : {}),
         ...(task.assignee ? { assignee: text(task.assignee, 512) } : {}),
       })),
     };
     return {
       ...base,
       section,
-      revision: this.revision(context, section, data),
+      revision: this.revision(context, section, [data, nativeState?.revision]),
       data,
       unavailable: [
         {
           operation: "kanban.dispatch",
           reason:
-            "Dispatch, schedule, reclaim, board changes and execution remain in native Kanban.",
+            "Dispatch, schedule, reclaim, board changes and execution remain in native Kanban. Local unclaimed task metadata edits use an atomic revision check.",
         },
         {
           operation: "projects.files",
@@ -431,6 +476,45 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
   async apply(operation: RuntimeOperation): Promise<RuntimeSnapshot> {
     if (!validateRuntimeOperation(operation))
       throw new Error("Invalid native operation");
+    if (operation.action === "kanban.task-edit") {
+      const context = await this.sources.context();
+      await this.check(context);
+      if (!this.sources.kanbanState || !this.sources.kanbanChange)
+        throw new Error("Native Kanban editing unavailable");
+      let current = await this.inspect("kanban");
+      if (current.revision !== operation.revision)
+        current = await this.inspect("projects");
+      await this.check(context);
+      if (
+        current.revision !== operation.revision ||
+        (current.section !== "kanban" && current.section !== "projects")
+      )
+        throw new Error("Native Kanban changed; inspect again");
+      const visible = current.data.tasks.find(
+        (task) => task.id === operation.taskId,
+      );
+      if (!visible?.editable)
+        throw new Error("Task requires native review or is not editable");
+      const state = this.sources.kanbanState();
+      const raw = state.tasks.find(
+        (task) => hash(["task", state.boardSlug, task.id]) === operation.taskId,
+      );
+      // A second same-owner snapshot must still match the view the user edited.
+      const latest = await this.inspect(current.section);
+      await this.check(context);
+      if (latest.revision !== operation.revision || !raw)
+        throw new Error("Native Kanban changed; inspect again");
+      const change: NativeKanbanChange = {
+        title: operation.title,
+        body: operation.body,
+        priority: operation.priority,
+      };
+      if (!portableNativeText(change.title) || !portableNativeText(change.body))
+        throw new Error("Sensitive or device-specific content is excluded");
+      this.sources.kanbanChange(state.revision, raw.id, change);
+      await this.check(context);
+      return this.inspect(current.section);
+    }
     if (
       operation.action === "plugin.preview" ||
       operation.action === "plugin.confirm-plan"
@@ -492,10 +576,44 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
       }
       return this.inspect(snapshot.section);
     }
-    if (operation.action.startsWith("memory."))
-      throw new Error(
-        "Shared native Memory is read-only: the existing editor must coordinate external Agent writes; no cross-process lock is available here",
-      );
+    if (
+      operation.action === "memory.add" ||
+      operation.action === "memory.update" ||
+      operation.action === "memory.remove" ||
+      operation.action === "memory.user-profile"
+    ) {
+      if (!this.sources.memoryApply)
+        throw new Error(
+          "Shared native Memory is read-only: compatible cross-process lock unavailable",
+        );
+      const context = await this.sources.context();
+      await this.check(context);
+      const memory = this.sources.memory(context.profile);
+      if (this.revision(context, "memory", memory) !== operation.revision)
+        throw new Error(
+          "Native data changed; inspect again before applying this edit",
+        );
+      const mutation: MemoryMutation =
+        operation.action === "memory.add"
+          ? { action: "add", content: operation.content }
+          : operation.action === "memory.update"
+            ? {
+                action: "update",
+                index: operation.index,
+                content: operation.content,
+              }
+            : operation.action === "memory.remove"
+              ? { action: "remove", index: operation.index }
+              : { action: "user", content: operation.content };
+      const result = this.sources.memoryApply(context.profile, mutation, {
+        memory: memory.memory.content,
+        user: memory.user.content,
+      });
+      if (!result.success)
+        throw new Error(result.error ?? "Native Memory write unavailable");
+      await this.check(context);
+      return this.inspect("memory");
+    }
     if (operation.action === "capability.toggle")
       throw new Error(
         "Shared native capability configuration is read-only; use native Tools to review permissions and configuration",

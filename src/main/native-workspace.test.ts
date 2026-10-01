@@ -99,6 +99,85 @@ function fixture(): {
   };
 }
 describe("Native workspace boundary", () => {
+  it("updates the actual display locale only after explicit matching-revision selection", async () => {
+    const f = fixture();
+    let locale = "en";
+    f.sources.locales = ["en", "ja"];
+    f.sources.locale = () => locale;
+    f.sources.setLocale = vi.fn((value) => {
+      locale = value;
+    });
+    const snapshot = await f.native.inspect("settings");
+    expect(f.sources.setLocale).not.toHaveBeenCalled();
+    await f.native.apply({
+      action: "settings.set",
+      revision: snapshot.revision,
+      key: "locale",
+      value: "ja",
+    });
+    expect(locale).toBe("ja");
+    await expect(
+      f.native.apply({
+        action: "settings.set",
+        revision: snapshot.revision,
+        key: "locale",
+        value: "en",
+      }),
+    ).rejects.toThrow("changed");
+    await expect(
+      f.native.apply({
+        action: "settings.set",
+        revision: snapshot.revision,
+        key: "provider",
+        value: "other",
+      }),
+    ).rejects.toThrow("native Settings");
+    expect(f.sources.setLocale).toHaveBeenCalledTimes(1);
+  });
+  it("applies explicitly selected native Memory edits through the locked CAS writer", async () => {
+    const f = fixture();
+    const apply = vi.fn((_profile, mutation, expected) => {
+      expect(expected).toEqual({
+        memory: f.memory.memory.content,
+        user: "Person",
+      });
+      f.memory.memory.content = mutation.content;
+      f.memory.memory.entries[0].content = mutation.content;
+      return { success: true };
+    });
+    f.sources.memoryApply = apply;
+    const snapshot = await f.native.inspect("memory");
+    expect(
+      snapshot.unavailable.some((item) => item.operation === "memory.update"),
+    ).toBe(false);
+    await f.native.apply({
+      action: "memory.update",
+      revision: snapshot.revision,
+      index: 0,
+      content: "Edited",
+    });
+    expect(apply).toHaveBeenCalledTimes(1);
+    await expect(
+      f.native.apply({
+        action: "memory.update",
+        revision: snapshot.revision,
+        index: 0,
+        content: "Stale",
+      }),
+    ).rejects.toThrow("changed");
+    expect(apply).toHaveBeenCalledTimes(1);
+    const current = await f.native.inspect("memory");
+    f.switch();
+    await expect(
+      f.native.apply({
+        action: "memory.remove",
+        revision: current.revision,
+        index: 0,
+        confirm: true,
+      }),
+    ).rejects.toThrow("changed");
+    expect(apply).toHaveBeenCalledTimes(1);
+  });
   it("returns the newest plugin intent and expires confirmation without executing", async () => {
     const f = fixture();
     let now = 1000000;

@@ -10,12 +10,14 @@ import {
   cloudWorkspace,
   onCloudWorkspaceAccountChanged,
 } from "./cloud-workspace-runtime";
-import { readMemory } from "./memory";
+import { readMemory, applyMemoryMutation } from "./memory";
 import { listProfiles } from "./profiles";
 import { getToolsets } from "./tools";
 import { listMcpServers } from "./mcp-servers";
 import { listInstalledSkills } from "./skills";
 import { listBoards, listTasks } from "./kanban";
+import { NativeKanbanStore } from "./native-kanban-store";
+import { HERMES_HOME } from "./installer";
 import { getConnectionConfig, getConfigValue } from "./config";
 import { getAppLocale, setAppLocale } from "./locale";
 import { APP_LOCALES, type AppLocale } from "../shared/i18n";
@@ -39,12 +41,32 @@ export function importNamespace(): string {
   return value;
 }
 
+const kanbanStore = new NativeKanbanStore(
+  process.env.HERMES_KANBAN_HOME?.trim() || HERMES_HOME,
+  process.env.HERMES_KANBAN_BOARD ?? "",
+);
+function checkedKanbanStore(): NativeKanbanStore {
+  if (process.env.HERMES_KANBAN_DB?.trim())
+    throw new Error(
+      "Custom native Kanban database override requires the existing native screen",
+    );
+  return kanbanStore;
+}
 export const nativeWorkspace = new NativeWorkspace({
   mode: () => getConnectionConfig().mode,
   context: () => cloudWorkspace.nativeContext(),
   namespace: importNamespace,
   now: Date.now,
   memory: readMemory,
+  ...(process.platform !== "win32"
+    ? {
+        memoryApply: (
+          profile: string,
+          mutation: Parameters<typeof applyMemoryMutation>[0],
+          expected: Parameters<typeof applyMemoryMutation>[1],
+        ) => applyMemoryMutation(mutation, expected, profile),
+      }
+    : {}),
   provider: (profile) => getConfigValue("memory.provider", profile),
   profiles: listProfiles,
   toolsets: getToolsets,
@@ -110,6 +132,9 @@ export const nativeWorkspace = new NativeWorkspace({
       throw new Error("Native Kanban tasks unavailable; no records imported");
     return result.data ?? [];
   },
+  kanbanState: () => checkedKanbanStore().read(),
+  kanbanChange: (revision, taskId, change) =>
+    checkedKanbanStore().change(revision, taskId, change),
   locale: getAppLocale,
   locales: APP_LOCALES,
   setLocale: (locale) => {

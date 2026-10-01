@@ -840,11 +840,17 @@ interface HermesAPI {
     index: number,
     content: string,
     profile?: string,
+    expected?: { memory: string; user: string },
   ) => Promise<{ success: boolean; error?: string }>;
-  removeMemoryEntry: (index: number, profile?: string) => Promise<boolean>;
+  removeMemoryEntry: (
+    index: number,
+    profile?: string,
+    expected?: { memory: string; user: string },
+  ) => Promise<boolean>;
   writeUserProfile: (
     content: string,
     profile?: string,
+    expected?: { memory: string; user: string },
   ) => Promise<{ success: boolean; error?: string }>;
 
   // Soul

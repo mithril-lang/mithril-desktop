@@ -34,7 +34,7 @@ export function getAppLocale(): AppLocale {
 }
 
 export function setAppLocale(locale: AppLocale): AppLocale {
-  const nextLocale = setSharedLocale(locale);
-  writeSavedLocale(nextLocale);
-  return nextLocale;
+  if (!isAppLocale(locale)) throw new Error("Unsupported display locale");
+  writeSavedLocale(locale);
+  return setSharedLocale(locale);
 }

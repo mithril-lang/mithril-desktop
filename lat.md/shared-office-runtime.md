@@ -36,4 +36,28 @@ An explicit injected run obtains its private lease once. Lost acknowledgement ne
 
 Fixture tests and blocked-network visual checks exercise renderer reuse, ownership and explicit operation boundaries without running native tools or inference.
 
+## Native Memory transactions
+
+[[src/main/memory-file-lock.ts#mutateMemoryFiles]] uses Hermes's separate MEMORY.md.lock and USER.md.lock files for coordinated native edits.
+
+On POSIX, fixed-order exclusive locks protect raw snapshot comparison, configured-limit fingerprint verification, private backup and atomic replacement. Reads use regular-file descriptors with no-follow flags; paths with symbolic-link ancestors are refused. A fixed isolated Python interpreter receives inputs through stdin, never a shell or inherited provider environment. Lock waits are bounded and failure never automatically retries a mutation.
+
+[[src/main/memory.ts]] routes every native Memory writer through this lock protocol. Existing native entry and USER editors capture their raw edit base and pass it through narrow IPC, so a stale index cannot edit a different entry after another writer changes the list. Explicit legacy whole-file replacement remains replacement, not a CAS operation. No automatic cloud import or deletion of older local data occurs. Successful changes keep private local backups.
+
+Shared Memory editing is enabled only for the POSIX implementation with directory-descriptor anchoring. Windows native flows retain byte-lock coordination; shared editing remains unavailable until equivalent directory safety is verified. [[src/main/memory-file-lock.test.ts]] uses temporary files and a real competing Python flock to prove that newer Agent content survives stale edits. Settings expose the actual persisted display locale only; provider configuration and permissions remain in their native flows.
+
+## Persisted display settings
+
+[[src/main/desktop-config-transaction.ts#DesktopConfigTransaction]] protects both existing desktop.json writers with original-document CAS and an ephemeral exclusive lock.
+
+Reads retain the original raw-document hash in a WeakMap associated with the returned object. Writes acquire a create-exclusive lock, recheck the original document, and use the existing atomic temp-file replacement. Independent Desktop instances cannot silently replace one another's changes. Busy or stale locks fail visibly; no other process's lock is deleted or automatically recovered. Malformed documents and untracked copied objects cannot overwrite the existing file.
+
+If a writer crashes while holding the lock, the error explains that all Desktop instances must be closed before the stale desktop.json.desktop-lock is cleared manually. A crash does not authorize another instance to remove an unknown live lock.
+
+[[src/main/config.ts#writeDesktopConfig]] covers the existing connection-registry writer and [[src/main/locale.ts#setAppLocale]] covers the actual locale preference. Locale persistence succeeds before the process-wide language changes. No startup single-instance restriction, provider expansion or additional permission is introduced. [[src/main/desktop-config-transaction.test.ts]] verifies independent-writer conflicts, unrelated-field preservation and unreadable-document refusal.
+
+The atomic writer is resolved lazily when a save occurs, so unrelated runtime modules do not initialize file-writing dependencies. [[tests/memory-limits.test.ts]] verifies configured caps through the real isolated helper using canonical temporary paths and captured native edit bases.
+
+[[src/renderer/src/screens/Memory/MemoryEditing.test.tsx]] verifies captured entry and USER edit bases across refreshes. Untouched USER drafts adopt refreshed data, while edited drafts keep their original revision until an explicit save or cancellation.
+
 [[src/main/cloud-chat.test.ts]] verifies runtime scopes and fixed routes. [[src/main/native-workspace.test.ts]] verifies plugin intent, stale revisions and identity isolation. Existing Office tests continue through canonical reexports, including [[src/renderer/src/screens/Office/office3d/objects/AgentsLayer.test.tsx]]. Actual Web canvas QA checks city, interior and walking with mocked owner snapshots, zero POSTs and no external network.

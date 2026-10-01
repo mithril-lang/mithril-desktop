@@ -7,9 +7,11 @@ const { TEST_HOME } = vi.hoisted(() => {
   const path = require("path");
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const os = require("os");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require("fs");
   return {
     TEST_HOME: path.join(
-      os.tmpdir(),
+      fs.realpathSync(os.tmpdir()),
       `hermes-memory-limits-test-${Date.now()}`,
     ),
   };
@@ -17,6 +19,7 @@ const { TEST_HOME } = vi.hoisted(() => {
 
 vi.mock("../src/main/installer", () => ({
   HERMES_HOME: TEST_HOME,
+  HERMES_PYTHON: "/usr/bin/python3",
 }));
 
 vi.mock("better-sqlite3", () => ({
@@ -138,7 +141,13 @@ describe("memory limits from active profile config.yaml", () => {
     );
 
     expect(addMemoryEntry("x".repeat(2600))).toEqual({ success: true });
-    expect(writeUserProfile("u".repeat(1800))).toEqual({ success: true });
+    const initial = readMemory();
+    expect(
+      writeUserProfile("u".repeat(1800), undefined, {
+        memory: initial.memory.content,
+        user: initial.user.content,
+      }),
+    ).toEqual({ success: true });
 
     expect(
       readFileSync(join(TEST_HOME, "memories", "MEMORY.md"), "utf-8").length,
@@ -160,7 +169,13 @@ describe("memory limits from active profile config.yaml", () => {
     );
     writeMemoryFile("short", "work");
 
-    expect(updateMemoryEntry(0, "x".repeat(2300), "work")).toEqual({
+    const initial = readMemory("work");
+    expect(
+      updateMemoryEntry(0, "x".repeat(2300), "work", {
+        memory: initial.memory.content,
+        user: initial.user.content,
+      }),
+    ).toEqual({
       success: true,
     });
   });
@@ -178,6 +193,6 @@ describe("memory limits from active profile config.yaml", () => {
     const result = addMemoryEntry("x".repeat(DEFAULT_MEMORY_CHAR_LIMIT + 1));
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain(`/${DEFAULT_MEMORY_CHAR_LIMIT} chars`);
+    expect(result.error).toContain("character limit exceeded");
   });
 });

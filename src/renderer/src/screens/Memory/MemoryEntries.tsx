@@ -5,16 +5,20 @@ import type { MemoryEntry } from "./types";
 
 interface MemoryEntriesProps {
   entries: MemoryEntry[];
+  expected: { memory: string; user: string };
   profile?: string;
   onRefresh: () => void;
 }
 
 export function MemoryEntries({
   entries,
+  expected,
   profile,
   onRefresh,
 }: MemoryEntriesProps): React.JSX.Element {
   const { t } = useI18n();
+  const [editBase, setEditBase] = useState(expected);
+  const [deleteBase, setDeleteBase] = useState(expected);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -45,6 +49,7 @@ export function MemoryEntries({
       editingIndex,
       editContent.trim(),
       profile,
+      editBase,
     );
     if (result.success) {
       setEditingIndex(null);
@@ -56,7 +61,15 @@ export function MemoryEntries({
   }
 
   async function handleDeleteEntry(index: number): Promise<void> {
-    await window.hermesAPI.removeMemoryEntry(index, profile);
+    const removed = await window.hermesAPI.removeMemoryEntry(
+      index,
+      profile,
+      deleteBase,
+    );
+    if (!removed) {
+      setError("Memory changed; refresh and review this entry before deleting");
+      return;
+    }
     setConfirmDelete(null);
     onRefresh();
   }
@@ -156,6 +169,7 @@ export function MemoryEntries({
                   <button
                     className="btn-ghost memory-entry-btn"
                     onClick={() => {
+                      setEditBase(expected);
                       setEditingIndex(entry.index);
                       setEditContent(entry.content);
                     }}
@@ -182,7 +196,10 @@ export function MemoryEntries({
                   ) : (
                     <button
                       className="btn-ghost memory-entry-btn"
-                      onClick={() => setConfirmDelete(entry.index)}
+                      onClick={() => {
+                        setDeleteBase(expected);
+                        setConfirmDelete(entry.index);
+                      }}
                     >
                       <Trash size={13} />
                     </button>

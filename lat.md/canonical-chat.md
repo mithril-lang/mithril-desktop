@@ -28,7 +28,7 @@ The selected available Mithril model is displayed in the preview and confirmed b
 
 The shared panel labels unavailable execution, grants, installation and configuration operations. Links open the existing native 3D Office, Memory, Tools, Kanban, profiles and settings views instead of substituting portable records for native features.
 
-Shared Desktop native Memory and capability configuration writes are explicitly unavailable: existing file helpers lack a cross-process Hermes lock, so optimistic read/write could overwrite concurrent Agent changes. Actual content, limits and enabled state remain inspectable, and native editor links remain available. No grants, installation or local configuration change occurs through this shared adapter. Display locale edits use the inspected revision and app-local preferences only.
+Shared Desktop native Memory edits use the same cross-process file locks as Hermes on supported POSIX systems, with under-lock raw snapshot and configuration comparisons. The existing native editor uses captured edit snapshots too. Windows retains native editing; shared Memory editing remains unavailable pending equivalent directory-handle safety. Capability configuration writes remain unavailable. No grants or installation occurs through this adapter. Display locale edits use the inspected revision and app-local preferences only.
 
 Portable workspace import is a separate preview and selection flow. It excludes paths, secrets, provider configuration and device permissions, uses existing cloud revisions for explicitly confirmed replacement, and never changes the native source. Import previews expire and are cleared on identity changes.
 

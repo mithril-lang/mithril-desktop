@@ -23,6 +23,7 @@ import { mirrorFirstPartyAgentProviders } from "./agent-config-providers";
 import { registerSecureEnvSource } from "./secure-env";
 import { profilePaths } from "./utils";
 import { readMithrilToken, writeMithrilToken } from "./mithril-token-store";
+import { invalidateCloudWorkspace } from "./cloud-workspace-events";
 
 export const MITHRIL_API_KEY_ENV = "MITHRIL_API_KEY";
 
@@ -39,11 +40,13 @@ export function registerMithrilSecureEnv(): void {
  * config.yaml (URL + env-var *name* only, no secret) and drop cached env views.
  */
 export function onMithrilConnected(profile: string | undefined): void {
+  invalidateCloudWorkspace();
   invalidateSecretsCache();
   mirrorFirstPartyAgentProviders(profile);
 }
 
 export function onMithrilDisconnected(): void {
+  invalidateCloudWorkspace();
   invalidateSecretsCache();
 }
 

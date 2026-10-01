@@ -21,6 +21,7 @@ import type {
   MithrilFirstRunState,
 } from "../shared/account";
 import type { AgentSyncResult, AgentSyncStatus } from "../shared/agent-sync";
+import type { CloudWorkspaceAPI } from "../shared/workspace";
 import type { ConnectionStatusSnapshot } from "../shared/connection-status";
 import type {
   RegistryKind,
@@ -336,7 +337,9 @@ interface HermesAPI {
     messages: { role: "user" | "assistant"; content: string }[],
     profile?: string,
   ) => Promise<MithrilChatResult>;
-  // Cloud agent sync (profiles ↔ signed-in Hermes One account)
+  cloudWorkspace: CloudWorkspaceAPI;
+  onCloudWorkspaceAccountChanged: (callback: () => void) => () => void;
+  // Legacy cloud agent sync remains unavailable.
   syncAgents: () => Promise<AgentSyncResult>;
   getAgentSyncStatus: () => Promise<AgentSyncStatus>;
   getLinkedAgentId: (profile: string) => Promise<string | null>;

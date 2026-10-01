@@ -13,7 +13,12 @@ import {
   dialog,
   clipboard,
 } from "electron";
-import { extname } from "path";
+import { extname, join } from "path";
+import { assertCloudWorkspaceSender } from "../cloud-workspace-sender";
+import {
+  cloudWorkspace,
+  onCloudWorkspaceAccountChanged,
+} from "../cloud-workspace-runtime";
 import { randomUUID } from "crypto";
 import { readdir, readFile, stat } from "fs/promises";
 import { getActiveProfileNameSync } from "../utils";
@@ -1179,7 +1184,46 @@ export function registerIpcHandlers(context: IpcContext): void {
     ) => mithrilChat(messages, profile?.trim() || getActiveProfileNameSync()),
   );
 
-  // Legacy cloud sync is intentionally unavailable in the Mithril preview.
+  // Portable Mithril workspace sync is opt-in and separate from local agent data.
+  const trustedWorkspaceSender = (event: Electron.IpcMainInvokeEvent): void => {
+    assertCloudWorkspaceSender(
+      event,
+      getMainWindow(),
+      join(__dirname, "../renderer/index.html"),
+      app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL,
+    );
+  };
+  onCloudWorkspaceAccountChanged(() => {
+    const win = getMainWindow();
+    if (win && !win.webContents.isDestroyed())
+      win.webContents.send("cloud-workspace-account-changed");
+  });
+  ipcMain.handle("cloud-workspace-status", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.status();
+  });
+  ipcMain.handle("cloud-workspace-enable", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.enable();
+  });
+  ipcMain.handle("cloud-workspace-disable", (event) => {
+    trustedWorkspaceSender(event);
+    cloudWorkspace.reset();
+  });
+  ipcMain.handle("cloud-workspace-snapshot", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.getSnapshot();
+  });
+  ipcMain.handle("cloud-workspace-operations", (event, operations) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.applyOperations(operations);
+  });
+  ipcMain.handle("cloud-workspace-history", (event, id, offset) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.history(id, offset);
+  });
+
+  // The previous Hermes One sync stays unavailable; this contract cannot import local profiles.
   // Keep the IPC contract so older renderer state fails closed and clearly.
   ipcMain.handle("agent-sync-run", async (event) => {
     const result = {
@@ -2787,6 +2831,7 @@ export function registerIpcHandlers(context: IpcContext): void {
     // on every relaunch. Then drop the cached health flag so the next check
     // probes the newly-active profile's gateway, not the previous one's.
     setActiveProfile(name);
+    cloudWorkspace.reset();
     notifyProfileSwitched();
     // Bring the activated profile's own gateway up if it isn't already —
     // without stopping any other profile's gateway (their bots stay online).

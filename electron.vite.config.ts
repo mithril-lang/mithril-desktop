@@ -8,6 +8,7 @@ const rendererPort = Number(process.env.HERMES_DESKTOP_RENDERER_PORT || 0);
 export default defineConfig({
   main: {
     build: {
+      externalizeDeps: { exclude: ["@mithril/workspace"] },
       rollupOptions: {
         external: ["better-sqlite3"],
       },
@@ -15,6 +16,7 @@ export default defineConfig({
   },
   preload: {
     build: {
+      externalizeDeps: { exclude: ["@mithril/workspace"] },
       rollupOptions: {
         input: {
           index: resolve("src/preload/index.ts"),
@@ -39,7 +41,7 @@ export default defineConfig({
       // Ensure a single Three.js instance across our code, @react-three/fiber,
       // drei and troika — multiple copies break `instanceof THREE.*` checks in
       // the ported office agent renderer.
-      dedupe: ["three"],
+      dedupe: ["three", "react", "react-dom"],
     },
     plugins: [tailwindcss(), react()],
   },

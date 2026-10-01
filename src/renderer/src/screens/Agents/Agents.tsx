@@ -31,12 +31,14 @@ interface AgentsProps {
   activeProfile: string;
   onSelectProfile: (name: string) => void;
   onChatWith: (name: string) => void;
+  onCloudWorkspace?: () => void;
 }
 
 function Agents({
   activeProfile,
   onSelectProfile,
   onChatWith,
+  onCloudWorkspace,
 }: AgentsProps): React.JSX.Element {
   const { t } = useI18n();
   const { openProfile } = useProfileModal();
@@ -262,6 +264,16 @@ function Agents({
           <p className="agents-subtitle">{t("agents.subtitle")}</p>
         </div>
         <div className="agents-header-actions">
+          {onCloudWorkspace && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onCloudWorkspace}
+              title="Local profiles stay on this device. Cloud Workspace syncs data you explicitly enter there."
+            >
+              Open Cloud Workspace
+            </button>
+          )}
           {syncStatus && !syncStatus.signedIn && (
             <span
               className="agents-sync-hint"

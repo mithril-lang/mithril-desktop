@@ -31,6 +31,7 @@ import Office from "../Office/Office";
 import Providers from "../Providers/Providers";
 import Schedules from "../Schedules/Schedules";
 import Kanban from "../Kanban/Kanban";
+import CloudWorkspace from "../CloudWorkspace/CloudWorkspace";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
 import { useSettingsModal } from "../../components/settings/SettingsModalContext";
@@ -53,6 +54,7 @@ import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 
 type View =
+  | "workspace"
   | "chat"
   | "discover"
   | "agents"
@@ -99,7 +101,7 @@ function Layout({
   onReinstall,
   onDismissVerifyWarning,
 }: LayoutProps): React.JSX.Element {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { openSettings } = useSettingsModal();
   const [view, setView] = useState<View>("chat");
   // Multiple conversations coexist (background sessions + multi-agent). Each is
@@ -715,6 +717,15 @@ function Layout({
 
           <nav className="sidebar-nav sidebar-nav-pinned">
             <button
+              className={`sidebar-nav-item ${view === "workspace" ? "active" : ""}`}
+              onClick={() => goTo("workspace")}
+              title="Cloud Workspace"
+              aria-label="Cloud Workspace"
+            >
+              <Compass size={16} />
+              <span className="sidebar-nav-label">Cloud Workspace</span>
+            </button>
+            <button
               className={`sidebar-nav-item sidebar-new-chat ${
                 view === "chat" && currentSessionId === null ? "active" : ""
               }`}
@@ -928,6 +939,15 @@ function Layout({
             </div>
           )}
 
+          {visitedViews.has("workspace") && (
+            <div style={paneStyle("workspace")}>
+              <CloudWorkspace
+                profile={activeProfile}
+                locale={locale}
+                active={view === "workspace"}
+              />
+            </div>
+          )}
           {visitedViews.has("discover") && (
             <div style={paneStyle("discover")}>
               {remoteMode ? (
@@ -951,6 +971,7 @@ function Layout({
                   activeProfile={activeProfile}
                   onSelectProfile={handleSelectProfile}
                   onChatWith={handleChatWithProfile}
+                  onCloudWorkspace={() => goTo("workspace")}
                 />
               )}
             </div>

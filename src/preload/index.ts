@@ -32,6 +32,7 @@ import type {
   MithrilFirstRunState,
 } from "../shared/account";
 import type { AgentSyncResult, AgentSyncStatus } from "../shared/agent-sync";
+import type { CloudWorkspaceAPI } from "../shared/workspace";
 import type { GpuPreferenceMode, GpuStatus } from "../shared/gpu";
 import type { AgentCapabilitySnapshot } from "../shared/agent-capabilities";
 import type { ConnectionStatusSnapshot } from "../shared/connection-status";
@@ -286,7 +287,24 @@ const hermesAPI = {
   ): Promise<MithrilChatResult> =>
     ipcRenderer.invoke("mithril-chat", messages, profile),
 
-  // Cloud agent sync (profiles ↔ signed-in Hermes One account)
+  cloudWorkspace: {
+    status: () => ipcRenderer.invoke("cloud-workspace-status"),
+    enable: () => ipcRenderer.invoke("cloud-workspace-enable"),
+    disable: () => ipcRenderer.invoke("cloud-workspace-disable"),
+    getSnapshot: () => ipcRenderer.invoke("cloud-workspace-snapshot"),
+    applyOperations: (operations) =>
+      ipcRenderer.invoke("cloud-workspace-operations", operations),
+    history: (id: string, offset?: number) =>
+      ipcRenderer.invoke("cloud-workspace-history", id, offset),
+  } satisfies CloudWorkspaceAPI,
+  onCloudWorkspaceAccountChanged: (callback: () => void): (() => void) => {
+    const handler = (): void => callback();
+    ipcRenderer.on("cloud-workspace-account-changed", handler);
+    return () =>
+      ipcRenderer.removeListener("cloud-workspace-account-changed", handler);
+  },
+
+  // Legacy cloud agent sync remains unavailable.
   syncAgents: (): Promise<AgentSyncResult> =>
     ipcRenderer.invoke("agent-sync-run"),
   getAgentSyncStatus: (): Promise<AgentSyncStatus> =>

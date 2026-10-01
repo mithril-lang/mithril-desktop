@@ -42,3 +42,5 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[gateway-multiplex]] — which profiles the live default gateway already serves, so a multiplexed profile reads Running instead of Off and its Start action does not spawn a gateway the CLI refuses.
 
 - [[dashboard-clarify]] — Interactive WebSocket clarification cards and answer delivery tests.
+- [[cloud-workspace]] — one shared Web and Desktop workspace renderer with account-bound opt-in and main-process credential isolation.
+- [[cloud-workspace-tests]] — consent, scope, owner, offline and account-switch safety tests for the cloud workspace adapter.

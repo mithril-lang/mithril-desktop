@@ -3,6 +3,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: {
+    dedupe: ["react", "react-dom"],
     alias: {
       "@renderer": resolve(__dirname, "src/renderer/src"),
       "@shared": resolve(__dirname, "src/shared"),

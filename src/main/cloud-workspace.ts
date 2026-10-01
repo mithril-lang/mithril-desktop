@@ -8,6 +8,7 @@ import {
   type WorkspaceSnapshot,
 } from "@mithril/workspace/protocol";
 import type { CloudWorkspaceStatus } from "../shared/workspace";
+import { createHash } from "crypto";
 
 interface Dependencies {
   token(): string | null;
@@ -15,6 +16,8 @@ interface Dependencies {
   origin(): string;
   fetch: typeof fetch;
   changed(): void;
+  readScope?: string;
+  writeScope?: string;
 }
 
 function validRecord(value: unknown): value is WorkspaceRecord {
@@ -50,6 +53,31 @@ export class CloudWorkspace {
     this.identity = null;
     this.enabled = false;
     this.deps.changed();
+  }
+
+  /** Main-process context only. Neither credential fingerprint nor profile is exposed through workspace IPC. */
+  async nativeContext(): Promise<{
+    userId: string;
+    profile: string;
+    epoch: number;
+    actor: string;
+  }> {
+    const epoch = this.generation;
+    const identity = await this.session();
+    if (
+      epoch !== this.generation ||
+      identity.token !== this.deps.token() ||
+      identity.profile !== this.deps.profile()
+    )
+      throw new Error(
+        "Workspace account changed; stale native context discarded",
+      );
+    return {
+      userId: identity.userId,
+      profile: identity.profile,
+      epoch: this.generation,
+      actor: createHash("sha256").update(identity.token).digest("hex"),
+    };
   }
 
   private async request(
@@ -139,10 +167,10 @@ export class CloudWorkspace {
     }
     if (this.identity && this.identity.userId !== me.user.id) this.reset();
     this.identity = { token, profile, userId: me.user.id, scopes: me.scopes };
-    if (!me.scopes.includes("workspace:read")) {
+    if (!me.scopes.includes(this.deps.readScope ?? "workspace:read")) {
       this.reset();
       throw new Error(
-        "Cloud Workspace requires explicit workspace:read authorization. Existing tokens are never upgraded automatically.",
+        `Cloud connection requires explicit ${this.deps.readScope ?? "workspace:read"} authorization. Existing tokens are never upgraded automatically.`,
       );
     }
     return { userId: me.user.id, enabled: this.enabled };
@@ -166,9 +194,11 @@ export class CloudWorkspace {
       throw new Error("Workspace account changed; enable sync again");
     if (!status.userId)
       throw new Error("Sign in to your Mithril account first");
-    if (!this.identity?.scopes.includes("workspace:write"))
+    if (
+      !this.identity?.scopes.includes(this.deps.writeScope ?? "workspace:write")
+    )
       throw new Error(
-        "Cloud Workspace sync requires explicit workspace:write authorization. Existing tokens are never upgraded automatically.",
+        `Cloud connection requires explicit ${this.deps.writeScope ?? "workspace:write"} authorization. Existing tokens are never upgraded automatically.`,
       );
     this.enabled = true;
     return { ...status, enabled: true };
@@ -195,6 +225,35 @@ export class CloudWorkspace {
       this.reset();
       throw new Error("Workspace owner/schema mismatch");
     }
+  }
+
+  /** Main-only authenticated transport; callers expose only fixed, schema-checked routes. */
+  async authorizedRequest(
+    path: string,
+    body?: unknown,
+    extraScope?: string,
+  ): Promise<{ value: unknown; userId: string }> {
+    const session = await this.session();
+    const generation = this.generation;
+    if (
+      body !== undefined &&
+      !session.scopes.includes(this.deps.writeScope ?? "workspace:write")
+    )
+      throw new Error("Explicit write authorization required");
+    if (extraScope && !session.scopes.includes(extraScope))
+      throw new Error(`Explicit ${extraScope} authorization required`);
+    const value = await this.request(
+      path,
+      session.token,
+      session.profile,
+      body,
+    );
+    this.checkOwner(
+      value as { schemaVersion?: unknown; userId?: unknown },
+      session.userId,
+      generation,
+    );
+    return { value, userId: session.userId };
   }
 
   async getSnapshot(): Promise<WorkspaceSnapshot> {
@@ -228,7 +287,7 @@ export class CloudWorkspace {
       throw new Error("Unsupported workspace operations");
     const session = await this.session();
     const generation = this.generation;
-    if (!session.scopes.includes("workspace:write"))
+    if (!session.scopes.includes(this.deps.writeScope ?? "workspace:write"))
       throw new Error(
         "Editing requires explicit workspace:write authorization",
       );

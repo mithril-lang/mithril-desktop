@@ -32,7 +32,12 @@ import type {
   MithrilFirstRunState,
 } from "../shared/account";
 import type { AgentSyncResult, AgentSyncStatus } from "../shared/agent-sync";
-import type { CloudWorkspaceAPI } from "../shared/workspace";
+import type {
+  CloudWorkspaceAPI,
+  CloudChatAPI,
+  NativeSessionImportAPI,
+  NativeWorkspaceAPI,
+} from "../shared/workspace";
 import type { GpuPreferenceMode, GpuStatus } from "../shared/gpu";
 import type { AgentCapabilitySnapshot } from "../shared/agent-capabilities";
 import type { ConnectionStatusSnapshot } from "../shared/connection-status";
@@ -287,6 +292,31 @@ const hermesAPI = {
   ): Promise<MithrilChatResult> =>
     ipcRenderer.invoke("mithril-chat", messages, profile),
 
+  nativeSessionImport: {
+    previewNativeSessions: () =>
+      ipcRenderer.invoke("cloud-chat-native-preview"),
+    importNativeSessions: (id, choices) =>
+      ipcRenderer.invoke("cloud-chat-native-import", id, choices),
+  } satisfies NativeSessionImportAPI,
+  cloudChat: {
+    legacySnapshot: () => ipcRenderer.invoke("cloud-chat-legacy-snapshot"),
+    status: () => ipcRenderer.invoke("cloud-chat-status"),
+    enable: () => ipcRenderer.invoke("cloud-chat-enable"),
+    disable: () => ipcRenderer.invoke("cloud-chat-disable"),
+    models: () => ipcRenderer.invoke("cloud-chat-models"),
+    list: () => ipcRenderer.invoke("cloud-chat-list"),
+    events: (id, after) => ipcRenderer.invoke("cloud-chat-events", id, after),
+    apply: (id, operation) =>
+      ipcRenderer.invoke("cloud-chat-apply", id, operation),
+    receipt: (id, operationId) =>
+      ipcRenderer.invoke("cloud-chat-receipt", id, operationId),
+  } satisfies CloudChatAPI,
+  onCloudChatAccountChanged: (callback: () => void): (() => void) => {
+    const handler = (): void => callback();
+    ipcRenderer.on("cloud-chat-account-changed", handler);
+    return () =>
+      ipcRenderer.removeListener("cloud-chat-account-changed", handler);
+  },
   cloudWorkspace: {
     status: () => ipcRenderer.invoke("cloud-workspace-status"),
     enable: () => ipcRenderer.invoke("cloud-workspace-enable"),
@@ -297,6 +327,15 @@ const hermesAPI = {
     history: (id: string, offset?: number) =>
       ipcRenderer.invoke("cloud-workspace-history", id, offset),
   } satisfies CloudWorkspaceAPI,
+  nativeWorkspace: {
+    inspect: (section) =>
+      ipcRenderer.invoke("native-workspace-inspect", section),
+    apply: (operation) =>
+      ipcRenderer.invoke("native-workspace-apply", operation),
+    previewImport: () => ipcRenderer.invoke("native-workspace-preview"),
+    importSelection: (id, choices) =>
+      ipcRenderer.invoke("native-workspace-import", id, choices),
+  } satisfies NativeWorkspaceAPI,
   onCloudWorkspaceAccountChanged: (callback: () => void): (() => void) => {
     const handler = (): void => callback();
     ipcRenderer.on("cloud-workspace-account-changed", handler);

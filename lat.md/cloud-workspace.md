@@ -14,9 +14,9 @@ Workspace access requires explicit `workspace:read` and `workspace:write` scopes
 
 The shared workspace package supplies Discover, Office, Kanban, Projects, Capabilities, Memory, Settings and Profile through one source; native Desktop screens remain available for device operations.
 
-Discover projects the official Mithril Registry into safe catalog links. Projects, tasks, workrooms, notes, profile and preferences use the owner-scoped workspace API. Capability preferences express intent without installing a plugin or granting device permission.
+Discover projects the official Mithril Registry into safe catalog links. Portable projects, tasks, workrooms, notes, profile and preferences use the owner-scoped workspace API. Actual native runtime views are separately inspected and linked; portable records do not substitute for native Office or tool execution. Capability preferences express intent without installing a plugin or granting device permission.
 
-Cloud entries are deliberately separate from existing local profiles, agent configuration and memory. No filesystem scan, credential upload or permission upload occurs. Closing the workspace or app can discard unsent in-memory changes; the UI reports this limitation.
+Cloud entries are deliberately separate from existing local profiles, agent configuration and memory. No automatic filesystem scan, credential upload or permission upload occurs. Explicit selected native preview is described in [[canonical-chat#Canonical Mithril chat#Native runtime views]]. Closing the workspace or app can discard unsent in-memory changes; the UI reports this limitation.
 
 ## Release boundary
 

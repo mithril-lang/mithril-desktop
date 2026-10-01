@@ -1,3 +1,4 @@
+import type { RuntimeSection } from "@mithril/workspace/runtime";
 import { useCallback, useEffect, useState } from "react";
 import { WorkspaceApp, type DiscoverItem } from "@mithril/workspace/react";
 import "@mithril/workspace/styles.css";
@@ -7,10 +8,12 @@ export default function CloudWorkspace({
   profile,
   locale = "en",
   active = true,
+  onOpenNativeSection,
 }: {
   profile: string;
   locale?: string;
   active?: boolean;
+  onOpenNativeSection?: (section: RuntimeSection) => void;
 }): React.JSX.Element {
   const [identityEpoch, setIdentityEpoch] = useState(0);
   useEffect(
@@ -55,6 +58,8 @@ export default function CloudWorkspace({
     <WorkspaceApp
       key={profile}
       transport={window.hermesAPI.cloudWorkspace}
+      runtimeAdapter={window.hermesAPI.nativeWorkspace}
+      onOpenNativeSection={onOpenNativeSection}
       beforeConnect={async () => {
         await window.hermesAPI.cloudWorkspace.enable();
       }}

@@ -1,3 +1,9 @@
+import { nativeSessionImport } from "../native-session-import-runtime";
+import {
+  cloudChat,
+  onCloudChatAccountChanged,
+  captureLegacyProviderSnapshot,
+} from "../cloud-chat-runtime";
 import {
   classifyMithrilError,
   describeMithrilError,
@@ -15,6 +21,7 @@ import {
 } from "electron";
 import { extname, join } from "path";
 import { assertCloudWorkspaceSender } from "../cloud-workspace-sender";
+import { nativeWorkspace } from "../native-workspace-runtime";
 import {
   cloudWorkspace,
   onCloudWorkspaceAccountChanged,
@@ -1198,6 +1205,55 @@ export function registerIpcHandlers(context: IpcContext): void {
     if (win && !win.webContents.isDestroyed())
       win.webContents.send("cloud-workspace-account-changed");
   });
+  onCloudChatAccountChanged(() => {
+    const win = getMainWindow();
+    if (win && !win.webContents.isDestroyed())
+      win.webContents.send("cloud-chat-account-changed");
+  });
+  ipcMain.handle("cloud-chat-native-preview", (event) => {
+    trustedWorkspaceSender(event);
+    return nativeSessionImport.previewNativeSessions();
+  });
+  ipcMain.handle("cloud-chat-native-import", (event, id, choices) => {
+    trustedWorkspaceSender(event);
+    return nativeSessionImport.importNativeSessions(id, choices);
+  });
+  ipcMain.handle("cloud-chat-legacy-snapshot", (event) => {
+    trustedWorkspaceSender(event);
+    return captureLegacyProviderSnapshot();
+  });
+  ipcMain.handle("cloud-chat-status", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.auth.status();
+  });
+  ipcMain.handle("cloud-chat-enable", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.auth.enable();
+  });
+  ipcMain.handle("cloud-chat-disable", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.auth.reset();
+  });
+  ipcMain.handle("cloud-chat-models", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.models();
+  });
+  ipcMain.handle("cloud-chat-list", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.list();
+  });
+  ipcMain.handle("cloud-chat-events", (event, id, after) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.events(id, after);
+  });
+  ipcMain.handle("cloud-chat-apply", (event, id, operation) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.apply(id, operation);
+  });
+  ipcMain.handle("cloud-chat-receipt", (event, id, operationId) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.receipt(id, operationId);
+  });
   ipcMain.handle("cloud-workspace-status", (event) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.status();
@@ -1221,6 +1277,22 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("cloud-workspace-history", (event, id, offset) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.history(id, offset);
+  });
+  ipcMain.handle("native-workspace-inspect", (event, section) => {
+    trustedWorkspaceSender(event);
+    return nativeWorkspace.inspect(section);
+  });
+  ipcMain.handle("native-workspace-apply", (event, operation) => {
+    trustedWorkspaceSender(event);
+    return nativeWorkspace.apply(operation);
+  });
+  ipcMain.handle("native-workspace-preview", (event) => {
+    trustedWorkspaceSender(event);
+    return nativeWorkspace.previewImport();
+  });
+  ipcMain.handle("native-workspace-import", (event, id, choices) => {
+    trustedWorkspaceSender(event);
+    return nativeWorkspace.importSelection(id, choices);
   });
 
   // The previous Hermes One sync stays unavailable; this contract cannot import local profiles.
@@ -2832,6 +2904,7 @@ export function registerIpcHandlers(context: IpcContext): void {
     // probes the newly-active profile's gateway, not the previous one's.
     setActiveProfile(name);
     cloudWorkspace.reset();
+    cloudChat.auth.reset();
     notifyProfileSwitched();
     // Bring the activated profile's own gateway up if it isn't already —
     // without stopping any other profile's gateway (their bots stay online).

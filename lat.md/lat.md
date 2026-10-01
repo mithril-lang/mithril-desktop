@@ -44,3 +44,5 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[dashboard-clarify]] — Interactive WebSocket clarification cards and answer delivery tests.
 - [[cloud-workspace]] — one shared Web and Desktop workspace renderer with account-bound opt-in and main-process credential isolation.
 - [[cloud-workspace-tests]] — consent, scope, owner, offline and account-switch safety tests for the cloud workspace adapter.
+
+- [[canonical-chat]] — default Mithril API-only D1 sessions, explicit native import and native runtime boundaries.

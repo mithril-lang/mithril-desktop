@@ -12,7 +12,6 @@ const operation: DeviceTurnOperation = {
   data: { content: "Fixture", model: "model1", deviceId: "device1" },
 };
 // Fixture return types retain Vitest mock methods for fault injection.
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 interface Fixture {
   deps: NativeLeaseDependencies;
   lease: NativeChatLease;

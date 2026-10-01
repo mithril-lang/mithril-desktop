@@ -4,7 +4,22 @@
  * (fetch + install) and the renderer (browse UI).
  */
 
-export type RegistryKind = "skills" | "mcps" | "agents" | "workflows";
+export type RegistryKind =
+  | "skills"
+  | "mcps"
+  | "agents"
+  | "workflows"
+  | "plugins";
+
+export type RegistrySource = "hermes" | "mithril";
+
+export interface RegistryArtifact {
+  format: "zip" | "git";
+  url: string;
+  commit?: string;
+  sha256?: string;
+  bytes?: number;
+}
 
 export interface RegistryItem {
   /** Stable identifier, unique within its kind. */
@@ -22,6 +37,13 @@ export interface RegistryItem {
   path?: string;
   /** Bundled skills only: install identifier for `hermes skills install`. */
   source?: string;
+  /** Catalog that owns path/artifact resolution for this entry. */
+  registry?: RegistrySource;
+  installable?: boolean;
+  permissions?: string[];
+  artifact?: RegistryArtifact;
+  requirements?: { commands?: string[] };
+  tools?: string[];
   /** Absolute raw URL of the entry's icon, when the registry provides one. */
   icon?: string;
 }
@@ -31,12 +53,14 @@ export interface RegistryCatalog {
   mcps: RegistryItem[];
   agents: RegistryItem[];
   workflows: RegistryItem[];
+  plugins: RegistryItem[];
 }
 
 export interface InstalledRegistry {
   skills: string[];
   mcps: string[];
   workflows: string[];
+  plugins: string[];
 }
 
 /** One labeled row in a structured (non-prose) detail view. */

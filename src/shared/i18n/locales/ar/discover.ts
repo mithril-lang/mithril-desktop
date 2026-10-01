@@ -1,11 +1,12 @@
 export default {
   title: "اكتشف",
-  subtitle: "تصفح المهارات المجتمعية وخوادم MCP والوكلاء وسير العمل.",
+  subtitle: "تصفح المهارات المجتمعية وخوادم MCP والوكلاء وسير العمل والإضافات.",
   tabs: {
     skills: "المهارات",
     mcps: "MCPs",
     agents: "الوكلاء",
     workflows: "سير العمل",
+    plugins: "الإضافات",
   },
   searchPlaceholder: "ابحث عن {{kind}}...",
   refresh: "تحديث",

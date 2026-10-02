@@ -1,3 +1,4 @@
+import { ChatTextarea, ChatSubmitButton } from "@mithril/design-system/react";
 import {
   useState,
   useRef,
@@ -8,9 +9,8 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { Square as Stop, Search, Paperclip, Mic, ArrowUp } from "lucide-react";
+import { Search, Paperclip, Mic } from "lucide-react";
 import { BorderBeam } from "border-beam";
-import { isImeComposing } from "./keyboard";
 import { useI18n } from "../../components/useI18n";
 import { useChatPreferences } from "../../components/ChatPreferencesProvider";
 import { useTheme } from "../../components/ThemeProvider";
@@ -112,11 +112,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [slashMenuViewportHeight, setSlashMenuViewportHeight] = useState(
       SLASH_COMMAND_VIEWPORT_HEIGHT,
     );
-    // Tracks an active IME composition (Korean/Japanese/Chinese). Driven by the
-    // composition events rather than the synthetic event's `isComposing` flag,
-    // which macOS Chromium can report as false on the finalizing Enter.
-    const composingRef = useRef(false);
-
     // Voice input. We snapshot whatever was already typed when recording starts
     // (`voiceBaseRef`), then rebuild the field as `base + livetranscript` on
     // every result so the SpeechRecognition path streams in live. The recorder
@@ -418,8 +413,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     }
 
     function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
-      if (isImeComposing(e) || composingRef.current) return;
-
       // Slash menu keyboard navigation
       if (slashMenuOpen && filteredSlashCommands.length > 0) {
         if (e.key === "ArrowDown") {
@@ -462,11 +455,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             return;
           }
         }
-      }
-
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
       }
     }
 
@@ -669,18 +657,15 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               style={{ display: "none" }}
               onChange={handleFileInputChange}
             />
-            <textarea
+            <ChatTextarea
               ref={inputRef}
               className="chat-input"
               placeholder={t("chat.typeMessage")}
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              onCompositionStart={() => {
-                composingRef.current = true;
-              }}
-              onCompositionEnd={() => {
-                composingRef.current = false;
+              onSend={() => {
+                if (canSend) handleSend();
               }}
               onPaste={handlePaste}
               rows={1}
@@ -737,35 +722,29 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               {contextUsage && contextUsage.used > 0 && (
                 <ContextGauge {...contextUsage} />
               )}
-              {isLoading ? (
+              {!isLoading && input.trim() && hasSession && (
                 <button
-                  className="chat-send-btn chat-stop-btn"
-                  onClick={onAbort}
-                  title={t("common.stop")}
+                  className="chat-btw-btn"
+                  onClick={handleQuickAsk}
+                  title={t("chat.quickAskTitle")}
+                  type="button"
                 >
-                  <Stop size={14} />
+                  💭
                 </button>
-              ) : (
-                <>
-                  {input.trim() && hasSession && (
-                    <button
-                      className="chat-btw-btn"
-                      onClick={handleQuickAsk}
-                      title={t("chat.quickAskTitle")}
-                    >
-                      💭
-                    </button>
-                  )}
-                  <button
-                    className="chat-send-btn"
-                    onClick={handleSend}
-                    disabled={!canSend}
-                    title={t("chat.send")}
-                  >
-                    <ArrowUp size={20} />
-                  </button>
-                </>
               )}
+              <ChatSubmitButton
+                busy={isLoading}
+                disabled={!canSend}
+                sendLabel={t("chat.send")}
+                stopLabel={t("common.stop")}
+                className={
+                  isLoading ? "chat-send-btn chat-stop-btn" : "chat-send-btn"
+                }
+                sendIconSize={20}
+                stopIconSize={14}
+                onSend={handleSend}
+                onStop={onAbort}
+              />
             </div>
           </div>
           <BorderBeam

@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Search, Clock, Mail, Code, ChartLine, Bell } from "lucide-react";
-import mithrilMark from "../../assets/mithril-mark.svg";
+import mithrilMark from "@mithril/design-system/mithril-mark.svg";
 import { useI18n } from "../../components/useI18n";
 
 interface Suggestion {

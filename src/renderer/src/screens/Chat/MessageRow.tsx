@@ -1,3 +1,4 @@
+import { ChatBubble } from "@mithril/design-system/react";
 import { memo, useMemo, useState, useCallback } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Copy, Check } from "lucide-react";
@@ -256,11 +257,7 @@ export const MessageRow = memo(function MessageRow({
       ) : (
         <HermesAvatar active={isLoading && isLast} agent={agent} />
       )}
-      <div
-        className={`chat-bubble chat-bubble-${msg.role}${
-          msg.error ? " chat-bubble-error" : ""
-        }`}
-      >
+      <ChatBubble role={msg.role} error={!!msg.error}>
         {msg.content && !isLoading && !msg.isSlashLoader && (
           <div className="chat-bubble-actions">
             <button
@@ -349,7 +346,7 @@ export const MessageRow = memo(function MessageRow({
             </div>
           )
         )}
-      </div>
+      </ChatBubble>
       {bubbleTime && isTimeValid && (
         <time
           className="chat-bubble-time"

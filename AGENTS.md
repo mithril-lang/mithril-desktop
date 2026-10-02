@@ -123,3 +123,10 @@ A change that ships inside the desktop app is done only when it is on `main` and
 ## Not a new installer
 
 `AGENTS.md`, `lat.md/` prose, and other files the packager excludes do not by themselves need a new preview. Commit and push them to `main`. Cut a preview when the packaged app changed, or when jun asks for a release anyway.
+
+## After merge, clean up the worktree
+
+After adapt, deploy, review, and merge to the default branch are finished, run the git-cleanup-conflict skill from the primary checkout before stopping. Remove that change's non-primary worktree and feature branch. Leave the primary checkout, the default branch, dirty trees, and branches review kept.
+
+- Skill: `~/.cursor/skills/git-cleanup-conflict/SKILL.md`
+- Workspace rule: `/Users/junkawasaki/github/mithril-lang/.cursor/rules/remove-worktree-after-merge.mdc`

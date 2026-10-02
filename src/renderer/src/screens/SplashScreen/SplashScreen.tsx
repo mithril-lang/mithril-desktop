@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import startVid from "../../assets/startvid.mp4";
-import mithrilMark from "../../assets/mithril-mark.svg";
+import mithrilMark from "@mithril/design-system/mithril-mark.svg";
 
 interface SplashScreenProps {
   onFinished: () => void;

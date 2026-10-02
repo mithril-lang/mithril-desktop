@@ -13,6 +13,11 @@ clipboard, preview navigation, local media and locale labels. Web supplies its
 browser clipboard, safe new tabs and text-only images. The shared package has
 no Electron or service dependencies.
 
+The public `mithril.fund` favicon is the canonical crystal mark. All renderer
+brand surfaces import `@mithril/design-system/mithril-mark.svg`, including the
+onboarding hero. Native package icons retain the same crystal artwork; logo
+changes require an explicit branding request, as recorded in shared BRANDING.md.
+
 [[src/renderer/src/screens/Chat/ChatInput.tsx#ChatInput]] keeps voice, attachments,
 input history, slash menu and resize behavior. Shared textarea keyboard handling
 runs application navigation first and sends only an unconsumed Enter outside

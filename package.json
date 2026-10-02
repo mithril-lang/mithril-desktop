@@ -36,7 +36,7 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
-    "@mithril/design-system": "git+https://github.com/mithril-lang/design-system.git#78289d07fb9b8fee7fbbca3cf29a6e7af27974a7",
+    "@mithril/design-system": "git+https://github.com/mithril-lang/design-system.git#d934564fe8c2d8d05871f276c2cc126e0f704fb6",
     "@radix-ui/react-dialog": "^1.1.17",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",

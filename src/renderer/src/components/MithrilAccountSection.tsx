@@ -183,8 +183,8 @@ export default function MithrilAccountSection({
       </h2>
       <p className="settings-section-hint">
         {label(
-          "Connect this desktop profile to Mithril Agent with a token from the Mithril Console.",
-          "Mithril Console の接続トークンで、このプロフィールを Mithril Agent に接続してください。",
+          "Connect this desktop profile to Mithril Agent in your browser. You can also use a connection token.",
+          "ブラウザーで、このプロフィールを Mithril Agent に接続できます。接続トークンも使用できます。",
         )}
       </p>
       {protection === "reduced" && (

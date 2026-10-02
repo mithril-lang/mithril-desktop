@@ -144,9 +144,11 @@ Existing legacy profile data is not automatically imported by the preview. The m
 
 ## First-run connect
 
-A first launch shows the Mithril connect screen, never the Hermes install prompt. The user pastes an `mf_` token; [[src/main/mithril-account.ts#connectMithrilAccount]] verifies it against `api.mithril.fund` and stores it with Electron `safeStorage`.
+First launch offers browser device sign-in as its primary action. Browser authentication supports passkeys; approval automatically connects Desktop without copying a token. Manual token entry remains an optional fallback.
 
-[[src/main/first-run.ts#mithrilFirstRunState]] answers from the local encrypted store only, so an offline launch is not blocked. [[src/renderer/src/screens/MithrilStart/MithrilStart.tsx#MithrilStart]] is the screen. The local Hermes agent runtime (large download) is an explicit opt-in from it. Browser sign-in via auth.mithril.fund is a follow-up; the screen links to the console to issue a token.
+[[src/renderer/src/screens/MithrilStart/MithrilStart.tsx#MithrilStart]] shows the approval code, browser reopen, waiting, cancellation and retry states. [[src/main/mithril-device-login.ts#startMithrilDeviceLogin]] requests only inference and billing:read, validates the Console approval URL, polls and verifies the returned token before encrypted storage. Cancellation during a network response prevents credential persistence.
+
+[[src/main/first-run.ts#mithrilFirstRunState]] reads local storage without blocking offline launch. Successful connection opens the existing connected screen; the native workspace remains an explicit opt-in. Component tests exercise success, refusal, cancellation, retry and fallback without live authentication or inference charges.
 
 ### In-app chat
 

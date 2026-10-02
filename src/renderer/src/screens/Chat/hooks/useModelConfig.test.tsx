@@ -1,147 +1,86 @@
+import { useEffect } from "react";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useModelConfig } from "./useModelConfig";
-
+const catalog = vi.hoisted(() => ({
+  models: ["qwen/qwen3.8-27b"],
+  status: "ok",
+}));
 vi.mock("../../../hooks/useDiscoveredModels", () => ({
-  useDiscoveredModels: () => ({
-    models: [],
-    status: "unsupported",
-  }),
+  useDiscoveredModels: (args: { provider: string }) => {
+    expect(args.provider).toBe("mithril");
+    return catalog;
+  },
 }));
-
 vi.mock("../../../components/useI18n", () => ({
-  useI18n: () => ({
-    t: (key: string) => key,
-  }),
+  useI18n: () => ({ t: (key: string) => key }),
 }));
-
-interface SavedModel {
-  id: string;
-  name: string;
-  provider: string;
-  model: string;
-  baseUrl: string;
-  createdAt: number;
-}
-
+let changed: () => void;
+let select: ReturnType<typeof useModelConfig>["selectModel"];
 function Harness(): React.JSX.Element {
-  const { modelGroups } = useModelConfig();
-  const labels = modelGroups.flatMap((group) =>
-    group.models.map((model) => model.label),
-  );
-  return <output data-testid="models">{JSON.stringify(labels)}</output>;
+  const state = useModelConfig();
+  useEffect(() => {
+    select = state.selectModel;
+  }, [state.selectModel]);
+  return <output>{JSON.stringify(state)}</output>;
 }
-
-// Exposes the grouping shape (header brand + each model's routing provider) so a
-// test can assert brand grouping without changing routing.
-function GroupHarness(): React.JSX.Element {
-  const { modelGroups } = useModelConfig();
-  const shape = modelGroups.map((g) => ({
-    provider: g.provider,
-    label: g.providerLabel,
-    models: g.models.map((m) => ({ model: m.model, provider: m.provider })),
-  }));
-  return <output data-testid="groups">{JSON.stringify(shape)}</output>;
-}
-
-describe("useModelConfig", () => {
-  let savedModels: SavedModel[];
-  let emitModelLibraryChanged: (() => void) | null;
-
-  beforeEach(() => {
-    savedModels = [
-      {
-        id: "codex-gpt-55",
-        name: "Codex CLI GPT-5.5",
-        provider: "codex-cli",
+beforeEach(() => {
+  catalog.models = ["qwen/qwen3.8-27b"];
+  Object.defineProperty(window, "hermesAPI", {
+    configurable: true,
+    value: {
+      getModelConfig: vi.fn(async () => ({
+        provider: "openai-codex",
         model: "gpt-5.5",
         baseUrl: "",
-        createdAt: 1,
-      },
-    ];
-    emitModelLibraryChanged = null;
-
-    Object.defineProperty(window, "hermesAPI", {
-      configurable: true,
-      value: {
-        getModelConfig: vi.fn(async () => ({
-          provider: "codex-cli",
+      })),
+      listModels: vi.fn(async () => [
+        {
+          provider: "openai-codex",
           model: "gpt-5.5",
+          name: "Legacy Codex",
           baseUrl: "",
-        })),
-        listModels: vi.fn(async () => savedModels),
-        onConnectionConfigChanged: vi.fn(() => vi.fn()),
-        onModelLibraryChanged: vi.fn((callback: () => void) => {
-          emitModelLibraryChanged = callback;
-          return vi.fn();
-        }),
-        setModelConfig: vi.fn(async () => true),
-      },
-    });
+        },
+      ]),
+      onConnectionConfigChanged: vi.fn(() => vi.fn()),
+      onModelLibraryChanged: vi.fn((fn) => {
+        changed = fn;
+        return vi.fn();
+      }),
+      setModelConfig: vi.fn(async () => true),
+    },
   });
-
-  afterEach(() => {
-    cleanup();
-    Reflect.deleteProperty(window, "hermesAPI");
-  });
-
-  it("reloads the chat picker when the model library changes", async () => {
+});
+afterEach(() => {
+  cleanup();
+  Reflect.deleteProperty(window, "hermesAPI");
+});
+describe("Mithril model picker", () => {
+  it("ignores old providers and shows only the authoritative Mithril catalog", async () => {
     render(<Harness />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId("models")).toHaveTextContent(
-        "Codex CLI GPT-5.5",
-      );
-    });
-
-    savedModels = [
-      ...savedModels,
-      {
-        id: "deepseek-v4-pro",
-        name: "DeepSeek V4 Pro",
-        provider: "deepseek",
-        model: "deepseek-v4-pro",
-        baseUrl: "",
-        createdAt: 2,
-      },
-    ];
-
-    await act(async () => {
-      emitModelLibraryChanged?.();
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("models")).toHaveTextContent("DeepSeek V4 Pro");
-    });
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Mithril Agent"),
+    );
+    expect(screen.getByRole("status")).not.toHaveTextContent("Legacy Codex");
+    expect(screen.getByRole("status")).toHaveTextContent("qwen/qwen3.8-27b");
   });
-
-  it("groups a custom Mithril model under the Mithril brand while keeping custom routing", async () => {
-    savedModels = [
-      {
-        id: "hs-swift",
-        name: "hermesone-swift",
-        provider: "custom",
-        model: "hermesone-swift",
-        baseUrl: "https://api.mithril.fund/v1",
-        createdAt: 1,
-      },
-    ];
-
-    render(<GroupHarness />);
-
-    await waitFor(() => {
-      const groups = JSON.parse(
-        screen.getByTestId("groups").textContent || "[]",
-      );
-      const hs = groups.find((g: { label: string }) => g.label === "Mithril");
-      expect(hs).toBeTruthy();
-      // Not lumped under the generic OpenAI-compatible bucket.
-      expect(hs.provider).toBe("mithril");
-      // Routing stays on `custom` + the base URL so the request still resolves.
-      expect(hs.models[0]).toEqual({
-        model: "hermesone-swift",
-        provider: "custom",
-      });
-    });
+  it("refreshes the catalog on library events and never persists on read", async () => {
+    render(<Harness />);
+    catalog.models = ["mithril/new-model"];
+    await act(async () => changed());
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("mithril/new-model"),
+    );
+    expect(window.hermesAPI.setModelConfig).not.toHaveBeenCalled();
+  });
+  it("refuses a session-only foreign provider without changing state or sending IPC", async () => {
+    render(<Harness />);
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Mithril Agent"),
+    );
+    await expect(
+      select("openai", "gpt-5.5", "", { persist: false }),
+    ).rejects.toThrow("only Mithril Agent");
+    expect(window.hermesAPI.setModelConfig).not.toHaveBeenCalled();
   });
 });

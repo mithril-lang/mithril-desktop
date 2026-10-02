@@ -1,3 +1,7 @@
+import {
+  mithrilModelConfig,
+  requireMithrilProvider,
+} from "../shared/mithril-provider-policy";
 import { ChildProcess, spawn } from "child_process";
 import { createHash, randomUUID } from "crypto";
 import {
@@ -2630,15 +2634,15 @@ function effectiveModelConfig(
   profile: string | undefined,
   override?: SessionModelOverride,
 ): ModelConfig {
-  const mc = getModelConfig(profile);
+  const mc = mithrilModelConfig(getModelConfig(profile));
   if (!override) return mc;
+  if (override.provider)
+    requireMithrilProvider(override.provider, override.baseUrl);
   return {
-    provider: override.provider || mc.provider,
+    provider: "mithril",
     model: override.model || mc.model,
-    // baseUrl is intentionally taken verbatim from the override (including an
-    // empty string) so a switch to a built-in provider clears a stale custom
-    // URL; only fall back to the persisted value when the override omits it.
-    baseUrl: override.baseUrl !== undefined ? override.baseUrl : mc.baseUrl,
+    // Desktop owns the fixed Mithril endpoint; session choices only change the model.
+    baseUrl: mc.baseUrl,
   };
 }
 
@@ -2721,7 +2725,9 @@ function sendMessageViaCli(
   }
 
   const cliProvider = CLI_COMPAT_PROVIDER_OVERRIDE[mc.provider];
-  if (cliProvider) {
+  if (mc.provider === "mithril") {
+    args.push("--provider", "mithril");
+  } else if (cliProvider) {
     args.push("--provider", cliProvider);
   } else if (overrideChangesRouting && mc.provider && mc.provider !== "auto") {
     // A session override that switches to a named provider (e.g. gemini) must

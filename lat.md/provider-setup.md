@@ -1,5 +1,7 @@
 # Provider setup
 
+Mithril Desktop now follows [[mithril-migration#Mithril Agent only]]. The inherited provider editor and auxiliary UI described below are retained as migration architecture references, not selectable Desktop screens.
+
 The first-run screen where the user picks an AI provider and enters credentials before the app is usable. Rendered by [[src/renderer/src/screens/Setup/Setup.tsx]], it writes the chosen provider/base-URL via `setModelConfig` and any key via `setEnv`.
 
 The provider list is data-driven from `PROVIDERS.setup` in [[src/renderer/src/constants.ts]]. Each entry carries an `envKey`, `configProvider`, `baseUrl`, and `needsKey`; selecting a card drives which form fields show (API key, or the Local server/base-URL flow).

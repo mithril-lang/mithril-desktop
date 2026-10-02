@@ -955,6 +955,7 @@ function Layout({
           {visitedViews.has("mithril-chat") && (
             <div style={paneStyle("mithril-chat")}>
               <MithrilChat
+                locale={locale}
                 profile={activeProfile}
                 visible={view === "mithril-chat"}
               />

@@ -7,9 +7,11 @@ import "@mithril/workspace/styles.css";
 export default function MithrilChat({
   profile,
   visible = true,
+  locale = "en",
 }: {
   profile: string;
   visible?: boolean;
+  locale?: string;
 }): React.JSX.Element {
   const [epoch, setEpoch] = useState(0);
   const [legacy, setLegacy] = useState<LegacyProviderSnapshot | null>(null);
@@ -46,6 +48,7 @@ export default function MithrilChat({
       <ChatSessions
         key={profile}
         visible={visible}
+        locale={locale}
         transport={window.hermesAPI.cloudChat}
         workspaceTransport={window.hermesAPI.cloudWorkspace}
         beforeWorkspaceConnect={async () => {

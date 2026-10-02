@@ -47,3 +47,9 @@ Canonical sessions capture a selected bot profile revision and persistent goal b
 [[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx]] mounts the common bot/goal controls. Bot inventory requires separate workspace opt-in; chat consent never silently enables workspace access. Existing native provider configuration, permissions and run routing remain in the original New Chat.
 
 The API captures reviewed authored instructions, USER context and goal in an owner-scoped agent_context event. Later bot edits do not silently change the captured session instructions. Both clients read identical goal and tool checkpoints; observing and reconnecting starts no iteration. This is persistent-goal synchronization, not automatic transfer of a running native Ralph loop.
+
+## Shared information architecture
+
+The coordinated workspace artifact 0.4.1 names the shared conversation screen Chat. Connection controls, tool permissions, bot goals and usage information are opened on demand. Native history import is available only when the native import adapter exists.
+
+The Desktop adapter supplies the current display locale to the same shared renderer used on Web; no consent or transport scope changes accompany this presentation update.

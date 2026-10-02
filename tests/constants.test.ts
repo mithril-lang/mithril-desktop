@@ -16,32 +16,10 @@ import {
 // ─── PROVIDERS ──────────────────────────────────────────
 
 describe("PROVIDERS", () => {
-  it("has auto-detect as first option", () => {
-    expect(PROVIDERS.options[0]).toEqual({
-      value: "auto",
-      label: "constants.autoDetect",
-    });
-  });
-
-  it("includes all v0.9.0 providers", () => {
-    const values = PROVIDERS.options.map((o) => o.value);
-    expect(values).toContain("openrouter");
-    expect(values).toContain("aimlapi");
-    expect(values).toContain("anthropic");
-    expect(values).toContain("openai");
-    expect(values).toContain("openai-codex");
-    expect(values).toContain("google");
-    expect(values).toContain("xai");
-    expect(values).toContain("xiaomi");
-    expect(values).toContain("nous");
-    expect(values).toContain("alibaba");
-    expect(values).toContain("qwen-oauth");
-    expect(values).toContain("minimax");
-    expect(values).toContain("lmstudio");
-    expect(values).toContain("ollama");
-    expect(values).toContain("vllm");
-    expect(values).toContain("llamacpp");
-    expect(values).toContain("custom");
+  it("offers Mithril Agent as the only inference provider", () => {
+    expect(PROVIDERS.options).toEqual([
+      { value: "mithril", label: "Mithril Agent" },
+    ]);
   });
 
   it("has labels for every non-auto provider option", () => {
@@ -233,12 +211,9 @@ describe("LOCAL_PRESETS", () => {
     expect(ids).toContain("llamacpp");
   });
 
-  it("exposes every local preset as a provider dropdown option", () => {
-    const options = new Set(PROVIDERS.options.map((o) => o.value));
-    for (const preset of LOCAL_PRESETS.filter((p) => p.group === "local")) {
-      expect(options.has(preset.id)).toBe(true);
-      expect(PROVIDERS.labels[preset.id]).toBeTruthy();
-    }
+  it("does not expose archived local presets as selectable providers", () => {
+    for (const preset of LOCAL_PRESETS)
+      expect(PROVIDERS.options.some((p) => p.value === preset.id)).toBe(false);
   });
 
   // Every preset chip routes through OPENAI_COMPATIBLE_BASE_URLS in the

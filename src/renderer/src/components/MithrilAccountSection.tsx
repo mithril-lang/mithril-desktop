@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { MithrilAccount } from "../../../shared/account";
 import { useI18n } from "./useI18n";
+import BrandLogo from "./common/BrandLogo";
 
 export default function MithrilAccountSection({
   profile,
@@ -182,8 +183,8 @@ export default function MithrilAccountSection({
       </h2>
       <p className="settings-section-hint">
         {label(
-          "Create a connection token in the Mithril console, then connect this desktop profile. Inference and hosted sessions are still being migrated.",
-          "Mithril Console で接続トークンを発行し、このデスクトップのプロフィールに接続してください。推論とホスト型セッションは移行中です。",
+          "Connect this desktop profile to Mithril Agent with a token from the Mithril Console.",
+          "Mithril Console の接続トークンで、このプロフィールを Mithril Agent に接続してください。",
         )}
       </p>
       {protection === "reduced" && (
@@ -200,7 +201,7 @@ export default function MithrilAccountSection({
       {account && (
         <div className="hermes-account-card">
           <span className="hermes-account-avatar hermes-account-avatar-fallback">
-            M
+            <BrandLogo provider="mithril" size={28} />
           </span>
           <span className="hermes-account-meta">
             <span className="hermes-account-name">Mithril</span>

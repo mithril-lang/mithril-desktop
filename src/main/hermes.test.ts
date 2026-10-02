@@ -490,11 +490,6 @@ describe("sendMessage session model override routing", () => {
     };
   }
 
-  function cliArgs(): string[] {
-    expect(mockedSpawn).toHaveBeenCalledTimes(1);
-    return mockedSpawn.mock.calls[0][1] as string[];
-  }
-
   beforeEach(() => {
     vi.mocked(readModels).mockReset().mockReturnValue([]);
     mockedGetApiServerKey.mockReset();
@@ -528,7 +523,7 @@ describe("sendMessage session model override routing", () => {
 
   // @lat: [[provider-setup#Provider setup#LLM-provider keys are configured-only, via modals#Named custom providers#Runtime credential parity]]
   it.each(["env", "vault"])(
-    "passes a named custom provider's %s key to the CLI for equivalent URLs",
+    "rejects a legacy custom override before using a %s credential",
     async (source) => {
       const key = "CUSTOM_PROVIDER_TEST_LABEL_KEY";
       vi.mocked(readModels).mockReturnValue([
@@ -554,7 +549,30 @@ describe("sendMessage session model override routing", () => {
       if (source === "env")
         mockedReadEnv.mockReturnValue({ [key]: "profile-secret" });
       else mockedProviderListSafe.mockReturnValue({ [key]: "profile-secret" });
-      await sendMessage(
+      await expect(
+        sendMessage(
+          "hello",
+          noopCallbacks,
+          "default",
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          {
+            provider: "custom",
+            model: "test",
+            baseUrl: "https://example.com/Api",
+          },
+        ),
+      ).rejects.toThrow("only Mithril Agent");
+      expect(mockedSpawn).not.toHaveBeenCalled();
+    },
+  );
+
+  // @lat: [[model-selection#Session model override#Text-only legacy fallback routes via CLI]]
+  it("rejects a cross-provider override before spawning", async () => {
+    await expect(
+      sendMessage(
         "hello",
         noopCallbacks,
         "default",
@@ -562,36 +580,10 @@ describe("sendMessage session model override routing", () => {
         undefined,
         undefined,
         undefined,
-        {
-          provider: "custom",
-          model: "test",
-          baseUrl: "https://example.com/Api",
-        },
-      );
-      const options = mockedSpawn.mock.calls[0][2];
-      expect(options?.env?.OPENAI_API_KEY).toBe("profile-secret");
-      expect(options?.env?.OPENAI_BASE_URL).toBe("https://example.com/Api");
-    },
-  );
-
-  // @lat: [[model-selection#Session model override#Text-only legacy fallback routes via CLI]]
-  it("routes a cross-provider override through the CLI with its provider + model", async () => {
-    await sendMessage(
-      "hello",
-      noopCallbacks,
-      "default",
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      { provider: "gemini", model: "gemini-2.5-pro", baseUrl: "" },
-    );
-
-    const args = cliArgs();
-    expect(args).toContain("-m");
-    expect(args[args.indexOf("-m") + 1]).toBe("gemini-2.5-pro");
-    expect(args).toContain("--provider");
-    expect(args[args.indexOf("--provider") + 1]).toBe("gemini");
+        { provider: "gemini", model: "gemini-2.5-pro", baseUrl: "" },
+      ),
+    ).rejects.toThrow("only Mithril Agent");
+    expect(mockedSpawn).not.toHaveBeenCalled();
   });
 
   // @lat: [[model-selection#Session model override#Attachment turns stay on session transport]]

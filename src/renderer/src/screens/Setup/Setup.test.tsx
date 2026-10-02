@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_DASHSCOPE_BASE_URL } from "../../constants";
+import { MITHRIL_PROVIDER_URL } from "../../../../shared/mithril-provider-policy";
 import Setup from "./Setup";
 
 vi.mock("../../components/useI18n", () => ({
@@ -39,29 +39,29 @@ function installHermesAPI(): {
 describe("Setup", () => {
   // @lat: [[provider-setup#Provider setup#Setup profile credentials]]
   it.each(["work", "default"])(
-    "saves DashScope credentials to setup profile %s",
+    "saves only Mithril credentials to setup profile %s",
     async (profile) => {
       const api = installHermesAPI();
       const onComplete = vi.fn();
       render(<Setup profile={profile} onComplete={onComplete} />);
 
-      fireEvent.click(screen.getByText("Alibaba DashScope"));
-      fireEvent.change(screen.getByPlaceholderText("sk-..."), {
-        target: { value: "sk-dashscope" },
+      expect(screen.queryByText("Alibaba DashScope")).toBeNull();
+      fireEvent.change(screen.getByPlaceholderText("mf_..."), {
+        target: { value: "mf-fixture" },
       });
       fireEvent.click(screen.getByText("setup.continue"));
 
       await waitFor(() => {
         expect(api.setEnv).toHaveBeenCalledWith(
-          "DASHSCOPE_API_KEY",
-          "sk-dashscope",
+          "MITHRIL_API_KEY",
+          "mf-fixture",
           profile,
         );
       });
       expect(api.setModelConfig).toHaveBeenCalledWith(
-        "alibaba",
+        "mithril",
         "",
-        DEFAULT_DASHSCOPE_BASE_URL,
+        MITHRIL_PROVIDER_URL,
         profile,
       );
       expect(onComplete).toHaveBeenCalled();

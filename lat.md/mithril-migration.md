@@ -161,3 +161,13 @@ Chat failures caused by the Mithril API are explained in plain language instead 
 ### Classifier never echoes raw errors
 
 The classifier returns only fixed strings, so bearer tokens embedded in an error cannot reach the UI or logs. Covered by `src/shared/mithril-errors.test.ts`.
+
+## Mithril Agent only
+
+Desktop exposes only Mithril Agent for inference, using the fixed Mithril API endpoint and account. Model choices come from its live catalog; old provider credentials and model rows stay stored but cannot appear in the picker.
+
+### Provider routing boundary
+
+[[src/shared/mithril-provider-policy.ts#requireMithrilProvider]] rejects foreign providers and substituted endpoints before Desktop model writes, discovery or chat dispatch. Exact legacy Mithril aliases normalize to the named provider; reads never rewrite stored legacy data.
+
+Settings replaces legacy provider/key/OAuth/credential-pool controls with the Mithril account and model selector. Setup offers only Mithril. Local and remote model libraries are filtered, and session-only choices cannot bypass the provider boundary. Existing generic library helpers remain for legacy data compatibility, not user selection.

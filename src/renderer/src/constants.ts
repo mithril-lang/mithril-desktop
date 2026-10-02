@@ -40,51 +40,7 @@ export const PROVIDERS = {
   // hermes_cli/auth.py::resolve_provider — _PROVIDER_ALIASES + PROVIDER_REGISTRY)
   // so the gateway routes correctly when the user picks the entry.  The
   // catch-all `custom` stays last for unlisted OpenAI-compatible endpoints.
-  options: [
-    { value: "auto", label: "constants.autoDetect" },
-    // Aggregators
-    { value: "openrouter", label: "constants.openrouterName" },
-    { value: "aimlapi", label: "constants.aimlapiName" },
-    // First-party API providers
-    { value: "anthropic", label: "constants.anthropicName" },
-    { value: "openai", label: "constants.openaiName" },
-    { value: "openai-codex", label: "constants.openaiCodexName" },
-    { value: "ollama-cloud", label: "constants.ollamaCloudName" },
-    { value: "google", label: "constants.googleName" },
-    { value: "xai", label: "constants.xaiName" },
-    { value: "xiaomi", label: "Xiaomi MiMo" },
-    { value: "mistral", label: "Mistral" },
-    { value: "deepseek", label: "DeepSeek" },
-    { value: "groq", label: "Groq" },
-    { value: "together", label: "Together AI" },
-    { value: "fireworks", label: "Fireworks AI" },
-    { value: "cerebras", label: "Cerebras" },
-    { value: "perplexity", label: "Perplexity" },
-    { value: "huggingface", label: "Hugging Face" },
-    { value: "nvidia", label: "NVIDIA NIM" },
-    { value: "zai", label: "Z.ai / GLM" },
-    { value: "alibaba", label: "Alibaba DashScope" },
-    { value: "minimax", label: "MiniMax" },
-    { value: "nous", label: "constants.nousName" },
-    // Local OpenAI-compatible servers. Keep these explicit so users
-    // looking for "Ollama" or "LM Studio" do not have to discover the
-    // generic custom-provider path first.
-    { value: "lmstudio", label: "constants.lmstudio" },
-    { value: "atomicchat", label: "constants.atomicchat" },
-    { value: "ollama", label: "constants.ollama" },
-    { value: "vllm", label: "constants.vllm" },
-    { value: "llamacpp", label: "constants.llamacpp" },
-    // Subscription / OAuth plans
-    // openai-codex is listed once above (first-party group) via #102 —
-    // not repeated here to avoid a duplicate <option> value.
-    { value: "xai-oauth", label: "xAI Grok (OAuth)" },
-    { value: "qwen-oauth", label: "Qwen (OAuth)" },
-    { value: "google-gemini-cli", label: "Gemini (CLI OAuth)" },
-    { value: "minimax-oauth", label: "MiniMax (OAuth)" },
-    { value: "kimi-coding", label: "Kimi (Coding Plan)" },
-    // Catch-all for any other OpenAI-compatible endpoint or local LLM
-    { value: "custom", label: "constants.customOpenAICompatibleName" },
-  ],
+  options: [{ value: "mithril", label: "Mithril Agent" }],
 
   labels: {
     mithril: "Mithril",
@@ -134,12 +90,12 @@ export const PROVIDERS = {
       // it routes through `custom` + base_url (like the `openai` card); the key
       // is stored/host-derived as MITHRIL_API_KEY (see url-key-map.ts).
       id: "mithril",
-      name: "Mithril",
+      name: "Mithril Agent",
       desc: "Mithril Inference — pay-per-token with Mithril credits",
       envKey: "MITHRIL_API_KEY",
       url: "https://console.mithril.fund/account",
       placeholder: "mf_...",
-      configProvider: "custom",
+      configProvider: "mithril",
       baseUrl: "https://api.mithril.fund/v1",
       needsKey: true,
     },

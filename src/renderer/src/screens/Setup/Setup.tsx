@@ -23,7 +23,7 @@ function Setup({
   onDismissVerifyWarning,
 }: SetupProps): React.JSX.Element {
   const { t } = useI18n();
-  const [selectedProvider, setSelectedProvider] = useState("openrouter");
+  const [selectedProvider, setSelectedProvider] = useState("mithril");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("http://localhost:1234/v1");
   const [modelName, setModelName] = useState("");
@@ -70,7 +70,7 @@ function Setup({
         await window.hermesAPI.setEnv(envKey, apiKey.trim(), profile);
       }
 
-      const configProvider = isLocal ? "custom" : provider.configProvider;
+      const configProvider = "mithril";
       const configBaseUrl =
         isLocal || isDashScope ? baseUrl.trim() : provider.baseUrl;
       const configModel = modelName.trim() || "";
@@ -101,34 +101,36 @@ function Setup({
         <p className="setup-subtitle">{t("setup.subtitle")}</p>
 
         <div className="setup-provider-grid">
-          {PROVIDERS.setup.map((p) => {
-            const active = selectedProvider === p.id;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                aria-pressed={active}
-                className={`setup-provider-card ${active ? "selected" : ""}`}
-                onClick={() => {
-                  setSelectedProvider(p.id);
-                  if (p.id === "alibaba") {
-                    setBaseUrl(p.baseUrl);
-                  }
-                  setError("");
-                }}
-              >
-                {active && (
-                  <span className="setup-provider-check" aria-hidden="true">
-                    <Check size={11} strokeWidth={3} />
+          {PROVIDERS.setup
+            .filter((p) => p.id === "mithril")
+            .map((p) => {
+              const active = selectedProvider === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  aria-pressed={active}
+                  className={`setup-provider-card ${active ? "selected" : ""}`}
+                  onClick={() => {
+                    setSelectedProvider(p.id);
+                    if (p.id === "alibaba") {
+                      setBaseUrl(p.baseUrl);
+                    }
+                    setError("");
+                  }}
+                >
+                  {active && (
+                    <span className="setup-provider-check" aria-hidden="true">
+                      <Check size={11} strokeWidth={3} />
+                    </span>
+                  )}
+                  <span className="setup-provider-logo">
+                    <BrandLogo provider={p.id} size={22} matchTheme={true} />
                   </span>
-                )}
-                <span className="setup-provider-logo">
-                  <BrandLogo provider={p.id} size={22} matchTheme={true} />
-                </span>
-                <span className="setup-provider-name">{t(p.name)}</span>
-              </button>
-            );
-          })}
+                  <span className="setup-provider-name">{t(p.name)}</span>
+                </button>
+              );
+            })}
         </div>
 
         <div className="setup-form">

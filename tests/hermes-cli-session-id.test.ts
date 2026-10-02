@@ -325,11 +325,12 @@ describe("CLI fallback session id propagation", () => {
     await expect(done).resolves.toBe("20260527_143413_10df4c");
   });
 
-  it("runs AIML API through the CLI custom provider bridge", async () => {
+  it("routes an old AIML default through Mithril without using its legacy credential", async () => {
     modelConfig.model = "gpt-4o-mini";
     modelConfig.provider = "aimlapi";
     modelConfig.baseUrl = "https://api.aimlapi.com/v1";
     profileEnv.AIMLAPI_API_KEY = "sk-aiml-test";
+    profileEnv.MITHRIL_API_KEY = "mf_fixture";
 
     const done = new Promise<string | undefined>((resolve) => {
       sendMessage("hi", {
@@ -347,13 +348,17 @@ describe("CLI fallback session id propagation", () => {
 
     const proc = spawned[0];
     expect(proc.spawnArgs).toEqual(
-      expect.arrayContaining(["-m", "gpt-4o-mini", "--provider", "custom"]),
+      expect.arrayContaining([
+        "-m",
+        "qwen/qwen3.8-27b",
+        "--provider",
+        "mithril",
+      ]),
     );
     expect(proc.spawnOptions?.env).toMatchObject({
       AIMLAPI_API_KEY: "sk-aiml-test",
-      OPENAI_API_KEY: "sk-aiml-test",
-      OPENAI_BASE_URL: "https://api.aimlapi.com/v1",
-      CUSTOM_BASE_URL: "https://api.aimlapi.com/v1",
+      OPENAI_API_KEY: "mf_fixture",
+      OPENAI_BASE_URL: "https://api.mithril.fund/v1",
       HERMES_INFERENCE_PROVIDER: "custom",
     });
   });

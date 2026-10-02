@@ -5,6 +5,12 @@ import {
   captureLegacyProviderSnapshot,
 } from "../cloud-chat-runtime";
 import {
+  isMithrilProvider,
+  requireMithrilProvider,
+  mithrilModelConfig,
+  MITHRIL_PROVIDER_URL,
+} from "../../shared/mithril-provider-policy";
+import {
   classifyMithrilError,
   describeMithrilError,
 } from "../../shared/mithril-errors";
@@ -1076,6 +1082,7 @@ export function registerIpcHandlers(context: IpcContext): void {
   // OAuth provider sign-in — spawns `hermes auth add <provider> --type
   // oauth`, streaming the CLI's output to the renderer's sign-in modal.
   ipcMain.handle("oauth-login", (event, provider: string, profile?: string) => {
+    requireMithrilProvider(provider);
     // Codex uses a device-code flow: it prints a URL + code instead
     // of opening a browser. Watch the stream for that prompt, then
     // open the page and pre-copy the code so the user just pastes.
@@ -1438,6 +1445,9 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle(
     "set-config",
     async (_event, key: string, value: string, profile?: string) => {
+      if (key === "model.provider") requireMithrilProvider(value);
+      if (key === "model.base_url" || key === "model.baseUrl")
+        requireMithrilProvider("mithril", value);
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh) {
         await sshSetConfigValue(conn.ssh, key, value, profile);
@@ -1461,22 +1471,25 @@ export function registerIpcHandlers(context: IpcContext): void {
     return getHermesHome(profile);
   });
 
-  ipcMain.handle("get-model-config", (_event, profile?: string) => {
-    const conn = getConnectionConfig();
-    if (conn.mode === "remote")
-      return withRemoteDashboard(
-        conn,
-        () => remoteGetModelConfig(conn),
-        () => getModelConfig(profile),
-      );
-    if (conn.mode === "ssh" && conn.ssh)
-      return withSshDashboardSessions(
-        conn,
-        (config) => remoteGetModelConfig(config),
-        () => sshGetModelConfig(conn.ssh!, profile),
-        activeSshProfile(profile),
-      );
-    return getModelConfig(profile);
+  ipcMain.handle("get-model-config", async (_event, profile?: string) => {
+    const read = async (): Promise<ReturnType<typeof getModelConfig>> => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "remote")
+        return withRemoteDashboard(
+          conn,
+          () => remoteGetModelConfig(conn),
+          () => getModelConfig(profile),
+        );
+      if (conn.mode === "ssh" && conn.ssh)
+        return withSshDashboardSessions(
+          conn,
+          (config) => remoteGetModelConfig(config),
+          () => sshGetModelConfig(conn.ssh!, profile),
+          activeSshProfile(profile),
+        );
+      return getModelConfig(profile);
+    };
+    return mithrilModelConfig(await read());
   });
 
   ipcMain.handle(
@@ -1488,6 +1501,9 @@ export function registerIpcHandlers(context: IpcContext): void {
       baseUrl: string,
       profile?: string,
     ) => {
+      requireMithrilProvider(provider, baseUrl);
+      provider = "mithril";
+      baseUrl = MITHRIL_PROVIDER_URL;
       const conn = getConnectionConfig();
       if (conn.mode === "remote") {
         return withRemoteDashboard(
@@ -1596,6 +1612,8 @@ export function registerIpcHandlers(context: IpcContext): void {
       cfg: { provider: string; model: string; baseUrl: string },
       profile?: string,
     ) => {
+      if (cfg.provider !== "auto")
+        requireMithrilProvider(cfg.provider, cfg.baseUrl);
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh) {
         // TODO: SSH path for auxiliary config (requires sshSetAuxiliaryTask)
@@ -2003,6 +2021,20 @@ export function registerIpcHandlers(context: IpcContext): void {
       modelOverride?: SessionModelOverride,
       connectionId?: string,
     ) => {
+      if (modelOverride?.provider)
+        requireMithrilProvider(modelOverride.provider, modelOverride.baseUrl);
+      if (
+        modelOverride?.baseUrl &&
+        modelOverride.baseUrl.replace(/\/+$/, "") !== MITHRIL_PROVIDER_URL
+      )
+        throw new Error("Mithril Desktop supports only Mithril Agent.");
+      const selected = mithrilModelConfig(getModelConfig(profile));
+      modelOverride = {
+        ...selected,
+        ...modelOverride,
+        provider: "mithril",
+        baseUrl: MITHRIL_PROVIDER_URL,
+      };
       // Each conversation has a stable runId minted by the renderer. Fall back
       // to a generated id for legacy callers so the run is still tracked.
       const chatRunId = runId || `run-${randomUUID()}`;
@@ -2358,6 +2390,7 @@ export function registerIpcHandlers(context: IpcContext): void {
       apiKey: string | undefined,
       profile?: string,
     ) => {
+      requireMithrilProvider(provider, baseUrl);
       return discoverProviderModels(provider, baseUrl, apiKey, profile);
     },
   );
@@ -2806,12 +2839,16 @@ export function registerIpcHandlers(context: IpcContext): void {
   // Per-session model/provider selected from the in-chat picker. This is a
   // desktop-only routing binding and intentionally stores no API keys.
   ipcMain.handle("get-session-model-override", (_event, sessionId: string) => {
-    return getSessionModelOverride(sessionId);
+    const saved = getSessionModelOverride(sessionId);
+    return saved && isMithrilProvider(saved.provider, saved.baseUrl)
+      ? { ...saved, provider: "mithril", baseUrl: MITHRIL_PROVIDER_URL }
+      : null;
   });
 
   ipcMain.handle(
     "set-session-model-override",
     (_event, sessionId: string, override: SessionModelOverride | null) => {
+      if (override) requireMithrilProvider(override.provider, override.baseUrl);
       setSessionModelOverride(sessionId, override);
       return true;
     },
@@ -2986,6 +3023,7 @@ export function registerIpcHandlers(context: IpcContext): void {
       profile: string | undefined,
       input: { name: string; baseUrl: string },
     ) => {
+      requireMithrilProvider("custom", input.baseUrl);
       const record = upsertCustomProvider(profile, input);
       notifyCustomProvidersChanged();
       return record;
@@ -3286,6 +3324,7 @@ export function registerIpcHandlers(context: IpcContext): void {
       entries: Array<Record<string, unknown>>,
       profile?: string,
     ) => {
+      requireMithrilProvider(provider);
       setCredentialPool(provider, entries, profile);
       return true;
     },
@@ -3304,36 +3343,47 @@ export function registerIpcHandlers(context: IpcContext): void {
       label: string,
       profile?: string,
     ) => {
+      requireMithrilProvider(provider);
       return addCredentialPoolEntry(provider, apiKey, label, profile);
     },
   );
 
   // Models
-  ipcMain.handle("list-models", () => {
-    const conn = getConnectionConfig();
-    if (conn.mode === "remote") {
-      if (conn.remoteChatTransport === "legacy") {
-        throw new Error(
-          "Remote model library reads require dashboard transport.",
+  ipcMain.handle("list-models", async () => {
+    const read = async (): Promise<Awaited<ReturnType<typeof listModels>>> => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "remote") {
+        if (conn.remoteChatTransport === "legacy") {
+          throw new Error(
+            "Remote model library reads require dashboard transport.",
+          );
+        }
+        return remoteListModels(conn);
+      }
+      if (conn.mode === "ssh" && conn.ssh) {
+        if (conn.sshChatTransport === "legacy") {
+          return sshListModels(conn.ssh);
+        }
+        return withSshDashboardModelLibrary(
+          conn,
+          (config) => remoteListModels(config),
+          () => sshListModels(conn.ssh!),
+          getActiveProfileNameSync(),
         );
       }
-      return remoteListModels(conn);
-    }
-    if (conn.mode === "ssh" && conn.ssh) {
-      if (conn.sshChatTransport === "legacy") {
-        return sshListModels(conn.ssh);
-      }
-      return withSshDashboardModelLibrary(
-        conn,
-        (config) => remoteListModels(config),
-        () => sshListModels(conn.ssh!),
-        getActiveProfileNameSync(),
-      );
-    }
-    // Pass the active profile so terminal-added `custom_providers:` entries in
-    // that profile's config.yaml are merged into the library on read.
-    return listModels(getActiveProfileNameSync());
+      // Pass the active profile so terminal-added `custom_providers:` entries in
+      // that profile's config.yaml are merged into the library on read.
+      return listModels(getActiveProfileNameSync());
+    };
+    return (await read())
+      .filter((m) => isMithrilProvider(m.provider, m.baseUrl))
+      .map((m) => ({
+        ...m,
+        provider: "mithril",
+        baseUrl: MITHRIL_PROVIDER_URL,
+      }));
   });
+
   ipcMain.handle(
     "add-model",
     async (
@@ -3345,6 +3395,9 @@ export function registerIpcHandlers(context: IpcContext): void {
       contextLength?: number,
       providerLabel?: string,
     ) => {
+      requireMithrilProvider(provider, baseUrl);
+      provider = "mithril";
+      baseUrl = MITHRIL_PROVIDER_URL;
       const conn = getConnectionConfig();
       let addedModel: Awaited<ReturnType<typeof addModel>>;
       if (conn.mode === "remote") {
@@ -3410,6 +3463,17 @@ export function registerIpcHandlers(context: IpcContext): void {
       // can't ride inside the string-only `fields`). Local-mode only for now.
       contextLength?: number | null,
     ) => {
+      if (fields.provider !== undefined || fields.baseUrl !== undefined) {
+        requireMithrilProvider(
+          fields.provider || "mithril",
+          fields.baseUrl || "",
+        );
+        fields = {
+          ...fields,
+          provider: "mithril",
+          baseUrl: MITHRIL_PROVIDER_URL,
+        };
+      }
       const conn = getConnectionConfig();
       let updated: boolean;
       if (conn.mode === "remote") {

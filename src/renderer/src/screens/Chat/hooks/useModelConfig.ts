@@ -1,58 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PROVIDERS, displayBrandFromConfig } from "../../../constants";
+import {
+  MITHRIL_PROVIDER,
+  MITHRIL_PROVIDER_URL,
+  MITHRIL_PROVIDER_NAME,
+  mithrilModelConfig,
+  requireMithrilProvider,
+  isMithrilProvider,
+} from "../../../../../shared/mithril-provider-policy";
 import { useDiscoveredModels } from "../../../hooks/useDiscoveredModels";
 import { useI18n } from "../../../components/useI18n";
 import type { ModelGroup } from "../types";
 
-const OLLAMA_CLOUD_PROVIDER = "ollama-cloud";
-const OLLAMA_CLOUD_BASE_URL = "https://ollama.com/v1";
-
-/**
- * Named providers (deepseek, groq, anthropic, …) have a hardcoded canonical
- * base_url in hermes-agent's PROVIDER_REGISTRY, so a stored `baseUrl` on those
- * entries can be stale and would misroute the request. Keep the baseUrl only
- * for `custom` and `ollama-cloud` entries, where it is authoritative; clear it
- * otherwise so the backend falls back to the provider's canonical URL. Shared
- * by `selectModel` and the chat-screen session override so they can't drift.
- */
 export function effectiveOverrideBaseUrl(
   provider: string,
   baseUrl: string,
 ): string {
-  return provider === "custom" || provider === OLLAMA_CLOUD_PROVIDER
-    ? baseUrl
-    : "";
+  requireMithrilProvider(provider, baseUrl);
+  return MITHRIL_PROVIDER_URL;
 }
-
 interface SavedModelForPicker {
   provider: string;
   model: string;
   name: string;
   baseUrl?: string;
-}
-
-function mergeLiveOllamaCloudModels(
-  savedModels: SavedModelForPicker[],
-  liveModels: string[],
-  liveStatus: string,
-): SavedModelForPicker[] {
-  if (liveStatus !== "ok" || liveModels.length === 0) {
-    return savedModels;
-  }
-
-  const liveEntries = Array.from(new Set(liveModels))
-    .sort()
-    .map((model) => ({
-      provider: OLLAMA_CLOUD_PROVIDER,
-      model,
-      name: `Ollama Cloud · ${model}`,
-      baseUrl: OLLAMA_CLOUD_BASE_URL,
-    }));
-
-  return [
-    ...savedModels.filter((model) => model.provider !== OLLAMA_CLOUD_PROVIDER),
-    ...liveEntries,
-  ];
 }
 
 interface UseModelConfigResult {
@@ -70,67 +40,39 @@ interface UseModelConfigResult {
   ) => Promise<void>;
 }
 
-function groupModelsByProvider(models: SavedModelForPicker[]): ModelGroup[] {
-  const groupMap = new Map<string, ModelGroup>();
-  for (const m of models) {
-    // Group by display brand so OpenAI-compatible providers stored as `custom`
-    // (Hermes One, Groq, …) show under their own header instead of the generic
-    // "OpenAI Compatible / Local" bucket. Each model keeps its raw provider +
-    // baseUrl below so selection/routing is unchanged.
-    const brand = displayBrandFromConfig(m.provider, m.baseUrl || "");
-    if (!groupMap.has(brand)) {
-      groupMap.set(brand, {
-        provider: brand,
-        providerLabel: PROVIDERS.labels[brand] || brand,
-        models: [],
-      });
-    }
-    groupMap.get(brand)!.models.push({
-      provider: m.provider,
-      model: m.model,
-      label: m.name,
-      baseUrl: m.baseUrl || "",
-    });
-  }
-  return Array.from(groupMap.values());
-}
-
 export function useModelConfig(profile?: string): UseModelConfigResult {
   const { t } = useI18n();
   const [currentModel, setCurrentModel] = useState("");
-  const [currentProvider, setCurrentProvider] = useState("auto");
+  const [currentProvider, setCurrentProvider] = useState(MITHRIL_PROVIDER);
   const [currentBaseUrl, setCurrentBaseUrl] = useState("");
   const [modelGroups, setModelGroups] = useState<ModelGroup[]>([]);
   const [savedModels, setSavedModels] = useState<SavedModelForPicker[]>([]);
   const loadSeqRef = useRef(0);
+  const [discoveryRevision, setDiscoveryRevision] = useState(0);
 
-  const ollamaCloudDiscovery = useDiscoveredModels({
-    provider: OLLAMA_CLOUD_PROVIDER,
+  const mithrilDiscovery = useDiscoveredModels({
+    provider: MITHRIL_PROVIDER,
+    baseUrl: MITHRIL_PROVIDER_URL,
     profile,
     enabled: true,
+    refreshToken: discoveryRevision,
   });
 
-  const modelsForPicker = useMemo(
-    () =>
-      mergeLiveOllamaCloudModels(
-        savedModels,
-        ollamaCloudDiscovery.models,
-        ollamaCloudDiscovery.status,
-      ),
-    [savedModels, ollamaCloudDiscovery.models, ollamaCloudDiscovery.status],
-  );
-
   const reload = useCallback(async (): Promise<void> => {
+    setDiscoveryRevision((n) => n + 1);
     const seq = ++loadSeqRef.current;
-    const [mc, savedModels] = await Promise.all([
+    const [raw, savedModels] = await Promise.all([
       window.hermesAPI.getModelConfig(profile),
       window.hermesAPI.listModels(),
     ]);
     if (seq !== loadSeqRef.current) return;
+    const mc = mithrilModelConfig(raw);
     setCurrentModel(mc.model);
     setCurrentProvider(mc.provider);
     setCurrentBaseUrl(mc.baseUrl);
-    setSavedModels(savedModels);
+    setSavedModels(
+      savedModels.filter((m) => isMithrilProvider(m.provider, m.baseUrl)),
+    );
   }, [profile]);
 
   // Initial load + reload whenever the profile changes (canonical
@@ -139,9 +81,26 @@ export function useModelConfig(profile?: string): UseModelConfigResult {
     reload();
   }, [reload]);
 
+  const catalog = JSON.stringify(mithrilDiscovery.models);
   useEffect(() => {
-    setModelGroups(groupModelsByProvider(modelsForPicker));
-  }, [modelsForPicker]);
+    const ids = Array.from(new Set(JSON.parse(catalog) as string[]));
+    setModelGroups(
+      ids.length
+        ? [
+            {
+              provider: MITHRIL_PROVIDER,
+              providerLabel: MITHRIL_PROVIDER_NAME,
+              models: ids.map((id) => ({
+                provider: MITHRIL_PROVIDER,
+                model: id,
+                label: savedModels.find((m) => m.model === id)?.name || id,
+                baseUrl: MITHRIL_PROVIDER_URL,
+              })),
+            },
+          ]
+        : [],
+    );
+  }, [catalog, savedModels]);
 
   useEffect(() => {
     return window.hermesAPI.onConnectionConfigChanged(() => {

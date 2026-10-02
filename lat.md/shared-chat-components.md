@@ -13,6 +13,11 @@ clipboard, preview navigation, local media and locale labels. Web supplies its
 browser clipboard, safe new tabs and text-only images. The shared package has
 no Electron or service dependencies.
 
+The public `mithril.fund` favicon is the canonical crystal mark. All renderer
+brand surfaces import `@mithril/design-system/mithril-mark.svg`, including the
+onboarding hero. Native package icons retain the same crystal artwork; logo
+changes require an explicit branding request, as recorded in shared BRANDING.md.
+
 [[src/renderer/src/screens/Chat/ChatInput.tsx#ChatInput]] keeps voice, attachments,
 input history, slash menu and resize behavior. Shared textarea keyboard handling
 runs application navigation first and sends only an unconsumed Enter outside
@@ -27,7 +32,9 @@ Consumers pin the same shared source commit. Shared changes pass component CI, t
 
 The shared repo checks adapter clipboard/link behavior, image policy, code
 expansion isolation during streaming, IME Enter, app-consumed keys, Send/Stop
-and bubble slots. Desktop retains its Markdown diagram/highlighting regressions
-and chat interaction tests. Run `npm run typecheck`, `npm test`, `npm run lint`
+and bubble slots. Stop cancels the browser click default before invoking abort,
+so a synchronous return to Send cannot submit the restored draft a second time.
+Desktop retains its Markdown diagram/highlighting regressions and chat
+interaction tests. Run `npm run typecheck`, `npm test`, `npm run lint`
 and `npm run lat:check` before publication. Desktop changes require a new preview
 installer; Web changes use current-main App CI only.

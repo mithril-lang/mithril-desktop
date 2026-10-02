@@ -923,7 +923,7 @@ body:has(.shell-vibrant),
   );
 }
 
-.onboard-emblem svg {
+.onboard-emblem img {
   position: relative;
   width: 84px;
   height: 84px;
@@ -964,7 +964,7 @@ body:has(.shell-vibrant),
     onboardBreath 3.2s ease 2s infinite;
 }
 
-.onboard-fly svg {
+.onboard-fly img {
   position: relative;
   width: 100%;
   height: 100%;

@@ -1,4 +1,4 @@
-import icon from "../../assets/mithril-mark.svg";
+import icon from "@mithril/design-system/mithril-mark.svg";
 
 function HermesLogo({ size = 32 }: { size?: number }): React.JSX.Element {
   return (

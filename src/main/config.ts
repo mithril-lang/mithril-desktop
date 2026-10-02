@@ -1,3 +1,4 @@
+import { DesktopConfigTransaction } from "./desktop-config-transaction";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { randomBytes } from "crypto";
 import { join } from "path";
@@ -113,40 +114,18 @@ export function normalizeRemoteAuthMode(value: unknown): RemoteAuthMode {
   return value === "token" || value === "oauth" ? value : "auto";
 }
 
+const desktopConfigTransaction = new DesktopConfigTransaction(
+  desktopConfigFile,
+  (path, content) => safeWriteFile(path, content),
+);
 export function readDesktopConfig(): Record<string, unknown> {
-  try {
-    const f = desktopConfigFile();
-    if (!existsSync(f)) return {};
-    return JSON.parse(readFileSync(f, "utf-8").replace(/^\uFEFF/, ""));
-  } catch {
-    return {};
-  }
+  return desktopConfigTransaction.read();
 }
-
 function readConnectionDesktopConfig(): Record<string, unknown> {
-  const file = desktopConfigFile();
-  if (!existsSync(file)) return {};
-  try {
-    const parsed: unknown = JSON.parse(
-      readFileSync(file, "utf-8").replace(/^\uFEFF/, ""),
-    );
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new Error("invalid root");
-    }
-    return parsed as Record<string, unknown>;
-  } catch {
-    throw new Error(
-      "Hermes Desktop could not read desktop.json; the existing file was left unchanged.",
-    );
-  }
+  return desktopConfigTransaction.read(true);
 }
-
 export function writeDesktopConfig(data: Record<string, unknown>): void {
-  // Refuse to replace an unreadable existing document. Callers often perform
-  // read-modify-write updates, and the tolerant read API returns {} on parse
-  // failure for legacy display paths.
-  readConnectionDesktopConfig();
-  safeWriteFile(desktopConfigFile(), JSON.stringify(data, null, 2));
+  desktopConfigTransaction.write(data);
 }
 
 function normalizeConnectionConfig(

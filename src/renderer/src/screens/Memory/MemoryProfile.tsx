@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "../../components/useI18n";
 
 interface MemoryProfileProps {
   content: string;
+  expected: { memory: string; user: string };
   charLimit: number;
   profile?: string;
   onRefresh: () => void;
@@ -10,21 +11,30 @@ interface MemoryProfileProps {
 
 export function MemoryProfile({
   content: initialContent,
+  expected,
   charLimit,
   profile,
   onRefresh,
 }: MemoryProfileProps): React.JSX.Element {
   const { t } = useI18n();
+  const [editBase, setEditBase] = useState(expected);
   const [userContent, setUserContent] = useState(initialContent);
   const [userEditing, setUserEditing] = useState(false);
   const [userSaved, setUserSaved] = useState(false);
   const [error, setError] = useState("");
+  useEffect(() => {
+    if (!userEditing) {
+      setUserContent(initialContent);
+      setEditBase(expected);
+    }
+  }, [initialContent, expected, userEditing]);
 
   async function handleSave(): Promise<void> {
     setError("");
     const result = await window.hermesAPI.writeUserProfile(
       userContent,
       profile,
+      editBase,
     );
     if (result.success) {
       setUserEditing(false);
@@ -65,6 +75,7 @@ export function MemoryProfile({
         className="memory-profile-textarea"
         value={userContent}
         onChange={(e) => {
+          if (!userEditing) setEditBase(expected);
           setUserContent(e.target.value);
           setUserEditing(true);
         }}

@@ -1,3 +1,4 @@
+import MithrilChat from "../CloudWorkspace/MithrilChat";
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import Chat from "../Chat/Chat";
 import {
@@ -31,6 +32,7 @@ import Office from "../Office/Office";
 import Providers from "../Providers/Providers";
 import Schedules from "../Schedules/Schedules";
 import Kanban from "../Kanban/Kanban";
+import CloudWorkspace from "../CloudWorkspace/CloudWorkspace";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
 import { useSettingsModal } from "../../components/settings/SettingsModalContext";
@@ -53,6 +55,8 @@ import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 
 type View =
+  | "mithril-chat"
+  | "workspace"
   | "chat"
   | "discover"
   | "agents"
@@ -99,7 +103,7 @@ function Layout({
   onReinstall,
   onDismissVerifyWarning,
 }: LayoutProps): React.JSX.Element {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { openSettings } = useSettingsModal();
   const [view, setView] = useState<View>("chat");
   // Multiple conversations coexist (background sessions + multi-agent). Each is
@@ -715,6 +719,15 @@ function Layout({
 
           <nav className="sidebar-nav sidebar-nav-pinned">
             <button
+              className={`sidebar-nav-item ${view === "workspace" ? "active" : ""}`}
+              onClick={() => goTo("workspace")}
+              title="Cloud Workspace"
+              aria-label="Cloud Workspace"
+            >
+              <Compass size={16} />
+              <span className="sidebar-nav-label">Cloud Workspace</span>
+            </button>
+            <button
               className={`sidebar-nav-item sidebar-new-chat ${
                 view === "chat" && currentSessionId === null ? "active" : ""
               }`}
@@ -746,21 +759,29 @@ function Layout({
           <div className="sidebar-chat-section">
             <div className="sidebar-nav-sessions">
               <div className="sidebar-chat-scroll" ref={sidebarChatScrollRef}>
-                <SidebarRecentSessions
-                  open={!sidebarCollapsed}
-                  connectionId={connectionId}
-                  activeProfile={activeProfile}
-                  currentSessionId={currentSessionId}
-                  loadingSessionIds={loadingSessionIds}
-                  resumingSessionId={resumingSessionId}
-                  onSelect={handleResumeSession}
-                  onSessionDeleted={(id) => {
-                    // If the open chat was the one deleted, drop to a fresh chat
-                    // so the user isn't left viewing a now-gone conversation.
-                    if (id === currentSessionId) handleNewChat();
-                  }}
-                  scrollRootRef={sidebarChatScrollRef}
-                />
+                <button
+                  className="sidebar-nav-item"
+                  onClick={() => goTo("mithril-chat")}
+                >
+                  Synchronized chat
+                </button>
+                {
+                  <SidebarRecentSessions
+                    open={!sidebarCollapsed}
+                    connectionId={connectionId}
+                    activeProfile={activeProfile}
+                    currentSessionId={currentSessionId}
+                    loadingSessionIds={loadingSessionIds}
+                    resumingSessionId={resumingSessionId}
+                    onSelect={handleResumeSession}
+                    onSessionDeleted={(id) => {
+                      // If the open chat was the one deleted, drop to a fresh chat
+                      // so the user isn't left viewing a now-gone conversation.
+                      if (id === currentSessionId) handleNewChat();
+                    }}
+                    scrollRootRef={sidebarChatScrollRef}
+                  />
+                }
               </div>
               {sidebarScrollbar.scrollable && (
                 <div
@@ -853,14 +874,16 @@ function Layout({
         <main className="content">
           {/* Doubles as the window drag strip — keep it first so it owns the top
             band; the warning banner (if any) sits just below it. */}
-          <ActiveSessionsBar
-            runs={runs}
-            activeRunId={activeRunId}
-            onSelect={handleActivateRun}
-            onClose={handleCloseRun}
-            onNew={handleNewChat}
-            getAppearance={getAppearance}
-          />
+          {view === "chat" && (
+            <ActiveSessionsBar
+              runs={runs}
+              activeRunId={activeRunId}
+              onSelect={handleActivateRun}
+              onClose={handleCloseRun}
+              onNew={handleNewChat}
+              getAppearance={getAppearance}
+            />
+          )}
           {verifyWarning && onReinstall && onDismissVerifyWarning && (
             <VerifyWarningBanner
               onReinstall={onReinstall}
@@ -868,37 +891,38 @@ function Layout({
             />
           )}
           <div style={paneStyle("chat")}>
-            {runs.map((run) => (
-              <div
-                key={run.runId}
-                style={{
-                  display:
-                    view === "chat" && run.runId === activeRunId
-                      ? "flex"
-                      : "none",
-                  flex: 1,
-                  flexDirection: "column",
-                  overflow: "hidden",
-                }}
-              >
-                <Chat
-                  runId={run.runId}
-                  connectionId={run.connectionId}
-                  initialMessages={run.seed}
-                  initialSessionId={run.sessionId}
-                  active={run.runId === activeRunId}
-                  profile={run.profile}
-                  onNewChat={handleNewChat}
-                  onOpenDiagnose={(section?: string) =>
-                    openSettings(section, { profile: run.profile })
-                  }
-                  onLoadingChange={handleRunLoading}
-                  onSessionIdChange={handleRunSessionId}
-                  onTitleChange={handleRunTitle}
-                  agentAppearance={getAppearance(run.profile)}
-                />
-              </div>
-            ))}
+            {visitedViews.has("chat") &&
+              runs.map((run) => (
+                <div
+                  key={run.runId}
+                  style={{
+                    display:
+                      view === "chat" && run.runId === activeRunId
+                        ? "flex"
+                        : "none",
+                    flex: 1,
+                    flexDirection: "column",
+                    overflow: "hidden",
+                  }}
+                >
+                  <Chat
+                    runId={run.runId}
+                    connectionId={run.connectionId}
+                    initialMessages={run.seed}
+                    initialSessionId={run.sessionId}
+                    active={run.runId === activeRunId}
+                    profile={run.profile}
+                    onNewChat={handleNewChat}
+                    onOpenDiagnose={(section?: string) =>
+                      openSettings(section, { profile: run.profile })
+                    }
+                    onLoadingChange={handleRunLoading}
+                    onSessionIdChange={handleRunSessionId}
+                    onTitleChange={handleRunTitle}
+                    agentAppearance={getAppearance(run.profile)}
+                  />
+                </div>
+              ))}
           </div>
 
           {sessionsModalOpen && (
@@ -928,6 +952,41 @@ function Layout({
             </div>
           )}
 
+          {visitedViews.has("mithril-chat") && (
+            <div style={paneStyle("mithril-chat")}>
+              <MithrilChat
+                locale={locale}
+                profile={activeProfile}
+                visible={view === "mithril-chat"}
+              />
+            </div>
+          )}
+          {visitedViews.has("workspace") && (
+            <div style={paneStyle("workspace")}>
+              <CloudWorkspace
+                profile={activeProfile}
+                locale={locale}
+                active={view === "workspace"}
+                onOpenChat={() => goTo("mithril-chat")}
+                onOpenNativeSection={(section) => {
+                  if (section === "settings") {
+                    openSettings();
+                    return;
+                  }
+                  const nativeViews = {
+                    office: "office",
+                    capability: "tools",
+                    memory: "memory",
+                    kanban: "kanban",
+                    projects: "kanban",
+                    profile: "agents",
+                    discover: "discover",
+                  } as const;
+                  goTo(nativeViews[section]);
+                }}
+              />
+            </div>
+          )}
           {visitedViews.has("discover") && (
             <div style={paneStyle("discover")}>
               {remoteMode ? (
@@ -951,6 +1010,7 @@ function Layout({
                   activeProfile={activeProfile}
                   onSelectProfile={handleSelectProfile}
                   onChatWith={handleChatWithProfile}
+                  onCloudWorkspace={() => goTo("workspace")}
                 />
               )}
             </div>

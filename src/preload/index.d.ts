@@ -21,6 +21,12 @@ import type {
   MithrilFirstRunState,
 } from "../shared/account";
 import type { AgentSyncResult, AgentSyncStatus } from "../shared/agent-sync";
+import type {
+  CloudWorkspaceAPI,
+  CloudChatAPI,
+  NativeSessionImportAPI,
+  NativeWorkspaceAPI,
+} from "../shared/workspace";
 import type { ConnectionStatusSnapshot } from "../shared/connection-status";
 import type {
   RegistryKind,
@@ -336,7 +342,13 @@ interface HermesAPI {
     messages: { role: "user" | "assistant"; content: string }[],
     profile?: string,
   ) => Promise<MithrilChatResult>;
-  // Cloud agent sync (profiles ↔ signed-in Hermes One account)
+  nativeSessionImport: NativeSessionImportAPI;
+  cloudChat: CloudChatAPI;
+  onCloudChatAccountChanged(callback: () => void): () => void;
+  cloudWorkspace: CloudWorkspaceAPI;
+  nativeWorkspace: NativeWorkspaceAPI;
+  onCloudWorkspaceAccountChanged: (callback: () => void) => () => void;
+  // Legacy cloud agent sync remains unavailable.
   syncAgents: () => Promise<AgentSyncResult>;
   getAgentSyncStatus: () => Promise<AgentSyncStatus>;
   getLinkedAgentId: (profile: string) => Promise<string | null>;
@@ -828,11 +840,17 @@ interface HermesAPI {
     index: number,
     content: string,
     profile?: string,
+    expected?: { memory: string; user: string },
   ) => Promise<{ success: boolean; error?: string }>;
-  removeMemoryEntry: (index: number, profile?: string) => Promise<boolean>;
+  removeMemoryEntry: (
+    index: number,
+    profile?: string,
+    expected?: { memory: string; user: string },
+  ) => Promise<boolean>;
   writeUserProfile: (
     content: string,
     profile?: string,
+    expected?: { memory: string; user: string },
   ) => Promise<{ success: boolean; error?: string }>;
 
   // Soul

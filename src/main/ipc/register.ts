@@ -1,3 +1,9 @@
+import { nativeSessionImport } from "../native-session-import-runtime";
+import {
+  cloudChat,
+  onCloudChatAccountChanged,
+  captureLegacyProviderSnapshot,
+} from "../cloud-chat-runtime";
 import {
   isMithrilProvider,
   requireMithrilProvider,
@@ -19,7 +25,13 @@ import {
   dialog,
   clipboard,
 } from "electron";
-import { extname } from "path";
+import { extname, join } from "path";
+import { assertCloudWorkspaceSender } from "../cloud-workspace-sender";
+import { nativeWorkspace } from "../native-workspace-runtime";
+import {
+  cloudWorkspace,
+  onCloudWorkspaceAccountChanged,
+} from "../cloud-workspace-runtime";
 import { randomUUID } from "crypto";
 import { readdir, readFile, stat } from "fs/promises";
 import { getActiveProfileNameSync } from "../utils";
@@ -1186,7 +1198,115 @@ export function registerIpcHandlers(context: IpcContext): void {
     ) => mithrilChat(messages, profile?.trim() || getActiveProfileNameSync()),
   );
 
-  // Legacy cloud sync is intentionally unavailable in the Mithril preview.
+  // Portable Mithril workspace sync is opt-in and separate from local agent data.
+  const trustedWorkspaceSender = (event: Electron.IpcMainInvokeEvent): void => {
+    assertCloudWorkspaceSender(
+      event,
+      getMainWindow(),
+      join(__dirname, "../renderer/index.html"),
+      app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL,
+    );
+  };
+  onCloudWorkspaceAccountChanged(() => {
+    const win = getMainWindow();
+    if (win && !win.webContents.isDestroyed())
+      win.webContents.send("cloud-workspace-account-changed");
+  });
+  onCloudChatAccountChanged(() => {
+    const win = getMainWindow();
+    if (win && !win.webContents.isDestroyed())
+      win.webContents.send("cloud-chat-account-changed");
+  });
+  ipcMain.handle("cloud-chat-native-preview", (event) => {
+    trustedWorkspaceSender(event);
+    return nativeSessionImport.previewNativeSessions();
+  });
+  ipcMain.handle("cloud-chat-native-import", (event, id, choices) => {
+    trustedWorkspaceSender(event);
+    return nativeSessionImport.importNativeSessions(id, choices);
+  });
+  ipcMain.handle("cloud-chat-legacy-snapshot", (event) => {
+    trustedWorkspaceSender(event);
+    return captureLegacyProviderSnapshot();
+  });
+  ipcMain.handle("cloud-chat-status", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.auth.status();
+  });
+  ipcMain.handle("cloud-chat-enable", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.auth.enable();
+  });
+  ipcMain.handle("cloud-chat-disable", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.auth.reset();
+  });
+  ipcMain.handle("cloud-chat-runtime", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.runtime();
+  });
+  ipcMain.handle("cloud-chat-models", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.models();
+  });
+  ipcMain.handle("cloud-chat-list", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.list();
+  });
+  ipcMain.handle("cloud-chat-events", (event, id, after) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.events(id, after);
+  });
+  ipcMain.handle("cloud-chat-apply", (event, id, operation) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.apply(id, operation);
+  });
+  ipcMain.handle("cloud-chat-receipt", (event, id, operationId) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.receipt(id, operationId);
+  });
+  ipcMain.handle("cloud-workspace-status", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.status();
+  });
+  ipcMain.handle("cloud-workspace-enable", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.enable();
+  });
+  ipcMain.handle("cloud-workspace-disable", (event) => {
+    trustedWorkspaceSender(event);
+    cloudWorkspace.reset();
+  });
+  ipcMain.handle("cloud-workspace-snapshot", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.getSnapshot();
+  });
+  ipcMain.handle("cloud-workspace-operations", (event, operations) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.applyOperations(operations);
+  });
+  ipcMain.handle("cloud-workspace-history", (event, id, offset) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.history(id, offset);
+  });
+  ipcMain.handle("native-workspace-inspect", (event, section) => {
+    trustedWorkspaceSender(event);
+    return nativeWorkspace.inspect(section);
+  });
+  ipcMain.handle("native-workspace-apply", (event, operation) => {
+    trustedWorkspaceSender(event);
+    return nativeWorkspace.apply(operation);
+  });
+  ipcMain.handle("native-workspace-preview", (event) => {
+    trustedWorkspaceSender(event);
+    return nativeWorkspace.previewImport();
+  });
+  ipcMain.handle("native-workspace-import", (event, id, choices) => {
+    trustedWorkspaceSender(event);
+    return nativeWorkspace.importSelection(id, choices);
+  });
+
+  // The previous Hermes One sync stays unavailable; this contract cannot import local profiles.
   // Keep the IPC contract so older renderer state fails closed and clearly.
   ipcMain.handle("agent-sync-run", async (event) => {
     const result = {
@@ -2824,6 +2944,8 @@ export function registerIpcHandlers(context: IpcContext): void {
     // on every relaunch. Then drop the cached health flag so the next check
     // probes the newly-active profile's gateway, not the previous one's.
     setActiveProfile(name);
+    cloudWorkspace.reset();
+    cloudChat.auth.reset();
     notifyProfileSwitched();
     // Bring the activated profile's own gateway up if it isn't already —
     // without stopping any other profile's gateway (their bots stay online).
@@ -2951,29 +3073,45 @@ export function registerIpcHandlers(context: IpcContext): void {
   );
   ipcMain.handle(
     "update-memory-entry",
-    (_event, index: number, content: string, profile?: string) => {
+    (
+      _event,
+      index: number,
+      content: string,
+      profile?: string,
+      expected?: { memory: string; user: string },
+    ) => {
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh)
         return sshUpdateMemoryEntry(conn.ssh, index, content, profile);
-      return updateMemoryEntry(index, content, profile);
+      return updateMemoryEntry(index, content, profile, expected);
     },
   );
   ipcMain.handle(
     "remove-memory-entry",
-    (_event, index: number, profile?: string) => {
+    (
+      _event,
+      index: number,
+      profile?: string,
+      expected?: { memory: string; user: string },
+    ) => {
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh)
         return sshRemoveMemoryEntry(conn.ssh, index, profile);
-      return removeMemoryEntry(index, profile);
+      return removeMemoryEntry(index, profile, expected);
     },
   );
   ipcMain.handle(
     "write-user-profile",
-    (_event, content: string, profile?: string) => {
+    (
+      _event,
+      content: string,
+      profile?: string,
+      expected?: { memory: string; user: string },
+    ) => {
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh)
         return sshWriteUserProfile(conn.ssh, content, profile);
-      return writeUserProfile(content, profile);
+      return writeUserProfile(content, profile, expected);
     },
   );
 

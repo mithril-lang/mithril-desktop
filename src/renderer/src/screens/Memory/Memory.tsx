@@ -68,7 +68,9 @@ function Memory({ profile }: { profile?: string }): React.JSX.Element {
 
       {tab === "entries" && (
         <MemoryEntries
+          key={profile}
           entries={data.memory.entries}
+          expected={{ memory: data.memory.content, user: data.user.content }}
           profile={profile}
           onRefresh={loadData}
         />
@@ -76,7 +78,9 @@ function Memory({ profile }: { profile?: string }): React.JSX.Element {
 
       {tab === "profile" && (
         <MemoryProfile
+          key={profile}
           content={data.user.content}
+          expected={{ memory: data.memory.content, user: data.user.content }}
           charLimit={data.user.charLimit}
           profile={profile}
           onRefresh={loadData}

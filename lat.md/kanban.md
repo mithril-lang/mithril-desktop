@@ -20,6 +20,20 @@ Drag-drop moves route through `dragAction(from, to)`, which maps a target column
 
 In-place editing of a live card's title/body/priority is unavailable — the CLI `edit` verb only backfills a result on already-`done` tasks.
 
+## Shared workspace task edits
+
+The shared panel edits actual local board task metadata through an atomic SQLite revision check. It never dispatches workers, invokes plugin hooks, grants device access or uploads native files.
+
+[[src/main/native-kanban-store.ts#NativeKanbanStore]] reads the existing current board with a 1000-task bound and no schema initialization. Under SQLite `BEGIN IMMEDIATE`, it compares the full original rows before editing title/body/priority on an unclaimed task. Native event append and edit commit together. Full archive and other lifecycle actions remain in the native Kanban screen. Running, claimed, archived, nonportable and incompatible-schema tasks cannot be edited here.
+
+[[src/main/native-workspace.ts#NativeWorkspace]] binds opaque board/task identifiers and revisions to the signed-in account, selected profile, token actor and connection epoch. Native paths and claim data remain in the main process. Named boards retain Hermes's existing shared-local-profile behavior; cross-device cloud notes are separate records.
+
+The pinned dashboard has plugin Kanban REST routes, but they do not provide this atomic revision contract. Web writes remain unavailable pending an authenticated fixed-store helper, compatible native schema and an explicit sandbox board durability plan. Existing profile archives do not persist the global Kanban root; no storage configuration is changed by this candidate.
+
+[[src/main/native-kanban-store.test.ts]] exercises real temporary SQLite files, concurrent stale revisions, claimed-task refusal, lifecycle preservation without dispatch, event-failure rollback and unsafe storage. No real user database, native worker or paid sandbox is exercised.
+
+[[src/main/native-kanban-boundary.test.ts]] verifies opaque native task projections, owner and revision rejection, excluded device content, and identity changes while loading board metadata. A board switch while obtaining the SQLite writer lock conflicts before mutation.
+
 ## Refresh model
 
 The board stays current without a live event stream, using three refresh triggers instead.

@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 870 170">
-  <g fill="none" stroke="#9fb6ff" stroke-width="10" stroke-linejoin="round">
-    <path d="M85 10 140 60v50l-55 50-55-50V60z"/>
-    <path d="M85 10v150M30 60l55 36 55-36M30 110l55-36 55 36"/>
-  </g>
-  <text x="185" y="120" fill="#9fb6ff" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="700" letter-spacing="12">MITHRIL</text>
-</svg>

@@ -16,7 +16,7 @@ vi.mock("@react-three/fiber", () => ({
   useFrame: vi.fn(),
 }));
 
-vi.mock("./agents", () => ({
+vi.mock("@mithril/workspace/office3d/objects/agents", () => ({
   AgentModel: ({
     agentLookupRef,
   }: {
@@ -27,7 +27,7 @@ vi.mock("./agents", () => ({
   },
 }));
 
-vi.mock("./RiggedCharacter", () => ({
+vi.mock("@mithril/workspace/office3d/objects/RiggedCharacter", () => ({
   RIGGED_EMPLOYEE_URL: "employee.glb",
   RIGGED_MAN_URL: "agent.glb",
 }));

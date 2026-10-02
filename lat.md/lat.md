@@ -35,6 +35,7 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[office-3d-interiors]] — enterable office/bank/showroom interiors: per-location conditional mounting (city unmounts while indoors), camera fly-in rig, interactable objects (ATM → wallet, desk → agent, car → spec card), and idle-agent walking trips between buildings.
 - [[office-3d-walk-mode]] — GTA-style walk mode: glass roofs over the enterable buildings, the user's own third-person avatar (WASD + chase camera, shared crowd/collision), doorway-driven interior loading, and proximity Press-E interactions.
 - [[office-community]] — the shared Community chat panel: rooms per convention-center hall, live presence, a WebSocket relay (or same-device fallback), and strict validation of inbound frames.
+- [[shared-office-runtime]] — canonical Desktop/Web Office rendering, authenticated remote-runtime routes and owner-bound plugin intent handoff without installation or permission grants.
 - [[office-3d-convention-center]] — the city view's Los Angeles theme: convention-center exterior skin over the office block and the elevated hyperloop line with its scheduled pod.
 - [[office-interactions]] — space representatives: interactive bank tellers whose menu runs account status, balances, and account creation against the hermes-one backend for a chosen agent; the extensible pattern for future spaces (showroom sales, building space).
 - [[office-world-actions]] — chat-commanded errands: the agent's LLM emits world-action blocks from the office chat, its avatar walks the trip route to the bank/showroom, and the rep modal auto-opens running the requested action on arrival.
@@ -43,3 +44,7 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[gateway-multiplex]] — which profiles the live default gateway already serves, so a multiplexed profile reads Running instead of Off and its Start action does not spawn a gateway the CLI refuses.
 
 - [[dashboard-clarify]] — Interactive WebSocket clarification cards and answer delivery tests.
+- [[cloud-workspace]] — one shared Web and Desktop workspace renderer with account-bound opt-in and main-process credential isolation.
+- [[cloud-workspace-tests]] — consent, scope, owner, offline and account-switch safety tests for the cloud workspace adapter.
+
+- [[canonical-chat]] — default Mithril API-only D1 sessions, explicit native import and native runtime boundaries.

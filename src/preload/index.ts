@@ -32,6 +32,12 @@ import type {
   MithrilFirstRunState,
 } from "../shared/account";
 import type { AgentSyncResult, AgentSyncStatus } from "../shared/agent-sync";
+import type {
+  CloudWorkspaceAPI,
+  CloudChatAPI,
+  NativeSessionImportAPI,
+  NativeWorkspaceAPI,
+} from "../shared/workspace";
 import type { GpuPreferenceMode, GpuStatus } from "../shared/gpu";
 import type { AgentCapabilitySnapshot } from "../shared/agent-capabilities";
 import type { ConnectionStatusSnapshot } from "../shared/connection-status";
@@ -286,7 +292,59 @@ const hermesAPI = {
   ): Promise<MithrilChatResult> =>
     ipcRenderer.invoke("mithril-chat", messages, profile),
 
-  // Cloud agent sync (profiles ↔ signed-in Hermes One account)
+  nativeSessionImport: {
+    previewNativeSessions: () =>
+      ipcRenderer.invoke("cloud-chat-native-preview"),
+    importNativeSessions: (id, choices) =>
+      ipcRenderer.invoke("cloud-chat-native-import", id, choices),
+  } satisfies NativeSessionImportAPI,
+  cloudChat: {
+    runtime: () => ipcRenderer.invoke("cloud-chat-runtime"),
+    legacySnapshot: () => ipcRenderer.invoke("cloud-chat-legacy-snapshot"),
+    status: () => ipcRenderer.invoke("cloud-chat-status"),
+    enable: () => ipcRenderer.invoke("cloud-chat-enable"),
+    disable: () => ipcRenderer.invoke("cloud-chat-disable"),
+    models: () => ipcRenderer.invoke("cloud-chat-models"),
+    list: () => ipcRenderer.invoke("cloud-chat-list"),
+    events: (id, after) => ipcRenderer.invoke("cloud-chat-events", id, after),
+    apply: (id, operation) =>
+      ipcRenderer.invoke("cloud-chat-apply", id, operation),
+    receipt: (id, operationId) =>
+      ipcRenderer.invoke("cloud-chat-receipt", id, operationId),
+  } satisfies CloudChatAPI,
+  onCloudChatAccountChanged: (callback: () => void): (() => void) => {
+    const handler = (): void => callback();
+    ipcRenderer.on("cloud-chat-account-changed", handler);
+    return () =>
+      ipcRenderer.removeListener("cloud-chat-account-changed", handler);
+  },
+  cloudWorkspace: {
+    status: () => ipcRenderer.invoke("cloud-workspace-status"),
+    enable: () => ipcRenderer.invoke("cloud-workspace-enable"),
+    disable: () => ipcRenderer.invoke("cloud-workspace-disable"),
+    getSnapshot: () => ipcRenderer.invoke("cloud-workspace-snapshot"),
+    applyOperations: (operations) =>
+      ipcRenderer.invoke("cloud-workspace-operations", operations),
+    history: (id: string, offset?: number) =>
+      ipcRenderer.invoke("cloud-workspace-history", id, offset),
+  } satisfies CloudWorkspaceAPI,
+  nativeWorkspace: {
+    inspect: (section) =>
+      ipcRenderer.invoke("native-workspace-inspect", section),
+    apply: (operation) =>
+      ipcRenderer.invoke("native-workspace-apply", operation),
+    previewImport: () => ipcRenderer.invoke("native-workspace-preview"),
+    importSelection: (id, choices) =>
+      ipcRenderer.invoke("native-workspace-import", id, choices),
+  } satisfies NativeWorkspaceAPI,
+  onCloudWorkspaceAccountChanged: (callback: () => void): (() => void) => {
+    const handler = (): void => callback();
+    ipcRenderer.on("cloud-workspace-account-changed", handler);
+    return () =>
+      ipcRenderer.removeListener("cloud-workspace-account-changed", handler);
+  },
+
+  // Legacy cloud agent sync remains unavailable.
   syncAgents: (): Promise<AgentSyncResult> =>
     ipcRenderer.invoke("agent-sync-run"),
   getAgentSyncStatus: (): Promise<AgentSyncStatus> =>
@@ -1125,15 +1183,27 @@ const hermesAPI = {
     index: number,
     content: string,
     profile?: string,
+    expected?: { memory: string; user: string },
   ): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke("update-memory-entry", index, content, profile),
-  removeMemoryEntry: (index: number, profile?: string): Promise<boolean> =>
-    ipcRenderer.invoke("remove-memory-entry", index, profile),
+    ipcRenderer.invoke(
+      "update-memory-entry",
+      index,
+      content,
+      profile,
+      expected,
+    ),
+  removeMemoryEntry: (
+    index: number,
+    profile?: string,
+    expected?: { memory: string; user: string },
+  ): Promise<boolean> =>
+    ipcRenderer.invoke("remove-memory-entry", index, profile, expected),
   writeUserProfile: (
     content: string,
     profile?: string,
+    expected?: { memory: string; user: string },
   ): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke("write-user-profile", content, profile),
+    ipcRenderer.invoke("write-user-profile", content, profile, expected),
 
   // Soul
   readSoul: (profile?: string): Promise<string> =>

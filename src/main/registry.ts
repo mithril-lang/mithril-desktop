@@ -310,17 +310,22 @@ export function listInstalledRegistry(profile?: string): InstalledRegistry {
   } catch {
     /* ignore */
   }
+  plugins = listInstalledPluginNames(profile);
+  return { skills, mcps, workflows, plugins };
+}
+
+/** Directory names only; no plugin manifest, script, environment or permission file is read. */
+export function listInstalledPluginNames(profile?: string): string[] {
   try {
     const dir = join(profileHome(profile), "plugins");
-    if (existsSync(dir)) {
-      plugins = readdirSync(dir, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
-        .map((entry) => entry.name);
-    }
+    return existsSync(dir)
+      ? readdirSync(dir, { withFileTypes: true })
+          .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+          .map((entry) => entry.name)
+      : [];
   } catch {
-    /* ignore */
+    return [];
   }
-  return { skills, mcps, workflows, plugins };
 }
 
 export interface InstallResult {

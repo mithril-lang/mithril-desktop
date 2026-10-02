@@ -1,8 +1,11 @@
+import { createHash } from "crypto";
 import { existsSync, readFileSync, statSync } from "fs";
 import { join } from "path";
 import Database from "better-sqlite3";
-import { profileHome, safeWriteFile } from "./utils";
+import { profileHome } from "./utils";
 import { parseMemoryLimitsConfig, type MemoryLimits } from "./memory-limits";
+import { HERMES_PYTHON } from "./installer";
+import { mutateMemoryFiles, type MemoryMutation } from "./memory-file-lock";
 
 const ENTRY_DELIMITER = "\n§\n";
 
@@ -77,16 +80,10 @@ function parseMemoryEntries(content: string): MemoryEntry[] {
   if (!content.trim()) return [];
   return content
     .split(ENTRY_DELIMITER)
-    .map((entry, index) => ({ index, content: entry.trim() }))
-    .filter((e) => e.content.length > 0);
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+    .map((content, index) => ({ index, content }));
 }
-
-function serializeEntries(entries: MemoryEntry[]): string {
-  return entries.map((e) => e.content).join(ENTRY_DELIMITER);
-}
-
-// Use shared safeWriteFile from utils
-const writeFileSafe = safeWriteFile;
 
 function getSessionStats(profile?: string): {
   totalSessions: number;
@@ -151,95 +148,72 @@ export function readMemoryRaw(profile?: string): string {
  * wins — the content is the user's own cloud copy, so no entry parsing or
  * char-limit gate applies (safeWriteFile creates `memories/` when missing).
  */
+function mutate(
+  content: MemoryMutation,
+  profile?: string,
+  expected?: { memory: string; user: string },
+): { success: boolean; error?: string } {
+  let config = "";
+  try {
+    config = readFileSync(configPath(profile), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT")
+      return { success: false, error: "Memory configuration unavailable" };
+  }
+  return mutateMemoryFiles({
+    configDigest: createHash("sha256").update(config).digest("hex"),
+    home: profileHome(profile),
+    python: HERMES_PYTHON,
+    limits: parseMemoryLimitsConfig(config),
+    mutation: content,
+    ...(expected ? { expected } : {}),
+  });
+}
+
 export function writeMemoryRaw(
   content: string,
   profile?: string,
 ): { success: boolean; error?: string } {
-  try {
-    safeWriteFile(memoryPath(profile), content);
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: (err as Error).message };
-  }
+  return mutate({ action: "raw", content }, profile);
 }
-
-// ── Write operations ────────────────────────────────
-
 export function addMemoryEntry(
   content: string,
   profile?: string,
 ): { success: boolean; error?: string } {
-  const filePath = memoryPath(profile);
-  const existing = readFileSafe(filePath);
-  const entries = parseMemoryEntries(existing.content);
-  const newContent = serializeEntries([
-    ...entries,
-    { index: entries.length, content: content.trim() },
-  ]);
-  const limits = readMemoryLimits(profile);
-
-  if (newContent.length > limits.memoryCharLimit) {
-    return {
-      success: false,
-      error: `Would exceed memory limit (${newContent.length}/${limits.memoryCharLimit} chars)`,
-    };
-  }
-
-  writeFileSafe(filePath, newContent);
-  return { success: true };
+  return mutate({ action: "add", content }, profile);
 }
-
 export function updateMemoryEntry(
   index: number,
   content: string,
   profile?: string,
+  expected?: { memory: string; user: string },
 ): { success: boolean; error?: string } {
-  const filePath = memoryPath(profile);
-  const existing = readFileSafe(filePath);
-  const entries = parseMemoryEntries(existing.content);
-
-  if (index < 0 || index >= entries.length) {
-    return { success: false, error: "Entry not found" };
-  }
-
-  entries[index] = { ...entries[index], content: content.trim() };
-  const newContent = serializeEntries(entries);
-  const limits = readMemoryLimits(profile);
-
-  if (newContent.length > limits.memoryCharLimit) {
-    return {
-      success: false,
-      error: `Would exceed memory limit (${newContent.length}/${limits.memoryCharLimit} chars)`,
-    };
-  }
-
-  writeFileSafe(filePath, newContent);
-  return { success: true };
+  if (!expected)
+    return { success: false, error: "Refresh Memory before editing" };
+  return mutate({ action: "update", index, content }, profile, expected);
 }
-
-export function removeMemoryEntry(index: number, profile?: string): boolean {
-  const filePath = memoryPath(profile);
-  const existing = readFileSafe(filePath);
-  const entries = parseMemoryEntries(existing.content);
-
-  if (index < 0 || index >= entries.length) return false;
-
-  entries.splice(index, 1);
-  writeFileSafe(filePath, serializeEntries(entries));
-  return true;
+export function removeMemoryEntry(
+  index: number,
+  profile?: string,
+  expected?: { memory: string; user: string },
+): boolean {
+  if (!expected) return false;
+  return mutate({ action: "remove", index }, profile, expected).success;
 }
-
 export function writeUserProfile(
   content: string,
   profile?: string,
+  expected?: { memory: string; user: string },
 ): { success: boolean; error?: string } {
-  const limits = readMemoryLimits(profile);
-  if (content.length > limits.userCharLimit) {
-    return {
-      success: false,
-      error: `Exceeds limit (${content.length}/${limits.userCharLimit} chars)`,
-    };
-  }
-  writeFileSafe(userPath(profile), content);
-  return { success: true };
+  if (!expected)
+    return { success: false, error: "Refresh Memory before editing" };
+  return mutate({ action: "user", content }, profile, expected);
+}
+/** Under-lock compare prevents concurrent Hermes writes from being overwritten. */
+export function applyMemoryMutation(
+  mutation: MemoryMutation,
+  expected: { memory: string; user: string },
+  profile?: string,
+): { success: boolean; error?: string } {
+  return mutate(mutation, profile, expected);
 }

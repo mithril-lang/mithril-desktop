@@ -11,13 +11,14 @@ const preloadTypes = readFileSync(
 
 /**
  * Extract method names from the hermesAPI object in preload/index.ts.
- * Matches lines like `  methodName: (...` or `  methodName: ()`.
+ * Matches methods and typed transport objects exposed through the bridge.
  */
 function extractPreloadMethods(src: string): string[] {
   const methods: string[] = [];
-  const re = /^\s{2}(\w+)\s*:\s*\(/gm;
+  const re = /^\s{2}(\w+)\s*:\s*(?:\(|\{)/gm;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(src)) !== null) {
+  const body = src.slice(src.indexOf("const hermesAPI = {"));
+  while ((m = re.exec(body)) !== null) {
     methods.push(m[1]);
   }
   return [...new Set(methods)];

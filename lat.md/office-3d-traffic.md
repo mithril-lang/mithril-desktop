@@ -1,22 +1,22 @@
 # Office 3D Traffic
 
-Backdrop cars and trucks looping on the Office tab's city roads. Vehicles follow the car ahead in their lane, yield at junctions, and the whole fleet renders with GPU instancing driven by one per-frame update in [[src/renderer/src/screens/Office/office3d/objects/Traffic.tsx#TrafficLayer]].
+Backdrop cars and trucks looping on the Office tab's city roads. Vehicles follow the car ahead in their lane, yield at junctions, and the whole fleet renders with GPU instancing driven by one per-frame update in [[src/renderer/src/screens/Office/office3d/objects/Traffic.tsx]].
 
 TrafficLayer is mounted only in the city view: entering a building interior (see [[office-3d-interiors]]) unmounts it, which pauses the simulation and its draw calls entirely; on exit it resumes from where it stopped.
 
-Roads stay physically clear of scenery: the detailed backdrop grid excludes road corridors when placing buildings, and the [[src/renderer/src/screens/Office/office3d/objects/CityBackdrop.tsx#DistantSkyline]] ring rejection-resamples each silhouette tower's polar position (using its half-diagonal as clearance) until it misses every corridor — the roads run the full ROAD_LEN out into the skyline band, so without this, cars drove straight through distant towers.
+Roads stay physically clear of scenery: the detailed backdrop grid excludes road corridors when placing buildings, and the [[src/renderer/src/screens/Office/office3d/objects/CityBackdrop.tsx]] ring rejection-resamples each silhouette tower's polar position (using its half-diagonal as clearance) until it misses every corridor — the roads run the full ROAD_LEN out into the skyline band, so without this, cars drove straight through distant towers.
 
 The road network itself (8 roads, two-way lanes, loop length) comes from the city master plan in `src/renderer/src/screens/Office/office3d/core/cityPlan.ts`; traffic reads `ROADS`, `ROAD_WIDTH` and `TRAFFIC_LEN` from there.
 
 ## Fleet generation
 
-[[src/renderer/src/screens/Office/office3d/objects/Traffic.tsx#makeTraffic]] builds 7 vehicles per road (56 total) from fixed seeds — like the rest of world-gen, traffic is deterministic and every load produces the same fleet, tints, and starting positions.
+[[src/renderer/src/screens/Office/office3d/objects/Traffic.tsx]] builds 7 vehicles per road (56 total) from fixed seeds — like the rest of world-gen, traffic is deterministic and every load produces the same fleet, tints, and starting positions.
 
 Each vehicle carries static config (model URL, tint, lane, cruise speed, precomputed heading index) plus live simulation state (`s` position along the road, current `speed`). Directions alternate per slot so each road has traffic in both lanes.
 
 ## Driving simulation
 
-[[src/renderer/src/screens/Office/office3d/objects/Traffic.tsx#stepTraffic]] advances all vehicles once per frame in three passes: junction occupancy, target-speed selection, then integration. Cars never drive through each other.
+[[src/renderer/src/screens/Office/office3d/objects/Traffic.tsx]] advances all vehicles once per frame in three passes: junction occupancy, target-speed selection, then integration. Cars never drive through each other.
 
 Car-following: within a lane each vehicle finds the nearest vehicle ahead (wrapped over the traffic loop). Inside `SLOW_GAP` it matches the leader's speed; inside `MIN_GAP` it targets zero — so cars brake, queue behind a stopped leader, and pull away again once it moves. Speeds ease toward the target with separate acceleration/braking rates so stops look like braking rather than snapping.
 
@@ -24,7 +24,7 @@ Vehicles are sized against people: cars are 4.2 world units long, trucks 5.6 —
 
 ### Braking for people
 
-Cars never drive through a person: anyone outdoors — pedestrians, trip agents, or the walk-mode player, all read from [[src/renderer/src/screens/Office/office3d/core/collision.ts#getCrowdBodies]] — who is in a vehicle's lane corridor ahead makes it creep (`PERSON_SLOW`), then hard-stop (`PERSON_STOP`).
+Cars never drive through a person: anyone outdoors — pedestrians, trip agents, or the walk-mode player, all read from [[src/renderer/src/screens/Office/office3d/core/collision.ts]] — who is in a vehicle's lane corridor ahead makes it creep (`PERSON_SLOW`), then hard-stop (`PERSON_STOP`).
 
 The check is one unwrapped along-axis gap plus a cross-axis corridor test per person, done in the target-speed pass; a person standing on the road holds the queue indefinitely, GTA-style. The sim also publishes every vehicle's live position as a push-out circle (`TRAFFIC_OBSTACLES` in Traffic.tsx) that [[office-3d-walk-mode|walk mode]]'s player resolves against, so walking into a stopped car shoves you off its body instead of clipping through; the list is emptied on unmount so no ghost cars exist indoors.
 
@@ -42,7 +42,7 @@ The fleet renders as one `THREE.InstancedMesh` per model sub-mesh — about a do
 
 The previous approach cloned the GLB per vehicle: hundreds of draw calls (each clone has ~5-10 meshes with unique materials) plus 56 separate `useFrame` subscriptions.
 
-[[src/renderer/src/screens/Office/office3d/objects/Traffic.tsx#buildPartTemplates]] flattens each vehicle GLB into parts, baking the same recentre/ground/scale/align transform as [[src/renderer/src/screens/Office/office3d/core/glb.ts#normalizeFootprint]] into a per-part matrix. Per-vehicle paint uses `instanceColor`: tintable (light) materials get a white base colour so the instance colour is the final paint, while dark trim (tyres, glass) keeps its source colour — matching what [[src/renderer/src/screens/Office/office3d/core/glb.ts#vehicleClone]] does for the showroom's individually-cloned cars.
+[[src/renderer/src/screens/Office/office3d/objects/Traffic.tsx]] flattens each vehicle GLB into parts, baking the same recentre/ground/scale/align transform as [[src/renderer/src/screens/Office/office3d/core/glb.ts]] into a per-part matrix. Per-vehicle paint uses `instanceColor`: tintable (light) materials get a white base colour so the instance colour is the final paint, while dark trim (tyres, glass) keeps its source colour — matching what [[src/renderer/src/screens/Office/office3d/core/glb.ts]] does for the showroom's individually-cloned cars.
 
 Per-frame matrix work is allocation-free: each part precomputes its four possible heading matrices (`ROT_YAWS`), so placing an instance is a matrix copy plus a translation add.
 
@@ -52,4 +52,4 @@ Per-frame matrix work is allocation-free: each part precomputes its four possibl
 
 Currently only car1 needs the flip: its GLB has front wheels at -Z, while car2 and truck1 already face +Z.
 
-The correction is applied in both pipelines — the instanced traffic templates and [[src/renderer/src/screens/Office/office3d/objects/Traffic.tsx#VehicleModel]] (used by the car showroom) — so a model faces the same way everywhere.
+The correction is applied in both pipelines — the instanced traffic templates and [[src/renderer/src/screens/Office/office3d/objects/Traffic.tsx]] (used by the car showroom) — so a model faces the same way everywhere.

@@ -517,7 +517,12 @@ export default function ProfileModal({
                   </div>
                 ) : memoryData ? (
                   <MemoryEntries
+                    key={profile.id}
                     entries={memoryData.memory.entries}
+                    expected={{
+                      memory: memoryData.memory.content,
+                      user: memoryData.user.content,
+                    }}
                     profile={profile.id}
                     onRefresh={loadMemoryData}
                   />

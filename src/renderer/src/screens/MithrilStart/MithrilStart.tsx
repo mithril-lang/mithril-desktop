@@ -5,6 +5,7 @@ import { ArrowRight, Spinner } from "../../assets/icons";
 import { useI18n } from "../../components/useI18n";
 import type {
   MithrilAccount,
+  MithrilDeviceCode,
   MithrilStorageProtection,
 } from "../../../../shared/account";
 
@@ -43,6 +44,30 @@ export function issueText(code: string, ja: boolean): string {
         "Could not reach api.mithril.fund. Check your network and retry.",
         "api.mithril.fund に接続できません。ネットワークを確認してください。",
       );
+    case "device_denied":
+      return l(
+        "Sign-in was denied. Try again.",
+        "接続が拒否されました。もう一度お試しください。",
+      );
+    case "device_expired":
+      return l(
+        "The code expired. Try again.",
+        "コードの有効期限が切れました。再試行してください。",
+      );
+    case "device_cancelled":
+      return l("Sign-in cancelled.", "接続を中止しました。");
+    case "device_in_progress":
+      return l("Another sign-in is in progress.", "別の接続操作が進行中です。");
+    case "device_unavailable":
+      return l(
+        "Browser sign-in is unavailable. Try again or use a connection token.",
+        "ブラウザー接続を利用できません。再試行するか、接続トークンを使用してください。",
+      );
+    case "device_start_failed":
+      return l(
+        "Could not start browser sign-in. Check your network and retry.",
+        "接続を開始できません。ネットワークを確認して再試行してください。",
+      );
     case "empty_reply":
       return l(
         "The model returned an empty reply.",
@@ -78,6 +103,47 @@ function MithrilStart({
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [deviceCode, setDeviceCode] = useState<MithrilDeviceCode | null>(null);
+  const deviceAttempt = useRef<object | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = window.hermesAPI.onMithrilDeviceCode((info) => {
+      if (deviceAttempt.current) setDeviceCode(info);
+    });
+    return () => {
+      unsubscribe();
+      if (deviceAttempt.current) {
+        deviceAttempt.current = null;
+        void window.hermesAPI.cancelMithrilDeviceLogin();
+      }
+    };
+  }, [profile]);
+
+  async function browserConnect(): Promise<void> {
+    if (busy || deviceAttempt.current) return;
+    const attempt = {};
+    deviceAttempt.current = attempt;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await window.hermesAPI.mithrilDeviceLogin(profile);
+      if (deviceAttempt.current !== attempt) return;
+      if (result.status === "connected") {
+        setAccount(result.account);
+        setProtection(result.protection);
+        setConnected(true);
+        setToken("");
+      } else setError(result.error);
+    } catch {
+      if (deviceAttempt.current === attempt) setError("device_start_failed");
+    } finally {
+      if (deviceAttempt.current === attempt) {
+        deviceAttempt.current = null;
+        setDeviceCode(null);
+        setBusy(false);
+      }
+    }
+  }
   const [protection, setProtection] =
     useState<MithrilStorageProtection>("keychain");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -180,8 +246,8 @@ function MithrilStart({
       >
         <p className="onboard-subtitle">
           {l(
-            "Paste a connection token (mf_…) from the Mithril console. It is checked against api.mithril.fund and stored in your OS keychain when one is available.",
-            "Mithril Console で発行した接続トークン（mf_…）を貼り付けてください。api.mithril.fund で確認し、利用可能な場合は OS キーチェーンに保存します。",
+            "Connect in your browser. Sign in with your passkey or existing Mithril account, then approve this device. Desktop connects automatically after approval.",
+            "ブラウザーで passkey または Mithril アカウントでサインインし、この端末を承認してください。承認後、Desktop が自動で接続します。",
           )}
         </p>
         {protection === "reduced" && (
@@ -193,31 +259,17 @@ function MithrilStart({
             {reducedProtectionNotice(ja)}
           </p>
         )}
-        <form
-          onSubmit={(e) => void connect(e)}
-          className="onboard-cta-row"
-          data-testid="mithril-connect-form"
-        >
-          <input
-            id="mithril-first-run-token"
-            aria-label={l("Connection token", "接続トークン")}
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            autoFocus
-            className="welcome-remote-input"
-            placeholder="mf_…"
-            value={token}
-            disabled={busy}
-            onChange={(e) => setToken(e.target.value)}
-          />
+        <div className="onboard-cta-row">
           <button
-            type="submit"
+            type="button"
             className="onboard-btn onboard-btn-primary"
-            disabled={busy || !token.trim()}
+            disabled={busy}
+            onClick={() => void browserConnect()}
           >
             <span>
-              {busy ? l("Checking…", "確認中…") : l("Connect", "接続")}
+              {busy
+                ? l("Waiting for connection…", "接続を待っています…")
+                : l("Connect in browser", "ブラウザーで接続")}
             </span>
             {busy ? (
               <Spinner size={16} className="animate-spin" />
@@ -225,31 +277,91 @@ function MithrilStart({
               <ArrowRight size={17} />
             )}
           </button>
-        </form>
+        </div>
+        {busy && deviceAttempt.current && (
+          <div role="status" className="onboard-subtitle">
+            {deviceCode ? (
+              <>
+                <p>
+                  {l(
+                    "Approve this code in your browser:",
+                    "ブラウザーでこのコードを確認して承認してください：",
+                  )}{" "}
+                  <strong>{deviceCode.userCode}</strong>
+                </p>
+                <button
+                  type="button"
+                  className="onboard-btn onboard-btn-glass"
+                  onClick={() =>
+                    void window.hermesAPI.openExternal(
+                      deviceCode.verificationUriComplete,
+                    )
+                  }
+                >
+                  {l("Open browser again", "ブラウザーをもう一度開く")}
+                </button>
+              </>
+            ) : (
+              <p>{l("Opening browser…", "ブラウザーを開いています…")}</p>
+            )}
+            <button
+              type="button"
+              className="onboard-btn onboard-btn-glass"
+              onClick={() => void window.hermesAPI.cancelMithrilDeviceLogin()}
+            >
+              {l("Cancel", "キャンセル")}
+            </button>
+          </div>
+        )}
+        <details>
+          <summary>
+            {l("Use a connection token instead", "接続トークンを使用する")}
+          </summary>
+          <form
+            onSubmit={(e) => void connect(e)}
+            className="onboard-cta-row"
+            data-testid="mithril-connect-form"
+          >
+            <input
+              id="mithril-first-run-token"
+              aria-label={l("Connection token", "接続トークン")}
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              className="welcome-remote-input"
+              placeholder="mf_…"
+              value={token}
+              disabled={busy}
+              onChange={(e) => setToken(e.target.value)}
+            />
+            <button
+              type="submit"
+              className="onboard-btn onboard-btn-primary"
+              disabled={busy || !token.trim()}
+            >
+              <span>
+                {busy ? l("Checking…", "確認中…") : l("Connect", "接続")}
+              </span>
+              {busy ? (
+                <Spinner size={16} className="animate-spin" />
+              ) : (
+                <ArrowRight size={17} />
+              )}
+            </button>
+          </form>
+        </details>
         {error && (
           <p role="alert" className="welcome-remote-error">
             {issueText(error, ja)}
           </p>
         )}
-        <div className="onboard-divider">
-          <span>{l("no token yet?", "トークンがない場合")}</span>
-        </div>
-        <div className="onboard-connect-row">
-          <button
-            type="button"
-            className="onboard-btn onboard-btn-glass"
-            onClick={() =>
-              void window.hermesAPI.openExternal(CONSOLE_TOKEN_URL)
-            }
-          >
-            <span>
-              {l(
-                "Sign in at auth.mithril.fund and create a token",
-                "auth.mithril.fund でサインインしてトークンを発行",
-              )}
-            </span>
-          </button>
-        </div>
+        <button
+          type="button"
+          className="onboard-btn onboard-btn-glass"
+          onClick={() => void window.hermesAPI.openExternal(CONSOLE_TOKEN_URL)}
+        >
+          {l("Open Mithril Console", "Mithril Console を開く")}
+        </button>
       </OnboardHero>
     );
   }

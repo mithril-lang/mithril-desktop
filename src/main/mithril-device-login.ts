@@ -107,6 +107,18 @@ export async function startMithrilDeviceLogin(
           start.status === 404 ? "device_unavailable" : "device_start_failed",
       };
     }
+    if (state.cancelled)
+      return { status: "refused", error: "device_cancelled" };
+    // The browser destination is a credential approval surface, never arbitrary.
+    const verification = new URL(
+      String(d.verification_uri_complete ?? d.verification_uri),
+    );
+    if (
+      verification.origin !== "https://console.mithril.fund" ||
+      verification.pathname !== "/account/device"
+    ) {
+      return { status: "refused", error: "device_start_failed" };
+    }
     onCode({
       userCode: String(d.user_code),
       verificationUri: String(d.verification_uri),
@@ -134,6 +146,7 @@ export async function startMithrilDeviceLogin(
       } catch {
         continue; // transient network error: keep polling until the deadline
       }
+      if (state.cancelled) break;
       if (action.kind === "success") {
         // Verified against /v1/me, stored encrypted, mirrored into the agent env.
         return connectMithrilAccount(action.accessToken, profile, fetchImpl);

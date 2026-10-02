@@ -6,8 +6,10 @@ import "@mithril/workspace/styles.css";
 /** New default Chat uses only the canonical Mithril model inventory and D1 sessions. */
 export default function MithrilChat({
   profile,
+  visible = true,
 }: {
   profile: string;
+  visible?: boolean;
 }): React.JSX.Element {
   const [epoch, setEpoch] = useState(0);
   const [legacy, setLegacy] = useState<LegacyProviderSnapshot | null>(null);
@@ -43,7 +45,12 @@ export default function MithrilChat({
       )}
       <ChatSessions
         key={profile}
+        visible={visible}
         transport={window.hermesAPI.cloudChat}
+        workspaceTransport={window.hermesAPI.cloudWorkspace}
+        beforeWorkspaceConnect={async () => {
+          await window.hermesAPI.cloudWorkspace.enable();
+        }}
         identityEpoch={`${profile}:${epoch}`}
         nativeImport={window.hermesAPI.nativeSessionImport}
         loadModels={() => window.hermesAPI.cloudChat.models()}

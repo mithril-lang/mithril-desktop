@@ -45,3 +45,7 @@ Desktop mounts the same eight shared views without reading user data and binds t
 ## Renderer account reset
 
 Account-change events and local profile changes clear the shared renderer owner without automatic reads, uploads or replays under the new account.
+
+## Bot and project import
+
+An explicit preview projects the actual selected bot instructions, user context, model preference, linked project titles and capability preferences. Known device-specific text is excluded and preview makes no cloud write or native mutation.

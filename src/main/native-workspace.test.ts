@@ -362,3 +362,48 @@ describe("Native workspace boundary", () => {
     expect(f.operations).not.toHaveBeenCalled();
   });
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Bot and project import]]
+it("previews actual selected bot instructions, linked project titles and capability preferences without uploading or mutating native files", async () => {
+  const f = fixture();
+  f.sources.profiles = async () => [
+    {
+      id: "default",
+      name: "Research bot",
+      model: "qwen/qwen3.8-27b",
+    } as Awaited<ReturnType<NativeSources["profiles"]>>[number],
+  ];
+  f.sources.soul = () => "Use primary evidence";
+  f.sources.projects = () => [
+    { id: "opaque-hash", title: "Research", description: "Linked folder" },
+  ];
+  f.sources.toolsets = () => [
+    {
+      key: "web",
+      label: "Web search",
+      description: "Search sources",
+      enabled: true,
+    },
+  ];
+  const preview = await f.native.previewImport();
+  expect(preview.candidates.map((row) => row.kind)).toEqual(
+    expect.arrayContaining(["bot_profile", "project", "capability"]),
+  );
+  expect(
+    preview.candidates.find((row) => row.kind === "bot_profile")?.data,
+  ).toMatchObject({
+    name: "Research bot",
+    instructions: "Use primary evidence",
+    userContext: "Person",
+  });
+  expect(f.operations).not.toHaveBeenCalled();
+  expect(f.update).not.toHaveBeenCalled();
+  f.sources.soul = () => "Use /Users/private/key";
+  const excluded = await f.native.previewImport();
+  expect(excluded.candidates.some((row) => row.kind === "bot_profile")).toBe(
+    false,
+  );
+  expect(
+    excluded.excluded.some((row) => row.label === "Selected bot profile"),
+  ).toBe(true);
+});

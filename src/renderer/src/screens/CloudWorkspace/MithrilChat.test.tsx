@@ -66,7 +66,7 @@ describe("Default shared Mithril Chat", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Connect session sync" }),
     );
-    await screen.findByRole("button", { name: "Create D1 session" });
+    await screen.findByRole("button", { name: "New synced chat" });
     expect(enable).toHaveBeenCalledTimes(1);
     expect(models).toHaveBeenCalledTimes(1);
     expect(preview).not.toHaveBeenCalled();
@@ -80,7 +80,7 @@ describe("Default shared Mithril Chat", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Connect session sync" }),
     );
-    await screen.findByRole("button", { name: "Create D1 session" });
+    await screen.findByRole("button", { name: "New synced chat" });
     changed();
     await waitFor(() =>
       expect(

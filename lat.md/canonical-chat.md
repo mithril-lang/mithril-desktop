@@ -1,6 +1,8 @@
 # Canonical Mithril chat
 
-Desktop opens the shared D1 Chat by default. This path only uses the authenticated Mithril API model inventory and never reads or selects retained local provider credentials.
+Desktop keeps its native New Chat, Projects and history. Synchronized chat is an explicit sidebar entry backed by shared D1 checkpoints.
+
+This path uses the Mithril API model inventory and never selects retained local provider credentials.
 
 ## Authenticated transport
 
@@ -37,3 +39,11 @@ Portable workspace import is a separate preview and selection flow. It excludes 
 [[src/main/cloud-chat.test.ts]] verifies dedicated scopes, explicit consent, cached inventory without probes, paid-turn rejection, checkpoint ownership and delayed prior-account isolation.
 
 [[src/main/native-session-import.test.ts]] proves selected Native-to-shared import, default skip, nonportable exclusion, repeated-click receipts, no overwrite, explicit copies and account-bound previews. [[src/main/native-workspace.test.ts]] verifies actual memory limits, path exclusion, explicit refusal of unsafe native writes and non-destructive selected import using injected fixtures only.
+
+## Shared bot and agent goal
+
+Canonical sessions capture a selected bot profile revision and persistent goal before explicit inference. Context edits use the session revision so a stale client cannot silently replace another client's instructions.
+
+[[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx]] mounts the common bot/goal controls. Bot inventory requires separate workspace opt-in; chat consent never silently enables workspace access. Existing native provider configuration, permissions and run routing remain in the original New Chat.
+
+The API captures reviewed authored instructions, USER context and goal in an owner-scoped agent_context event. Later bot edits do not silently change the captured session instructions. Both clients read identical goal and tool checkpoints; observing and reconnecting starts no iteration. This is persistent-goal synchronization, not automatic transfer of a running native Ralph loop.

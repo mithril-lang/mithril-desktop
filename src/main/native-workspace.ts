@@ -43,6 +43,8 @@ export interface NativeSources {
   context(): Promise<NativeContext>;
   namespace(): string;
   now(): number;
+  soul?(profile: string): string;
+  projects?(): { id: string; title: string; description: string }[];
   memory(profile: string): MemoryInfo;
   memoryApply?(
     profile: string,
@@ -698,6 +700,40 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
         { displayName: profile.name, bio: memory.user.content },
         "Selected profile",
       );
+    if (profile && this.sources.soul)
+      add(
+        "bot_profile",
+        "bot-profile",
+        {
+          name: profile.name,
+          instructions: this.sources.soul(context.profile),
+          userContext: memory.user.content,
+          ...(profile.model ? { model: profile.model } : {}),
+        },
+        "Selected bot profile",
+      );
+    this.sources
+      .projects?.()
+      .forEach((project) =>
+        add(
+          "project",
+          "folder:" + project.id,
+          { title: project.title, description: project.description },
+          "Linked project",
+        ),
+      );
+    this.sources.toolsets(context.profile).forEach((tool) =>
+      add(
+        "capability",
+        "toolset:" + tool.key,
+        {
+          name: tool.label,
+          description: tool.description,
+          enabled: tool.enabled,
+        },
+        "Capability preference",
+      ),
+    );
     memory.memory.entries.forEach((entry) =>
       add(
         "memory",

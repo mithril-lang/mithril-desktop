@@ -4,12 +4,15 @@ import type { RuntimePluginSummary } from "@mithril/workspace/runtime";
 import { app } from "electron";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
+import { basename } from "path";
+import { getRecentSessionContextFolders } from "./session-context-folder-store";
 import { NativeWorkspace } from "./native-workspace";
 import {
   cloudWorkspace,
   onCloudWorkspaceAccountChanged,
 } from "./cloud-workspace-runtime";
+import { readSoul } from "./soul";
 import { readMemory, applyMemoryMutation } from "./memory";
 import { listProfiles } from "./profiles";
 import { getToolsets } from "./tools";
@@ -58,6 +61,13 @@ export const nativeWorkspace = new NativeWorkspace({
   namespace: importNamespace,
   now: Date.now,
   memory: readMemory,
+  soul: readSoul,
+  projects: () =>
+    getRecentSessionContextFolders(100).map((folder) => ({
+      id: createHash("sha256").update(folder).digest("hex"),
+      title: basename(folder),
+      description: "Linked Desktop working folder; device path stays local.",
+    })),
   ...(process.platform !== "win32"
     ? {
         memoryApply: (

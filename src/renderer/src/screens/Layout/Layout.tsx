@@ -105,7 +105,7 @@ function Layout({
 }: LayoutProps): React.JSX.Element {
   const { t, locale } = useI18n();
   const { openSettings } = useSettingsModal();
-  const [view, setView] = useState<View>("mithril-chat");
+  const [view, setView] = useState<View>("chat");
   // Multiple conversations coexist (background sessions + multi-agent). Each is
   // a ChatRun; all are mounted, only the active one is shown. Profile switches
   // preserve existing conversations and activate a scratch run for the selected
@@ -270,7 +270,7 @@ function Layout({
   // Tabs lazy-mount on first visit, then stay mounted (display:none toggle).
   // Keeps IPC refetch / DOM rebuild off the tab-switch hot path.
   const [visitedViews, setVisitedViews] = useState<Set<View>>(
-    () => new Set<View>(["mithril-chat"]),
+    () => new Set<View>(["chat"]),
   );
   // Remote-only mode — SSH tunnel has full access; only pure HTTP remote mode restricts screens
   const [remoteMode, setRemoteMode] = useState(false);
@@ -435,10 +435,6 @@ function Layout({
             : undefined);
 
   const handleNewChat = useCallback(() => {
-    if (view !== "chat") {
-      goTo("mithril-chat");
-      return;
-    }
     // Open a fresh run WITHOUT aborting others — any in-flight session keeps
     // streaming in the background and stays reachable via the active bar. If the
     // current chat is already a blank scratch, reuse it instead of stacking
@@ -457,7 +453,7 @@ function Layout({
     setRuns((prev) => [...prev, run]);
     setActiveRunId(run.runId);
     goTo("chat");
-  }, [runs, activeRunId, connectionId, activeProfile, goTo, view]);
+  }, [runs, activeRunId, connectionId, activeProfile, goTo]);
 
   // Listen for menu IPC events (Cmd+N, Cmd+K from app menu)
   useEffect(() => {
@@ -733,9 +729,9 @@ function Layout({
             </button>
             <button
               className={`sidebar-nav-item sidebar-new-chat ${
-                view === "mithril-chat" ? "active" : ""
+                view === "chat" && currentSessionId === null ? "active" : ""
               }`}
-              onClick={() => goTo("mithril-chat")}
+              onClick={handleNewChat}
               title={t("navigation.newChat")}
               aria-label={t("navigation.newChat")}
             >
@@ -763,10 +759,13 @@ function Layout({
           <div className="sidebar-chat-section">
             <div className="sidebar-nav-sessions">
               <div className="sidebar-chat-scroll" ref={sidebarChatScrollRef}>
-                <button onClick={() => goTo("chat")}>
-                  Retained local history (legacy providers; manual only)
+                <button
+                  className="sidebar-nav-item"
+                  onClick={() => goTo("mithril-chat")}
+                >
+                  Synchronized chat
                 </button>
-                {view === "chat" && (
+                {
                   <SidebarRecentSessions
                     open={!sidebarCollapsed}
                     connectionId={connectionId}
@@ -782,7 +781,7 @@ function Layout({
                     }}
                     scrollRootRef={sidebarChatScrollRef}
                   />
-                )}
+                }
               </div>
               {sidebarScrollbar.scrollable && (
                 <div
@@ -955,7 +954,10 @@ function Layout({
 
           {visitedViews.has("mithril-chat") && (
             <div style={paneStyle("mithril-chat")}>
-              <MithrilChat profile={activeProfile} />
+              <MithrilChat
+                profile={activeProfile}
+                visible={view === "mithril-chat"}
+              />
             </div>
           )}
           {visitedViews.has("workspace") && (

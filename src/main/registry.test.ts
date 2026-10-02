@@ -17,6 +17,7 @@ vi.mock("./installer", () => ({
 vi.mock("./skills", () => ({
   installSkill: vi.fn(() => ({ success: true })),
   listInstalledSkills: () => [],
+  bundledSkillMarkdown: vi.fn(() => ""),
 }));
 vi.mock("./profiles", () => ({
   createProfile: vi.fn(() => ({ success: true })),
@@ -30,9 +31,11 @@ vi.mock("./process-options", () => ({ HIDDEN_SUBPROCESS_OPTIONS: {} }));
 
 import {
   fetchRegistry,
+  fetchRegistryDetail,
   installRegistryItem,
   validateGitPluginEntry,
 } from "./registry";
+import { bundledSkillMarkdown } from "./skills";
 
 const artifact = {
   format: "git" as const,
@@ -168,5 +171,21 @@ describe("Git plugin artifact validation", () => {
         artifact: { ...artifact, url: "http://example.com/x" },
       }),
     ).toThrow("reviewed public GitHub");
+  });
+
+  it("opens a bundled skill from its local SKILL.md", async () => {
+    vi.mocked(bundledSkillMarkdown).mockReturnValue(
+      "python message_spam.py collect\npython message_spam.py analyze\npython message_spam.py register",
+    );
+    const detail = await fetchRegistryDetail("skills", {
+      id: "message-spam",
+      name: "message-spam",
+      description: "Classify exported SMS and register local indicators.",
+      source: "message-spam",
+    });
+    expect(detail.markdown).toContain("collect");
+    expect(detail.markdown).toContain("analyze");
+    expect(detail.markdown).toContain("register");
+    expect(bundledSkillMarkdown).toHaveBeenCalledWith("message-spam");
   });
 });

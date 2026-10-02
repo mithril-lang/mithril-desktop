@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { join } from "path";
-import { mkdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+
+const { execFileSync } = vi.hoisted(() => ({ execFileSync: vi.fn() }));
+
+vi.mock("child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("child_process")>();
+  return { ...actual, default: { ...actual, execFileSync }, execFileSync };
+});
 
 const { TEST_HOME, TEST_REPO } = vi.hoisted(() => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -22,7 +29,11 @@ vi.mock("../src/main/installer", () => ({
   getEnhancedPath: () => "",
 }));
 
-import { getSkillContent } from "../src/main/skills";
+import {
+  bundledSkillMarkdown,
+  getSkillContent,
+  installSkill,
+} from "../src/main/skills";
 
 function writeSkill(root: string, content: string): string {
   mkdirSync(root, { recursive: true });
@@ -83,5 +94,58 @@ describe("getSkillContent path validation", () => {
     );
 
     expect(getSkillContent(skillPath)).toBe("");
+  });
+});
+
+describe("bundled message-spam skill", () => {
+  const skillBody = [
+    "---",
+    "name: message-spam",
+    "description: Classify exported SMS and register local indicators.",
+    "---",
+    "",
+    "python message_spam.py collect",
+    "python message_spam.py analyze",
+    "python message_spam.py register",
+    "",
+  ].join("\n");
+
+  it("returns the local SKILL.md procedure for Discover", () => {
+    writeSkill(
+      join(TEST_REPO, "skills", "security", "message-spam"),
+      skillBody,
+    );
+
+    const markdown = bundledSkillMarkdown("message-spam");
+    expect(markdown).toContain("collect");
+    expect(markdown).toContain("analyze");
+    expect(markdown).toContain("register");
+  });
+
+  it("installs a repo-local skill into the profile when the hub cannot resolve it", () => {
+    writeSkill(
+      join(TEST_REPO, "skills", "security", "message-spam"),
+      skillBody,
+    );
+    execFileSync.mockImplementation(() => {
+      const error = new Error("spawn failed") as Error & { stderr?: Buffer };
+      error.stderr = Buffer.from(
+        "No exact match for 'message-spam'. Did you mean one of these?",
+      );
+      throw error;
+    });
+
+    const result = installSkill("message-spam");
+    const installed = join(
+      TEST_HOME,
+      "skills",
+      "security",
+      "message-spam",
+      "SKILL.md",
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(existsSync(installed)).toBe(true);
+    expect(readFileSync(installed, "utf-8")).toContain("register");
   });
 });

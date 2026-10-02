@@ -3,7 +3,11 @@ import { existsSync, readFileSync, readdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { profileHome, safeWriteFile } from "./utils";
-import { installSkill, listInstalledSkills } from "./skills";
+import {
+  bundledSkillMarkdown,
+  installSkill,
+  listInstalledSkills,
+} from "./skills";
 import { createProfile } from "./profiles";
 import { writeSoul } from "./soul";
 import { listMcpServers } from "./installer";
@@ -542,7 +546,15 @@ export async function fetchRegistryDetail(
   kind: RegistryKind,
   item: RegistryItem,
 ): Promise<RegistryDetail> {
-  if (!item.path) return { description: item.description || "" };
+  if (!item.path) {
+    // Bundled skills are listed from the hermes-agent checkout and have no
+    // registry folder. Open the local SKILL.md so the procedure is visible.
+    if (kind === "skills") {
+      const markdown = bundledSkillMarkdown(item.name || item.id);
+      if (markdown) return { markdown };
+    }
+    return { description: item.description || "" };
+  }
   const registry = item.registry || "hermes";
 
   if (kind === "skills") {

@@ -1,6 +1,6 @@
 {
   "name": "mithril-desktop",
-  "version": "0.8.0-preview.8",
+  "version": "0.8.0-preview.9",
   "description": "Mithril desktop app — Hermes Agent client for Mithril Fund (fork of fathah/hermes-desktop)",
   "main": "./out/main/index.js",
   "author": "Mithril",
@@ -36,6 +36,7 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@mithril/design-system": "git+https://github.com/mithril-lang/design-system.git#78289d07fb9b8fee7fbbca3cf29a6e7af27974a7",
     "@radix-ui/react-dialog": "^1.1.17",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
@@ -58,8 +59,7 @@
     "thinking-orbs": "^0.1.1",
     "three": "^0.183.2",
     "troika-three-text": "^0.52.4",
-    "ws": "^8.20.0",
-    "@mithril/design-system": "git+https://github.com/mithril-lang/design-system.git#6dde1815944635ad8d189a77d5252ff10f61d665"
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",

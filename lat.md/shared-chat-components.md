@@ -27,7 +27,9 @@ Consumers pin the same shared source commit. Shared changes pass component CI, t
 
 The shared repo checks adapter clipboard/link behavior, image policy, code
 expansion isolation during streaming, IME Enter, app-consumed keys, Send/Stop
-and bubble slots. Desktop retains its Markdown diagram/highlighting regressions
-and chat interaction tests. Run `npm run typecheck`, `npm test`, `npm run lint`
+and bubble slots. Stop cancels the browser click default before invoking abort,
+so a synchronous return to Send cannot submit the restored draft a second time.
+Desktop retains its Markdown diagram/highlighting regressions and chat
+interaction tests. Run `npm run typecheck`, `npm test`, `npm run lint`
 and `npm run lat:check` before publication. Desktop changes require a new preview
 installer; Web changes use current-main App CI only.

@@ -102,6 +102,11 @@ export default {
   mcpUpdated: "MCP server updated.",
   mcpUpdateFailed: "Failed to update MCP server.",
   mcpBrowseCatalog: "Browse catalog",
+  mcpAddEvidence: "Add Mithril evidence tools",
+  mcpAddEvidenceHint:
+    "Adds tools to save notes, links and files to your Mithril evidence vault and to build checklists from what you saved. They use your connected Mithril account. Linux preview.",
+  mcpEvidenceAdded: "Mithril evidence tools added.",
+  mcpEvidenceAddFailed: "Could not add the Mithril evidence tools.",
   mcpSearch: "Filter MCP servers...",
   mcpNoResults: "No MCP servers match your filter.",
   mcpEmptyTitle: "No MCP servers configured",

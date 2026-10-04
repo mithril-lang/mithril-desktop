@@ -14,6 +14,7 @@ import {
 } from "@mithril/workspace/runtime";
 import {
   validateData,
+  taskStatuses,
   type WorkspaceKind,
   type WorkspaceData,
   type WorkspaceOperation,
@@ -756,31 +757,44 @@ export class NativeWorkspace implements WorkspaceRuntimeAdapter {
           "Kanban board",
         ),
       );
-    tasks
-      .filter((task) => task.status !== "archived")
-      .forEach((task) => {
-        if (
-          !["todo", "done", "running"].includes(task.status) ||
-          task.body ||
-          task.assignee
-        ) {
-          excluded.push({
-            label: "Kanban task",
-            reason:
-              "This native task has fields/status not yet representable by the portable schema; inspect native Kanban instead.",
-          });
-          return;
-        }
-        add(
-          "task",
-          `task:${task.id}`,
-          {
-            title: task.title,
-            status: task.status === "running" ? "doing" : task.status,
-          },
-          "Kanban task",
-        );
-      });
+    const currentBoard = boards.find(
+      (board) => board.is_current && !board.archived,
+    );
+    tasks.forEach((task) => {
+      if (
+        !taskStatuses.includes(task.status as (typeof taskStatuses)[number])
+      ) {
+        excluded.push({
+          label: "Kanban task",
+          reason: "Unsupported task status; local task remains unchanged.",
+        });
+        return;
+      }
+      add(
+        "task",
+        `task:${task.id}`,
+        {
+          title: task.title,
+          status: task.status,
+          ...(task.body ? { description: task.body } : {}),
+          ...(task.assignee ? { assignee: task.assignee } : {}),
+          priority:
+            task.priority >= 10
+              ? "urgent"
+              : task.priority >= 5
+                ? "high"
+                : task.priority === 1
+                  ? "low"
+                  : "normal",
+          ...(currentBoard
+            ? {
+                projectId: `native_${hash([namespace, context.userId, context.profile, "project", `board:${currentBoard.slug}`])}`,
+              }
+            : {}),
+        },
+        "Kanban task",
+      );
+    });
     add(
       "preferences",
       "locale",

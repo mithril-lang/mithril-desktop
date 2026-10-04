@@ -48,6 +48,24 @@ export class CloudWorkspace {
   private generation = 0;
   constructor(private deps: Dependencies) {}
 
+  // @lat: [[cloud-workspace#Cloud workspace#Canonical catalog]]
+  async catalog(): Promise<import("@mithril/workspace/react").DiscoverItem[]> {
+    const response = await this.deps.fetch(
+      `${this.deps.origin()}/v1/discover/catalog`,
+      {
+        credentials: "omit",
+        redirect: "error",
+        signal: AbortSignal.timeout(15000),
+        headers: { accept: "application/json" },
+      },
+    );
+    if (!response.ok) throw new Error("Catalog unavailable");
+    const value: unknown = await response.json();
+    if (!Array.isArray(value) || value.length > 2000)
+      throw new Error("Invalid catalog");
+    return value;
+  }
+
   reset(): void {
     this.generation++;
     this.identity = null;

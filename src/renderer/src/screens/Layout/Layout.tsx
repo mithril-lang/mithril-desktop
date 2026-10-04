@@ -22,17 +22,14 @@ import { ActiveSessionsBar } from "./ActiveSessionsBar";
 import { StatusBar } from "./StatusBar";
 import Sessions from "../Sessions/Sessions";
 import Agents from "../Agents/Agents";
-import Discover from "../Discover/Discover";
 import ProfileSwitcher from "./ProfileSwitcher";
 import SidebarRecentSessions from "./SidebarRecentSessions";
 import Skills from "../Skills/Skills";
 import Memory from "../Memory/Memory";
 import Tools from "../Tools/Tools";
 import Gateway from "../Gateway/Gateway";
-import Office from "../Office/Office";
 import Providers from "../Providers/Providers";
 import Schedules from "../Schedules/Schedules";
-import Kanban from "../Kanban/Kanban";
 import CloudWorkspace from "../CloudWorkspace/CloudWorkspace";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
@@ -979,15 +976,15 @@ function Layout({
           )}
           {visitedViews.has("discover") && (
             <div style={paneStyle("discover")}>
-              {remoteMode ? (
-                <RemoteNotice feature="Discover" />
-              ) : (
-                <Discover
-                  profile={activeProfile}
-                  visible={view === "discover"}
-                  focusKind={discoverFocus ?? undefined}
-                />
-              )}
+              <CloudWorkspace
+                profile={activeProfile}
+                locale={locale}
+                initialView="discover"
+                discoverFocus={discoverFocus ?? undefined}
+                embedded
+                active={view === "discover"}
+                onOpenChat={() => goTo("mithril-chat")}
+              />
             </div>
           )}
 
@@ -1008,7 +1005,14 @@ function Layout({
 
           {visitedViews.has("office") && (
             <div style={paneStyle("office")}>
-              <Office profile={activeProfile} visible={view === "office"} />
+              <CloudWorkspace
+                profile={activeProfile}
+                locale={locale}
+                initialView="office"
+                embedded
+                active={view === "office"}
+                onOpenChat={() => goTo("mithril-chat")}
+              />
             </div>
           )}
 
@@ -1066,11 +1070,14 @@ function Layout({
 
           {visitedViews.has("kanban") && (
             <div style={paneStyle("kanban")}>
-              {remoteMode ? (
-                <RemoteNotice feature="Kanban" />
-              ) : (
-                <Kanban profile={activeProfile} visible={view === "kanban"} />
-              )}
+              <CloudWorkspace
+                profile={activeProfile}
+                locale={locale}
+                initialView="kanban"
+                embedded
+                active={view === "kanban"}
+                onOpenChat={() => goTo("mithril-chat")}
+              />
             </div>
           )}
 

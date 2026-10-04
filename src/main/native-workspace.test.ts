@@ -337,6 +337,52 @@ describe("Native workspace boundary", () => {
       "Changed by native runtime",
     );
   });
+  it("preserves reviewed native task descriptions, board and Desktop priority semantics", async () => {
+    const f = fixture();
+    f.sources.boards = async () => [
+      {
+        slug: "evidence",
+        name: "Evidence",
+        description: "Review",
+        is_current: true,
+        archived: false,
+        total: 1,
+        counts: { review: 1 },
+      },
+    ];
+    f.sources.tasks = async () => [
+      {
+        id: "t_1",
+        title: "Review receipt",
+        body: "Keep the receipt",
+        assignee: "reviewer",
+        status: "review",
+        priority: 5,
+        tenant: null,
+        workspace_kind: "scratch",
+        workspace_path: null,
+        created_by: null,
+        created_at: null,
+        started_at: null,
+        completed_at: null,
+        result: null,
+        skills: [],
+        max_retries: null,
+      },
+    ];
+    const preview = await f.native.previewImport();
+    const board = preview.candidates.find((row) => row.kind === "project")!;
+    const task = preview.candidates.find((row) => row.kind === "task")!;
+    expect(task.data).toEqual({
+      title: "Review receipt",
+      description: "Keep the receipt",
+      assignee: "reviewer",
+      status: "review",
+      priority: "high",
+      projectId: board.cloudId,
+    });
+    expect(f.operations).not.toHaveBeenCalled();
+  });
   it("preview is opt-in and selected portable import never writes local memory", async () => {
     const f = fixture();
     const p = await f.native.previewImport();

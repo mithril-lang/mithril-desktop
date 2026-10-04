@@ -40,11 +40,11 @@ Only the main Desktop window's trusted top frame may invoke workspace IPC; webvi
 
 ## Shared renderer consent
 
-Desktop mounts the same eight shared views without reading user data and binds the shared Enable and Disconnect controls to main-process consent.
+Desktop mounts shared screens and automatically reads through existing scoped main authorization. Observation does not write or grant scopes.
 
 ## Renderer account reset
 
-Account-change events and local profile changes clear the shared renderer owner without automatic reads, uploads or replays under the new account.
+Account-change events and local profile changes clear the prior renderer owner and recheck scoped identity before reading the new workspace. They never replay edits or tools.
 
 ## Bot and project import
 

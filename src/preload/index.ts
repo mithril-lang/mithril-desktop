@@ -319,6 +319,7 @@ const hermesAPI = {
       ipcRenderer.removeListener("cloud-chat-account-changed", handler);
   },
   cloudWorkspace: {
+    catalog: () => ipcRenderer.invoke("cloud-workspace-catalog"),
     status: () => ipcRenderer.invoke("cloud-workspace-status"),
     enable: () => ipcRenderer.invoke("cloud-workspace-enable"),
     disable: () => ipcRenderer.invoke("cloud-workspace-disable"),

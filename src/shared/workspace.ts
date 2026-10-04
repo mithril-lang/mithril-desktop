@@ -8,6 +8,7 @@ export interface CloudWorkspaceStatus {
 }
 
 export interface CloudWorkspaceAPI extends WorkspaceTransport {
+  catalog(): Promise<import("@mithril/workspace/react").DiscoverItem[]>;
   status(): Promise<CloudWorkspaceStatus>;
   enable(): Promise<CloudWorkspaceStatus>;
   disable(): Promise<void>;

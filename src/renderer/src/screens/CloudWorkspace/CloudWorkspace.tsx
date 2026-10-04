@@ -1,17 +1,27 @@
 import type { RuntimeSection } from "@mithril/workspace/runtime";
 import { useCallback, useEffect, useState } from "react";
-import { WorkspaceApp, type DiscoverItem } from "@mithril/workspace/react";
+import {
+  WorkspaceApp,
+  type DiscoverItem,
+  type WorkspaceView,
+} from "@mithril/workspace/react";
 import "@mithril/workspace/styles.css";
 
 // @lat: [[cloud-workspace#Cloud workspace#Shared screens]]
 export default function CloudWorkspace({
   profile,
+  initialView,
+  embedded = false,
+  discoverFocus,
   locale = "en",
   active = true,
   onOpenNativeSection,
   onOpenChat,
 }: {
   profile: string;
+  initialView?: WorkspaceView;
+  embedded?: boolean;
+  discoverFocus?: { kind: "skills" | "mcps"; nonce: number };
   locale?: string;
   active?: boolean;
   onOpenNativeSection?: (section: RuntimeSection) => void;
@@ -25,47 +35,25 @@ export default function CloudWorkspace({
       ),
     [],
   );
-  const loadCatalog = useCallback(async (): Promise<DiscoverItem[]> => {
-    const catalog = await window.hermesAPI.fetchRegistry();
-    if (
-      catalog.error &&
-      Object.values(catalog).every(
-        (value) => !Array.isArray(value) || value.length === 0,
-      )
-    )
-      throw new Error("Registry unavailable");
-    return [
-      catalog.skills,
-      catalog.mcps,
-      catalog.agents,
-      catalog.workflows,
-      catalog.plugins,
-    ]
-      .flat()
-      .filter(
-        (item) =>
-          item.registry === "mithril" &&
-          item.path &&
-          /^[a-zA-Z0-9/_\-.]+$/.test(item.path) &&
-          !item.path.includes(".."),
-      )
-      .map((item) => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        href: `https://github.com/mithril-lang/mithril-registry/tree/main/${item.path}`,
-      }));
+  const loadCatalog = useCallback(
+    (): Promise<DiscoverItem[]> => window.hermesAPI.cloudWorkspace.catalog(),
+    [],
+  );
+  const beforeConnect = useCallback(async () => {
+    await window.hermesAPI.cloudWorkspace.enable();
   }, []);
   return (
     <WorkspaceApp
       key={profile}
+      initialView={initialView}
+      embedded={embedded}
+      discoverFocus={discoverFocus}
+      autoConnect
       transport={window.hermesAPI.cloudWorkspace}
       runtimeAdapter={window.hermesAPI.nativeWorkspace}
       onOpenNativeSection={onOpenNativeSection}
       onOpenChat={onOpenChat}
-      beforeConnect={async () => {
-        await window.hermesAPI.cloudWorkspace.enable();
-      }}
+      beforeConnect={beforeConnect}
       afterDisconnect={() => window.hermesAPI.cloudWorkspace.disable()}
       identityEpoch={`${profile}:${identityEpoch}`}
       loadCatalog={loadCatalog}

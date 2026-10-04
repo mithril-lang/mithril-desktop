@@ -1,6 +1,6 @@
 # Cloud workspace
 
-Desktop and Web consume one versioned Mithril workspace renderer and protocol, with explicit opt-in portable user data and no implicit import of local agent files.
+Desktop and Web consume one versioned Mithril workspace renderer and protocol, with signed-in automatic Cloud observation and explicitly selected native imports and no implicit import of local agent files.
 
 ## Main process boundary
 
@@ -12,7 +12,9 @@ Workspace access requires explicit `workspace:read` and `workspace:write` scopes
 
 ## Shared screens
 
-The shared workspace package supplies Discover, Office, Kanban, Projects, Capabilities, Memory, Settings and Profile through one source; native Desktop screens remain available for device operations.
+The shared workspace package supplies Discover, Office, Kanban, Projects, Capabilities, Memory, Settings and Profile through one source; Discover, Office and Kanban navigation now mounts this renderer directly in both clients.
+
+The old native records remain available through reviewed import, without scanning or overwriting local files.
 
 Discover projects the official Mithril Registry into safe catalog links. Portable projects, tasks, workrooms, notes, profile and preferences use the owner-scoped workspace API. Actual native runtime views are separately inspected and linked; portable records do not substitute for native Office or tool execution. Capability preferences express intent without installing a plugin or granting device permission.
 
@@ -20,7 +22,7 @@ Cloud entries are deliberately separate from existing local profiles, agent conf
 
 ## Release boundary
 
-Workspace changes require a coordinated API migration and shared-package release before installer publication; this branch prepares draft review without a production migration or release.
+Package 0.5.0 requires the compatible API to be published before Web and Desktop. The existing D1 JSON tables need no new DDL for richer task records; CI health gates verify the protocol version.
 
 [[mithril-migration#Mithril desktop migration#Desktop release gate]] remains the packaged release gate after explicit publication authorization.
 
@@ -31,3 +33,13 @@ Projects, capability preferences and bot definitions use the shared owner-scoped
 While the shared workspace is active and connected, read-only observation refreshes every five seconds and on focus or network recovery. It never flushes unsent edits; explicit save/reconnect owns writes. Editing retains its captured revision, so remote updates become conflicts instead of replacing a draft.
 
 [[src/main/native-workspace.ts#NativeWorkspace#previewImport]] includes reviewed selected SOUL/USER content and model preference, linked working-folder titles and current toolset preferences. Only opaque IDs and portable authored fields enter the preview. Absolute folder paths, credentials and execution grants are excluded; selected import leaves native files unchanged.
+
+## Canonical catalog
+
+[[src/main/cloud-workspace.ts#CloudWorkspace#catalog]] reads public release-pinned catalog metadata only through api.mithril.fund. Both clients receive the same Mithril and Hermes registry entries, category tabs and cards. No metadata action installs code or grants permissions.
+
+## Cloud-first surfaces
+
+Discover, Office and Kanban use the compiled @mithril/workspace package in both clients.
+
+D1 workspace_records/history/operations own portable data; revisions and operation IDs prevent silent concurrent overwrites and duplicate saves. Read observation runs on focus and every five seconds. Native files, credentials, run history and device permission grants are never implicit imports. An offline window retains queued changes until explicit retry; durable disk outbox is not implemented. Office profiles are cloud definitions; they are not evidence of a running gateway. Rich task status, description, priority, board/project and assignee fields require package 0.5.0 or later.

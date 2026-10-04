@@ -23,6 +23,7 @@ beforeEach(() => {
     configurable: true,
     value: {
       cloudWorkspace: {
+        catalog: vi.fn(async () => []),
         enable,
         disable,
         getSnapshot: snapshot,
@@ -47,7 +48,7 @@ afterEach(cleanup);
 
 describe("Desktop shared workspace", () => {
   // @lat: [[cloud-workspace-tests#Cloud workspace tests#Shared renderer consent]]
-  it("mounts eight real shared views with no automatic user data access, then binds explicit main consent", async () => {
+  it("mounts shared views and automatically reads through the existing scoped main adapter", async () => {
     render(<CloudWorkspace profile="default" />);
     for (const name of [
       "Discover",
@@ -61,36 +62,29 @@ describe("Desktop shared workspace", () => {
     ]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
-    expect(enable).not.toHaveBeenCalled();
-    expect(snapshot).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Enable.*sync/i }));
     await waitFor(() => expect(enable).toHaveBeenCalledTimes(1));
-    await screen.findByText(/Sync enabled for this account/);
+    await screen.findByText(/Cloud synced/);
     expect(snapshot).toHaveBeenCalled();
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: /Disconnect and clear cached workspace/i,
-      }),
-    );
-    await waitFor(() => expect(disable).toHaveBeenCalledTimes(1));
+    expect(
+      window.hermesAPI.cloudWorkspace.applyOperations,
+    ).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(snapshot.mock.calls.length).toBeGreaterThan(2));
+    expect(disable).not.toHaveBeenCalled();
   });
 
   // @lat: [[cloud-workspace-tests#Cloud workspace tests#Renderer account reset]]
-  it("resets shared cached owner on main account change and profile change without resending edits", async () => {
+  it("rechecks identity after account and profile changes without replaying edits", async () => {
     const { rerender } = render(<CloudWorkspace profile="default" />);
-    fireEvent.click(screen.getByRole("button", { name: /Enable.*sync/i }));
-    await screen.findByText(/Sync enabled for this account/);
+    await screen.findByText(/Cloud synced/);
     accountChanged();
-    await waitFor(() =>
-      expect(
-        screen.queryByText(/Sync enabled for this account/),
-      ).not.toBeInTheDocument(),
-    );
-    const previousCalls = snapshot.mock.calls.length;
+    await waitFor(() => expect(enable).toHaveBeenCalledTimes(2));
+    await screen.findByText(/Cloud synced/);
     rerender(<CloudWorkspace profile="another-profile" />);
+    await waitFor(() => expect(enable).toHaveBeenCalledTimes(3));
+    await screen.findByText(/Cloud synced/);
     expect(
-      screen.getByRole("button", { name: /Enable.*sync/i }),
-    ).toBeInTheDocument();
-    expect(snapshot.mock.calls.length).toBe(previousCalls);
+      window.hermesAPI.cloudWorkspace.applyOperations,
+    ).not.toHaveBeenCalled();
   });
 });

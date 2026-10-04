@@ -1265,6 +1265,10 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudChat.receipt(id, operationId);
   });
+  ipcMain.handle("cloud-workspace-catalog", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.catalog();
+  });
   ipcMain.handle("cloud-workspace-status", (event) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.status();

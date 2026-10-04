@@ -148,7 +148,9 @@ describe("selected project folder synchronization", () => {
     const preview = await a.preview("p", join(f.root, "a"));
     expect(preview).toMatchObject({ count: 2, excluded: 1 });
     await a.connect("p", preview.ticket);
+    await a.tick();
     await b.connect("p", (await b.preview("p", join(f.root, "b"))).ticket);
+    await b.tick();
     expect(await readFile(join(f.root, "b", "hello.txt"), "utf8")).toBe(
       "hello",
     );
@@ -176,6 +178,7 @@ describe("selected project folder synchronization", () => {
     await writeFile(join(f.root, "a", "hello.txt"), "hello");
     f.loseAck();
     await a.connect("p", (await a.preview("p", join(f.root, "a"))).ticket);
+    await a.tick();
     expect((await a.status("p")).error).toContain("Connection lost");
     const old = f.operations[0];
     const restarted = new ProjectFolderSync(f.deps("state"));
@@ -200,7 +203,9 @@ describe("selected project folder synchronization", () => {
     await writeFile(join(f.root, "a", "hello.txt"), "hello");
     expect((await a.preview("p", join(f.root, "a"))).excluded).toBe(1);
     await a.connect("p", (await a.preview("p", join(f.root, "a"))).ticket);
+    await a.tick();
     await b.connect("p", (await b.preview("p", join(f.root, "b"))).ticket);
+    await b.tick();
     await unlink(join(f.root, "a", "hello.txt"));
     await a.tick();
     await b.tick();
@@ -218,6 +223,7 @@ describe("selected project folder synchronization", () => {
       a = new ProjectFolderSync(f.deps("state-a"));
     await writeFile(join(f.root, "a", "hello.txt"), "hello");
     await a.connect("p", (await a.preview("p", join(f.root, "a"))).ticket);
+    await a.tick();
     let started!: () => void, release!: () => void;
     const waiting = new Promise<void>((resolve) => {
       started = resolve;
@@ -236,10 +242,8 @@ describe("selected project folder synchronization", () => {
       },
     };
     const b = new ProjectFolderSync(deps);
-    const connecting = b.connect(
-      "p",
-      (await b.preview("p", join(f.root, "b"))).ticket,
-    );
+    await b.connect("p", (await b.preview("p", join(f.root, "b"))).ticket);
+    const connecting = b.tick();
     const result = connecting.catch((error: unknown) => error);
     await waiting;
     await b.disconnect("p");

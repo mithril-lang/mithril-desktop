@@ -272,7 +272,8 @@ export class ProjectFolderSync {
       ...links.filter((l) => l.projectId !== projectId),
       link,
     ]);
-    await this.tick();
+    // The scheduled pass runs in the background; starting sync must not block
+    // the renderer from stopping a long initial transfer.
     return this.status(projectId);
   }
   async status(

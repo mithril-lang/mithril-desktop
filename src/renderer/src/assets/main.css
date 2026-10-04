@@ -17214,6 +17214,6 @@ body:has(.shell-vibrant),
 
 /* Cloud history shares its Desktop/Web component; device history stays explicit. */
 .sidebar-cloud-history { flex:1; min-height:0; overflow:hidden; }
-.sidebar-chat-section { flex:0; max-height:180px; }
+.sidebar-chat-section { flex:0 0 auto; max-height:180px; overflow:auto; }
 .sidebar-collapsed .workspace-sidebar-history,.sidebar-collapsed .workspace-session-sidebar .sidebar-new-chat span:last-child { display:none; }
 .sidebar-collapsed .workspace-session-sidebar .sidebar-new-chat { justify-content:center; }

@@ -59,3 +59,11 @@ A stored Mithril account opens the shared workspace even when the optional local
 Normal startup retains device settings without starting a legacy SSH tunnel, probing its remote backend or checking its gateway. Local runtime installation is available only from the explicit Device runtime action. Shared Chat verifies account and API scopes before reading sessions; it never reads legacy provider configuration on connect. Models, sessions and workspace data come from Mithril API.
 
 Stopping synchronization invalidates active work before publishing downloaded bytes and serializes journal writes, so an in-flight pass cannot re-enable a stopped folder. A regression test pauses a download, stops sync, and verifies the destination remains absent.
+
+## Shared sidebar history
+
+The API-backed Chat shares Web’s expanded sidebar for cloud sessions and projects. Pins are owner-scoped device preferences; legacy device history stays separate. Reading the sidebar never creates sessions or executes tools.
+
+### Read-only cloud sidebar
+
+The shared sidebar reads the checked cloud account and project inventory without importing device history, writing workspace records, or issuing chat operations.

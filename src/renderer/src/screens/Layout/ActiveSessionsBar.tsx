@@ -1,5 +1,5 @@
+import { ChatTabs } from "@mithril/design-system/react";
 import { memo } from "react";
-import { X, Plus } from "../../assets/icons";
 import { OrbLoader } from "../../components/OrbLoader";
 import { useI18n } from "../../components/useI18n";
 import ProfileAvatar from "../../components/common/ProfileAvatar";
@@ -44,65 +44,33 @@ export const ActiveSessionsBar = memo(function ActiveSessionsBar({
   const showChips = runs.length > 1 || anyLoading || hasRealSession;
 
   return (
-    <div className="active-sessions-bar" role="tablist">
-      {showChips &&
-        runs.map((run) => {
-          const active = run.runId === activeRunId;
-          const label = run.title || t("sessions.newConversation");
-          const appearance = getAppearance?.(run.profile);
-          return (
-            <div
-              key={run.runId}
-              role="tab"
-              aria-selected={active}
-              className={`active-session-chip ${active ? "active" : ""} ${
-                run.loading ? "loading" : ""
-              }`}
-              onClick={() => onSelect(run.runId)}
-              title={`${run.profile} — ${label}`}
-            >
-              {run.loading ? (
-                <span
-                  className="active-session-chip-avatar active-session-chip-orb"
-                  aria-label={run.profile}
-                >
-                  <OrbLoader state="composing" size={20} />
-                </span>
-              ) : (
-                <ProfileAvatar
-                  name={run.profile}
-                  color={appearance?.color}
-                  avatar={appearance?.avatar}
-                  size={18}
-                />
-              )}
-              <span className="active-session-chip-title">{label}</span>
-              <button
-                type="button"
-                className="active-session-chip-close"
-                title={t("sessions.closeTab")}
-                aria-label={t("sessions.closeTab")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose(run.runId);
-                }}
-              >
-                <X size={12} />
-              </button>
-            </div>
-          );
-        })}
-      {showChips && (
-        <button
-          type="button"
-          className="active-session-new"
-          title={t("sessions.newConversation")}
-          aria-label={t("sessions.newConversation")}
-          onClick={onNew}
-        >
-          <Plus size={14} />
-        </button>
-      )}
-    </div>
+    <ChatTabs
+      showTabs={showChips}
+      activeId={activeRunId}
+      tabs={runs.map((run) => {
+        const appearance = getAppearance?.(run.profile);
+        return {
+          id: run.runId,
+          title: run.title || t("sessions.newConversation"),
+          description: `${run.profile} — ${run.title || t("sessions.newConversation")}`,
+          busy: run.loading,
+          avatar: run.loading ? (
+            <OrbLoader state="composing" size={20} />
+          ) : (
+            <ProfileAvatar
+              name={run.profile}
+              color={appearance?.color}
+              avatar={appearance?.avatar}
+              size={18}
+            />
+          ),
+        };
+      })}
+      onSelect={onSelect}
+      onClose={onClose}
+      onNew={onNew}
+      newLabel={t("sessions.newConversation")}
+      closeLabel={t("sessions.closeTab")}
+    />
   );
 });

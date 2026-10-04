@@ -1,3 +1,4 @@
+import { ChatSurface } from "@mithril/design-system/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Zap, Globe } from "lucide-react";
@@ -1024,7 +1025,7 @@ function Chat({
   );
 
   return (
-    <div
+    <ChatSurface
       className="chat-container"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -1183,7 +1184,7 @@ function Chat({
       />
       {/* Show follow-us modal only after setup is complete */}
       {active && connectionModeLoaded && readiness.ok && <FollowUsModal />}
-    </div>
+    </ChatSurface>
   );
 }
 

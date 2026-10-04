@@ -1,3 +1,4 @@
+import { ToolActivity } from "@mithril/design-system/react";
 import { memo, useState } from "react";
 import { Brain, ChevronRight, Wrench } from "../../assets/icons";
 import { OrbLoader } from "../../components/OrbLoader";
@@ -255,7 +256,6 @@ export const ToolActivityGroup = memo(function ToolActivityGroup({
   /** Appearance of the chatting agent, shown once the avatar goes idle. */
   agent?: AgentAvatarInfo;
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false);
   const last = items[items.length - 1];
   const detail = itemDetail(last);
   const title = toolActivityGroupTitle(items);
@@ -273,23 +273,12 @@ export const ToolActivityGroup = memo(function ToolActivityGroup({
       ) : (
         <AvatarSpacer />
       )}
-      <div
-        className={`chat-tool-group${active ? " chat-tool-group--active" : ""}`}
-      >
-        <button
-          type="button"
-          className="chat-tool-group-summary"
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-        >
-          {active ? (
-            <OrbLoader
-              state="working"
-              size={20}
-              aria-label="tool-loading"
-              className="chat-tool-group-spinner"
-            />
-          ) : soloTool ? (
+      <ToolActivity
+        title={title}
+        detail={detail}
+        active={active}
+        icon={
+          soloTool ? (
             <ToolGlyph
               toolName={soloTool}
               size={13}
@@ -297,28 +286,13 @@ export const ToolActivityGroup = memo(function ToolActivityGroup({
             />
           ) : (
             <Wrench size={13} className="chat-tool-group-icon" />
-          )}
-          <span className="chat-tool-group-name">{title}</span>
-          {detail && <span className="chat-tool-group-detail">{detail}</span>}
-          <ChevronRight
-            size={14}
-            className={`chat-tool-group-chevron${
-              open ? " chat-tool-group-chevron--open" : ""
-            }`}
-          />
-        </button>
-        <div
-          className={`chat-tool-collapse${open ? " chat-tool-collapse--open" : ""}`}
-        >
-          <div className="chat-tool-collapse-inner">
-            <div className="chat-tool-group-items">
-              {orderedItems.map((it, index) => (
-                <ToolActivityItem key={`${it.id}-${index}`} msg={it} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+          )
+        }
+      >
+        {orderedItems.map((it, index) => (
+          <ToolActivityItem key={`${it.id}-${index}`} msg={it} />
+        ))}
+      </ToolActivity>
     </div>
   );
 });

@@ -1,4 +1,4 @@
-import { ChatTextarea, ChatSubmitButton } from "@mithril/design-system/react";
+import { ChatComposer } from "@mithril/design-system/react";
 import {
   useState,
   useRef,
@@ -648,31 +648,41 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             {voice.error}
           </div>
         )}
-        <div className="chat-input-shell">
-          <div className="chat-input-wrapper">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              style={{ display: "none" }}
-              onChange={handleFileInputChange}
-            />
-            <ChatTextarea
-              ref={inputRef}
-              className="chat-input"
-              placeholder={t("chat.typeMessage")}
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              onSend={() => {
-                if (canSend) handleSend();
-              }}
-              onPaste={handlePaste}
-              rows={1}
-              spellCheck={spellcheckEnabled}
-              autoFocus
-            />
-            <div className="chat-input-toolbar">
+        <ChatComposer
+          ref={inputRef}
+          busy={isLoading}
+          disabled={!canSend}
+          sendLabel={t("chat.send")}
+          stopLabel={t("common.stop")}
+          onSend={handleSend}
+          onStop={onAbort}
+          sendIconSize={20}
+          stopIconSize={14}
+          beforeInput={
+            <>
+              {" "}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                style={{ display: "none" }}
+                onChange={handleFileInputChange}
+              />
+            </>
+          }
+          textarea={{
+            placeholder: t("chat.typeMessage"),
+            value: input,
+            onChange: handleInputChange,
+            onKeyDown: handleKeyDown,
+            onPaste: handlePaste,
+            rows: 1,
+            spellCheck: spellcheckEnabled,
+            autoFocus: true,
+          }}
+          leadingActions={
+            <>
+              {" "}
               <button
                 className="chat-attach-btn"
                 onClick={() => fileInputRef.current?.click()}
@@ -712,13 +722,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   <Mic size={16} />
                 </button>
               )}
-              {toolbarExtras && (
-                <>
-                  <span className="chat-input-toolbar-divider" aria-hidden />
-                  {toolbarExtras}
-                </>
-              )}
-              <div className="chat-input-toolbar-spacer" />
+            </>
+          }
+          controls={toolbarExtras}
+          trailingActions={
+            <>
+              {" "}
               {contextUsage && contextUsage.used > 0 && (
                 <ContextGauge {...contextUsage} />
               )}
@@ -732,32 +741,21 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   💭
                 </button>
               )}
-              <ChatSubmitButton
-                busy={isLoading}
-                disabled={!canSend}
-                sendLabel={t("chat.send")}
-                stopLabel={t("common.stop")}
-                className={
-                  isLoading ? "chat-send-btn chat-stop-btn" : "chat-send-btn"
-                }
-                sendIconSize={20}
-                stopIconSize={14}
-                onSend={handleSend}
-                onStop={onAbort}
-              />
-            </div>
-          </div>
-          <BorderBeam
-            aria-hidden="true"
-            className="chat-input-beam"
-            size="pulse-inner"
-            colorVariant="mono"
-            strength={0.7}
-            theme={beamTheme}
-          >
-            <span className="chat-input-beam-surface" />
-          </BorderBeam>
-        </div>
+            </>
+          }
+          decoration={
+            <BorderBeam
+              aria-hidden="true"
+              className="chat-input-beam"
+              size="pulse-inner"
+              colorVariant="mono"
+              strength={0.7}
+              theme={beamTheme}
+            >
+              <span className="chat-input-beam-surface" />
+            </BorderBeam>
+          }
+        />
       </>
     );
   },

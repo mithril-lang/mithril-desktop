@@ -58,71 +58,20 @@ function App(): React.JSX.Element {
     const startedAt = Date.now();
     let next: Screen = "mithril";
     const error: string | null = null;
-    let isRemote = false;
     let nextSetupProfile = "default";
-
     try {
-      setSplashStatus("Checking connection…");
+      setSplashStatus("Checking Mithril account…");
+      // Preserve device configuration, but normal cloud startup never starts a
+      // legacy SSH tunnel, probes its server, or requires a local agent install.
       const conn = await window.hermesAPI.getConnectionConfig();
-      isRemote = conn.mode === "remote" || conn.mode === "ssh";
       setConnectionMode(conn.mode);
       setConnectionId(conn.connectionId);
-
-      if (conn.mode === "ssh" && conn.ssh) {
-        setSplashStatus("Starting SSH tunnel…");
-        try {
-          await window.hermesAPI.startSshTunnel();
-        } catch (tunnelErr) {
-          console.warn("SSH tunnel failed to start on launch:", tunnelErr);
-        }
-        next = "main";
-      } else if (conn.mode === "remote" && conn.remoteUrl) {
-        setSplashStatus("Testing remote connection…");
-        const ok = await window.hermesAPI.testRemoteConnection(conn.remoteUrl);
-        if (ok) {
-          next = "main";
-        } else {
-          console.warn(`Cannot reach remote Hermes at ${conn.remoteUrl}.`);
-          next = "main";
-        }
-      } else {
-        setSplashStatus("Checking Mithril account…");
-        const status = await window.hermesAPI.checkInstall();
-        nextSetupProfile = status.activeProfile || "default";
-        const first = await window.hermesAPI
-          .getMithrilFirstRunState(nextSetupProfile)
-          .catch(() => ({ connected: false, protection: "keychain" as const }));
-        setMithrilConnected(first.connected);
-        if (!first.connected || !status.installed) {
-          // First run: Mithril connect, never the Hermes install prompt. The
-          // local agent runtime is an explicit opt-in from that screen.
-          next = "mithril";
-        } else if (!status.hasApiKey) {
-          next = "setup";
-        } else {
-          next = "main";
-        }
-
-        // Warm config-health and gateway status in the background while the
-        // splash is still visible so the first render is snappy. Cap at 800ms
-        // so it never pushes us past the 3s minimum.
-        if (next === "main") {
-          setSplashStatus("Checking configuration…");
-          await Promise.race([
-            Promise.all([
-              window.hermesAPI
-                .getConfigHealth()
-                .catch(() => null)
-                .then(() => undefined),
-              window.hermesAPI
-                .gatewayStatus()
-                .catch(() => null)
-                .then(() => undefined),
-            ]),
-            new Promise<void>((r) => setTimeout(r, 800)),
-          ]);
-        }
-      }
+      const status = await window.hermesAPI.checkInstall().catch(() => null);
+      nextSetupProfile = status?.activeProfile || "default";
+      const first =
+        await window.hermesAPI.getMithrilFirstRunState(nextSetupProfile);
+      setMithrilConnected(first.connected);
+      next = first.connected ? "main" : "mithril";
     } catch {
       next = "mithril";
     }
@@ -140,24 +89,8 @@ function App(): React.JSX.Element {
       await new Promise((r) => setTimeout(r, wait));
     }
     if (myRun !== runIdRef.current) return;
-    if (!isRemote) setSetupProfile(nextSetupProfile);
+    setSetupProfile(nextSetupProfile);
     setScreen(next);
-
-    // Lazy deep-verify in the background after the UI is up. If the
-    // install is broken, surface the warning then — don't block startup.
-    //
-    // Skip for remote-mode connections: verifyInstall() probes the LOCAL
-    // Python + script paths (HERMES_PYTHON / HERMES_SCRIPT in installer.ts),
-    // which don't exist on machines that only use a remote backend. Without
-    // this guard the user is bounced back to Welcome with an "installBroken"
-    // error immediately after a successful remote connect. (#47, #41, #30)
-    if ((next === "main" || next === "setup") && !isRemote) {
-      window.hermesAPI.verifyInstall().then((ok) => {
-        // Files exist (checkInstall passed) but the probe failed. Surface
-        // a soft warning instead of bouncing to Welcome — see #130.
-        if (!ok) setVerifyWarning(true);
-      });
-    }
   }, []);
 
   useEffect(() => {
@@ -188,6 +121,10 @@ function App(): React.JSX.Element {
   }
 
   async function openWorkspace(): Promise<void> {
+    setScreen("main");
+  }
+
+  async function openDeviceRuntime(): Promise<void> {
     // Explicit opt-in to the local Hermes agent runtime (large download).
     const status = await window.hermesAPI.checkInstall().catch(() => null);
     if (!status?.installed) setScreen("welcome");
@@ -281,6 +218,7 @@ function App(): React.JSX.Element {
         return (
           <Layout
             connectionId={connectionId}
+            onOpenDeviceRuntime={() => void openDeviceRuntime()}
             verifyWarning={verifyWarning}
             onReinstall={handleVerifyReinstall}
             onDismissVerifyWarning={handleDismissVerifyWarning}

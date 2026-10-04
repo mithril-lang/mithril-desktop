@@ -1,10 +1,4 @@
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import MithrilChat from "./MithrilChat";
 const enable = vi.fn(async () => ({ userId: "owner", enabled: true }));
@@ -24,6 +18,7 @@ beforeEach(() => {
     value: {
       cloudChat: {
         enable,
+        status: vi.fn(async () => ({ userId: "owner", enabled: false })),
         legacySnapshot: vi.fn(async () => ({
           policyVersion: 1,
           userId: "owner",
@@ -57,17 +52,11 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 describe("Default shared Mithril Chat", () => {
-  it("does not access user sessions, models or local history before explicit connection", async () => {
+  it("automatically reads a checked cloud account without using local history or issuing operations", async () => {
     render(<MithrilChat profile="default" />);
-    expect(enable).not.toHaveBeenCalled();
-    expect(list).not.toHaveBeenCalled();
-    expect(models).not.toHaveBeenCalled();
-    expect(preview).not.toHaveBeenCalled();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Connect session sync" }),
-    );
-    await screen.findByRole("button", { name: "New synced chat" });
+    await screen.findByRole("combobox", { name: /Mithril model/ });
     expect(enable).toHaveBeenCalledTimes(1);
+    expect(window.hermesAPI.cloudChat.legacySnapshot).not.toHaveBeenCalled();
     expect(models).toHaveBeenCalledTimes(1);
     expect(preview).not.toHaveBeenCalled();
     expect(apply).not.toHaveBeenCalled();
@@ -75,18 +64,11 @@ describe("Default shared Mithril Chat", () => {
       screen.getByRole("combobox", { name: /Mithril model/ }),
     ).toHaveTextContent("mithril-model");
   });
-  it("clears connected account on main identity change and preserves explicit reconnect", async () => {
+  it("does not replay operations after an account change", async () => {
     render(<MithrilChat profile="default" />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Connect session sync" }),
-    );
-    await screen.findByRole("button", { name: "New synced chat" });
+    await screen.findByRole("combobox", { name: /Mithril model/ });
     changed();
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Connect session sync" }),
-      ).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(enable).toHaveBeenCalledTimes(2));
     expect(apply).not.toHaveBeenCalled();
   });
 });

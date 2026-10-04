@@ -345,6 +345,7 @@ interface HermesAPI {
   nativeSessionImport: NativeSessionImportAPI;
   cloudChat: CloudChatAPI;
   onCloudChatAccountChanged(callback: () => void): () => void;
+  projectFolderSync: import("@mithril/workspace/files").ProjectFolderAdapter;
   cloudWorkspace: CloudWorkspaceAPI;
   nativeWorkspace: NativeWorkspaceAPI;
   onCloudWorkspaceAccountChanged: (callback: () => void) => () => void;

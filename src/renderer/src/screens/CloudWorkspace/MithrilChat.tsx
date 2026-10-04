@@ -1,5 +1,4 @@
-import type { LegacyProviderSnapshot } from "../../../../shared/legacy-provider";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ChatSessions } from "@mithril/workspace/session-react";
 import "@mithril/workspace/styles.css";
 
@@ -14,39 +13,33 @@ export default function MithrilChat({
   locale?: string;
 }): React.JSX.Element {
   const [epoch, setEpoch] = useState(0);
-  const [legacy, setLegacy] = useState<LegacyProviderSnapshot | null>(null);
-  const generation = useRef(0);
-  useEffect(() => {
-    generation.current++;
-    setLegacy(null);
-  }, [profile]);
+  const [accountId, setAccountId] = useState<string | null>(null);
   useEffect(
     () =>
       window.hermesAPI.onCloudChatAccountChanged(() => {
-        generation.current++;
         setEpoch((value) => value + 1);
-        setLegacy(null);
       }),
     [],
   );
+  useEffect(() => {
+    let canceled = false;
+    setAccountId(null);
+    void window.hermesAPI.cloudChat
+      .status()
+      .then((status) => {
+        if (!canceled) setAccountId(status.userId);
+      })
+      .catch(() => {});
+    return () => {
+      canceled = true;
+    };
+  }, [profile, epoch]);
   return (
     <div>
-      <p>
-        Models and inference use api.mithril.fund. Local provider configurations
-        and history are retained for explicit legacy access; they are never used
-        by this Chat.
-      </p>
-      {legacy && (
-        <p>
-          Local provider configuration{" "}
-          {legacy.configuration.present
-            ? "is retained"
-            : "has not been configured"}
-          . Automatic use is disabled for this Mithril Chat.
-        </p>
-      )}
       <ChatSessions
         key={profile}
+        autoConnect
+        accountId={accountId}
         visible={visible}
         locale={locale}
         transport={window.hermesAPI.cloudChat}
@@ -59,10 +52,7 @@ export default function MithrilChat({
         loadModels={() => window.hermesAPI.cloudChat.models()}
         loadRuntime={() => window.hermesAPI.cloudChat.runtime()}
         beforeConnect={async () => {
-          const current = generation.current;
           await window.hermesAPI.cloudChat.enable();
-          const snapshot = await window.hermesAPI.cloudChat.legacySnapshot();
-          if (current === generation.current) setLegacy(snapshot);
         }}
         afterDisconnect={() => window.hermesAPI.cloudChat.disable()}
       />

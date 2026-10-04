@@ -17,7 +17,7 @@ interface MithrilStartProps {
   /** Already connected at launch (a stored mf_ token exists). */
   initiallyConnected: boolean;
   profile?: string;
-  /** Optional: continue into the full Hermes agent workspace. */
+  /** Optional: continue into the shared API-backed workspace. */
   onOpenWorkspace: () => void;
 }
 
@@ -449,12 +449,7 @@ function MithrilStart({
           className="onboard-btn onboard-btn-glass"
           onClick={onOpenWorkspace}
         >
-          <span>
-            {l(
-              "Open agent workspace (optional)",
-              "エージェントワークスペースを開く（任意）",
-            )}
-          </span>
+          <span>{l("Open workspace", "Workspace を開く")}</span>
         </button>
         <button
           type="button"

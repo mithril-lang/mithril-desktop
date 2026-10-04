@@ -47,7 +47,6 @@ import {
   Download,
   PanelLeftClose,
   PanelLeftOpen,
-  Plus,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
@@ -694,6 +693,27 @@ function Layout({
     ? t("navigation.expandSidebar")
     : t("navigation.collapseSidebar");
 
+  const cloudSidebarNavigation = (
+    <WorkspaceNavigation
+      className="sidebar-nav-pinned"
+      items={[
+        {
+          id: "workspace",
+          label: "Cloud Workspace",
+          icon: <Compass size={16} />,
+          active: view === "workspace",
+          onSelect: () => goTo("workspace"),
+        },
+        ...PINNED_NAV_ITEMS.map(({ view: v, icon: Icon, labelKey }) => ({
+          id: v,
+          label: t(labelKey),
+          icon: <Icon size={16} />,
+          active: view === v,
+          onSelect: () => goTo(v),
+        })),
+      ]}
+    />
+  );
   return (
     <div className="layout-shell">
       <div className={`layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
@@ -724,43 +744,11 @@ function Layout({
             </button>
           </div>
 
-          <WorkspaceNavigation
-            className="sidebar-nav-pinned"
-            items={[
-              {
-                id: "workspace",
-                label: "Cloud Workspace",
-                icon: <Compass size={16} />,
-                active: view === "workspace",
-                onSelect: () => goTo("workspace"),
-              },
-              {
-                id: "new",
-                label: t("navigation.chat"),
-                icon: <Plus size={16} />,
-                active: view === "mithril-chat",
-                onSelect: () => goTo("mithril-chat"),
-                className: "sidebar-new-chat",
-              },
-              ...PINNED_NAV_ITEMS.map(({ view: v, icon: Icon, labelKey }) => ({
-                id: v,
-                label: t(labelKey),
-                icon: <Icon size={16} />,
-                active: view === v,
-                onSelect: () => goTo(v),
-              })),
-            ]}
-          />
+          <div id="cloud-session-sidebar" className="sidebar-cloud-history" />
 
           <div className="sidebar-chat-section">
             <div className="sidebar-nav-sessions">
               <div className="sidebar-chat-scroll" ref={sidebarChatScrollRef}>
-                <button
-                  className="sidebar-nav-item"
-                  onClick={() => goTo("mithril-chat")}
-                >
-                  Chat
-                </button>
                 <details
                   onToggle={(e) => setLegacyHistoryOpen(e.currentTarget.open)}
                 >
@@ -961,6 +949,9 @@ function Layout({
               <MithrilChat
                 locale={locale}
                 profile={activeProfile}
+                sidebarNavigation={cloudSidebarNavigation}
+                onSidebarSelect={() => goTo("mithril-chat")}
+                onSidebarProjects={() => goTo("projects")}
                 visible={view === "mithril-chat"}
               />
             </div>

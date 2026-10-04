@@ -1,3 +1,4 @@
+import { WorkspaceNavigation } from "@mithril/design-system/react";
 import MithrilChat from "../CloudWorkspace/MithrilChat";
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import Chat from "../Chat/Chat";
@@ -717,44 +718,33 @@ function Layout({
             </button>
           </div>
 
-          <nav className="sidebar-nav sidebar-nav-pinned">
-            <button
-              className={`sidebar-nav-item ${view === "workspace" ? "active" : ""}`}
-              onClick={() => goTo("workspace")}
-              title="Cloud Workspace"
-              aria-label="Cloud Workspace"
-            >
-              <Compass size={16} />
-              <span className="sidebar-nav-label">Cloud Workspace</span>
-            </button>
-            <button
-              className={`sidebar-nav-item sidebar-new-chat ${
-                view === "chat" && currentSessionId === null ? "active" : ""
-              }`}
-              onClick={handleNewChat}
-              title={t("navigation.newChat")}
-              aria-label={t("navigation.newChat")}
-            >
-              <Plus size={16} />
-              <span className="sidebar-nav-label">
-                {t("navigation.newChat")}
-              </span>
-            </button>
-            {PINNED_NAV_ITEMS.map(({ view: v, icon: Icon, labelKey }) => {
-              return (
-                <button
-                  key={v}
-                  className={`sidebar-nav-item ${view === v ? "active" : ""}`}
-                  onClick={() => goTo(v)}
-                  title={t(labelKey)}
-                  aria-label={t(labelKey)}
-                >
-                  <Icon size={16} />
-                  <span className="sidebar-nav-label">{t(labelKey)}</span>
-                </button>
-              );
-            })}
-          </nav>
+          <WorkspaceNavigation
+            className="sidebar-nav-pinned"
+            items={[
+              {
+                id: "workspace",
+                label: "Cloud Workspace",
+                icon: <Compass size={16} />,
+                active: view === "workspace",
+                onSelect: () => goTo("workspace"),
+              },
+              {
+                id: "new",
+                label: t("navigation.newChat"),
+                icon: <Plus size={16} />,
+                active: view === "chat" && currentSessionId === null,
+                onSelect: handleNewChat,
+                className: "sidebar-new-chat",
+              },
+              ...PINNED_NAV_ITEMS.map(({ view: v, icon: Icon, labelKey }) => ({
+                id: v,
+                label: t(labelKey),
+                icon: <Icon size={16} />,
+                active: view === v,
+                onSelect: () => goTo(v),
+              })),
+            ]}
+          />
 
           <div className="sidebar-chat-section">
             <div className="sidebar-nav-sessions">

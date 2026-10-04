@@ -15,3 +15,13 @@ The beam is an absolutely positioned, non-interactive decoration whose generated
 The ChatInput integration test verifies the requested preset, strength, and theme while ensuring the beam is decorative and not an overflow-clipping ancestor of the textarea or toolbar.
 
 [[src/renderer/src/screens/Chat/ChatInput.test.tsx]] protects the component boundary and configuration without coupling tests to the dependency's generated animation CSS.
+
+## Shared Desktop and Web surface
+
+Desktop consumes the canonical compiled ChatComposer from the design-system package, together with the same CSS and screen components used on Web.
+
+[[src/renderer/src/screens/Chat/ChatInput.tsx#ChatInput]] supplies attachment, voice, model/context, quick ask and border-beam slots. The shared composer owns textarea/toolbar/send layout, Enter and IME handling. Native callbacks retain readiness, permission and queue behavior.
+
+ChatTabs, ChatWelcome, ToolActivity, WorkspaceNavigation and ChatSurface use the same package. Desktop supplies local profiles, run selection, native receipt content and navigation callbacks. No Electron or transport dependency enters the shared components. The package ships compiled ESM and declarations pinned by Git revision; CSS has one Desktop-derived owner.
+
+[[src/renderer/src/screens/Chat/ChatInput.test.tsx]] and [[src/renderer/src/screens/Layout/ActiveSessionsBar.test.tsx]] protect native integration; packaged shared tests cover keyboard tabs, close isolation, mounted disclosure and explicit actions.

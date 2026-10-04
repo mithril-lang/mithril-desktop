@@ -278,13 +278,13 @@ export const MessageList = memo(function MessageList({
   // rows — reasoning and tool rows would triple the number in agentic
   // sessions. All-history heads (no hidden bubble at all) fall back to the
   // row count rather than showing zero.
-  const hiddenMessageCount = useMemo(() => {
+  const hiddenMessageCount = (() => {
     let n = 0;
     for (let i = 0; i < windowStart; i++) {
       if (isBubble(visibleMessages[i])) n++;
     }
     return n;
-  }, [visibleMessages, windowStart]);
+  })();
 
   // Observe the top marker while rows are hidden (see comment block above).
   // `extraRows` is a dependency on purpose: IntersectionObserver only reports

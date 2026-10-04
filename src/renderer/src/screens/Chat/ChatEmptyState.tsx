@@ -1,3 +1,4 @@
+import { ChatWelcome } from "@mithril/design-system/react";
 import { memo } from "react";
 import { Search, Clock, Mail, Code, ChartLine, Bell } from "lucide-react";
 import mithrilMark from "@mithril/design-system/mithril-mark.svg";
@@ -52,24 +53,17 @@ export const ChatEmptyState = memo(function ChatEmptyState({
   const { t } = useI18n();
 
   return (
-    <div className="chat-empty">
-      <div className="chat-empty-icon">
-        <img className="chat-empty-logo" src={mithrilMark} alt="Mithril" />
-      </div>
-      <div className="chat-empty-text">{t("chat.emptyTitle")}</div>
-      <div className="chat-empty-hint">{t("chat.emptyHint")}</div>
-      <div className="chat-empty-suggestions">
-        {SUGGESTIONS.map(({ i18nKey, text, Icon }) => (
-          <button
-            key={i18nKey}
-            className="chat-suggestion"
-            onClick={() => onSelectSuggestion(text)}
-          >
-            <Icon size={16} />
-            {t(i18nKey)}
-          </button>
-        ))}
-      </div>
-    </div>
+    <ChatWelcome
+      logo={<img className="chat-empty-logo" src={mithrilMark} alt="Mithril" />}
+      title={t("chat.emptyTitle")}
+      hint={t("chat.emptyHint")}
+      suggestions={SUGGESTIONS.map(({ i18nKey, text, Icon }) => ({
+        id: i18nKey,
+        label: t(i18nKey),
+        prompt: text,
+        icon: <Icon size={16} />,
+      }))}
+      onSelect={onSelectSuggestion}
+    />
   );
 });

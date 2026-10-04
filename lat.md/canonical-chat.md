@@ -53,3 +53,9 @@ The API captures reviewed authored instructions, USER context and goal in an own
 Workspace 0.4.2 names the shared conversation screen Chat. Connection controls, tool permissions, bot goals and usage information are opened on demand. Native history import is available only when the native import adapter exists.
 
 The Desktop adapter supplies the current display locale to the same shared renderer used on Web; no consent or transport scope changes accompany this presentation update.
+
+## Desktop-derived shared components
+
+Workspace 0.4.3 and native Chat consume the same compiled Desktop composer, tabs, tool disclosure, welcome, navigation and conversation root.
+
+The design-system Git revision and lockfile match Web. Native attachment, voice, profiles and local gateway operations stay in Desktop adapters. Browser cloud controls and account consent stay in Web adapters. Both hosts import the shared Desktop-derived chat CSS; synchronized Chat is packaged as compiled ESM in the vendor workspace tarball.

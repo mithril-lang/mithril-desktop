@@ -1,3 +1,4 @@
+import { ProjectFolderSync } from "../project-folder-sync";
 import { nativeSessionImport } from "../native-session-import-runtime";
 import {
   cloudChat,
@@ -1264,6 +1265,91 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("cloud-chat-receipt", (event, id, operationId) => {
     trustedWorkspaceSender(event);
     return cloudChat.receipt(id, operationId);
+  });
+  const folderSync = new ProjectFolderSync({
+    context: () => cloudWorkspace.nativeContext(),
+    snapshot: () => cloudWorkspace.getSnapshot(),
+    apply: async (op) =>
+      (await cloudWorkspace.applyOperations([op])).results[0],
+    files: cloudWorkspace.files,
+    stateDir: join(app.getPath("userData"), "project-file-sync"),
+  });
+  const folderTimer = setInterval(() => {
+    void folderSync.tick().catch(() => {});
+  }, 15000);
+  folderTimer.unref();
+  app.once("before-quit", () => clearInterval(folderTimer));
+  ipcMain.handle("project-files-status", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.files.status();
+  });
+  ipcMain.handle(
+    "project-files-put-chunk",
+    (event, projectId, bytes, owner) => {
+      trustedWorkspaceSender(event);
+      return (
+        owner === undefined
+          ? cloudWorkspace.files
+          : cloudWorkspace.files.forOwner!(owner)
+      ).putChunk(projectId, bytes);
+    },
+  );
+  ipcMain.handle(
+    "project-files-get-chunk",
+    (event, projectId, digest, owner) => {
+      trustedWorkspaceSender(event);
+      return (
+        owner === undefined
+          ? cloudWorkspace.files
+          : cloudWorkspace.files.forOwner!(owner)
+      ).getChunk(projectId, digest);
+    },
+  );
+  ipcMain.handle("project-files-put-manifest", (event, manifest, owner) => {
+    trustedWorkspaceSender(event);
+    return (
+      owner === undefined
+        ? cloudWorkspace.files
+        : cloudWorkspace.files.forOwner!(owner)
+    ).putManifest(manifest);
+  });
+  ipcMain.handle(
+    "project-files-get-manifest",
+    (event, projectId, digest, owner) => {
+      trustedWorkspaceSender(event);
+      return (
+        owner === undefined
+          ? cloudWorkspace.files
+          : cloudWorkspace.files.forOwner!(owner)
+      ).getManifest(projectId, digest);
+    },
+  );
+  ipcMain.handle("project-folder-choose", async (event, projectId) => {
+    trustedWorkspaceSender(event);
+    const before = await cloudWorkspace.nativeContext();
+    const result = await dialog.showOpenDialog({
+      properties: ["openDirectory"],
+      title: "Choose project folder to synchronize with Mithril",
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    if (
+      JSON.stringify(before) !==
+      JSON.stringify(await cloudWorkspace.nativeContext())
+    )
+      throw new Error("Account changed; choose the folder again");
+    return folderSync.preview(projectId, result.filePaths[0]);
+  });
+  ipcMain.handle("project-folder-connect", (event, projectId, ticket) => {
+    trustedWorkspaceSender(event);
+    return folderSync.connect(projectId, ticket);
+  });
+  ipcMain.handle("project-folder-status", (event, projectId) => {
+    trustedWorkspaceSender(event);
+    return folderSync.status(projectId);
+  });
+  ipcMain.handle("project-folder-disconnect", (event, projectId) => {
+    trustedWorkspaceSender(event);
+    return folderSync.disconnect(projectId);
   });
   ipcMain.handle("cloud-workspace-catalog", (event) => {
     trustedWorkspaceSender(event);

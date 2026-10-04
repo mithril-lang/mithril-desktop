@@ -47,6 +47,28 @@ import type {
   SshDockerProvisionResult,
 } from "../shared/ssh-docker";
 
+function projectFileAPI(
+  owner?: string,
+): import("@mithril/workspace/files").ProjectFileTransport {
+  return {
+    forOwner: (value) => projectFileAPI(value),
+    status: () => ipcRenderer.invoke("project-files-status"),
+    putChunk: (projectId, bytes) =>
+      ipcRenderer.invoke("project-files-put-chunk", projectId, bytes, owner),
+    getChunk: (projectId, digest) =>
+      ipcRenderer.invoke("project-files-get-chunk", projectId, digest, owner),
+    putManifest: (manifest) =>
+      ipcRenderer.invoke("project-files-put-manifest", manifest, owner),
+    getManifest: (projectId, digest) =>
+      ipcRenderer.invoke(
+        "project-files-get-manifest",
+        projectId,
+        digest,
+        owner,
+      ),
+  };
+}
+
 /**
  * Mirror of the renderer-side `CredentialPoolEntry` ambient type
  * (src/preload/index.d.ts) — preload is type-checked under
@@ -318,7 +340,18 @@ const hermesAPI = {
     return () =>
       ipcRenderer.removeListener("cloud-chat-account-changed", handler);
   },
+  projectFolderSync: {
+    choose: (projectId) =>
+      ipcRenderer.invoke("project-folder-choose", projectId),
+    connect: (projectId, ticket) =>
+      ipcRenderer.invoke("project-folder-connect", projectId, ticket),
+    status: (projectId) =>
+      ipcRenderer.invoke("project-folder-status", projectId),
+    disconnect: (projectId) =>
+      ipcRenderer.invoke("project-folder-disconnect", projectId),
+  },
   cloudWorkspace: {
+    files: projectFileAPI(),
     catalog: () => ipcRenderer.invoke("cloud-workspace-catalog"),
     status: () => ipcRenderer.invoke("cloud-workspace-status"),
     enable: () => ipcRenderer.invoke("cloud-workspace-enable"),

@@ -1,4 +1,8 @@
 import {
+  createProjectFileTransport,
+  type ProjectFileTransport,
+} from "@mithril/workspace/files";
+import {
   validateData,
   validateOperation,
   validId,
@@ -46,7 +50,41 @@ export class CloudWorkspace {
   } | null = null;
   private enabled = false;
   private generation = 0;
-  constructor(private deps: Dependencies) {}
+  readonly files: ProjectFileTransport;
+  constructor(private deps: Dependencies) {
+    this.files = createProjectFileTransport(async (path, init) => {
+      const session = await this.session(),
+        generation = this.generation;
+      if (
+        init?.method === "POST" &&
+        !session.scopes.includes(this.deps.writeScope ?? "workspace:write")
+      )
+        throw new Error("Workspace write scope required");
+      const response = await this.deps.fetch(`${this.deps.origin()}${path}`, {
+        ...init,
+        credentials: "omit",
+        redirect: "error",
+        signal: AbortSignal.timeout(60000),
+        headers: {
+          "x-mithril-workspace-owner": session.userId,
+          ...init?.headers,
+          authorization: `Bearer ${session.token}`,
+        },
+      });
+      const bytes = await response.arrayBuffer();
+      if (
+        generation !== this.generation ||
+        session.token !== this.deps.token() ||
+        session.profile !== this.deps.profile()
+      )
+        throw new Error("Account changed; file response discarded");
+      if (response.status === 401 || response.status === 403) this.reset();
+      return new Response(bytes, {
+        status: response.status,
+        headers: response.headers,
+      });
+    });
+  }
 
   // @lat: [[cloud-workspace#Cloud workspace#Canonical catalog]]
   async catalog(): Promise<import("@mithril/workspace/react").DiscoverItem[]> {
@@ -282,7 +320,7 @@ export class CloudWorkspace {
     const session = await this.session();
     const generation = this.generation;
     const snapshot = (await this.request(
-      "/v1/workspace",
+      "/v1/workspace?files=1",
       session.token,
       session.profile,
     )) as WorkspaceSnapshot;

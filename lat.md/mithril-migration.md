@@ -120,7 +120,9 @@ It clears the entered bearer after success. The old Kotoba sign-in and gateway c
 
 ## Desktop release gate
 
-GitHub Actions remain disabled on this public source repository. The preview is built locally after its packaging, type, signature, and launch checks, then published as a GitHub prerelease with checksums and update metadata.
+GitHub Actions now build preview installers on current main. The cross-platform workflow publishes the prerelease assets only after every platform passes packaging checks and both Mac packages pass Apple notarization.
+
+An Apple agreement HTTP403 leaves publication pending; source merge is not installer publication.
 
 The inherited stable and beta release jobs also have a source-level false gate; migrate those workflows before intentionally enabling them.
 

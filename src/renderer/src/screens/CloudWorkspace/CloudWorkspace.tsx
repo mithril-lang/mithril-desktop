@@ -50,6 +50,8 @@ export default function CloudWorkspace({
       discoverFocus={discoverFocus}
       autoConnect
       transport={window.hermesAPI.cloudWorkspace}
+      fileTransport={window.hermesAPI.cloudWorkspace.files}
+      folderAdapter={window.hermesAPI.projectFolderSync}
       runtimeAdapter={window.hermesAPI.nativeWorkspace}
       onOpenNativeSection={onOpenNativeSection}
       onOpenChat={onOpenChat}

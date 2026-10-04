@@ -1,3 +1,6 @@
+import Agents from "../Agents/Agents";
+import Tools from "../Tools/Tools";
+import Memory from "../Memory/Memory";
 import { WorkspaceNavigation } from "@mithril/design-system/react";
 import MithrilChat from "../CloudWorkspace/MithrilChat";
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
@@ -21,12 +24,9 @@ import {
 import { ActiveSessionsBar } from "./ActiveSessionsBar";
 import { StatusBar } from "./StatusBar";
 import Sessions from "../Sessions/Sessions";
-import Agents from "../Agents/Agents";
 import ProfileSwitcher from "./ProfileSwitcher";
 import SidebarRecentSessions from "./SidebarRecentSessions";
 import Skills from "../Skills/Skills";
-import Memory from "../Memory/Memory";
-import Tools from "../Tools/Tools";
 import Gateway from "../Gateway/Gateway";
 import Providers from "../Providers/Providers";
 import Schedules from "../Schedules/Schedules";
@@ -55,6 +55,11 @@ import { useI18n } from "../../components/useI18n";
 type View =
   | "mithril-chat"
   | "workspace"
+  | "projects"
+  | "cloud-settings"
+  | "device-agents"
+  | "device-tools"
+  | "device-memory"
   | "chat"
   | "discover"
   | "agents"
@@ -73,6 +78,7 @@ const PINNED_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   // "Manage profiles" action rather than a top-level nav item.
   { view: "office", icon: Building, labelKey: "navigation.office" },
   { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
+  { view: "projects", icon: Compass, labelKey: "navigation.projects" },
   // "skills" lives under the Discover tab (installed + community), so it's no
   // longer a top-level nav item.
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
@@ -89,6 +95,7 @@ const SIDEBAR_COLLAPSED_KEY = "hermes.sidebar.collapsed";
 const SIDEBAR_SCROLLBAR_HIDE_MS = 700;
 
 interface LayoutProps {
+  onOpenDeviceRuntime?: () => void;
   connectionId: string;
   verifyWarning?: boolean;
   onReinstall?: () => void;
@@ -97,13 +104,14 @@ interface LayoutProps {
 
 function Layout({
   connectionId,
+  onOpenDeviceRuntime,
   verifyWarning,
   onReinstall,
   onDismissVerifyWarning,
 }: LayoutProps): React.JSX.Element {
   const { t, locale } = useI18n();
   const { openSettings } = useSettingsModal();
-  const [view, setView] = useState<View>("chat");
+  const [view, setView] = useState<View>("mithril-chat");
   // Multiple conversations coexist (background sessions + multi-agent). Each is
   // a ChatRun; all are mounted, only the active one is shown. Profile switches
   // preserve existing conversations and activate a scratch run for the selected
@@ -265,10 +273,11 @@ function Layout({
   // the Cmd/Ctrl+K menu action). Reuses the Sessions screen inside a modal —
   // there is no longer a top-level Sessions view.
   const [sessionsModalOpen, setSessionsModalOpen] = useState(false);
+  const [legacyHistoryOpen, setLegacyHistoryOpen] = useState(false);
   // Tabs lazy-mount on first visit, then stay mounted (display:none toggle).
   // Keeps IPC refetch / DOM rebuild off the tab-switch hot path.
   const [visitedViews, setVisitedViews] = useState<Set<View>>(
-    () => new Set<View>(["chat"]),
+    () => new Set<View>(["mithril-chat"]),
   );
   // Remote-only mode — SSH tunnel has full access; only pure HTTP remote mode restricts screens
   const [remoteMode, setRemoteMode] = useState(false);
@@ -727,10 +736,10 @@ function Layout({
               },
               {
                 id: "new",
-                label: t("navigation.newChat"),
+                label: t("navigation.chat"),
                 icon: <Plus size={16} />,
-                active: view === "chat" && currentSessionId === null,
-                onSelect: handleNewChat,
+                active: view === "mithril-chat",
+                onSelect: () => goTo("mithril-chat"),
                 className: "sidebar-new-chat",
               },
               ...PINNED_NAV_ITEMS.map(({ view: v, icon: Icon, labelKey }) => ({
@@ -750,25 +759,35 @@ function Layout({
                   className="sidebar-nav-item"
                   onClick={() => goTo("mithril-chat")}
                 >
-                  Synchronized chat
+                  Chat
                 </button>
-                {
-                  <SidebarRecentSessions
-                    open={!sidebarCollapsed}
-                    connectionId={connectionId}
-                    activeProfile={activeProfile}
-                    currentSessionId={currentSessionId}
-                    loadingSessionIds={loadingSessionIds}
-                    resumingSessionId={resumingSessionId}
-                    onSelect={handleResumeSession}
-                    onSessionDeleted={(id) => {
-                      // If the open chat was the one deleted, drop to a fresh chat
-                      // so the user isn't left viewing a now-gone conversation.
-                      if (id === currentSessionId) handleNewChat();
-                    }}
-                    scrollRootRef={sidebarChatScrollRef}
-                  />
-                }
+                <details
+                  onToggle={(e) => setLegacyHistoryOpen(e.currentTarget.open)}
+                >
+                  <summary>Device runtime · local history</summary>
+                  {onOpenDeviceRuntime && (
+                    <button onClick={onOpenDeviceRuntime}>
+                      Set up device runtime
+                    </button>
+                  )}
+                  {legacyHistoryOpen && (
+                    <SidebarRecentSessions
+                      open={!sidebarCollapsed}
+                      connectionId={connectionId}
+                      activeProfile={activeProfile}
+                      currentSessionId={currentSessionId}
+                      loadingSessionIds={loadingSessionIds}
+                      resumingSessionId={resumingSessionId}
+                      onSelect={handleResumeSession}
+                      onSessionDeleted={(id) => {
+                        // If the open chat was the one deleted, drop to a fresh chat
+                        // so the user isn't left viewing a now-gone conversation.
+                        if (id === currentSessionId) handleNewChat();
+                      }}
+                      scrollRootRef={sidebarChatScrollRef}
+                    />
+                  )}
+                </details>
               </div>
               {sidebarScrollbar.scrollable && (
                 <div
@@ -840,9 +859,7 @@ function Layout({
               ))}
               <button
                 className="sidebar-footer-action"
-                onClick={() =>
-                  openSettings(undefined, { profile: activeProfile })
-                }
+                onClick={() => goTo("cloud-settings")}
                 aria-label={t("navigation.settings")}
                 data-tooltip={t("navigation.settings")}
               >
@@ -962,16 +979,43 @@ function Layout({
                   }
                   const nativeViews = {
                     office: "office",
-                    capability: "tools",
-                    memory: "memory",
+                    capability: "device-tools",
+                    memory: "device-memory",
                     kanban: "kanban",
-                    projects: "kanban",
-                    profile: "agents",
+                    projects: "projects",
+                    profile: "device-agents",
                     discover: "discover",
                   } as const;
                   goTo(nativeViews[section]);
                 }}
               />
+            </div>
+          )}
+          {visitedViews.has("device-agents") && (
+            <div style={paneStyle("device-agents")}>
+              <Agents
+                activeProfile={activeProfile}
+                onSelectProfile={handleSelectProfile}
+                onChatWith={handleChatWithProfile}
+                onCloudWorkspace={() => goTo("workspace")}
+              />
+            </div>
+          )}
+          {visitedViews.has("device-tools") && (
+            <div style={paneStyle("device-tools")}>
+              <Tools
+                profile={activeProfile}
+                showPlatformToolsets={!remoteMode}
+                remoteMode={remoteMode}
+                visible={view === "device-tools"}
+                onBrowseSkills={() => focusDiscover("skills")}
+                onBrowseMcps={() => focusDiscover("mcps")}
+              />
+            </div>
+          )}
+          {visitedViews.has("device-memory") && (
+            <div style={paneStyle("device-memory")}>
+              <Memory profile={activeProfile} />
             </div>
           )}
           {visitedViews.has("discover") && (
@@ -990,19 +1034,37 @@ function Layout({
 
           {visitedViews.has("agents") && (
             <div style={paneStyle("agents")}>
-              {remoteMode ? (
-                <RemoteNotice feature="Profiles" />
-              ) : (
-                <Agents
-                  activeProfile={activeProfile}
-                  onSelectProfile={handleSelectProfile}
-                  onChatWith={handleChatWithProfile}
-                  onCloudWorkspace={() => goTo("workspace")}
-                />
-              )}
+              <CloudWorkspace
+                profile={activeProfile}
+                locale={locale}
+                initialView="bots"
+                embedded
+                active={view === "agents"}
+              />
             </div>
           )}
-
+          {visitedViews.has("projects") && (
+            <div style={paneStyle("projects")}>
+              <CloudWorkspace
+                profile={activeProfile}
+                locale={locale}
+                initialView="projects"
+                embedded
+                active={view === "projects"}
+              />
+            </div>
+          )}
+          {visitedViews.has("cloud-settings") && (
+            <div style={paneStyle("cloud-settings")}>
+              <CloudWorkspace
+                profile={activeProfile}
+                locale={locale}
+                initialView="settings"
+                embedded
+                active={view === "cloud-settings"}
+              />
+            </div>
+          )}
           {visitedViews.has("office") && (
             <div style={paneStyle("office")}>
               <CloudWorkspace
@@ -1041,27 +1103,26 @@ function Layout({
 
           {visitedViews.has("memory") && (
             <div style={paneStyle("memory")}>
-              {remoteMode ? (
-                <RemoteNotice feature="Memory" />
-              ) : (
-                <Memory profile={activeProfile} />
-              )}
-            </div>
-          )}
-
-          {visitedViews.has("tools") && (
-            <div style={paneStyle("tools")}>
-              <Tools
+              <CloudWorkspace
                 profile={activeProfile}
-                showPlatformToolsets={!remoteMode}
-                remoteMode={remoteMode}
-                visible={view === "tools"}
-                onBrowseSkills={() => focusDiscover("skills")}
-                onBrowseMcps={() => focusDiscover("mcps")}
+                locale={locale}
+                initialView="memory"
+                embedded
+                active={view === "memory"}
               />
             </div>
           )}
-
+          {visitedViews.has("tools") && (
+            <div style={paneStyle("tools")}>
+              <CloudWorkspace
+                profile={activeProfile}
+                locale={locale}
+                initialView="capability"
+                embedded
+                active={view === "tools"}
+              />
+            </div>
+          )}
           {visitedViews.has("schedules") && (
             <div style={paneStyle("schedules")}>
               <Schedules profile={activeProfile} />

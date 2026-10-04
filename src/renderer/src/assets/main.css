@@ -17208,3 +17208,6 @@ body:has(.shell-vibrant),
 
 /* Native-only window dragging stays in the Desktop adapter. */
 .active-sessions-bar { -webkit-app-region:drag; z-index:1001; }
+
+/* Electron drag regions belong to the native adapter. */
+.active-session-chip, .active-session-new { -webkit-app-region: no-drag; }

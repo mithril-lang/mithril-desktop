@@ -15,6 +15,7 @@ export default {
   soul: "ペルソナ",
   memory: "メモリ",
   tools: "ツール",
+  security: "セキュリティ診断",
   schedules: "スケジュール",
   kanban: "カンバン",
   gateway: "ゲートウェイ",

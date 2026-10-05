@@ -426,3 +426,50 @@ it("uses fixed owner-checked schedule routes and refuses writes without chat and
   );
   await expect(client.getSchedules()).rejects.toThrow(/owner/i);
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Security execution boundaries]]
+it("uses fixed security routes with explicit read/run scopes and rejects owner changes", async () => {
+  const op = {
+    id: "security-op",
+    targetId: "sandbox",
+    policyDigest: "a".repeat(64),
+  };
+  await client.enable();
+  await expect(client.getSecurity()).rejects.toThrow("security:read");
+  await expect(client.submitSecurity(op)).rejects.toThrow("security:run");
+  fetcher.mockImplementation(async (url: string) =>
+    url.endsWith("/v1/me")
+      ? reply({
+          via: "api_token",
+          user: { id: "a" },
+          scopes: [
+            "workspace:read",
+            "workspace:write",
+            "security:read",
+            "security:run",
+          ],
+        })
+      : reply({ schemaVersion: 1, userId: "a", targets: [], runs: [] }),
+  );
+  expect((await client.getSecurity()).runs).toEqual([]);
+  await client.submitSecurity(op);
+  const call = fetcher.mock.calls.find(
+    ([url, init]) =>
+      String(url).endsWith("/v1/security") && init?.method === "POST",
+  );
+  expect(call).toBeTruthy();
+  expect(JSON.parse(String(call![1]!.body))).toEqual(op);
+  await expect(
+    client.submitSecurity({ ...op, token: "renderer-secret" } as typeof op),
+  ).rejects.toThrow("Invalid security operation");
+  fetcher.mockImplementation(async (url: string) =>
+    url.endsWith("/v1/me")
+      ? reply({
+          via: "api_token",
+          user: { id: "a" },
+          scopes: ["workspace:read", "workspace:write", "security:read"],
+        })
+      : reply({ schemaVersion: 1, userId: "b", targets: [], runs: [] }),
+  );
+  await expect(client.getSecurity()).rejects.toThrow("owner");
+});

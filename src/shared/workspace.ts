@@ -8,6 +8,7 @@ export interface CloudWorkspaceStatus {
 }
 
 export interface CloudWorkspaceAPI extends WorkspaceTransport {
+  security: import("@mithril/workspace/security").SecurityTransport;
   schedules: import("@mithril/workspace/schedules").ScheduleTransport;
   previewSchedules(): Promise<{
     userId: string;

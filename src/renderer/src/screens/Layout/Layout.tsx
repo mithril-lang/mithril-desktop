@@ -1,3 +1,4 @@
+import CloudSecurity from "../CloudWorkspace/CloudSecurity";
 import Agents from "../Agents/Agents";
 import Tools from "../Tools/Tools";
 import Memory from "../Memory/Memory";
@@ -67,6 +68,7 @@ type View =
   | "skills"
   | "memory"
   | "tools"
+  | "security"
   | "schedules"
   | "kanban"
   | "gateway";
@@ -80,6 +82,7 @@ const PINNED_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "projects", icon: Compass, labelKey: "navigation.projects" },
   // "skills" lives under the Discover tab (installed + community), so it's no
   // longer a top-level nav item.
+  { view: "security", icon: KeyRound, labelKey: "navigation.security" },
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
 ];
 
@@ -1116,6 +1119,11 @@ function Layout({
                 embedded
                 active={view === "tools"}
               />
+            </div>
+          )}
+          {visitedViews.has("security") && (
+            <div style={paneStyle("security")}>
+              <CloudSecurity profile={activeProfile} locale={locale} />
             </div>
           )}
           {visitedViews.has("schedules") && (

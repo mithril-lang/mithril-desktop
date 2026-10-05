@@ -15,6 +15,7 @@ export default {
   soul: "פרסונה",
   memory: "זיכרון",
   tools: "כלים",
+  security: "Security",
   schedules: "תזמונים",
   kanban: "קנבן",
   gateway: "שער",

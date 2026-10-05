@@ -1379,6 +1379,14 @@ export function registerIpcHandlers(context: IpcContext): void {
       throw Error("Local schedule account changed");
     return { userId: before.userId, drafts };
   });
+  ipcMain.handle("cloud-workspace-security", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.getSecurity();
+  });
+  ipcMain.handle("cloud-workspace-security-submit", (event, operation) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.submitSecurity(operation);
+  });
   ipcMain.handle("cloud-workspace-schedules", (event) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.getSchedules();

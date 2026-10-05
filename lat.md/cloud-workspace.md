@@ -85,3 +85,9 @@ The compiled shared package validates persisted operations, preserves concurrent
 Schedules uses the shared owner-scoped API list and CAS edit protocol. Main-process IPC validates fixed routes and explicit scopes.
 
 No tokens enter the renderer. Cloud execution produces ordinary D1 Chat results; local Cron jobs are retained separately and are never silently enabled in the cloud.
+
+## Security diagnostics
+
+[[src/main/cloud-workspace.ts#CloudWorkspace#getSecurity]] and [[src/main/cloud-workspace.ts#CloudWorkspace#submitSecurity]] expose fixed owner-scoped routes with explicit security read/run scopes. Executor tokens and cloud credentials never enter the renderer.
+
+The shared Security screen selects provisioned targets, retains ambiguous request IDs and displays persistent job receipts. Sandbox receipts never claim production verification.

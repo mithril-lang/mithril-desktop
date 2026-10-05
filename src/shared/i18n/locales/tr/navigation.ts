@@ -15,6 +15,7 @@ export default {
   soul: "Persona",
   memory: "Bellek",
   tools: "Araçlar",
+  security: "Security",
   schedules: "Zamanlayıcı",
   kanban: "Kanban",
   gateway: "Gateway",

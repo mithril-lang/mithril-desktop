@@ -62,7 +62,7 @@ Stopping synchronization invalidates active work before publishing downloaded by
 
 ## Shared sidebar history
 
-The API-backed Chat shares Web’s expanded sidebar for cloud sessions and projects. Pins are owner-scoped device preferences; legacy device history stays separate. Reading the sidebar never creates sessions or executes tools.
+The API-backed Chat shares Web’s expanded sidebar for cloud sessions and projects. Pins and project membership use owner-scoped API records; legacy device history stays separate. Reading the sidebar never creates sessions or executes tools.
 
 ### Read-only cloud sidebar
 
@@ -79,3 +79,9 @@ Pins and explicit project membership now use owner-scoped API records shared by 
 Workspace metadata edits are journaled by owner and operation ID in renderer IndexedDB before network writes; reconnect restores the pending edits without sending them automatically.
 
 The compiled shared package validates persisted operations, preserves concurrent window edits and retries ambiguous acknowledgements with their original IDs. Explicit conflict resolution atomically replaces or removes the pending operation. Failed device storage prevents a new network write. Completed native histories can be inspected fifty at a time through [[src/main/native-session-import.ts#NativeSessionImport#previewNativeSessions]], preserving originals and selected-copy consent. This is not bulk filesystem upload, credential migration or schedule execution.
+
+## Cloud schedules
+
+Schedules uses the shared owner-scoped API list and CAS edit protocol. Main-process IPC validates fixed routes and explicit scopes.
+
+No tokens enter the renderer. Cloud execution produces ordinary D1 Chat results; local Cron jobs are retained separately and are never silently enabled in the cloud.

@@ -5,6 +5,7 @@ import "@mithril/workspace/styles.css";
 /** New default Chat uses only the canonical Mithril model inventory and D1 sessions. */
 export default function MithrilChat({
   profile,
+  initialSessionId,
   sidebarNavigation,
   onSidebarSelect,
   onSidebarProjects,
@@ -12,6 +13,7 @@ export default function MithrilChat({
   locale = "en",
 }: {
   profile: string;
+  initialSessionId?: string;
   sidebarNavigation?: ReactNode;
   onSidebarSelect?: () => void;
   onSidebarProjects?: () => void;
@@ -61,7 +63,8 @@ export default function MithrilChat({
         sidebarNavigation={sidebarNavigation}
         onSidebarSelect={onSidebarSelect}
         onSidebarProjects={onSidebarProjects}
-        key={profile}
+        key={`${profile}:${initialSessionId ?? ""}`}
+        initialSessionId={initialSessionId}
         autoConnect
         accountId={accountId}
         visible={visible}

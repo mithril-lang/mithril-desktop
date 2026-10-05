@@ -1,3 +1,4 @@
+import { previewLocalSchedules } from "../cronjobs";
 import { ProjectFolderSync } from "../project-folder-sync";
 import { nativeSessionImport } from "../native-session-import-runtime";
 import {
@@ -1366,6 +1367,25 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("cloud-workspace-disable", (event) => {
     trustedWorkspaceSender(event);
     cloudWorkspace.reset();
+  });
+  ipcMain.handle("cloud-workspace-local-schedules", async (event) => {
+    trustedWorkspaceSender(event);
+    const before = await cloudWorkspace.nativeContext();
+    const drafts = await previewLocalSchedules(before.profile);
+    if (
+      JSON.stringify(before) !==
+      JSON.stringify(await cloudWorkspace.nativeContext())
+    )
+      throw Error("Local schedule account changed");
+    return { userId: before.userId, drafts };
+  });
+  ipcMain.handle("cloud-workspace-schedules", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.getSchedules();
+  });
+  ipcMain.handle("cloud-workspace-schedule-edit", (event, operation) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.applySchedule(operation);
   });
   ipcMain.handle("cloud-workspace-sidebar", (event) => {
     trustedWorkspaceSender(event);

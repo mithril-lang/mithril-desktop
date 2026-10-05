@@ -49,3 +49,7 @@ Account-change events and local profile changes clear the prior renderer owner a
 ## Bot and project import
 
 An explicit preview projects the actual selected bot instructions, user context, model preference, linked project titles and capability preferences. Known device-specific text is excluded and preview makes no cloud write or native mutation.
+
+## Cloud sidebar identity
+
+Sidebar reads and writes use only fixed cloud routes, preserve operation IDs, reject nonportable input, and discard records from a different owner.

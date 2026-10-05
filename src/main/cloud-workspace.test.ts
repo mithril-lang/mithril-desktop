@@ -311,3 +311,57 @@ describe("Desktop cloud workspace boundary", () => {
     await expect(client.history("project1")).rejects.toThrow("history invalid");
   });
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Cloud sidebar identity]]
+it("checks cloud sidebar owners and retains exact operation IDs on fixed routes", async () => {
+  await client.enable();
+  const op = {
+    operationId: "pin-op",
+    chatId: "chat",
+    baseRevision: 0,
+    pinned: true,
+    projectId: null,
+  };
+  const fallback = fetcher.getMockImplementation()! as (
+    url: string,
+    init?: RequestInit,
+  ) => Promise<Response>;
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/workspace/sidebar"))
+      return reply(
+        init?.method === "POST"
+          ? {
+              schemaVersion: 1,
+              userId: "a",
+              operationId: "pin-op",
+              status: "accepted",
+              placement: {
+                chatId: "chat",
+                revision: 1,
+                pinned: true,
+                projectId: null,
+              },
+            }
+          : { schemaVersion: 1, userId: "a", placements: [] },
+      );
+    return fallback(url, init);
+  });
+  expect((await client.getSidebar()).placements).toEqual([]);
+  expect((await client.applySidebar(op)).status).toBe("accepted");
+  expect(
+    JSON.parse(
+      fetcher.mock.calls.find(
+        (c) => c[0].endsWith("/sidebar") && c[1].method === "POST",
+      )![1].body,
+    ),
+  ).toEqual(op);
+  await expect(
+    client.applySidebar({ ...op, projectId: "/Users/private" }),
+  ).rejects.toThrow("Invalid sidebar");
+  fetcher.mockImplementation(async (url: string) =>
+    url.endsWith("/sidebar")
+      ? reply({ schemaVersion: 1, userId: "other", placements: [] })
+      : fallback(url),
+  );
+  await expect(client.getSidebar()).rejects.toThrow("owner/schema mismatch");
+});

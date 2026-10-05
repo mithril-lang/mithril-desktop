@@ -1,4 +1,12 @@
 import {
+  validSidebarOperation,
+  validSidebarSnapshot,
+  validPlacement,
+  type SidebarOperation,
+  type SidebarResult,
+  type SidebarSnapshot,
+} from "@mithril/workspace/sidebar";
+import {
   createProjectFileTransport,
   type ProjectFileTransport,
 } from "@mithril/workspace/files";
@@ -316,6 +324,46 @@ export class CloudWorkspace {
     return { value, userId: session.userId };
   }
 
+  async getSidebar(): Promise<SidebarSnapshot> {
+    const { value, userId } = await this.authorizedRequest(
+      "/v1/workspace/sidebar",
+    );
+    if (!validSidebarSnapshot(value as SidebarSnapshot, userId))
+      throw new Error("Sidebar owner/schema mismatch");
+    return value as SidebarSnapshot;
+  }
+  async applySidebar(operation: SidebarOperation): Promise<SidebarResult> {
+    if (!validSidebarOperation(operation))
+      throw new Error("Invalid sidebar operation");
+    let response: { value: unknown; userId: string };
+    try {
+      response = await this.authorizedRequest(
+        "/v1/workspace/sidebar",
+        operation,
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        /Workspace request failed \((400|409)\)/.test(error.message)
+      )
+        throw new Error(
+          "[sidebar-rejected] Review the current chat and project.",
+        );
+      throw error;
+    }
+    const { value, userId } = response;
+    const result = value as SidebarResult;
+    if (
+      result.userId !== userId ||
+      result.operationId !== operation.operationId ||
+      !["accepted", "conflict"].includes(result.status) ||
+      (result.placement !== null &&
+        (!validPlacement(result.placement) ||
+          result.placement.chatId !== operation.chatId))
+    )
+      throw new Error("Sidebar receipt mismatch");
+    return result;
+  }
   async getSnapshot(): Promise<WorkspaceSnapshot> {
     const session = await this.session();
     const generation = this.generation;

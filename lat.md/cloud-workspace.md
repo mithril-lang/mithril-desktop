@@ -67,3 +67,9 @@ The API-backed Chat shares Web’s expanded sidebar for cloud sessions and proje
 ### Read-only cloud sidebar
 
 The shared sidebar reads the checked cloud account and project inventory without importing device history, writing workspace records, or issuing chat operations.
+
+## Cloud sidebar placement
+
+Pins and explicit project membership now use owner-scoped API records shared by both clients, with per-chat revisions and operation receipts.
+
+[[src/main/cloud-workspace.ts#CloudWorkspace#getSidebar]] reads canonical placement without uploading device pins. [[src/main/cloud-workspace.ts#CloudWorkspace#applySidebar]] exposes only the fixed sidebar API through trusted IPC. The shared renderer offers explicit migration of each device pin, retains failed operation IDs for acknowledgement retries, and reports concurrent-edit conflicts. Legacy local pins remain intact; titles and folders never imply project membership.

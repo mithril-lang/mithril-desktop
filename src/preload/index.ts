@@ -356,6 +356,9 @@ const hermesAPI = {
     status: () => ipcRenderer.invoke("cloud-workspace-status"),
     enable: () => ipcRenderer.invoke("cloud-workspace-enable"),
     disable: () => ipcRenderer.invoke("cloud-workspace-disable"),
+    getSidebar: () => ipcRenderer.invoke("cloud-workspace-sidebar"),
+    applySidebar: (operation) =>
+      ipcRenderer.invoke("cloud-workspace-sidebar-operation", operation),
     getSnapshot: () => ipcRenderer.invoke("cloud-workspace-snapshot"),
     applyOperations: (operations) =>
       ipcRenderer.invoke("cloud-workspace-operations", operations),

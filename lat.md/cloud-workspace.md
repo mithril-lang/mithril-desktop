@@ -91,3 +91,8 @@ No tokens enter the renderer. Cloud execution produces ordinary D1 Chat results;
 Desktop uses the shared Chat sidebar as its primary navigation. Projects, Office, Discover, Kanban and Schedules share one API-backed workspace; device history remains explicitly accessible for migration without uploading it automatically.
 
 The redundant Cloud Workspace navigation entry is removed. Cloud views show the API storage boundary in the footer rather than the unrelated local gateway state. Disconnected authorization failures remain visible and require explicit reconnection, without repeated account-change remounts.
+## Security diagnostics
+
+[[src/main/cloud-workspace.ts#CloudWorkspace#getSecurity]] and [[src/main/cloud-workspace.ts#CloudWorkspace#submitSecurity]] expose fixed owner-scoped routes with explicit security read/run scopes. Executor tokens and cloud credentials never enter the renderer.
+
+The shared Security screen selects provisioned targets, retains ambiguous request IDs and displays persistent job receipts. Sandbox receipts never claim production verification.

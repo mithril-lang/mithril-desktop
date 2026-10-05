@@ -15,6 +15,7 @@ export default {
   soul: "Persona",
   memory: "Memori",
   tools: "Alat",
+  security: "Security",
   schedules: "Jadwal",
   kanban: "Kanban",
   gateway: "Gateway",

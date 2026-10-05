@@ -1,4 +1,10 @@
 import {
+  validSecuritySnapshot,
+  validSecuritySubmit,
+  type SecuritySnapshot,
+  type SecuritySubmit,
+} from "@mithril/workspace/security";
+import {
   validScheduleEdit,
   validCloudSchedule,
   type ScheduleEdit,
@@ -332,6 +338,29 @@ export class CloudWorkspace {
     return { value, userId: session.userId };
   }
 
+  // @lat: [[cloud-workspace#Cloud workspace#Security diagnostics]]
+  async getSecurity(): Promise<SecuritySnapshot> {
+    const { value } = await this.authorizedRequest(
+      "/v1/security",
+      undefined,
+      "security:read",
+    );
+    if (!validSecuritySnapshot(value))
+      throw Error("Security snapshot rejected");
+    return value;
+  }
+  async submitSecurity(operation: SecuritySubmit): Promise<SecuritySnapshot> {
+    if (!validSecuritySubmit(operation))
+      throw Error("Invalid security operation");
+    const { value } = await this.authorizedRequest(
+      "/v1/security",
+      operation,
+      "security:run",
+    );
+    if (!validSecuritySnapshot(value))
+      throw Error("Security snapshot rejected");
+    return value;
+  }
   async getSchedules(): Promise<ScheduleSnapshot> {
     const { value } = await this.authorizedRequest("/v1/schedules");
     const snapshot = value as ScheduleSnapshot;

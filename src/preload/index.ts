@@ -353,6 +353,11 @@ const hermesAPI = {
   cloudWorkspace: {
     previewSchedules: () =>
       ipcRenderer.invoke("cloud-workspace-local-schedules"),
+    security: {
+      list: () => ipcRenderer.invoke("cloud-workspace-security"),
+      submit: (operation) =>
+        ipcRenderer.invoke("cloud-workspace-security-submit", operation),
+    },
     schedules: {
       list: () => ipcRenderer.invoke("cloud-workspace-schedules"),
       apply: (operation) =>

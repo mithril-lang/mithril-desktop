@@ -29,7 +29,7 @@ import SidebarRecentSessions from "./SidebarRecentSessions";
 import Skills from "../Skills/Skills";
 import Gateway from "../Gateway/Gateway";
 import Providers from "../Providers/Providers";
-import Schedules from "../Schedules/Schedules";
+import Schedules from "../CloudWorkspace/CloudSchedules";
 import CloudWorkspace from "../CloudWorkspace/CloudWorkspace";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
@@ -111,6 +111,9 @@ function Layout({
   const { t, locale } = useI18n();
   const { openSettings } = useSettingsModal();
   const [view, setView] = useState<View>("mithril-chat");
+  const [cloudResultSession, setCloudResultSession] = useState<
+    string | undefined
+  >();
   // Multiple conversations coexist (background sessions + multi-agent). Each is
   // a ChatRun; all are mounted, only the active one is shown. Profile switches
   // preserve existing conversations and activate a scratch run for the selected
@@ -949,6 +952,7 @@ function Layout({
               <MithrilChat
                 locale={locale}
                 profile={activeProfile}
+                initialSessionId={cloudResultSession}
                 sidebarNavigation={cloudSidebarNavigation}
                 onSidebarSelect={() => goTo("mithril-chat")}
                 onSidebarProjects={() => goTo("projects")}
@@ -1116,7 +1120,14 @@ function Layout({
           )}
           {visitedViews.has("schedules") && (
             <div style={paneStyle("schedules")}>
-              <Schedules profile={activeProfile} />
+              <Schedules
+                profile={activeProfile}
+                locale={locale}
+                onOpenSession={(id) => {
+                  setCloudResultSession(id);
+                  goTo("mithril-chat");
+                }}
+              />
             </div>
           )}
 

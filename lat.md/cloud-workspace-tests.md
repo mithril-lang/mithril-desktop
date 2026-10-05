@@ -57,3 +57,9 @@ Sidebar reads and writes use only fixed cloud routes, preserve operation IDs, re
 ## Paged native history migration
 
 Completed local chat histories can be reviewed in bounded pages beyond the first fifty; opening a page never uploads history or runs inference.
+
+## Cloud schedule boundaries
+
+Schedule tests cover fixed API routes, owner validation, scope refusal and local-only preview projection.
+
+Credentials, absolute paths, scripts, delivery destinations and native tool grants are excluded. Calendar schedules require an explicit new interval; no background import starts a cloud run.

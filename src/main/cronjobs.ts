@@ -1,3 +1,5 @@
+import { projectLocalSchedules } from "./local-schedule-preview";
+import type { NativeScheduleDraft } from "@mithril/workspace/schedules";
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
@@ -478,4 +480,29 @@ export async function triggerCronJob(
   if (isRemoteMode()) return remoteJobAction(jobId, "run", profile);
   const result = await runCronCommand(["run", jobId], profile);
   return { success: result.success, error: result.error };
+}
+
+/** Explicit local-only projection: no SSH, external delivery or script is read into the cloud draft. */
+export async function previewLocalSchedules(
+  profile: string,
+): Promise<NativeScheduleDraft[]> {
+  const raw = JSON.parse(
+    await readFile(jobsFilePath(profile), "utf8").catch((error) => {
+      if (error.code === "ENOENT") return "[]";
+      throw error;
+    }),
+  ) as unknown;
+  const rows = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object" && "jobs" in raw
+      ? (raw as { jobs: unknown }).jobs
+      : [];
+  if (!Array.isArray(rows) || rows.length > 100)
+    throw Error("Local schedule preview capacity exceeded");
+  return projectLocalSchedules(
+    rows
+      .filter((value) => value && typeof value === "object")
+      .map((value) => normalizeJob(value as Record<string, unknown>))
+      .filter((job): job is CronJob => !!job),
+  );
 }

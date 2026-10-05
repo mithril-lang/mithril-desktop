@@ -8,6 +8,11 @@ export interface CloudWorkspaceStatus {
 }
 
 export interface CloudWorkspaceAPI extends WorkspaceTransport {
+  schedules: import("@mithril/workspace/schedules").ScheduleTransport;
+  previewSchedules(): Promise<{
+    userId: string;
+    drafts: import("@mithril/workspace/schedules").NativeScheduleDraft[];
+  }>;
   files: import("@mithril/workspace/files").ProjectFileTransport;
   catalog(): Promise<import("@mithril/workspace/react").DiscoverItem[]>;
   status(): Promise<CloudWorkspaceStatus>;

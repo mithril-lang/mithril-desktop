@@ -1,4 +1,11 @@
 import {
+  validScheduleEdit,
+  validCloudSchedule,
+  type ScheduleEdit,
+  type ScheduleSnapshot,
+  type ScheduleResult,
+} from "@mithril/workspace/schedules";
+import {
   validSidebarOperation,
   validSidebarSnapshot,
   validPlacement,
@@ -172,7 +179,7 @@ export class CloudWorkspace {
       });
     } catch {
       throw new Error(
-        "Workspace network unavailable; pending changes remain in this window",
+        "Workspace network unavailable; reconnect to check pending changes",
       );
     }
     if (generation !== this.generation) {
@@ -324,6 +331,32 @@ export class CloudWorkspace {
     return { value, userId: session.userId };
   }
 
+  async getSchedules(): Promise<ScheduleSnapshot> {
+    const { value } = await this.authorizedRequest("/v1/schedules");
+    const snapshot = value as ScheduleSnapshot;
+    if (
+      !Array.isArray(snapshot.schedules) ||
+      snapshot.schedules.length > 100 ||
+      !snapshot.schedules.every(validCloudSchedule)
+    )
+      throw Error("Schedule snapshot rejected");
+    return snapshot;
+  }
+  async applySchedule(operation: ScheduleEdit): Promise<ScheduleResult> {
+    if (!validScheduleEdit(operation)) throw Error("Invalid schedule edit");
+    const { value } = await this.authorizedRequest("/v1/schedules", operation, [
+      "chat:write",
+      "inference",
+    ]);
+    const result = value as ScheduleResult;
+    if (
+      result.operationId !== operation.operationId ||
+      !["accepted", "conflict"].includes(result.status) ||
+      (result.schedule !== null && !validCloudSchedule(result.schedule))
+    )
+      throw Error("Schedule receipt rejected");
+    return result;
+  }
   async getSidebar(): Promise<SidebarSnapshot> {
     const { value, userId } = await this.authorizedRequest(
       "/v1/workspace/sidebar",

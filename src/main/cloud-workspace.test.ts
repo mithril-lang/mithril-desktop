@@ -365,3 +365,64 @@ it("checks cloud sidebar owners and retains exact operation IDs on fixed routes"
   );
   await expect(client.getSidebar()).rejects.toThrow("owner/schema mismatch");
 });
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Cloud schedule boundaries]]
+it("uses fixed owner-checked schedule routes and refuses writes without chat and inference authority", async () => {
+  const op = {
+    operationId: "schedule-op",
+    id: "schedule",
+    baseRevision: 0,
+    name: "Test",
+    prompt: "Synthetic",
+    model: "model",
+    intervalMinutes: 60,
+    enabled: false,
+    deleted: false,
+  };
+  await client.enable();
+  await expect(client.applySchedule(op)).rejects.toThrow("chat:write");
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: "a" },
+        scopes: [
+          "workspace:read",
+          "workspace:write",
+          "chat:write",
+          "inference",
+        ],
+      });
+    if (init?.method === "POST")
+      return reply({
+        schemaVersion: 1,
+        userId: "a",
+        operationId: "schedule-op",
+        status: "accepted",
+        schedule: null,
+      });
+    return reply({ schemaVersion: 1, userId: "a", schedules: [] });
+  });
+  expect((await client.getSchedules()).schedules).toEqual([]);
+  expect((await client.applySchedule(op)).status).toBe("accepted");
+  expect(
+    fetcher.mock.calls.some(
+      ([url, init]) =>
+        String(url).endsWith("/v1/schedules") && init?.method === "POST",
+    ),
+  ).toBe(true);
+  fetcher.mockImplementation(async (url: string) =>
+    url.endsWith("/v1/me")
+      ? reply({
+          via: "api_token",
+          user: { id: "a" },
+          scopes: [
+            "workspace:read",
+            "workspace:write",
+            "chat:write",
+            "inference",
+          ],
+        })
+      : reply({ schemaVersion: 1, userId: "b", schedules: [] }),
+  );
+  await expect(client.getSchedules()).rejects.toThrow(/owner/i);
+});

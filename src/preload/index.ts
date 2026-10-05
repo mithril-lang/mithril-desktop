@@ -351,6 +351,13 @@ const hermesAPI = {
       ipcRenderer.invoke("project-folder-disconnect", projectId),
   },
   cloudWorkspace: {
+    previewSchedules: () =>
+      ipcRenderer.invoke("cloud-workspace-local-schedules"),
+    schedules: {
+      list: () => ipcRenderer.invoke("cloud-workspace-schedules"),
+      apply: (operation) =>
+        ipcRenderer.invoke("cloud-workspace-schedule-edit", operation),
+    },
     files: projectFileAPI(),
     catalog: () => ipcRenderer.invoke("cloud-workspace-catalog"),
     status: () => ipcRenderer.invoke("cloud-workspace-status"),

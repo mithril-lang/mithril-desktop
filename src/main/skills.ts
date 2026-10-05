@@ -1,6 +1,8 @@
 import { execFileSync } from "child_process";
 import {
+  cpSync,
   existsSync,
+  mkdirSync,
   readdirSync,
   readFileSync,
   realpathSync,
@@ -228,6 +230,93 @@ export function searchSkills(query: string): SkillSearchResult[] {
 }
 
 /**
+ * A skill shipped in the hermes-agent repo (`<HERMES_REPO>/skills/<category>/<name>`).
+ * Desktop Discover lists these by walking that tree; the public skill hub does
+ * not know about repo-local skills until they are published.
+ */
+function findBundledSkill(
+  identifier: string,
+): { category: string; entry: string; path: string } | null {
+  const id = identifier.trim();
+  if (!id || id.includes("..") || id.includes("\0")) return null;
+
+  const bundledDir = join(HERMES_REPO, "skills");
+  if (!existsSync(bundledDir)) return null;
+
+  try {
+    for (const category of readdirSync(bundledDir)) {
+      const catPath = join(bundledDir, category);
+      if (!statSync(catPath).isDirectory()) continue;
+
+      for (const entry of readdirSync(catPath)) {
+        const entryPath = join(catPath, entry);
+        if (!statSync(entryPath).isDirectory()) continue;
+
+        const skillFile = join(entryPath, "SKILL.md");
+        if (!existsSync(skillFile)) continue;
+
+        let skillName = entry;
+        try {
+          const content = readFileSync(skillFile, "utf-8").slice(0, 4000);
+          skillName = parseSkillFrontmatter(content).name || entry;
+        } catch {
+          skillName = entry;
+        }
+
+        if (
+          id === skillName ||
+          id === entry ||
+          id === `${category}/${entry}` ||
+          id === `${category}/${skillName}`
+        ) {
+          return { category, entry, path: entryPath };
+        }
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+/**
+ * Full SKILL.md for a bundled skill Discover can open. Registry catalog
+ * entries carry a repo `path`; bundled skills do not, so the detail modal
+ * would otherwise show only the one-line frontmatter description.
+ */
+export function bundledSkillMarkdown(name: string): string {
+  const found = findBundledSkill(name);
+  if (!found) return "";
+  return getSkillContent(found.path);
+}
+
+/**
+ * Copy a repo-bundled skill into the active profile's skills tree.
+ * Returns null when the name is not a bundled skill (caller should keep the
+ * hub CLI result). Used when `hermes skills install` cannot resolve a skill
+ * that is already on disk under the hermes-agent checkout.
+ */
+function copyBundledSkillIntoProfile(
+  identifier: string,
+  profile?: string,
+): SkillCliResult | null {
+  const found = findBundledSkill(identifier);
+  if (!found) return null;
+
+  const destRoot = join(profileHome(profile), "skills", found.category);
+  const dest = join(destRoot, found.entry);
+  try {
+    mkdirSync(destRoot, { recursive: true });
+    cpSync(found.path, dest, { recursive: true, dereference: true });
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Install failed.";
+    return { success: false, error: message };
+  }
+}
+
+/**
  * List bundled skills from the hermes-agent repo.
  */
 export function listBundledSkills(): SkillSearchResult[] {
@@ -366,14 +455,17 @@ export function installSkill(
     // Exit 0 alone is not proof of success — the CLI exits 0 on resolution
     // failure too. Inspect the captured stdout for known failure markers
     // (issue #310).
-    return classifySkillCliOutput(stdout?.toString() ?? "");
+    const cliResult = classifySkillCliOutput(stdout?.toString() ?? "");
+    if (cliResult.success) return cliResult;
+    return copyBundledSkillIntoProfile(identifier, profile) ?? cliResult;
   } catch (err) {
     const e = err as { stdout?: Buffer; stderr?: Buffer; message?: string };
     const msg = (e.stderr?.toString() || e.message || "").trim();
-    return {
+    const cliResult = {
       success: false,
       error: msg || e.stdout?.toString()?.trim() || "Install failed.",
     };
+    return copyBundledSkillIntoProfile(identifier, profile) ?? cliResult;
   }
 }
 

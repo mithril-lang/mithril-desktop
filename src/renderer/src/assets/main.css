@@ -17225,3 +17225,5 @@ body:has(.shell-vibrant),
 .device-history-dialog { position:fixed; z-index:1001; top:50%; left:50%; transform:translate(-50%, -50%); background:var(--bg-primary, #202020); color:var(--text-primary, #eee); border:1px solid #8885; border-radius:16px; padding:20px; width:min(520px, 100%); max-height:80vh; overflow:auto; box-shadow:0 24px 80px #0006; }
 .device-history-close { float:right; background:transparent; color:inherit; border:1px solid #8885; border-radius:8px; padding:6px 12px; cursor:pointer; }
 .device-history-dialog .sidebar-chat-scroll { max-height:60vh; overflow:auto; }
+
+.device-schedules-dialog { width:min(1000px, calc(100vw - 48px)); }

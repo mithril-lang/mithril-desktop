@@ -1,3 +1,4 @@
+import * as Dialog from "@radix-ui/react-dialog";
 import { useCallback, useEffect, useState } from "react";
 import { CloudSchedules as SharedSchedules } from "@mithril/workspace/schedules-react";
 import "@mithril/workspace/styles.css";
@@ -39,14 +40,34 @@ export default function CloudSchedules({
         previewNative={() => window.hermesAPI.cloudWorkspace.previewSchedules()}
         onOpenSession={onOpenSession}
       />
-      <details onToggle={(event) => setLegacyOpen(event.currentTarget.open)}>
-        <summary>
-          {locale.startsWith("ja")
-            ? "この端末の旧スケジュールを管理"
-            : "Manage legacy schedules on this device"}
-        </summary>
-        {legacyOpen && <LegacySchedules profile={profile} />}
-      </details>
+      <Dialog.Root open={legacyOpen} onOpenChange={setLegacyOpen}>
+        <Dialog.Trigger asChild>
+          <button type="button" className="device-history-button">
+            {locale.startsWith("ja")
+              ? "端末のスケジュールを開く"
+              : "Schedules on this device"}
+          </button>
+        </Dialog.Trigger>
+        <Dialog.Portal>
+          <Dialog.Overlay className="device-history-backdrop" />
+          <Dialog.Content
+            className="device-history-dialog device-schedules-dialog"
+            aria-describedby={undefined}
+          >
+            <Dialog.Close asChild>
+              <button type="button" className="device-history-close">
+                {locale.startsWith("ja") ? "閉じる" : "Close"}
+              </button>
+            </Dialog.Close>
+            <Dialog.Title>
+              {locale.startsWith("ja")
+                ? "端末のスケジュール"
+                : "Schedules on this device"}
+            </Dialog.Title>
+            <LegacySchedules profile={profile} />
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
   );
 }

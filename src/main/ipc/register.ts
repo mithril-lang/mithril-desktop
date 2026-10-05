@@ -1218,9 +1218,9 @@ export function registerIpcHandlers(context: IpcContext): void {
     if (win && !win.webContents.isDestroyed())
       win.webContents.send("cloud-chat-account-changed");
   });
-  ipcMain.handle("cloud-chat-native-preview", (event) => {
+  ipcMain.handle("cloud-chat-native-preview", (event, offset) => {
     trustedWorkspaceSender(event);
-    return nativeSessionImport.previewNativeSessions();
+    return nativeSessionImport.previewNativeSessions(offset);
   });
   ipcMain.handle("cloud-chat-native-import", (event, id, choices) => {
     trustedWorkspaceSender(event);

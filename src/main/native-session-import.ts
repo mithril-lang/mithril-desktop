@@ -21,7 +21,7 @@ interface Dependencies {
   context(): Promise<NativeContext>;
   namespace(): string;
   now(): number;
-  local(profile: string): LocalSessionProjection[];
+  local(profile: string, offset?: number): LocalSessionProjection[];
   models(): Promise<ChatModel[]>;
   sessions(): Promise<ChatSession[]>;
   apply(id: string, operation: ChatOperation): Promise<ChatOperationResponse>;
@@ -49,7 +49,11 @@ export class NativeSessionImport {
   reset(): void {
     this.previews.clear();
   }
-  async previewNativeSessions(): Promise<RuntimeSessionImportPreview> {
+  async previewNativeSessions(
+    offset = 0,
+  ): Promise<RuntimeSessionImportPreview> {
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000)
+      throw new Error("Invalid native history page");
     const context = await this.deps.context();
     const models = await this.deps.models();
     const sessions = await this.deps.sessions();
@@ -62,8 +66,12 @@ export class NativeSessionImport {
       expiresAt: Math.floor(this.deps.now() / 1000) + 300,
       candidates: [],
       excluded: [],
+      offset,
+      nextOffset: null,
     };
-    for (const local of this.deps.local(context.profile).slice(0, 50)) {
+    const locals = this.deps.local(context.profile, offset);
+    preview.nextOffset = locals.length > 50 ? offset + 50 : null;
+    for (const local of locals.slice(0, 50)) {
       const label = `Local session ${preview.candidates.length + preview.excluded.length + 1}`;
       if (
         !model ||

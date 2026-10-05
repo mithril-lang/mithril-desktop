@@ -53,3 +53,7 @@ An explicit preview projects the actual selected bot instructions, user context,
 ## Cloud sidebar identity
 
 Sidebar reads and writes use only fixed cloud routes, preserve operation IDs, reject nonportable input, and discard records from a different owner.
+
+## Paged native history migration
+
+Completed local chat histories can be reviewed in bounded pages beyond the first fifty; opening a page never uploads history or runs inference.

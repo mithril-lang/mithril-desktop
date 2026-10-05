@@ -8,7 +8,10 @@ import { listSessions } from "./sessions";
 import { getDbConnection } from "./db";
 import { getConnectionConfig } from "./config";
 
-function localProjection(profile: string): LocalSessionProjection[] {
+function localProjection(
+  profile: string,
+  offset = 0,
+): LocalSessionProjection[] {
   if (getConnectionConfig().mode !== "local")
     throw new Error(
       "Native import requires explicit local connection; no remote history is scanned",
@@ -16,7 +19,7 @@ function localProjection(profile: string): LocalSessionProjection[] {
   const db = getDbConnection(true, profile);
   if (!db) return [];
   try {
-    return listSessions(50, 0, profile).map((session) => {
+    return listSessions(51, offset, profile).map((session) => {
       // No images, attachments, provider configuration, paths, or runnable tool calls are read.
       const rows = db
         .prepare(

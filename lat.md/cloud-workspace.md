@@ -98,3 +98,5 @@ The redundant Cloud Workspace navigation entry is removed. Cloud views show the 
 The shared Security screen selects provisioned targets, retains ambiguous request IDs and displays persistent job receipts. Sandbox receipts never claim production verification.
 
 Device schedule management opens in the same contextual dialog pattern as local history, instead of displaying a second schedule page beneath the cloud list. Existing device Cron jobs remain unchanged.
+
+Browser device login requests inference, billing read, Chat read/write and Workspace read/write with explicit browser approval. Partial grants are refused before credential replacement; existing credentials and native permissions are retained. A passkey is required by the API for workspace scopes.

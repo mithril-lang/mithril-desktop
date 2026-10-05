@@ -58,6 +58,11 @@ export function issueText(code: string, ja: boolean): string {
       return l("Sign-in cancelled.", "接続を中止しました。");
     case "device_in_progress":
       return l("Another sign-in is in progress.", "別の接続操作が進行中です。");
+    case "device_workspace_authorization_required":
+      return l(
+        "Use your passkey to approve Chat and Workspace access. Your previous connection is unchanged.",
+        "パスキーで Chat・Workspace へのアクセスを承認してください。以前の接続はそのままです。",
+      );
     case "device_unavailable":
       return l(
         "Browser sign-in is unavailable. Try again or use a connection token.",
@@ -246,8 +251,8 @@ function MithrilStart({
       >
         <p className="onboard-subtitle">
           {l(
-            "Connect in your browser. Sign in with your passkey or existing Mithril account, then approve this device. Desktop connects automatically after approval.",
-            "ブラウザーで passkey または Mithril アカウントでサインインし、この端末を承認してください。承認後、Desktop が自動で接続します。",
+            "Sign in with your passkey and approve Chat and Workspace access. Desktop connects after approval.",
+            "パスキーでサインインし、Chat・Workspace へのアクセスを承認してください。承認後、Desktop が接続します。",
           )}
         </p>
         {protection === "reduced" && (

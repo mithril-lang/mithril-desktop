@@ -53,11 +53,21 @@ describe("device flow lifecycle", () => {
     const fetcher = vi
       .fn()
       .mockResolvedValueOnce(reply(grant))
-      .mockResolvedValueOnce(reply({ access_token: "mf_fixture" }));
+      .mockResolvedValueOnce(
+        reply({
+          access_token: "mf_fixture",
+          scope:
+            "inference billing:read workspace:read workspace:write chat:read chat:write",
+        }),
+      );
     const code = vi.fn();
     const result = startMithrilDeviceLogin("fixture-profile", code, fetcher);
     await vi.advanceTimersByTimeAsync(1100);
     expect(await result).toEqual({ status: "connected" });
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({
+      scope:
+        "inference billing:read workspace:read workspace:write chat:read chat:write",
+    });
     expect(code).toHaveBeenCalledWith(
       expect.objectContaining({ userCode: grant.user_code }),
     );
@@ -104,4 +114,21 @@ describe("device flow lifecycle", () => {
     expect(result).toEqual({ status: "refused", error: "device_start_failed" });
     expect(onCode).not.toHaveBeenCalled();
   });
+});
+
+it("keeps the existing credential when browser approval lacks workspace scopes", async () => {
+  vi.useFakeTimers();
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(reply(grant))
+    .mockResolvedValueOnce(
+      reply({ access_token: "mf_fixture", scope: "inference billing:read" }),
+    );
+  const result = startMithrilDeviceLogin("fixture-profile", vi.fn(), fetcher);
+  await vi.advanceTimersByTimeAsync(1100);
+  expect(await result).toEqual({
+    status: "refused",
+    error: "device_workspace_authorization_required",
+  });
+  expect(connectMithrilAccount).not.toHaveBeenCalled();
 });

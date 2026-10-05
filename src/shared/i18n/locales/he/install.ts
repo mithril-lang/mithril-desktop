@@ -3,7 +3,7 @@ export default {
   startingInstall: "מתחיל בהתקנה",
   installationComplete: "ההתקנה הושלמה",
   installationFailed: "ההתקנה נכשלה",
-  installingHermes: "מתקין את Hermes Agent",
+  installingHermes: "מתקין את Mithril Agent",
   installationFailedHint: "ההתקנה נכשלה. אנא נסו שוב או התקינו דרך הטרמינל.",
   retryInstallation: "נסה התקנה שוב",
   copied: "הועתק!",
@@ -12,19 +12,19 @@ export default {
   waitingToStart: "ממתין להתחלה...",
   continueToSetup: "המשך להגדרה",
   confirmTitle: "לפני ההתקנה",
-  confirmLocationLabel: "‏Hermes יותקן בנתיב:",
+  confirmLocationLabel: "‏Mithril Agent יותקן בנתיב:",
   confirmFresh: "לא נמצאה התקנה קיימת כאן - תוגדר עותק חדש.",
-  confirmUpdate: "קיימת כאן התקנת Hermes - היא תעודכן לגרסה האחרונה.",
+  confirmUpdate: "קיימת כאן התקנת Mithril Agent - היא תעודכן לגרסה האחרונה.",
   confirmReplace:
-    "קיימת כאן תיקייה אך היא אינה התקנת Hermes תקפה - ההתקנה תמחק ותחליף אותה.",
+    "קיימת כאן תיקייה אך היא אינה התקנת Mithril Agent תקפה - ההתקנה תמחק ותחליף אותה.",
   confirmNotInherited:
-    "אם התקנתם את Hermes במקום אחר, או דרך שורת הפקודה, ההתקנה הזו לא תועבר.",
-  confirmInstallBtn: "התקנת Hermes",
+    "אם התקנתם את Mithril Agent במקום אחר, או דרך שורת הפקודה, ההתקנה הזו לא תועבר.",
+  confirmInstallBtn: "התקנת Mithril Agent",
   useExistingBtn: "שימוש בהתקנה קיימת",
   useExistingHint:
-    "בחרו את התיקייה שמכילה את התקנת Hermes הקיימת שלכם (זו שמכילה את התיקייה hermes-agent).",
-  useExistingInvalid: "לא נמצאה התקנת Hermes תקינה בתיקייה זו.",
+    "בחרו את התיקייה שמכילה את התקנת Mithril Agent הקיימת שלכם (זו שמכילה את התיקייה hermes-agent).",
+  useExistingInvalid: "לא נמצאה התקנת Mithril Agent תקינה בתיקייה זו.",
   useExistingDone:
-    "ההתקנה הקיימת הוגדרה - צאו ופתחו מחדש את Hermes כדי להחיל אותה.",
-  useExistingQuitBtn: "יציאה מ-Hermes",
+    "ההתקנה הקיימת הוגדרה - צאו ופתחו מחדש את Mithril Agent כדי להחיל אותה.",
+  useExistingQuitBtn: "יציאה מ-Mithril Agent",
 } as const;

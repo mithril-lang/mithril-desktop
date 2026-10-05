@@ -29,3 +29,9 @@ Hermes reported `Gateway shutdown (<phase>) killed the job's tool subprocess bef
 [[src/main/profile-cron.test.ts]] verifies cron-state folding with real temporary files and a sqlite database.
 
 [[src/main/gateway-restart-defer.test.ts]] checks immediate, deferred, capped, coalesced, and independent restarts with injected time and probes. [[src/renderer/src/screens/Office/office3d/agents.test.ts]] checks working, error, idle, Kanban and gateway priority, unchanged non-cron behavior, and re-rendering when cron state changes.
+
+## Abandoned installer work
+
+Agent updates ignore claimed/running cron rows only when their owner PID is confirmed absent. Unknown owners, permission errors, legacy schemas, and pending handoffs remain busy; the ledger is never rewritten by the installer.
+
+[[src/main/gateway-restart-defer.ts#executionOwnerMayBeActive]] checks owners with signal zero. PID reuse conservatively delays an update. The installer waits at most two minutes, then reports a retryable failure without terminating work. Installation UI calls the packaged runtime Mithril Agent while preserving Hermes-compatible paths and APIs.

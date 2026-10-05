@@ -63,3 +63,7 @@ Completed local chat histories can be reviewed in bounded pages beyond the first
 Schedule tests cover fixed API routes, owner validation, scope refusal and local-only preview projection.
 
 Credentials, absolute paths, scripts, delivery destinations and native tool grants are excluded. Calendar schedules require an explicit new interval; no background import starts a cloud run.
+
+## Security execution boundaries
+
+Security tests require explicit read/run scopes, fixed main-process API routes and tenant-checked snapshots. Renderer requests cannot carry credentials or executor policy.

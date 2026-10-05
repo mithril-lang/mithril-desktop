@@ -15,6 +15,7 @@ export default {
   soul: "الشخصية",
   memory: "الذاكرة",
   tools: "الإمكانيات",
+  security: "Security",
   schedules: "الجدولة",
   kanban: "كانبان",
   gateway: "البوابة",

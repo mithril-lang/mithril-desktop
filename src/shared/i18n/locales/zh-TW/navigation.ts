@@ -15,6 +15,7 @@ export default {
   soul: "人格",
   memory: "記憶",
   tools: "工具",
+  security: "Security",
   schedules: "排程工作",
   kanban: "看板",
   gateway: "網關",

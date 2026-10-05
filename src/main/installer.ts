@@ -829,7 +829,7 @@ const STAGE_MARKERS: { pattern: RegExp; step: number; title: string }[] = [
     pattern:
       /Cloning|cloning|Updating.*repository|Repository|Installing to .*hermes-agent|Downloading PortableGit/i,
     step: 4,
-    title: "Downloading Hermes Agent",
+    title: "Downloading Mithril Agent",
   },
   {
     pattern: /Creating virtual|virtual environment|uv venv|\bvenv\b/i,

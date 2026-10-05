@@ -787,7 +787,7 @@ export function registerIpcHandlers(context: IpcContext): void {
     event: Electron.IpcMainInvokeEvent,
   ): Promise<void> {
     if (agentInstallAbort || agentInstallInProgress) {
-      throw new Error("A Hermes Agent install or update is already running.");
+      throw new Error("A Mithril Agent install or update is already running.");
     }
     const controller = new AbortController();
     agentInstallAbort = controller;
@@ -796,10 +796,10 @@ export function registerIpcHandlers(context: IpcContext): void {
       event.sender.send("install-progress", {
         step: 1,
         totalSteps: 7,
-        title: "Waiting for Hermes Agent to become idle",
+        title: "Waiting for Mithril Agent to become idle",
         detail:
           "Active chats and scheduled work will finish before the update.",
-        log: "Waiting for active Hermes work to finish before updating...\n",
+        log: "Waiting for active Mithril Agent work to finish before updating...\n",
         cancellable: true,
       } satisfies InstallProgress);
       const result = await restartMithrilRuntimeWhenIdle(
@@ -809,9 +809,9 @@ export function registerIpcHandlers(context: IpcContext): void {
           event.sender.send("install-progress", {
             step: 1,
             totalSteps: 7,
-            title: "Preparing Hermes Agent update",
+            title: "Preparing Mithril Agent update",
             detail: "Stopping idle runtimes safely before updating.",
-            log: "Hermes Agent is idle; beginning verified update...\n",
+            log: "Mithril Agent is idle; beginning verified update...\n",
             cancellable: false,
           } satisfies InstallProgress);
           try {
@@ -836,7 +836,7 @@ export function registerIpcHandlers(context: IpcContext): void {
           }
         },
         {
-          maxWaitMs: Number.POSITIVE_INFINITY,
+          maxWaitMs: 2 * 60_000,
           signal: controller.signal,
           busy: () =>
             agentInstallBusy(
@@ -848,9 +848,13 @@ export function registerIpcHandlers(context: IpcContext): void {
         },
       );
       if (result.reason === "cancelled") {
-        throw new Error("Hermes Agent installation was cancelled.");
+        throw new Error("Mithril Agent installation was cancelled.");
       }
-      if (!result.restarted) throw new Error("Hermes Agent remained busy");
+      if (!result.restarted)
+        throw new Error(
+          "Mithril Agent update paused: active work or unreadable runtime state remains. " +
+            "Finish active chats and scheduled work, then retry. No running work was stopped.",
+        );
     } finally {
       if (agentInstallAbort === controller) agentInstallAbort = null;
     }
@@ -1009,14 +1013,14 @@ export function registerIpcHandlers(context: IpcContext): void {
         return {
           success: false,
           error:
-            "Update this Hermes Agent on its remote host, then reconnect the desktop.",
+            "Update this Mithril Agent on its remote host, then reconnect the desktop.",
         };
       }
       if (conn.mode === "ssh" && conn.ssh) {
         event.sender.send("install-progress", {
           step: 1,
           totalSteps: 1,
-          title: "Updating remote Hermes Agent",
+          title: "Updating remote Mithril Agent",
           detail: "Running hermes update over SSH...",
           log: "Running hermes update over SSH...\n",
         });
@@ -1026,7 +1030,7 @@ export function registerIpcHandlers(context: IpcContext): void {
           event.sender.send("install-progress", {
             step: 1,
             totalSteps: 1,
-            title: "Updating remote Hermes Agent",
+            title: "Updating remote Mithril Agent",
             detail: "Dashboard compatibility check needs attention.",
             log: `Dashboard compatibility warning: ${
               compat.error ? `${compat.detail}: ${compat.error}` : compat.detail
@@ -1054,7 +1058,7 @@ export function registerIpcHandlers(context: IpcContext): void {
         event.sender.send("install-progress", {
           step: 1,
           totalSteps: 1,
-          title: "Updating Hermes Agent",
+          title: "Updating Mithril Agent",
           detail: "Dashboard compatibility check needs attention.",
           log: `Dashboard compatibility warning: ${
             compat.error ? `${compat.detail}: ${compat.error}` : compat.detail
@@ -2119,7 +2123,7 @@ export function registerIpcHandlers(context: IpcContext): void {
     ): Promise<string> => {
       if (agentInstallInProgress)
         throw new Error(
-          "Hermes Agent is updating; try again when it finishes.",
+          "Mithril Agent is updating; try again when it finishes.",
         );
       return transcribeAudio(audio, mimeType, profile);
     },
@@ -2161,7 +2165,7 @@ export function registerIpcHandlers(context: IpcContext): void {
       const conn = getConnectionConfig(chatConnectionId);
       if (conn.mode === "local" && agentInstallInProgress) {
         throw new Error(
-          "Hermes Agent is updating; try again when it finishes.",
+          "Mithril Agent is updating; try again when it finishes.",
         );
       }
       if (conn.mode === "ssh" && chatConnectionId !== activeConnectionId) {

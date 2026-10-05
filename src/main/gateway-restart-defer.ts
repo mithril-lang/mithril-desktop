@@ -88,21 +88,76 @@ export function cronBusy(
   }
 }
 
+export interface CronExecutionOwner {
+  pid: number | null;
+  handoff_pending: number;
+}
+
+/** Only ESRCH proves an owner is gone; permissions and unknown owners stay busy. */
+export function executionOwnerMayBeActive(
+  row: CronExecutionOwner,
+  probe: (pid: number) => void = (pid) => {
+    process.kill(pid, 0);
+  },
+): boolean {
+  if (
+    row.handoff_pending ||
+    !Number.isSafeInteger(row.pid) ||
+    Number(row.pid) <= 0
+  )
+    return true;
+  try {
+    probe(Number(row.pid));
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH";
+  }
+}
+
+export function countActiveCronOwners(dbPath: string): number {
+  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+  try {
+    const columns = new Set(
+      (
+        db.prepare("PRAGMA table_info(executions)").all() as {
+          name: string;
+        }[]
+      ).map((column) => column.name),
+    );
+    if (columns.size === 0) return 0;
+    if (!columns.has("status"))
+      throw new Error("Unrecognized cron executions schema");
+    // Legacy rows without an owner cannot be proved abandoned.
+    if (!columns.has("pid")) {
+      return Number(
+        (
+          db
+            .prepare(
+              "SELECT COUNT(*) AS count FROM executions WHERE status IN ('claimed','running')",
+            )
+            .get() as { count: number }
+        ).count,
+      );
+    }
+    const handoff = columns.has("handoff_pending")
+      ? "handoff_pending"
+      : "0 AS handoff_pending";
+    const rows = db
+      .prepare(
+        `SELECT pid, ${handoff} FROM executions WHERE status IN ('claimed','running')`,
+      )
+      .all() as CronExecutionOwner[];
+    return rows.filter((row) => executionOwnerMayBeActive(row)).length;
+  } finally {
+    db.close();
+  }
+}
+
 /** A fail-closed cron probe for credential-triggered process recreation. */
 export function cronBusyStrict(
   profile: string | undefined,
   count: (dbPath: string) => number = (dbPath) => {
-    const db = new Database(dbPath, { readonly: true, fileMustExist: true });
-    try {
-      const row = db
-        .prepare(
-          "SELECT COUNT(*) AS count FROM executions WHERE status IN ('claimed','running')",
-        )
-        .get() as { count?: number } | undefined;
-      return Number(row?.count ?? 0);
-    } finally {
-      db.close();
-    }
+    return countActiveCronOwners(dbPath);
   },
   exists: (dbPath: string) => boolean = existsSync,
 ): boolean {

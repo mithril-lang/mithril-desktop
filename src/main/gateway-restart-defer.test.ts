@@ -1,6 +1,11 @@
 // @vitest-environment node
 // @lat: [[office-cron-presence#Cron presence#Tests]]
 
+import Database from "better-sqlite3";
+import { mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./utils", () => ({
@@ -16,6 +21,8 @@ vi.mock("./utils", () => ({
 import {
   cronBusy,
   cronBusyStrict,
+  executionOwnerMayBeActive,
+  countActiveCronOwners,
   dashboardTurnBusy,
   resetGatewayRestartDeferrals,
   restartGatewayWhenIdle,
@@ -58,6 +65,64 @@ describe("cronBusy", () => {
         throw new Error("EACCES");
       }),
     ).toBe(false);
+  });
+});
+
+describe("executionOwnerMayBeActive", () => {
+  // @lat: [[office-cron-presence#Cron presence#Abandoned installer work]]
+  it("ignores a dead owner while preserving living and uncertain owners", () => {
+    const dead = (): never => {
+      throw Object.assign(new Error("gone"), { code: "ESRCH" });
+    };
+    expect(
+      executionOwnerMayBeActive({ pid: 94275, handoff_pending: 0 }, dead),
+    ).toBe(false);
+    expect(
+      executionOwnerMayBeActive({ pid: 42, handoff_pending: 0 }, () => {}),
+    ).toBe(true);
+    expect(
+      executionOwnerMayBeActive({ pid: 42, handoff_pending: 0 }, () => {
+        throw Object.assign(new Error("denied"), { code: "EPERM" });
+      }),
+    ).toBe(true);
+    expect(
+      executionOwnerMayBeActive({ pid: null, handoff_pending: 0 }, dead),
+    ).toBe(true);
+    expect(
+      executionOwnerMayBeActive({ pid: 0, handoff_pending: 0 }, dead),
+    ).toBe(true);
+    expect(
+      executionOwnerMayBeActive({ pid: 42, handoff_pending: 1 }, dead),
+    ).toBe(true);
+  });
+});
+
+describe("cron ledger owner inspection", () => {
+  it("reads actual sqlite rows without modifying abandoned work", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mithril-idle-test-"));
+    const path = join(dir, "executions.db");
+    const db = new Database(path);
+    try {
+      db.exec(
+        "CREATE TABLE executions (status TEXT, pid INTEGER, handoff_pending INTEGER)",
+      );
+      const insert = db.prepare("INSERT INTO executions VALUES (?, ?, ?)");
+      insert.run("running", 2147483647, 0);
+      expect(countActiveCronOwners(path)).toBe(0);
+      expect(db.prepare("SELECT status FROM executions").get()).toEqual({
+        status: "running",
+      });
+      insert.run("running", process.pid, 0);
+      expect(countActiveCronOwners(path)).toBe(1);
+      insert.run("claimed", 2147483647, 1);
+      expect(countActiveCronOwners(path)).toBe(2);
+      db.exec("DROP TABLE executions; CREATE TABLE executions (status TEXT)");
+      db.prepare("INSERT INTO executions VALUES (?)").run("running");
+      expect(countActiveCronOwners(path)).toBe(1);
+    } finally {
+      db.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

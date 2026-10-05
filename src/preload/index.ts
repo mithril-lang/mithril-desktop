@@ -315,8 +315,8 @@ const hermesAPI = {
     ipcRenderer.invoke("mithril-chat", messages, profile),
 
   nativeSessionImport: {
-    previewNativeSessions: () =>
-      ipcRenderer.invoke("cloud-chat-native-preview"),
+    previewNativeSessions: (offset) =>
+      ipcRenderer.invoke("cloud-chat-native-preview", offset),
     importNativeSessions: (id, choices) =>
       ipcRenderer.invoke("cloud-chat-native-import", id, choices),
   } satisfies NativeSessionImportAPI,

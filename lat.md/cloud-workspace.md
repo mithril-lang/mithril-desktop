@@ -73,3 +73,9 @@ The shared sidebar reads the checked cloud account and project inventory without
 Pins and explicit project membership now use owner-scoped API records shared by both clients, with per-chat revisions and operation receipts.
 
 [[src/main/cloud-workspace.ts#CloudWorkspace#getSidebar]] reads canonical placement without uploading device pins. [[src/main/cloud-workspace.ts#CloudWorkspace#applySidebar]] exposes only the fixed sidebar API through trusted IPC. The shared renderer offers explicit migration of each device pin, retains failed operation IDs for acknowledgement retries, and reports concurrent-edit conflicts. Legacy local pins remain intact; titles and folders never imply project membership.
+
+## Durable pending edits and history pages
+
+Workspace metadata edits are journaled by owner and operation ID in renderer IndexedDB before network writes; reconnect restores the pending edits without sending them automatically.
+
+The compiled shared package validates persisted operations, preserves concurrent window edits and retries ambiguous acknowledgements with their original IDs. Explicit conflict resolution atomically replaces or removes the pending operation. Failed device storage prevents a new network write. Completed native histories can be inspected fifty at a time through [[src/main/native-session-import.ts#NativeSessionImport#previewNativeSessions]], preserving originals and selected-copy consent. This is not bulk filesystem upload, credential migration or schedule execution.

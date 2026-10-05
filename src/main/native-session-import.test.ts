@@ -51,7 +51,7 @@ function fixture(): {
     context: async () => context,
     namespace: () => "fixture-device",
     now: () => 1000000,
-    local: () => local,
+    local: (_profile, offset = 0) => local.slice(offset, offset + 51),
     models: async () => [{ id: "mithril-model", available: true }],
     sessions: async () => existing,
     apply,
@@ -196,4 +196,30 @@ describe("Explicit non-destructive native session import", () => {
     ).rejects.toThrow("account changed");
     expect(f.apply).not.toHaveBeenCalled();
   });
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Paged native history migration]]
+it("previews later native sessions without reading or importing them automatically", async () => {
+  const f = fixture();
+  const source = f.local[0]!;
+  f.local.splice(
+    0,
+    1,
+    ...Array.from({ length: 75 }, (_, i) => ({
+      ...source,
+      id: `old-${i}`,
+      title: `History ${i}`,
+    })),
+  );
+  const first = await f.importer.previewNativeSessions();
+  expect(first.candidates).toHaveLength(50);
+  expect(first.nextOffset).toBe(50);
+  const second = await f.importer.previewNativeSessions(50);
+  expect(second.candidates).toHaveLength(25);
+  expect(second.candidates[0]?.title).toBe("History 50");
+  expect(second.nextOffset).toBeNull();
+  expect(f.apply).not.toHaveBeenCalled();
+  await expect(f.importer.previewNativeSessions(-1)).rejects.toThrow(
+    "Invalid native history page",
+  );
 });

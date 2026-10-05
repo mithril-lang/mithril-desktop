@@ -24,6 +24,7 @@ export default function MithrilChat({
   useEffect(() => {
     setSidebarTarget(document.getElementById("cloud-session-sidebar"));
   }, []);
+  const [connectionError, setConnectionError] = useState("");
   const [epoch, setEpoch] = useState(0);
   const [accountId, setAccountId] = useState<string | null>(null);
   useEffect(
@@ -36,12 +37,18 @@ export default function MithrilChat({
   useEffect(() => {
     let canceled = false;
     setAccountId(null);
+    setConnectionError("");
     void window.hermesAPI.cloudChat
       .status()
       .then((status) => {
         if (!canceled) setAccountId(status.userId);
       })
-      .catch(() => {});
+      .catch((error) => {
+        if (!canceled)
+          setConnectionError(
+            error instanceof Error ? error.message : "Sign-in unavailable",
+          );
+      });
     return () => {
       canceled = true;
     };
@@ -58,6 +65,14 @@ export default function MithrilChat({
   );
   return (
     <div>
+      {connectionError && (
+        <div className="session-notice" role="alert">
+          <p>{connectionError}</p>
+          <button type="button" onClick={() => setEpoch((value) => value + 1)}>
+            {locale.startsWith("ja") ? "再接続" : "Reconnect"}
+          </button>
+        </div>
+      )}
       <ChatSessions
         sidebarTarget={sidebarTarget}
         sidebarNavigation={sidebarNavigation}

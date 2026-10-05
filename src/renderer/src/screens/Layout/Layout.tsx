@@ -1,3 +1,4 @@
+import * as Dialog from "@radix-ui/react-dialog";
 import Agents from "../Agents/Agents";
 import Tools from "../Tools/Tools";
 import Memory from "../Memory/Memory";
@@ -700,13 +701,6 @@ function Layout({
     <WorkspaceNavigation
       className="sidebar-nav-pinned"
       items={[
-        {
-          id: "workspace",
-          label: "Cloud Workspace",
-          icon: <Compass size={16} />,
-          active: view === "workspace",
-          onSelect: () => goTo("workspace"),
-        },
         ...PINNED_NAV_ITEMS.map(({ view: v, icon: Icon, labelKey }) => ({
           id: v,
           label: t(labelKey),
@@ -750,53 +744,91 @@ function Layout({
           <div id="cloud-session-sidebar" className="sidebar-cloud-history" />
 
           <div className="sidebar-chat-section">
-            <div className="sidebar-nav-sessions">
-              <div className="sidebar-chat-scroll" ref={sidebarChatScrollRef}>
-                <details
-                  onToggle={(e) => setLegacyHistoryOpen(e.currentTarget.open)}
+            <Dialog.Root
+              open={legacyHistoryOpen}
+              onOpenChange={setLegacyHistoryOpen}
+            >
+              <Dialog.Trigger asChild>
+                <button className="device-history-button" type="button">
+                  {locale.startsWith("ja")
+                    ? "端末の履歴・移行"
+                    : "Device history and migration"}
+                </button>
+              </Dialog.Trigger>
+              <Dialog.Portal>
+                <Dialog.Overlay className="device-history-backdrop" />
+                <Dialog.Content
+                  className="device-history-dialog"
+                  aria-describedby={undefined}
                 >
-                  <summary>Device runtime · local history</summary>
-                  {onOpenDeviceRuntime && (
-                    <button onClick={onOpenDeviceRuntime}>
-                      Set up device runtime
+                  <Dialog.Close asChild>
+                    <button type="button" className="device-history-close">
+                      {locale.startsWith("ja") ? "閉じる" : "Close"}
                     </button>
-                  )}
-                  {legacyHistoryOpen && (
-                    <SidebarRecentSessions
-                      open={!sidebarCollapsed}
-                      connectionId={connectionId}
-                      activeProfile={activeProfile}
-                      currentSessionId={currentSessionId}
-                      loadingSessionIds={loadingSessionIds}
-                      resumingSessionId={resumingSessionId}
-                      onSelect={handleResumeSession}
-                      onSessionDeleted={(id) => {
-                        // If the open chat was the one deleted, drop to a fresh chat
-                        // so the user isn't left viewing a now-gone conversation.
-                        if (id === currentSessionId) handleNewChat();
-                      }}
-                      scrollRootRef={sidebarChatScrollRef}
-                    />
-                  )}
-                </details>
-              </div>
-              {sidebarScrollbar.scrollable && (
-                <div
-                  className={`sidebar-chat-scrollbar ${
-                    sidebarScrollbar.visible ? "visible" : ""
-                  }`}
-                  aria-hidden="true"
-                >
-                  <div
-                    className="sidebar-chat-scrollbar-thumb"
-                    style={{
-                      height: sidebarScrollbar.height,
-                      transform: `translateY(${sidebarScrollbar.top}px)`,
-                    }}
-                  />
-                </div>
-              )}
-            </div>
+                  </Dialog.Close>
+                  <div className="sidebar-nav-sessions">
+                    <div
+                      className="sidebar-chat-scroll"
+                      ref={sidebarChatScrollRef}
+                    >
+                      <div>
+                        <Dialog.Title>
+                          {locale.startsWith("ja")
+                            ? "端末の履歴・移行"
+                            : "Device history and migration"}
+                        </Dialog.Title>
+                        {onOpenDeviceRuntime && (
+                          <button
+                            onClick={() => {
+                              setLegacyHistoryOpen(false);
+                              onOpenDeviceRuntime();
+                            }}
+                          >
+                            Set up device runtime
+                          </button>
+                        )}
+                        {legacyHistoryOpen && (
+                          <SidebarRecentSessions
+                            open={!sidebarCollapsed}
+                            connectionId={connectionId}
+                            activeProfile={activeProfile}
+                            currentSessionId={currentSessionId}
+                            loadingSessionIds={loadingSessionIds}
+                            resumingSessionId={resumingSessionId}
+                            onSelect={(id) => {
+                              handleResumeSession(id);
+                              setLegacyHistoryOpen(false);
+                            }}
+                            onSessionDeleted={(id) => {
+                              // If the open chat was the one deleted, drop to a fresh chat
+                              // so the user isn't left viewing a now-gone conversation.
+                              if (id === currentSessionId) handleNewChat();
+                            }}
+                            scrollRootRef={sidebarChatScrollRef}
+                          />
+                        )}
+                      </div>
+                    </div>
+                    {sidebarScrollbar.scrollable && (
+                      <div
+                        className={`sidebar-chat-scrollbar ${
+                          sidebarScrollbar.visible ? "visible" : ""
+                        }`}
+                        aria-hidden="true"
+                      >
+                        <div
+                          className="sidebar-chat-scrollbar-thumb"
+                          style={{
+                            height: sidebarScrollbar.height,
+                            transform: `translateY(${sidebarScrollbar.top}px)`,
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </Dialog.Content>
+              </Dialog.Portal>
+            </Dialog.Root>
           </div>
 
           <div className="sidebar-footer">
@@ -965,6 +997,7 @@ function Layout({
               <CloudWorkspace
                 profile={activeProfile}
                 locale={locale}
+                embedded
                 active={view === "workspace"}
                 onOpenChat={() => goTo("mithril-chat")}
                 onOpenNativeSection={(section) => {
@@ -1155,7 +1188,19 @@ function Layout({
           )}
         </main>
       </div>
-      <StatusBar activeProfile={activeProfile} />
+      <StatusBar
+        activeProfile={activeProfile}
+        cloud={
+          ![
+            "chat",
+            "sessions",
+            "runs",
+            "providers",
+            "gateway",
+            "settings",
+          ].includes(view)
+        }
+      />
     </div>
   );
 }

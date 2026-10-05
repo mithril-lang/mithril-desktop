@@ -63,3 +63,7 @@ Completed local chat histories can be reviewed in bounded pages beyond the first
 Schedule tests cover fixed API routes, owner validation, scope refusal and local-only preview projection.
 
 Credentials, absolute paths, scripts, delivery destinations and native tool grants are excluded. Calendar schedules require an explicit new interval; no background import starts a cloud run.
+
+## Stable disconnected identity
+
+Repeated denied sign-in or missing-scope checks preserve the disconnected error instead of emitting account-change events that remount the renderer indefinitely. Explicit resets still invalidate in-flight requests.

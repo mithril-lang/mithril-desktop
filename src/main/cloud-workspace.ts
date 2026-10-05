@@ -120,10 +120,11 @@ export class CloudWorkspace {
   }
 
   reset(): void {
+    const notify = this.identity !== null || this.enabled;
     this.generation++;
     this.identity = null;
     this.enabled = false;
-    this.deps.changed();
+    if (notify) this.deps.changed();
   }
 
   /** Main-process context only. Neither credential fingerprint nor profile is exposed through workspace IPC. */
@@ -237,13 +238,13 @@ export class CloudWorkspace {
       throw new Error("Workspace identity response invalid");
     }
     if (this.identity && this.identity.userId !== me.user.id) this.reset();
-    this.identity = { token, profile, userId: me.user.id, scopes: me.scopes };
     if (!me.scopes.includes(this.deps.readScope ?? "workspace:read")) {
       this.reset();
       throw new Error(
         `Cloud connection requires explicit ${this.deps.readScope ?? "workspace:read"} authorization. Existing tokens are never upgraded automatically.`,
       );
     }
+    this.identity = { token, profile, userId: me.user.id, scopes: me.scopes };
     return { userId: me.user.id, enabled: this.enabled };
   }
 

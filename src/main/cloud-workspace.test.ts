@@ -426,3 +426,17 @@ it("uses fixed owner-checked schedule routes and refuses writes without chat and
   );
   await expect(client.getSchedules()).rejects.toThrow(/owner/i);
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Stable disconnected identity]]
+it("does not emit an account-change loop for repeated rejected connections", async () => {
+  fetcher.mockResolvedValue(
+    reply({ via: "api_token", user: { id: "a" }, scopes: ["inference"] }),
+  );
+  await expect(client.enable()).rejects.toThrow("workspace:read");
+  await expect(client.enable()).rejects.toThrow("workspace:read");
+  expect(changed).not.toHaveBeenCalled();
+  fetcher.mockResolvedValue(reply(null, 401));
+  await expect(client.enable()).rejects.toThrow("sign-in expired");
+  await expect(client.enable()).rejects.toThrow("sign-in expired");
+  expect(changed).not.toHaveBeenCalled();
+});

@@ -148,7 +148,7 @@ Existing legacy profile data is not automatically imported by the preview. The m
 
 First launch offers browser device sign-in as its primary action. Browser authentication supports passkeys; approval automatically connects Desktop without copying a token. Manual token entry remains an optional fallback.
 
-[[src/renderer/src/screens/MithrilStart/MithrilStart.tsx#MithrilStart]] shows the approval code, browser reopen, waiting, cancellation and retry states. [[src/main/mithril-device-login.ts#startMithrilDeviceLogin]] requests only inference and billing:read, validates the Console approval URL, polls and verifies the returned token before encrypted storage. Cancellation during a network response prevents credential persistence.
+[[src/renderer/src/screens/MithrilStart/MithrilStart.tsx#MithrilStart]] shows the approval code, browser reopen, waiting, cancellation and retry states. [[src/main/mithril-device-login.ts#startMithrilDeviceLogin]] requests inference, billing:read, Chat read/write and Workspace read/write with explicit browser approval, validates the Console approval URL, and refuses partial grants before replacing encrypted credentials. Workspace scopes require passkey approval. Cancellation during a network response prevents credential persistence.
 
 [[src/main/first-run.ts#mithrilFirstRunState]] reads local storage without blocking offline launch. Successful connection opens the existing connected screen; the native workspace remains an explicit opt-in. Component tests exercise success, refusal, cancellation, retry and fallback without live authentication or inference charges.
 

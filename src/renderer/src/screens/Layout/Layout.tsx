@@ -38,6 +38,7 @@ import VerifyWarningBanner from "../../components/VerifyWarningBanner";
 import { useSettingsModal } from "../../components/settings/SettingsModalContext";
 import {
   Compass,
+  Folder,
   Settings as SettingsIcon,
   Brain,
   Workflow,
@@ -80,7 +81,7 @@ const PINNED_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   // "Manage profiles" action rather than a top-level nav item.
   { view: "office", icon: Building, labelKey: "navigation.office" },
   { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
-  { view: "projects", icon: Compass, labelKey: "navigation.projects" },
+  { view: "projects", icon: Folder, labelKey: "navigation.projects" },
   // "skills" lives under the Discover tab (installed + community), so it's no
   // longer a top-level nav item.
   { view: "security", icon: KeyRound, labelKey: "navigation.security" },
@@ -991,6 +992,7 @@ function Layout({
                 sidebarNavigation={cloudSidebarNavigation}
                 onSidebarSelect={() => goTo("mithril-chat")}
                 onSidebarProjects={() => goTo("projects")}
+                onConnectAccount={() => goTo("providers")}
                 visible={view === "mithril-chat"}
               />
             </div>

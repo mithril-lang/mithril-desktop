@@ -190,3 +190,11 @@ Native and cloud title changes reconcile against independent acknowledged baseli
 ## Native title compare and swap
 
 Cloud title application checks the exact captured original title in a SQLite transaction. User title provenance protects against late automatic generation, while stale reads, duplicate titles and older schemas retain source records.
+
+## Reviewed title conflict resolution
+
+Title choices compare the reviewed names, cloud revision and owner/profile before writing. Newer edits require fresh review; lost rename acknowledgements retain their operation IDs without execution.
+
+## Title conflict review interaction
+
+The synchronization disclosure shows both reviewed names and sends only a metadata choice with its account/profile and cloud revision. Account changes hide old titles immediately and ignore late resolution failures.

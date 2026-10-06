@@ -455,6 +455,13 @@ export async function synchronizeNativeHistory(): Promise<
   return nativeHistorySync.run();
 }
 
+export async function resolveNativeHistoryTitle(
+  request: import("./native-history-sync").NativeTitleResolution,
+): Promise<Awaited<ReturnType<typeof nativeHistorySync.run>>> {
+  await cloudChat.auth.enable();
+  return nativeHistorySync.resolveTitle(request);
+}
+
 /** Read-only inventory for the original sidebar; no migration, file capture or execution. */
 export async function nativeHistoryInventory(): Promise<{
   userId: string;

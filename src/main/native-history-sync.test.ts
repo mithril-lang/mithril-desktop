@@ -749,3 +749,129 @@ it("retains an unsupported source title without storing an invalid pending opera
   expect(f.currentTitle()).toHaveLength(513);
   expect(f.sessions.get(sid)!.title).toBe("Original chat");
 });
+
+// @lat: [[cloud-workspace-tests#Reviewed title conflict resolution]]
+it("resolves only the reviewed title pair and preserves newer edits", async () => {
+  for (const choice of ["native", "cloud"] as const) {
+    const f = fixture(),
+      sync = new NativeHistorySync(f.ports);
+    await sync.run();
+    const sid = nativeCloudSessionId("default", "original");
+    f.title("Native edit");
+    const remote = f.sessions.get(sid)!;
+    f.sessions.set(sid, {
+      ...remote,
+      title: "Cloud edit",
+      revision: remote.revision + 1,
+    });
+    const review = (await sync.run()).titleConflicts[0];
+    expect(review).toMatchObject({
+      native: "Native edit",
+      cloud: "Cloud edit",
+    });
+    await sync.resolveTitle({
+      ...review,
+      userId: "alice",
+      profile: "default",
+      choice,
+    });
+    expect(f.currentTitle()).toBe(
+      choice === "native" ? "Native edit" : "Cloud edit",
+    );
+    expect(f.sessions.get(sid)!.title).toBe(f.currentTitle());
+    expect((await sync.run()).titleConflicts).toEqual([]);
+    expect(f.executions()).toBe(0);
+  }
+  const f = fixture(),
+    sync = new NativeHistorySync(f.ports);
+  await sync.run();
+  const sid = nativeCloudSessionId("default", "original"),
+    remote = f.sessions.get(sid)!;
+  f.title("Native edit");
+  f.sessions.set(sid, {
+    ...remote,
+    title: "Cloud edit",
+    revision: remote.revision + 1,
+  });
+  const review = (await sync.run()).titleConflicts[0];
+  f.title("Newer native edit");
+  await expect(
+    sync.resolveTitle({
+      ...review,
+      userId: "alice",
+      profile: "default",
+      choice: "cloud",
+    }),
+  ).rejects.toThrow("changed");
+  expect(f.currentTitle()).toBe("Newer native edit");
+  expect(f.sessions.get(sid)!.title).toBe("Cloud edit");
+  f.owner("bob");
+  await expect(
+    sync.resolveTitle({
+      ...review,
+      userId: "alice",
+      profile: "default",
+      choice: "native",
+    }),
+  ).rejects.toThrow("account changed");
+  expect(f.executions()).toBe(0);
+});
+it("recovers a reviewed native title choice after a lost acknowledgement", async () => {
+  const f = fixture(),
+    sync = new NativeHistorySync(f.ports);
+  await sync.run();
+  const sid = nativeCloudSessionId("default", "original"),
+    remote = f.sessions.get(sid)!;
+  f.title("Native edit");
+  f.sessions.set(sid, {
+    ...remote,
+    title: "Cloud edit",
+    revision: remote.revision + 1,
+  });
+  const review = (await sync.run()).titleConflicts[0];
+  f.lose();
+  await sync.resolveTitle({
+    ...review,
+    userId: "alice",
+    profile: "default",
+    choice: "native",
+  });
+  const operationId = f.state().entries[sid].pending!.operation.operationId;
+  const receipt = vi.spyOn(f.ports.transport, "receipt");
+  await new NativeHistorySync(f.ports).run();
+  expect(receipt).toHaveBeenCalledWith(sid, operationId);
+  expect(f.state().entries[sid].pending).toBeNull();
+  expect(f.sessions.get(sid)!.title).toBe("Native edit");
+  expect(f.executions()).toBe(0);
+});
+
+it("rejects a title choice after the cloud revision changes even if its title is unchanged", async () => {
+  const f = fixture(),
+    sync = new NativeHistorySync(f.ports);
+  await sync.run();
+  const sid = nativeCloudSessionId("default", "original"),
+    remote = f.sessions.get(sid)!;
+  f.title("Native edit");
+  f.sessions.set(sid, {
+    ...remote,
+    title: "Cloud edit",
+    revision: remote.revision + 1,
+  });
+  const review = (await sync.run()).titleConflicts[0];
+  f.sessions.set(sid, {
+    ...f.sessions.get(sid)!,
+    revision: review.cloudRevision + 1,
+  });
+  const apply = vi.spyOn(f.ports.transport, "apply");
+  await expect(
+    sync.resolveTitle({
+      ...review,
+      userId: "alice",
+      profile: "default",
+      choice: "native",
+    }),
+  ).rejects.toThrow("changed");
+  expect(apply).not.toHaveBeenCalled();
+  expect(f.currentTitle()).toBe("Native edit");
+  expect(f.sessions.get(sid)!.title).toBe("Cloud edit");
+});

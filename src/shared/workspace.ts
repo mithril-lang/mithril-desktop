@@ -50,11 +50,26 @@ export interface CloudChatAPI extends SessionTransport {
     profile: string;
     rows: Array<{ id: string; sourceId: string; title: string }>;
   }>;
+  resolveNativeHistoryTitle(request: {
+    userId: string;
+    profile: string;
+    sessionId: string;
+    native: string;
+    cloud: string;
+    cloudRevision: number;
+    choice: "native" | "cloud";
+  }): ReturnType<CloudChatAPI["syncNativeHistory"]>;
   syncNativeHistory(): Promise<{
     userId: string;
     synced: number;
     reconstructed?: number;
     conflicts: string[];
+    titleConflicts?: Array<{
+      sessionId: string;
+      native: string;
+      cloud: string;
+      cloudRevision: number;
+    }>;
     deferred: string[];
   }>;
   historyFiles: import("@mithril/workspace/history").HistoryFileTransport;

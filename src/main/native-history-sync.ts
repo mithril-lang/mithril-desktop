@@ -14,6 +14,17 @@ import {
   validArchivedHistoryItem,
   type ArchivedHistoryItem,
 } from "@mithril/workspace/history";
+export interface NativeTitleConflict {
+  sessionId: string;
+  native: string;
+  cloud: string;
+  cloudRevision: number;
+}
+export interface NativeTitleResolution extends NativeTitleConflict {
+  userId: string;
+  profile: string;
+  choice: "native" | "cloud";
+}
 export interface NativeHistorySource {
   id: string;
   title: string;
@@ -80,6 +91,7 @@ export class NativeHistorySync {
     synced: number;
     reconstructed: number;
     conflicts: string[];
+    titleConflicts: NativeTitleConflict[];
     deferred: string[];
   }> | null = null;
   constructor(private ports: NativeHistoryPorts) {}
@@ -88,6 +100,7 @@ export class NativeHistorySync {
     synced: number;
     reconstructed: number;
     conflicts: string[];
+    titleConflicts: NativeTitleConflict[];
     deferred: string[];
   }> {
     if (this.running) return this.running;
@@ -96,14 +109,48 @@ export class NativeHistorySync {
     });
     return this.running;
   }
-  private async pass(): Promise<{
+  async resolveTitle(
+    request: NativeTitleResolution,
+  ): Promise<Awaited<ReturnType<NativeHistorySync["run"]>>> {
+    if (
+      !request ||
+      typeof request !== "object" ||
+      typeof request.userId !== "string" ||
+      typeof request.profile !== "string" ||
+      typeof request.sessionId !== "string" ||
+      typeof request.native !== "string" ||
+      typeof request.cloud !== "string" ||
+      request.native.length > 512 ||
+      request.cloud.length > 512 ||
+      !Number.isSafeInteger(request.cloudRevision) ||
+      request.cloudRevision < 1 ||
+      !["native", "cloud"].includes(request.choice)
+    )
+      throw Error("Invalid title resolution");
+    // Serialize with background replication; never act on a renderer-supplied owner alone.
+    const captured = structuredClone(request);
+    while (this.running) await this.running.catch(() => undefined);
+    this.running = this.pass(captured).finally(() => {
+      this.running = null;
+    });
+    return this.running;
+  }
+  private async pass(resolution?: NativeTitleResolution): Promise<{
     userId: string;
     synced: number;
     reconstructed: number;
     conflicts: string[];
+    titleConflicts: NativeTitleConflict[];
     deferred: string[];
   }> {
     const identity = await this.ports.context();
+    if (
+      resolution &&
+      (resolution.userId !== identity.userId ||
+        resolution.profile !== identity.profile)
+    )
+      throw Error("Title resolution account changed");
+    let resolved = false;
     const check = async (): Promise<void> => {
       if (
         JSON.stringify(identity) !== JSON.stringify(await this.ports.context())
@@ -161,6 +208,7 @@ export class NativeHistorySync {
       synced: 0,
       reconstructed: 0,
       conflicts: [] as string[],
+      titleConflicts: [] as NativeTitleConflict[],
       deferred: sourceFailure ? [sourceFailure] : ([] as string[]),
     };
     for (const native of source) {
@@ -370,7 +418,40 @@ export class NativeHistorySync {
         }
         // Three-way title reconciliation uses independent native/cloud baselines.
         // A pending operation always keeps its original ID across lost receipts.
-        if (!journal.title) {
+        if (resolution?.sessionId === sid) {
+          if (
+            !journal.titleConflict ||
+            journal.pending ||
+            native.title !== resolution.native ||
+            remote.title !== resolution.cloud ||
+            remote.revision !== resolution.cloudRevision ||
+            journal.titleConflict.native !== resolution.native ||
+            journal.titleConflict.cloud !== resolution.cloud
+          )
+            throw Error("Title conflict changed; review current titles");
+          if (resolution.choice === "cloud") {
+            if (!native.cacheTitle)
+              throw Error("Native title cache unavailable");
+            const effective = await native.cacheTitle(remote.title);
+            await check();
+            if (typeof effective !== "string" || effective.length > 512)
+              throw Error("Invalid native title acknowledgement");
+            journal.title = { native: effective, cloud: remote.title };
+          } else {
+            // Rebase only the reviewed metadata choice onto the complete cloud checkpoint.
+            journal.title = { native: remote.title, cloud: remote.title };
+          }
+          delete journal.titleConflict;
+          await persist();
+          resolved = true;
+        }
+        if (
+          resolved &&
+          resolution?.sessionId === sid &&
+          resolution.choice === "cloud"
+        ) {
+          // The source snapshot predates transactional writeback; do not echo it this pass.
+        } else if (!journal.title) {
           if (native.title === remote.title) {
             journal.title = { native: native.title, cloud: remote.title };
             delete journal.titleConflict;
@@ -448,6 +529,12 @@ export class NativeHistorySync {
         if (journal.titleConflict) {
           journal.titleConflict = { native: native.title, cloud: remote.title };
           outcome.conflicts.push(sid);
+          outcome.titleConflicts.push({
+            sessionId: sid,
+            native: native.title,
+            cloud: remote.title,
+            cloudRevision: remote.revision,
+          });
         }
         await persist();
         const stored = new Map(
@@ -652,6 +739,10 @@ export class NativeHistorySync {
         }
       }
     }
+    if (resolution && !resolved)
+      throw Error(
+        "Title conflict changed or unavailable; review current titles",
+      );
     return { ...outcome, conflicts: [...new Set(outcome.conflicts)] };
   }
 }

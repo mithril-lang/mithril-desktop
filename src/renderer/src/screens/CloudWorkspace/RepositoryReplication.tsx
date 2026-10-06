@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRepositoryReplication } from "@mithril/workspace/repository-react";
 
 /** One background reconciler for the application, independent of the active screen. */
@@ -11,13 +11,25 @@ export default function RepositoryReplication({
   locale: string;
   enabled: boolean;
 }): React.JSX.Element | null {
+  const identityGeneration = useRef(0);
   const [owner, setOwner] = useState<string | null>(null);
   const [epoch, setEpoch] = useState(0);
   const [connectionNotice, setConnectionNotice] = useState("");
   const [historyNotice, setHistoryNotice] = useState("");
+  const [titleConflicts, setTitleConflicts] = useState<
+    NonNullable<
+      Awaited<
+        ReturnType<typeof window.hermesAPI.cloudChat.syncNativeHistory>
+      >["titleConflicts"]
+    >
+  >([]);
+  const [resolvingTitle, setResolvingTitle] = useState(false);
   useEffect(
     () =>
       window.hermesAPI.onCloudWorkspaceAccountChanged(() => {
+        identityGeneration.current++;
+        setTitleConflicts([]);
+        setHistoryNotice("");
         setOwner(null);
         setEpoch((value) => value + 1);
       }),
@@ -25,8 +37,11 @@ export default function RepositoryReplication({
   );
   useEffect(() => {
     let active = true;
+    const generation = identityGeneration;
+    generation.current++;
     setOwner(null);
     setHistoryNotice("");
+    setTitleConflicts([]);
     if (enabled)
       void window.hermesAPI.cloudWorkspace
         .status()
@@ -47,6 +62,7 @@ export default function RepositoryReplication({
         });
     return () => {
       active = false;
+      generation.current++;
     };
   }, [profile, epoch, enabled]);
   useEffect(() => {
@@ -59,7 +75,8 @@ export default function RepositoryReplication({
       try {
         const result = await window.hermesAPI.cloudChat.syncNativeHistory();
         if (result.userId !== owner) throw Error("History owner changed");
-        if (active)
+        if (active) {
+          setTitleConflicts(result.titleConflicts ?? []);
           setHistoryNotice(
             result.conflicts.length || result.deferred.length
               ? locale.startsWith("ja")
@@ -67,6 +84,7 @@ export default function RepositoryReplication({
                 : `${result.conflicts.length + result.deferred.length} chats need synchronization review. Original history is retained.`
               : "",
           );
+        }
       } catch (error) {
         if (active)
           setHistoryNotice(
@@ -92,11 +110,39 @@ export default function RepositoryReplication({
     `${profile}:${epoch}`,
     window.hermesAPI.cloudWorkspace.capabilityResources,
   );
+  const resolveTitle = async (
+    conflict: (typeof titleConflicts)[number],
+    choice: "native" | "cloud",
+  ): Promise<void> => {
+    if (!owner || resolvingTitle) return;
+    const capturedOwner = owner;
+    const generation = identityGeneration.current;
+    setResolvingTitle(true);
+    try {
+      const result = await window.hermesAPI.cloudChat.resolveNativeHistoryTitle(
+        { ...conflict, userId: capturedOwner, profile, choice },
+      );
+      if (generation !== identityGeneration.current) return;
+      if (result.userId !== capturedOwner) throw Error("History owner changed");
+      // A status refresh uses the current owner effect; avoid applying old-account results.
+      setEpoch((value) => value + 1);
+    } catch (error) {
+      if (generation === identityGeneration.current)
+        setHistoryNotice(
+          error instanceof Error ? error.message : String(error),
+        );
+    } finally {
+      setResolvingTitle(false);
+    }
+  };
   const ja = locale.startsWith("ja");
   const notice = connectionNotice || replication.notice || historyNotice;
   if (
     !enabled ||
-    (!notice && !replication.conflicts.length && !replication.deferred)
+    (!notice &&
+      !titleConflicts.length &&
+      !replication.conflicts.length &&
+      !replication.deferred)
   )
     return null;
   const resolve = (key: string, choice: "local" | "cloud"): void => {
@@ -128,6 +174,27 @@ export default function RepositoryReplication({
           </p>
         </details>
       )}
+      {titleConflicts.map((conflict) => (
+        <details key={conflict.sessionId}>
+          <summary>
+            {ja ? "チャット名の変更を確認" : "Review chat title changes"}
+          </summary>
+          <p>{conflict.native}</p>
+          <p>{conflict.cloud}</p>
+          <button
+            disabled={resolvingTitle}
+            onClick={() => void resolveTitle(conflict, "native")}
+          >
+            {ja ? "この端末で編集した名前を使用" : "Use the name edited here"}
+          </button>
+          <button
+            disabled={resolvingTitle}
+            onClick={() => void resolveTitle(conflict, "cloud")}
+          >
+            {ja ? "同期された名前を使用" : "Use the synchronized name"}
+          </button>
+        </details>
+      ))}
       {replication.conflicts.map((conflict) => (
         <details key={conflict.key}>
           <summary>

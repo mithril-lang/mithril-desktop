@@ -29,6 +29,8 @@ export interface NativeHistorySource {
   id: string;
   title: string;
   model: string;
+  archived?: boolean;
+  cacheArchived?(archived: boolean): Promise<boolean>;
   items(sessionId: string): Promise<ArchivedHistoryItem[]>;
   cache?(sessionId: string, items: ArchivedHistoryItem[]): Promise<void>;
   cacheTitle?(title: string): Promise<string>;
@@ -42,6 +44,7 @@ export interface NativeHistoryJournal {
       nativeHashes?: Record<string, string>;
       title?: { native: string; cloud: string };
       model?: { native: string; cloud: string };
+      visibility?: { native: boolean; cloud: boolean };
       titleConflict?: { native: string; cloud: string };
       pending: {
         sessionId: string;
@@ -95,6 +98,7 @@ export class NativeHistorySync {
     conflicts: string[];
     titleConflicts: NativeTitleConflict[];
     modelConflicts: NativeTitleConflict[];
+    visibilityConflicts: NativeTitleConflict[];
     deferred: string[];
   }> | null = null;
   constructor(private ports: NativeHistoryPorts) {}
@@ -105,6 +109,7 @@ export class NativeHistorySync {
     conflicts: string[];
     titleConflicts: NativeTitleConflict[];
     modelConflicts: NativeTitleConflict[];
+    visibilityConflicts: NativeTitleConflict[];
     deferred: string[];
   }> {
     if (this.running) return this.running;
@@ -123,9 +128,14 @@ export class NativeHistorySync {
   ): Promise<Awaited<ReturnType<NativeHistorySync["run"]>>> {
     return this.resolveMetadata(request, "model");
   }
+  resolveVisibility(
+    request: NativeTitleResolution,
+  ): Promise<Awaited<ReturnType<NativeHistorySync["run"]>>> {
+    return this.resolveMetadata(request, "visibility");
+  }
   private async resolveMetadata(
     request: NativeTitleResolution,
-    field: "title" | "model",
+    field: "title" | "model" | "visibility",
   ): Promise<Awaited<ReturnType<NativeHistorySync["run"]>>> {
     if (
       !request ||
@@ -138,6 +148,9 @@ export class NativeHistorySync {
       request.native.length > (field === "model" ? 256 : 512) ||
       request.cloud.length > (field === "model" ? 256 : 512) ||
       (field === "model" && (!request.native || !request.cloud)) ||
+      (field === "visibility" &&
+        (!["archived", "visible"].includes(request.native) ||
+          !["archived", "visible"].includes(request.cloud))) ||
       !Number.isSafeInteger(request.cloudRevision) ||
       request.cloudRevision < 1 ||
       !["native", "cloud"].includes(request.choice)
@@ -152,7 +165,9 @@ export class NativeHistorySync {
     return this.running;
   }
   private async pass(
-    resolution?: NativeTitleResolution & { field: "title" | "model" },
+    resolution?: NativeTitleResolution & {
+      field: "title" | "model" | "visibility";
+    },
   ): Promise<{
     userId: string;
     synced: number;
@@ -160,6 +175,7 @@ export class NativeHistorySync {
     conflicts: string[];
     titleConflicts: NativeTitleConflict[];
     modelConflicts: NativeTitleConflict[];
+    visibilityConflicts: NativeTitleConflict[];
     deferred: string[];
   }> {
     const identity = await this.ports.context();
@@ -229,6 +245,7 @@ export class NativeHistorySync {
       conflicts: [] as string[],
       titleConflicts: [] as NativeTitleConflict[],
       modelConflicts: [] as NativeTitleConflict[],
+      visibilityConflicts: [] as NativeTitleConflict[],
       deferred: sourceFailure ? [sourceFailure] : ([] as string[]),
     };
     for (const native of source) {
@@ -258,7 +275,7 @@ export class NativeHistorySync {
         journal.pending &&
         (journal.pending.sessionId !== sid ||
           !validateChatOperation(journal.pending.operation) ||
-          !["create", "history", "rename"].includes(
+          !["create", "history", "rename", "delete", "restore"].includes(
             journal.pending.operation.type,
           ) ||
           typeof journal.pending.conflicted !== "boolean")
@@ -292,6 +309,16 @@ export class NativeHistorySync {
           journal.model.cloud.length > 256)
       )
         throw Error("Invalid model journal");
+      if (
+        journal.visibility !== undefined &&
+        (!journal.visibility ||
+          typeof journal.visibility !== "object" ||
+          Array.isArray(journal.visibility) ||
+          Object.keys(journal.visibility).length !== 2 ||
+          typeof journal.visibility.native !== "boolean" ||
+          typeof journal.visibility.cloud !== "boolean")
+      )
+        throw Error("Invalid visibility journal");
       if (journal.pending?.conflicted) {
         outcome.conflicts.push(sid);
         continue;
@@ -360,6 +387,23 @@ export class NativeHistorySync {
             };
             delete journal.titleConflict;
           }
+          if (
+            pending.operation.type === "delete" ||
+            pending.operation.type === "restore"
+          ) {
+            const deleted = pending.operation.type === "delete";
+            if (
+              receipt.session.revision !== pending.operation.baseRevision + 1 ||
+              receipt.session.deleted !== deleted
+            )
+              throw Error("Invalid visibility receipt");
+            journal.visibility = { native: deleted, cloud: deleted };
+          }
+          if (
+            pending.operation.type === "create" &&
+            typeof native.archived === "boolean"
+          )
+            journal.visibility = { native: false, cloud: false };
           sessions.set(sid, receipt.session);
           journal.pending = null;
           await persist();
@@ -406,10 +450,157 @@ export class NativeHistorySync {
             native: native.model || "native-history",
             cloud: result.session.model,
           };
+          if (typeof native.archived === "boolean")
+            journal.visibility = { native: false, cloud: false };
           remote = result.session;
           sessions.set(sid, remote);
           journal.pending = null;
           await persist();
+        }
+        if (
+          remote.activeTurn &&
+          ["running", "uncertain"].includes(remote.activeTurn.status)
+        ) {
+          outcome.deferred.push(sid);
+          continue;
+        }
+        let archived = native.archived;
+        const visibility = async (
+          current: ChatSession,
+          afterHistory: boolean,
+        ): Promise<ChatSession> => {
+          if (typeof archived !== "boolean") return current;
+          if (
+            resolution?.field === "visibility" &&
+            resolution.sessionId === sid &&
+            !resolved
+          ) {
+            if (
+              journal.pending ||
+              journal.visibility ||
+              archived === current.deleted ||
+              resolution.native !== (archived ? "archived" : "visible") ||
+              resolution.cloud !== (current.deleted ? "archived" : "visible") ||
+              current.revision !== resolution.cloudRevision
+            )
+              throw Error("Visibility conflict changed; review current states");
+            if (resolution.choice === "cloud") {
+              if (!native.cacheArchived)
+                throw Error("Native archive cache unavailable");
+              const checkpoint = await this.ports.transport.events(sid);
+              await check();
+              if (
+                checkpoint.schemaVersion !== 1 ||
+                checkpoint.userId !== identity.userId ||
+                !validateChatSession(checkpoint.session) ||
+                JSON.stringify(checkpoint.session) !== JSON.stringify(current)
+              )
+                throw Error(
+                  "Visibility checkpoint changed; review current states",
+                );
+              const cached = await native.cacheArchived(current.deleted);
+              await check();
+              if (cached !== current.deleted)
+                throw Error("Invalid native archive acknowledgement");
+              archived = cached;
+              journal.visibility = { native: cached, cloud: current.deleted };
+            } else
+              journal.visibility = {
+                native: current.deleted,
+                cloud: current.deleted,
+              };
+            await persist();
+            resolved = true;
+          }
+          if (archived === current.deleted) {
+            journal.visibility = { native: archived, cloud: current.deleted };
+            await persist();
+            return current;
+          }
+          if (!journal.visibility) {
+            if (!afterHistory) {
+              outcome.conflicts.push(sid);
+              outcome.visibilityConflicts.push({
+                sessionId: sid,
+                native: archived ? "archived" : "visible",
+                cloud: current.deleted ? "archived" : "visible",
+                cloudRevision: current.revision,
+              });
+            }
+            return current;
+          }
+          const localChanged = archived !== journal.visibility.native;
+          if (localChanged) {
+            // Preserve complete original history before hiding a newly archived source.
+            if (archived && !afterHistory) return current;
+            const operation: ChatOperation = {
+              type: archived ? "delete" : "restore",
+              operationId: crypto.randomUUID(),
+              baseRevision: current.revision,
+              data: {},
+            };
+            if (!validateChatOperation(operation))
+              throw Error("Invalid visibility operation");
+            journal.pending = { sessionId: sid, operation, conflicted: false };
+            await persist();
+            const receipt = await this.ports.transport.apply(sid, operation);
+            await check();
+            if (
+              receipt.schemaVersion !== 1 ||
+              receipt.userId !== identity.userId ||
+              receipt.operationId !== operation.operationId ||
+              !validateChatSession(receipt.session) ||
+              receipt.session.id !== sid
+            )
+              throw Error("Invalid visibility receipt");
+            if (receipt.status === "conflict") {
+              journal.pending.conflicted = true;
+              await persist();
+              outcome.conflicts.push(sid);
+              return current;
+            }
+            if (
+              receipt.status !== "accepted" ||
+              receipt.session.revision !== operation.baseRevision + 1 ||
+              receipt.session.deleted !== archived ||
+              receipt.session.title !== current.title ||
+              receipt.session.model !== current.model
+            )
+              throw Error("Visibility receipt remains unknown");
+            journal.visibility = {
+              native: archived,
+              cloud: receipt.session.deleted,
+            };
+            journal.pending = null;
+            await persist();
+            sessions.set(sid, receipt.session);
+            return receipt.session;
+          }
+          if (!native.cacheArchived)
+            throw Error("Native archive cache unavailable");
+          const checkpoint = await this.ports.transport.events(sid);
+          await check();
+          if (
+            checkpoint.schemaVersion !== 1 ||
+            checkpoint.userId !== identity.userId ||
+            !validateChatSession(checkpoint.session) ||
+            JSON.stringify(checkpoint.session) !== JSON.stringify(current)
+          )
+            throw Error("Visibility checkpoint changed; review current states");
+          const cached = await native.cacheArchived(current.deleted);
+          await check();
+          if (cached !== current.deleted)
+            throw Error("Invalid native archive acknowledgement");
+          archived = cached;
+          journal.visibility = { native: cached, cloud: current.deleted };
+          await persist();
+          return current;
+        };
+        remote = await visibility(remote, false);
+        if (state.entries[sid].pending?.conflicted) continue;
+        if (remote.deleted) {
+          if (archived !== true) outcome.deferred.push(sid);
+          continue;
         }
         if (
           remote.deleted ||
@@ -801,6 +992,8 @@ export class NativeHistorySync {
           await persist();
           outcome.synced += batch.length;
         }
+        if (!journal.pending && !outcome.conflicts.includes(sid))
+          remote = await visibility(remote, true);
       } catch (error) {
         await check();
         outcome.deferred.push(

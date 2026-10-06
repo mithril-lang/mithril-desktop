@@ -384,6 +384,8 @@ const hermesAPI = {
       ipcRenderer.invoke("cloud-chat-native-title-resolve", request),
     resolveNativeHistoryModel: (request) =>
       ipcRenderer.invoke("cloud-chat-native-model-resolve", request),
+    resolveNativeHistoryVisibility: (request) =>
+      ipcRenderer.invoke("cloud-chat-native-visibility-resolve", request),
     syncNativeHistory: () =>
       ipcRenderer.invoke("cloud-chat-native-history-sync"),
     historyFiles: {

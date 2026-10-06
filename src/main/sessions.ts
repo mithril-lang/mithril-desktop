@@ -38,6 +38,7 @@ export interface SessionSummary {
   model: string;
   title: string | null;
   preview: string;
+  archived?: boolean;
 }
 
 export interface SessionMessage {
@@ -268,10 +269,12 @@ export function listSessions(
   limit = 30,
   offset = 0,
   profile?: unknown,
+  includeArchived = false,
 ): SessionSummary[] {
   const db = getDb(true, profile);
   if (!db) return [];
 
+  const supportsArchive = sessionVisibilityPredicate(db) !== "1 = 1";
   // Simple query without correlated subquery — titles come from session cache
   const rows = db
     .prepare(
@@ -282,9 +285,10 @@ export function listSessions(
         s.ended_at,
         s.message_count,
         s.model,
-        s.title
+        s.title,
+        ${supportsArchive ? "s.archived" : "0"} AS archived
       FROM sessions s
-      WHERE ${sessionVisibilityPredicate(db)}
+      WHERE ${includeArchived ? "1 = 1" : sessionVisibilityPredicate(db)}
       ORDER BY s.started_at DESC
       LIMIT ? OFFSET ?`,
     )
@@ -296,8 +300,15 @@ export function listSessions(
     message_count: number;
     model: string;
     title: string | null;
+    archived: number;
   }>;
 
+  if (
+    includeArchived &&
+    supportsArchive &&
+    rows.some((row) => row.archived !== 0 && row.archived !== 1)
+  )
+    throw Error("Unsupported native archive value");
   return rows.map((r) => ({
     id: r.id,
     source: r.source,
@@ -307,6 +318,9 @@ export function listSessions(
     model: r.model || "",
     title: r.title,
     preview: "",
+    ...(includeArchived && supportsArchive
+      ? { archived: r.archived === 1 }
+      : {}),
   }));
 }
 

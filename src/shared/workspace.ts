@@ -69,6 +69,15 @@ export interface CloudChatAPI extends SessionTransport {
     cloudRevision: number;
     choice: "native" | "cloud";
   }): ReturnType<CloudChatAPI["syncNativeHistory"]>;
+  resolveNativeHistoryVisibility(request: {
+    userId: string;
+    profile: string;
+    sessionId: string;
+    native: string;
+    cloud: string;
+    cloudRevision: number;
+    choice: "native" | "cloud";
+  }): ReturnType<CloudChatAPI["syncNativeHistory"]>;
   syncNativeHistory(): Promise<{
     userId: string;
     synced: number;
@@ -81,6 +90,12 @@ export interface CloudChatAPI extends SessionTransport {
       cloudRevision: number;
     }>;
     modelConflicts?: Array<{
+      sessionId: string;
+      native: string;
+      cloud: string;
+      cloudRevision: number;
+    }>;
+    visibilityConflicts?: Array<{
       sessionId: string;
       native: string;
       cloud: string;

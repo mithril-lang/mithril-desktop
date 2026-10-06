@@ -359,3 +359,31 @@ Model choices compare the displayed values, owner/profile and cloud revision bef
 ## Model conflict review interaction
 
 The existing synchronization disclosure shows both model values and sends the reviewed choice. Account changes clear private values and suppress late results.
+
+## Original chat archive synchronization
+
+Archive and restore converge in both directions without removing source history. A newly archived source uploads complete items before cloud hiding; lost delete/restore acknowledgements retain their operation IDs and never execute a turn.
+
+## Reviewed chat visibility choices
+
+Older unequal visibility states require an explicit choice rather than inferred deletion. Reviewed values, owner/profile and cloud revision must still match; new revisions and owner changes preserve the original state.
+
+## Native archive compare and swap
+
+Archive writeback changes only the captured original flag under SQLite CAS. Exact row readback rolls back mutated metadata; original messages, project folders and other sessions remain intact, while legacy schemas stay unmodified.
+
+## Complete native archive inventory
+
+Repository capture explicitly includes archived original rows before pagination. The ordinary sidebar stays filtered; unsupported archive values fail capture instead of becoming false visibility states.
+
+## Chat visibility review interaction
+
+Visibility choices use the existing synchronization disclosure with localized states and the correct owner-bound IPC. Title and model resolvers are not called by visibility controls.
+
+## Original compression lineage archive
+
+Archive and restore use the original Agent compression ancestry/descendancy semantics. Entire-lineage readback preserves unrelated conversations and rolls back metadata changes from unexpected triggers.
+
+## Archive synchronization guards
+
+Busy/uncertain cloud work prevents archival metadata dispatch. Changed cloud checkpoints and unsupported legacy archive schemas retain original visibility instead of silently overwriting it.

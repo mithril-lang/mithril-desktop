@@ -24,6 +24,7 @@ const conflict = {
 const sync = vi.fn();
 const resolve = vi.fn();
 const resolveModel = vi.fn();
+const resolveVisibility = vi.fn();
 let changed: () => void;
 let owner: string;
 beforeEach(() => {
@@ -52,6 +53,7 @@ beforeEach(() => {
         syncNativeHistory: sync,
         resolveNativeHistoryTitle: resolve,
         resolveNativeHistoryModel: resolveModel,
+        resolveNativeHistoryVisibility: resolveVisibility,
       },
     },
   });
@@ -131,4 +133,33 @@ it("reviews models in the existing sync notice and suppresses old-owner results"
   await waitFor(() =>
     expect(screen.queryByText("alice model failure")).toBeNull(),
   );
+});
+
+// @lat: [[cloud-workspace-tests#Chat visibility review interaction]]
+it("reviews visibility in the existing notice without exposing a separate history screen", async () => {
+  const visibility = { ...conflict, native: "archived", cloud: "visible" };
+  sync.mockImplementation(async () => ({
+    userId: owner,
+    conflicts: [visibility.sessionId],
+    visibilityConflicts: [visibility],
+    deferred: [],
+  }));
+  resolveVisibility.mockResolvedValue({ userId: "alice" });
+  render(<RepositoryReplication profile="default" locale="ja" enabled />);
+  expect(await screen.findByText("チャットの表示状態を確認")).toBeTruthy();
+  expect(screen.getByText("非表示")).toBeTruthy();
+  expect(screen.getByText("表示")).toBeTruthy();
+  fireEvent.click(
+    screen.getByRole("button", { name: "同期された表示状態を使用" }),
+  );
+  await waitFor(() =>
+    expect(resolveVisibility).toHaveBeenCalledWith({
+      ...visibility,
+      userId: "alice",
+      profile: "default",
+      choice: "cloud",
+    }),
+  );
+  expect(resolve).not.toHaveBeenCalled();
+  expect(resolveModel).not.toHaveBeenCalled();
 });

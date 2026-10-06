@@ -4,6 +4,7 @@ import {
   synchronizeNativeHistory,
   resolveNativeHistoryTitle,
   resolveNativeHistoryModel,
+  resolveNativeHistoryVisibility,
   nativeHistoryInventory,
 } from "../native-history-runtime";
 import {
@@ -1307,6 +1308,10 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("cloud-chat-native-model-resolve", (event, request) => {
     trustedWorkspaceSender(event);
     return resolveNativeHistoryModel(request);
+  });
+  ipcMain.handle("cloud-chat-native-visibility-resolve", (event, request) => {
+    trustedWorkspaceSender(event);
+    return resolveNativeHistoryVisibility(request);
   });
   ipcMain.handle("cloud-chat-native-history-sync", (event) => {
     trustedWorkspaceSender(event);

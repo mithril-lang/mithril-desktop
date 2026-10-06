@@ -1,6 +1,7 @@
 import {
   applyCloudSessionTitle,
   applyCloudSessionModel,
+  applyCloudSessionArchive,
 } from "./native-history-title";
 import { app } from "electron";
 import { createHash, randomUUID } from "crypto";
@@ -384,7 +385,7 @@ const nativeHistorySync = new NativeHistorySync({
       context.userId,
     );
     const sessions = db.transaction(() =>
-      listSessions(1001, 0, context.profile).map((session) => {
+      listSessions(1001, 0, context.profile, true).map((session) => {
         try {
           return {
             session,
@@ -404,6 +405,25 @@ const nativeHistorySync = new NativeHistorySync({
       id: session.id,
       title: session.title || "Chat",
       model: session.model || "native-history",
+      archived: session.archived,
+      cacheArchived:
+        session.archived === undefined
+          ? undefined
+          : async (archived) => {
+              if (
+                JSON.stringify(context) !==
+                JSON.stringify(await cloudChat.auth.nativeContext(true))
+              )
+                throw Error("History account changed");
+              const writable = getDbConnection(false, context.profile);
+              if (!writable) throw Error("Native archive cache unavailable");
+              return applyCloudSessionArchive(
+                writable,
+                session.id,
+                session.archived!,
+                archived,
+              );
+            },
       items: (sessionId) => {
         if (error) return Promise.reject(Error(error));
         return portableItems(context, sessionId, items);
@@ -485,6 +505,13 @@ export async function resolveNativeHistoryModel(
 ): Promise<Awaited<ReturnType<typeof nativeHistorySync.run>>> {
   await cloudChat.auth.enable();
   return nativeHistorySync.resolveModel(request);
+}
+
+export async function resolveNativeHistoryVisibility(
+  request: import("./native-history-sync").NativeTitleResolution,
+): Promise<Awaited<ReturnType<typeof nativeHistorySync.run>>> {
+  await cloudChat.auth.enable();
+  return nativeHistorySync.resolveVisibility(request);
 }
 
 /** Read-only inventory for the original sidebar; no migration, file capture or execution. */

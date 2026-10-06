@@ -25,6 +25,8 @@ function fixture(): {
   currentTitle: () => string;
   model: (value: string) => void;
   currentModel: () => string;
+  archive: (value: boolean) => void;
+  currentArchive: () => boolean | undefined;
 } {
   const sessions = new Map<string, ChatSession>(),
     events = new Map<string, ChatEvent[]>(),
@@ -34,7 +36,8 @@ function fixture(): {
     lost = false,
     executions = 0,
     nativeTitle = "Original chat",
-    nativeModel = "mock";
+    nativeModel = "mock",
+    archived: boolean | undefined;
   const items: ArchivedHistoryItem[] = [
     { id: "user_1", kind: "user", content: "Investigate", timestamp: 1 },
     {
@@ -78,6 +81,11 @@ function fixture(): {
           return nativeTitle;
         },
         model: nativeModel,
+        archived,
+        cacheArchived: async (value) => {
+          archived = value;
+          return value;
+        },
         cacheModel: async (model) => {
           nativeModel = model;
           return model;
@@ -112,7 +120,11 @@ function fixture(): {
           session: sessions.get(id) ?? null,
         },
       apply: async (id, operation) => {
-        if (!["create", "history", "rename"].includes(operation.type)) {
+        if (
+          !["create", "history", "rename", "delete", "restore"].includes(
+            operation.type,
+          )
+        ) {
           executions++;
           throw Error("Unexpected execution");
         }
@@ -133,7 +145,13 @@ function fixture(): {
               : (old?.model ?? "mock"),
           revision: accepted ? (old?.revision ?? 0) + 1 : old!.revision,
           eventSeq: old?.eventSeq ?? 0,
-          deleted: false,
+          deleted: accepted
+            ? operation.type === "delete"
+              ? true
+              : operation.type === "restore"
+                ? false
+                : (old?.deleted ?? false)
+            : old!.deleted,
           activeTurn: null,
         };
         if (accepted && operation.type === "history")
@@ -148,7 +166,10 @@ function fixture(): {
             });
             events.set(id, rows);
           }
-        if (accepted && operation.type === "rename") {
+        if (
+          accepted &&
+          ["rename", "delete", "restore"].includes(operation.type)
+        ) {
           const rows = events.get(id) ?? [];
           rows.push({
             seq: ++session.eventSeq,
@@ -157,7 +178,7 @@ function fixture(): {
             data: {
               title: session.title,
               model: session.model,
-              deleted: "false",
+              deleted: String(session.deleted),
             },
             createdAt: 1,
           });
@@ -172,7 +193,10 @@ function fixture(): {
           session,
         };
         receipts.set(operation.operationId, receipt);
-        if (lost && ["history", "rename"].includes(operation.type)) {
+        if (
+          lost &&
+          ["history", "rename", "delete", "restore"].includes(operation.type)
+        ) {
           lost = false;
           throw Error("Lost acknowledgement");
         }
@@ -201,6 +225,10 @@ function fixture(): {
       nativeModel = value;
     },
     currentModel: () => nativeModel,
+    archive: (value) => {
+      archived = value;
+    },
+    currentArchive: () => archived,
   };
 }
 describe("automatic rich native history archival", () => {
@@ -1017,4 +1045,147 @@ it("resolves reviewed models with exact retry and refuses stale or wrong-owner c
     expect(apply).not.toHaveBeenCalled();
     expect(f.executions()).toBe(0);
   }
+});
+
+// @lat: [[cloud-workspace-tests#Original chat archive synchronization]]
+it("syncs archives and restoration both ways with retained history and exact lost receipts", async () => {
+  const f = fixture(),
+    sid = nativeCloudSessionId("default", "original"),
+    sync = new NativeHistorySync(f.ports);
+  f.archive(true);
+  expect((await sync.run()).deferred).toEqual([]);
+  expect(f.sessions.get(sid)!.deleted).toBe(true);
+  expect(
+    f.events.get(sid)!.filter((event) => event.type === "history_item"),
+  ).toHaveLength(f.items.length);
+  const original = structuredClone(f.items);
+  f.archive(false);
+  f.lose();
+  await sync.run();
+  const pending = f.state().entries[sid].pending!;
+  expect(pending.operation.type).toBe("restore");
+  const receipt = vi.spyOn(f.ports.transport, "receipt");
+  expect((await new NativeHistorySync(f.ports).run()).deferred).toEqual([]);
+  expect(receipt).toHaveBeenCalledWith(sid, pending.operation.operationId);
+  expect(f.sessions.get(sid)!.deleted).toBe(false);
+  for (const deleted of [true, false]) {
+    f.sessions.set(sid, {
+      ...f.sessions.get(sid)!,
+      deleted,
+      revision: f.sessions.get(sid)!.revision + 1,
+    });
+    expect((await sync.run()).deferred).toEqual([]);
+    expect(f.currentArchive()).toBe(deleted);
+    expect(f.items).toEqual(original);
+  }
+  f.archive(true);
+  f.lose();
+  await sync.run();
+  expect(f.state().entries[sid].pending!.operation.type).toBe("delete");
+  await sync.run();
+  expect(f.state().entries[sid].pending).toBeNull();
+  expect(f.sessions.get(sid)!.deleted).toBe(true);
+  expect(f.items).toEqual(original);
+  expect(f.executions()).toBe(0);
+});
+// @lat: [[cloud-workspace-tests#Reviewed chat visibility choices]]
+it("requires review for older unequal visibility and refuses stale or wrong-owner choices", async () => {
+  for (const choice of ["native", "cloud"] as const) {
+    const f = fixture(),
+      sid = nativeCloudSessionId("default", "original"),
+      sync = new NativeHistorySync(f.ports);
+    await sync.run(); // Older journal has no visibility origin.
+    f.archive(true);
+    const review = (await sync.run()).visibilityConflicts[0];
+    expect(review).toMatchObject({ native: "archived", cloud: "visible" });
+    await sync.resolveVisibility({
+      ...review,
+      userId: "alice",
+      profile: "default",
+      choice,
+    });
+    expect(f.currentArchive()).toBe(choice === "native");
+    expect(f.sessions.get(sid)!.deleted).toBe(choice === "native");
+    expect((await sync.run()).visibilityConflicts).toEqual([]);
+    expect(f.executions()).toBe(0);
+  }
+  const f = fixture(),
+    sid = nativeCloudSessionId("default", "original"),
+    sync = new NativeHistorySync(f.ports);
+  await sync.run();
+  f.archive(true);
+  const review = (await sync.run()).visibilityConflicts[0];
+  f.sessions.set(sid, {
+    ...f.sessions.get(sid)!,
+    revision: review.cloudRevision + 1,
+  });
+  await expect(
+    sync.resolveVisibility({
+      ...review,
+      userId: "alice",
+      profile: "default",
+      choice: "cloud",
+    }),
+  ).rejects.toThrow("changed");
+  expect(f.currentArchive()).toBe(true);
+  f.owner("bob");
+  await expect(
+    sync.resolveVisibility({
+      ...review,
+      userId: "alice",
+      profile: "default",
+      choice: "native",
+    }),
+  ).rejects.toThrow("account changed");
+});
+
+// @lat: [[cloud-workspace-tests#Archive synchronization guards]]
+it("defers busy visibility, rejects changed checkpoints and retains legacy source without archive support", async () => {
+  const f = fixture(),
+    sid = nativeCloudSessionId("default", "original"),
+    sync = new NativeHistorySync(f.ports);
+  f.archive(false);
+  await sync.run();
+  f.archive(true);
+  f.sessions.get(sid)!.activeTurn = {
+    id: "busy",
+    status: "running",
+    leaseExpiresAt: Date.now() + 1000,
+  };
+  const apply = vi.spyOn(f.ports.transport, "apply");
+  expect((await sync.run()).deferred).toContain(sid);
+  expect(apply).not.toHaveBeenCalled();
+  expect(f.sessions.get(sid)!.deleted).toBe(false);
+  f.archive(false);
+  f.sessions.set(sid, {
+    ...f.sessions.get(sid)!,
+    activeTurn: null,
+    deleted: true,
+    revision: f.sessions.get(sid)!.revision + 1,
+  });
+  const events = f.ports.transport.events;
+  f.ports.transport.events = async (...args) => {
+    const result = await events(...args);
+    return {
+      ...result,
+      session: { ...result.session, revision: result.session.revision + 1 },
+    };
+  };
+  expect(
+    (await sync.run()).deferred.some((value) =>
+      value.includes("checkpoint changed"),
+    ),
+  ).toBe(true);
+  expect(f.currentArchive()).toBe(false);
+  const legacy = fixture(),
+    legacySync = new NativeHistorySync(legacy.ports);
+  await legacySync.run();
+  legacy.sessions.set(sid, {
+    ...legacy.sessions.get(sid)!,
+    deleted: true,
+    revision: legacy.sessions.get(sid)!.revision + 1,
+  });
+  expect((await legacySync.run()).deferred).toContain(sid);
+  expect(legacy.currentArchive()).toBeUndefined();
+  expect(legacy.executions()).toBe(0);
 });

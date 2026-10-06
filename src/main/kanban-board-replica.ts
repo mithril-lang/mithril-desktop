@@ -358,8 +358,8 @@ export function restoreKanbanBoard(
 }
 
 const publishMetadata = String.raw`
-import os,sys,stat
-source,target=sys.argv[1:]
+import os,sys,stat,hashlib,fcntl,time
+before,source,target=sys.argv[1:]
 parent=os.path.dirname(source)
 if parent!=os.path.dirname(target) or not os.path.basename(source).startswith('.mithril-board-metadata-'):raise RuntimeError('Invalid metadata publication')
 flags=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW
@@ -367,18 +367,66 @@ fd=os.open('/',flags)
 try:
  for part in os.path.abspath(parent).split('/')[1:]:
   nxt=os.open(part,flags,dir_fd=fd);os.close(fd);fd=nxt
- sf=os.open(os.path.basename(source),flags,dir_fd=fd)
+ lock=os.open('.board-metadata.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600,dir_fd=fd)
  try:
-  f=os.open('board.json',os.O_RDONLY|os.O_NOFOLLOW,dir_fd=sf)
+  if not stat.S_ISREG(os.fstat(lock).st_mode):raise RuntimeError('Invalid metadata lock')
+  deadline=time.monotonic()+5
+  while True:
+   try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB);break
+   except BlockingIOError:
+    if time.monotonic()>=deadline:raise TimeoutError('Board metadata is busy')
+    time.sleep(.02)
+  named=os.stat('.board-metadata.lock',dir_fd=fd,follow_symlinks=False)
+  if (named.st_dev,named.st_ino)!=(os.fstat(lock).st_dev,os.fstat(lock).st_ino):raise RuntimeError('Metadata lock changed')
+  sf=os.open(os.path.basename(source),flags,dir_fd=fd)
   try:
-   if not stat.S_ISREG(os.fstat(f).st_mode):raise RuntimeError('Invalid metadata staging')
-   os.fsync(f)
-   if os.fstat(sf).st_ino!=os.stat(os.path.basename(source),dir_fd=fd,follow_symlinks=False).st_ino:raise RuntimeError('Metadata staging changed')
-   try:os.link('board.json',os.path.basename(target),src_dir_fd=sf,dst_dir_fd=fd,follow_symlinks=False)
-   except FileExistsError:print('conflict')
-   else:os.fsync(fd);print('applied')
-  finally:os.close(f)
- finally:os.close(sf)
+   f=os.open('board.json',os.O_RDONLY|os.O_NOFOLLOW,dir_fd=sf)
+   try:
+    if not stat.S_ISREG(os.fstat(f).st_mode):raise RuntimeError('Invalid metadata staging')
+    os.fsync(f)
+    if os.fstat(sf).st_ino!=os.stat(os.path.basename(source),dir_fd=fd,follow_symlinks=False).st_ino:raise RuntimeError('Metadata staging changed')
+    leaf=os.path.basename(target)
+    try:
+     original=os.open(leaf,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=fd)
+    except FileNotFoundError:original=None
+    old=None
+    if original is not None:
+     try:
+      original_info=os.fstat(original)
+      if not stat.S_ISREG(original_info.st_mode):raise RuntimeError('Invalid original metadata')
+      old=os.read(original,65537)
+     finally:os.close(original)
+    if (before=='absent' and old is not None) or (before!='absent' and (old is None or hashlib.sha256(old).hexdigest()!=before)):
+     print('conflict')
+    elif before=='absent':
+     try:os.link('board.json',leaf,src_dir_fd=sf,dst_dir_fd=fd,follow_symlinks=False)
+     except FileExistsError:print('conflict')
+     else:os.fsync(fd);print('applied')
+    else:
+     backup='.mithril-board-before-'+before
+     try:bf=os.open(backup,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=fd)
+     except FileExistsError:
+      bf=os.open(backup,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=fd)
+      try:
+       if not stat.S_ISREG(os.fstat(bf).st_mode) or os.read(bf,65537)!=old:raise RuntimeError('Retained original metadata changed')
+       os.fsync(bf)
+      finally:os.close(bf)
+     else:
+      try:
+       view=memoryview(old)
+       while view:
+        n=os.write(bf,view)
+        if n<=0:raise RuntimeError('Incomplete retained metadata')
+        view=view[n:]
+       os.fsync(bf)
+      finally:os.close(bf)
+     os.fsync(fd)
+     os.fchmod(f,stat.S_IMODE(original_info.st_mode));os.fsync(f)
+     os.replace('board.json',leaf,src_dir_fd=sf,dst_dir_fd=fd)
+     os.fsync(fd);print('applied')
+   finally:os.close(f)
+  finally:os.close(sf)
+ finally:os.close(lock)
 finally:os.close(fd)
 `;
 const syncMetadata = String.raw`
@@ -442,6 +490,7 @@ export function initializeKanbanBoardMetadata(
   replicaId: string,
   write: ReplicaWrite,
   python: string,
+  replacementSupported = false,
 ): ReplicaResult {
   const slug = write.document.id,
     body = write.document.body;
@@ -500,16 +549,41 @@ export function initializeKanbanBoardMetadata(
     ) + "\n";
   if (Buffer.byteLength(desiredBytes) > 65536) return result("deferred");
   const db = new Database(dbFile, { fileMustExist: true });
-  type Pending = { fingerprint: string; bytes: string; receipt: string };
+  type Pending = {
+    fingerprint: string;
+    bytes: string;
+    receipt: string;
+    before_bytes: string | null;
+  };
   try {
     db.exec(
       "CREATE TABLE IF NOT EXISTS mithril_board_pending(operation_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,bytes TEXT NOT NULL,receipt TEXT NOT NULL)",
     );
+    if (
+      !(
+        db.prepare("PRAGMA table_info(mithril_board_pending)").all() as {
+          name: string;
+        }[]
+      ).some((row) => row.name === "before_bytes")
+    )
+      db.exec("ALTER TABLE mithril_board_pending ADD COLUMN before_bytes TEXT");
     const pending = db
       .prepare(
-        "SELECT fingerprint,bytes,receipt FROM mithril_board_pending WHERE operation_id=?",
+        "SELECT fingerprint,bytes,receipt,before_bytes FROM mithril_board_pending WHERE operation_id=?",
       )
       .get(write.operationId) as Pending | undefined;
+    const desired = (before: string | null): string => {
+      const portable = JSON.parse(desiredBytes) as Record<string, JsonValue>;
+      if (before !== null) {
+        const original = JSON.parse(before.replace(/^\uFEFF/, "")) as Record<
+          string,
+          JsonValue
+        >;
+        if (Object.prototype.hasOwnProperty.call(original, "default_workdir"))
+          portable.default_workdir = original.default_workdir;
+      }
+      return JSON.stringify(portable) + "\n";
+    };
     let journal: Pending | undefined = pending;
     if (journal && journal.fingerprint !== fingerprint)
       throw Error("Replica operation was reused");
@@ -522,7 +596,7 @@ export function initializeKanbanBoardMetadata(
         saved.record.deleted ||
         repositoryFingerprint({ body: saved.record.body, deleted: false }) !==
           repositoryFingerprint(write.document) ||
-        journal.bytes !== desiredBytes ||
+        journal.bytes !== desired(journal.before_bytes) ||
         saved.userId !== userId ||
         saved.replicaId !== replicaId ||
         saved.record?.id !== slug ||
@@ -542,7 +616,8 @@ export function initializeKanbanBoardMetadata(
             ...observed,
             deleted: false,
           };
-          if (existsSync(file)) return result("deferred", record);
+          if (existsSync(file) && !replacementSupported)
+            return result("deferred", record);
           if (
             !write.expectedRecord ||
             write.expectedRecord.collection !== "board" ||
@@ -556,14 +631,12 @@ export function initializeKanbanBoardMetadata(
               repositoryFingerprint({ body: observed.body, deleted: false })
           )
             return result("conflict", record);
-          const bytes =
-            JSON.stringify(
-              Object.fromEntries(
-                Object.entries(body).filter(
-                  ([key]) => !["is_current", "total", "counts"].includes(key),
-                ),
-              ),
-            ) + "\n";
+          const before_bytes = existsSync(file)
+            ? readFileSync(file, "utf8")
+            : null;
+          const bytes = desired(before_bytes);
+          if (Buffer.byteLength(bytes) > 65536)
+            return result("deferred", record);
           const accepted = result("applied", {
             collection: "board",
             id: slug,
@@ -573,12 +646,20 @@ export function initializeKanbanBoardMetadata(
               .update(JSON.stringify([slug, tasks, bytes]))
               .digest("hex"),
           });
-          journal = { fingerprint, bytes, receipt: JSON.stringify(accepted) };
-          db.prepare("INSERT INTO mithril_board_pending VALUES(?,?,?,?)").run(
+          journal = {
+            fingerprint,
+            bytes,
+            receipt: JSON.stringify(accepted),
+            before_bytes,
+          };
+          db.prepare(
+            "INSERT INTO mithril_board_pending(operation_id,fingerprint,bytes,receipt,before_bytes) VALUES(?,?,?,?,?)",
+          ).run(
             write.operationId,
             fingerprint,
             bytes,
             journal.receipt,
+            before_bytes,
           );
           return null;
         })
@@ -604,10 +685,17 @@ export function initializeKanbanBoardMetadata(
           ).run(write.operationId);
           return result("conflict", current);
         };
-        if (existsSync(file)) {
-          if (readFileSync(file, "utf8") !== retained.bytes) return abandon();
-        } else {
-          if (observed.version !== write.expectedVersion) return abandon();
+        const currentBytes = existsSync(file)
+          ? readFileSync(file, "utf8")
+          : null;
+        if (currentBytes !== retained.bytes) {
+          if (
+            currentBytes !== retained.before_bytes ||
+            observed.version !== write.expectedVersion
+          )
+            return abandon();
+          if (retained.before_bytes !== null && !replacementSupported)
+            return result("deferred", current);
           mkdirSync(parent, { recursive: true, mode: 0o700 });
           checked(parent);
           const stage = mkdtempSync(join(parent, ".mithril-board-metadata-"));
@@ -618,7 +706,18 @@ export function initializeKanbanBoardMetadata(
             });
             const status = execFileSync(
               python,
-              ["-I", "-c", publishMetadata, stage, file],
+              [
+                "-I",
+                "-c",
+                publishMetadata,
+                retained.before_bytes === null
+                  ? "absent"
+                  : createHash("sha256")
+                      .update(retained.before_bytes)
+                      .digest("hex"),
+                stage,
+                file,
+              ],
               { encoding: "utf8", timeout: 10000 },
             ).trim();
             if (status === "conflict") {
@@ -667,5 +766,33 @@ export function initializeKanbanBoardMetadata(
       .immediate();
   } finally {
     db.close();
+  }
+}
+
+/** Exact reviewed Agent source admission; missing/changed writers cannot authorize replacement. */
+export function supportsKanbanMetadataReplacement(agentRoot: string): boolean {
+  const files = [
+    [
+      "kanban_metadata_lock.py",
+      "01307eed97d0730cd537890b52b25d2f39e693ae811acc3e3b0813d3004e542c",
+    ],
+    [
+      "kanban_db.py",
+      "44be336eae4897aa747224d20dcbbf8de1722642de190fd7e7c3bddf44695289",
+    ],
+  ];
+  try {
+    return files.every(([name, digest]) => {
+      const file = join(agentRoot, "hermes_cli", name);
+      checked(file);
+      const info = lstatSync(file);
+      return (
+        info.isFile() &&
+        info.size <= 2097152 &&
+        createHash("sha256").update(readFileSync(file)).digest("hex") === digest
+      );
+    });
+  } catch {
+    return false;
   }
 }

@@ -304,3 +304,11 @@ Stale source versions cannot prepare metadata. Existing board files remain untou
 ## Unpublished metadata recovery conflict
 
 Prepared metadata that never published cannot override later original task edits. Recovery releases the barrier and returns a source conflict; oversized UTF-8 display data cannot create an unreadable file.
+
+## Original board metadata replacement
+
+Reviewed Agent writers allow source-CAS replacement while preserving private work directories, original permissions and retained prior bytes. Fresh snapshots equal receipts, and unsupported writers defer without replacing originals.
+
+## Original metadata replacement recovery
+
+Interrupted publication recovers the exact prepared operation before source reconciliation. Concurrent original edits win without replacement, and completed receipts remain independent of later native edits.

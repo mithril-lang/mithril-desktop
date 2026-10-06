@@ -2,6 +2,7 @@ import {
   hasPendingKanbanBoard,
   pendingKanbanBoards,
   initializeKanbanBoardMetadata,
+  supportsKanbanMetadataReplacement,
   kanbanBoardRecord,
   restoreKanbanBoard,
 } from "./kanban-board-replica";
@@ -549,6 +550,7 @@ export function applyKanbanReplica(
   attachmentProjection?: KanbanAttachmentProjection,
   attachmentWriteback?: KanbanAttachmentWriteback,
   boardPython?: string,
+  boardMetadataReplacement = false,
 ): import("@mithril/workspace/replica-sync").ReplicaResult {
   const retained = retainedTaskReceipt(root, userId, replicaId, write);
   if (retained) return retained;
@@ -569,6 +571,7 @@ export function applyKanbanReplica(
           replicaId,
           write,
           boardPython,
+          boardMetadataReplacement,
         )
       : {
           schemaVersion: 1,
@@ -1557,7 +1560,7 @@ export async function nativeReplicaApply(
         status: "deferred",
         record: null,
       };
-    const { HERMES_PYTHON } = await import("./installer");
+    const { HERMES_PYTHON, HERMES_REPO } = await import("./installer");
     if (
       JSON.stringify(before.context) !==
       JSON.stringify(await cloudWorkspace.nativeContext(true))
@@ -1623,6 +1626,7 @@ export async function nativeReplicaApply(
         capture.project,
         attachments,
         HERMES_PYTHON,
+        supportsKanbanMetadataReplacement(HERMES_REPO),
       );
     } finally {
       attachments?.dispose();

@@ -36,7 +36,10 @@ vi.mock("./cloud-workspace-runtime", () => ({
   },
 }));
 vi.mock("./config", () => ({ getConnectionConfig: () => ({ mode: "local" }) }));
-vi.mock("./installer", () => ({ HERMES_PYTHON: "/usr/bin/python3" }));
+vi.mock("./installer", () => ({
+  HERMES_PYTHON: "/usr/bin/python3",
+  HERMES_REPO: "",
+}));
 vi.mock("./tools", () => ({ getToolsets: () => [] }));
 vi.mock("./mcp-servers", () => ({ listMcpServers: async () => [] }));
 

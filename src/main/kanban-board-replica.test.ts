@@ -12,6 +12,7 @@ import {
   existsSync,
   chmodSync,
   readdirSync,
+  statSync,
   unlinkSync,
 } from "fs";
 import { tmpdir } from "os";
@@ -659,4 +660,133 @@ it("abandons unpublished preparation if original tasks change before recovery wi
   ).toBe("deferred");
   expect(existsSync(oversized.file)).toBe(false);
   expect(pendingKanbanBoards(oversized.r)).toEqual([]);
+});
+
+function replacementFixture(): ReturnType<typeof metadataFixture> {
+  const value = metadataFixture();
+  writeFileSync(
+    value.file,
+    JSON.stringify({
+      slug: "evidence",
+      name: "Original name",
+      description: "Original description",
+      default_workdir: "/private/native/work",
+      archived: false,
+      created_at: 42,
+    }),
+  );
+  const observed = kanbanReplicaSnapshot(
+    value.r,
+    "default",
+    "alice",
+    "replica",
+  ).documents.find((row) => row.collection === "board")!;
+  value.w = {
+    ...value.w,
+    operationId: "replace-original-metadata",
+    expectedRecord: observed,
+    expectedVersion: observed.version,
+    document: {
+      ...value.w.document,
+      body: {
+        ...(observed.body as object),
+        name: "Cloud name",
+        description: "Cloud description",
+        archived: true,
+      },
+    },
+  };
+  return value;
+}
+function replaceMetadata(
+  r: string,
+  w: ReplicaWrite,
+  python = "/usr/bin/python3",
+): ReturnType<typeof applyKanbanReplica> {
+  return applyKanbanReplica(
+    r,
+    "default",
+    "alice",
+    "replica",
+    w,
+    undefined,
+    undefined,
+    python,
+    true,
+  );
+}
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Original board metadata replacement]]
+it("writes cloud display changes under the original writer lock, preserves private bytes and retains original metadata for recovery", () => {
+  const { r, w, file } = replacementFixture(),
+    original = readFileSync(file);
+  chmodSync(file, 0o640);
+  expect(apply(r, w).status).toBe("deferred");
+  expect(readFileSync(file)).toEqual(original);
+  const accepted = replaceMetadata(r, w);
+  expect(accepted.status).toBe("applied");
+  expect(statSync(file).mode & 0o777).toBe(0o640);
+  expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({
+    name: "Cloud name",
+    description: "Cloud description",
+    archived: true,
+    default_workdir: "/private/native/work",
+    created_at: 42,
+  });
+  expect(accepted.record).toEqual(
+    kanbanReplicaSnapshot(r, "default", "alice", "replica").documents.find(
+      (row) => row.collection === "board",
+    ),
+  );
+  const backups = readdirSync(join(r, "kanban", "boards", "evidence")).filter(
+    (name) => name.startsWith(".mithril-board-before-"),
+  );
+  expect(backups).toHaveLength(1);
+  expect(
+    readFileSync(join(r, "kanban", "boards", "evidence", backups[0])),
+  ).toEqual(original);
+  expect(apply(r, w)).toEqual(accepted);
+  expect(pendingKanbanBoards(r)).toEqual([]);
+});
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Original metadata replacement recovery]]
+it("recovers an interrupted replacement before source publication and does not overwrite a concurrent original edit", () => {
+  const { r, w, file } = replacementFixture(),
+    original = readFileSync(file),
+    wrapper = join(r, "interrupted-replacement-python");
+  writeFileSync(
+    wrapper,
+    '#!/usr/bin/python3\nimport subprocess,sys\np=subprocess.run(["/usr/bin/python3",*sys.argv[1:]])\nsys.exit(71)\n',
+  );
+  chmodSync(wrapper, 0o700);
+  expect(() => replaceMetadata(r, w, wrapper)).toThrow();
+  expect(pendingKanbanBoards(r)).toEqual(["evidence"]);
+  const accepted = replaceMetadata(r, w);
+  expect(accepted.status).toBe("applied");
+  expect(pendingKanbanBoards(r)).toEqual([]);
+  writeFileSync(
+    file,
+    JSON.stringify({
+      slug: "evidence",
+      name: "Later native",
+      default_workdir: "/private/later",
+    }),
+  );
+  expect(replaceMetadata(r, w)).toEqual(accepted);
+  expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({
+    name: "Later native",
+  });
+  const race = replacementFixture(),
+    concurrent = join(race.r, "concurrent-replacement-python");
+  writeFileSync(
+    concurrent,
+    '#!/usr/bin/python3\nimport subprocess,sys,json\nwith open(sys.argv[-1],"w") as f:json.dump({"slug":"evidence","name":"Concurrent native","default_workdir":"/private/concurrent"},f)\nsys.exit(subprocess.run(["/usr/bin/python3",*sys.argv[1:]]).returncode)\n',
+  );
+  chmodSync(concurrent, 0o700);
+  const conflict = replaceMetadata(race.r, race.w, concurrent);
+  expect(conflict.status).toBe("conflict");
+  expect(conflict.record?.body).toMatchObject({ name: "Concurrent native" });
+  expect(JSON.parse(readFileSync(race.file, "utf8"))).toMatchObject({
+    default_workdir: "/private/concurrent",
+  });
+  expect(pendingKanbanBoards(race.r)).toEqual([]);
+  expect(original.length).toBeGreaterThan(0);
 });

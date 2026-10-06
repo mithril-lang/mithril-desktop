@@ -430,3 +430,15 @@ Existing nonempty board.json updates still require recoverable replacement with 
 Local qualification: 44 Native tests / 5 files passed, including source barriers, exact prepared-operation recovery, stale source refusal, publication collision, different-owner refusal, operation reuse, later original task/display edits and oversized UTF-8 metadata. Node/web types, full lint, production build and lat check passed. Existing nonempty metadata replacement and installed/authenticated publication remain unqualified.
 
 Oversized metadata admission now returns before opening the writable SQLite handle, so a deferred operation cannot retain a database descriptor. The original Agent writer-lock prerequisite is being prepared separately; installed replacement remains unqualified.
+
+## Existing board metadata replacement (draft)
+
+The original Kanban board file can now receive cloud display edits under the same writer lock as the reviewed Agent implementation, without changing the original UI.
+
+[[src/main/kanban-board-replica.ts#initializeKanbanBoardMetadata]] retains original private default_workdir, file permissions and immutable prior bytes. A before-image joins the durable SQLite preparation; source CAS and the permanent .board-metadata.lock protect atomic replacement. File and directory fsync precede receipt commit. Interrupted publication recovers the exact operation; concurrent original changes return conflict.
+
+[[src/main/kanban-board-replica.ts#supportsKanbanMetadataReplacement]] admits only the exact reviewed writer sources from Agent PR 11. Old, missing or changed writers defer replacement. This source guard does not certify a running process or publish the updated Agent. The installer still pins the older Agent; upgrading and restarting it, Windows support and authenticated installed/offline/multi-device qualification remain required.
+
+A temporary-storage integration exercised the actual reviewed Agent writer and Native publisher together: the Agent refused edits during the pending preparation, cloud metadata applied with private fields retained, and subsequent Agent edits appeared in a fresh Native snapshot. No original user storage or production API was changed.
+
+Final local qualification for existing-file replacement: 46 Native tests / 5 files passed; Node/web type checks, full lint, production build and lat check passed. The separate actual-Agent interoperability fixture passed on isolated temporary storage and was removed after qualification. Installer and production publication remain unverified.

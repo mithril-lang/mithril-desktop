@@ -216,9 +216,7 @@ it("opens the original account card only after explicit reconnect and resumes af
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(window.hermesAPI.mithrilDeviceLogin).not.toHaveBeenCalled();
   expect(snapshot).not.toHaveBeenCalled();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Reconnect" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Reconnect" }));
   await screen.findByRole("dialog", { name: "Reconnect to Mithril" });
   expect(
     screen.getByRole("button", { name: "Sign in with browser" }),
@@ -245,9 +243,7 @@ it("keeps transient network reconnection on the existing transport without an ac
   );
   render(<CloudWorkspace profile="default" />);
   await screen.findByText(/Workspace network unavailable/);
-  fireEvent.click(
-    screen.getByRole("button", { name: "Reconnect" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Reconnect" }));
   await waitFor(() => expect(enable).toHaveBeenCalledTimes(2));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(snapshot).not.toHaveBeenCalled();

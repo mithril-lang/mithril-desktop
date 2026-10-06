@@ -214,3 +214,23 @@ Cloud-created inactive tasks retain IDs through restoration, receipt replay and 
 ## Kanban device execution state isolation
 
 Cloud projections exclude task/run claim leases, PIDs, process fingerprints, heartbeat state and active-run pointers. Metadata edits preserve these native fields, while receipt fingerprints still detect changes to the full source rows.
+
+
+## Original Kanban attachment capture
+
+Registered binary attachments retain original IDs, metadata and bytes for each board while private paths stay native.
+
+Immutable captures survive later source edits, verify account/upload receipts, reject unsafe or incomplete files and leave source storage untouched.
+
+## Kanban attachment metadata CAS
+
+Metadata edits preserve attached files and return exact file-aware source fingerprints. Lost acknowledgements retain receipts even after source files disappear. Cloud attachment changes defer without altering task metadata or source rows.
+
+## Task attachment IPC authority
+
+Main-process task chunk requests pin the owner and keep credentials outside the renderer. Unsupported routes and stale owners are rejected; late bytes are discarded after an account change.
+
+
+## Kanban attachment publication barrier
+
+The native snapshot exposes task records only after every private byte upload is acknowledged for the expected owner. Failed publication omits the Kanban scope and preserves source files and attachment rows.

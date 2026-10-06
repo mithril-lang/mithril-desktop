@@ -717,6 +717,75 @@ it("refuses Capability resource uploads without write scope", async () => {
   );
 });
 
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Task attachment IPC authority]]
+it("keeps task attachment credentials in main and discards late data after account changes", async () => {
+  const { digestBytes } = await import("@mithril/workspace/files");
+  const bytes = new Uint8Array([0, 255, 7]),
+    digest = await digestBytes(bytes);
+  let release: ((response: Response) => void) | undefined;
+  let delayed = false;
+  const calls: { url: string; init?: RequestInit }[] = [];
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: token === tokenB ? "b" : "a" },
+        scopes: ["workspace:read", "workspace:write"],
+      });
+    calls.push({ url, init });
+    if (delayed)
+      return new Promise<Response>((resolve) => {
+        release = resolve;
+      });
+    if (init?.method === "HEAD")
+      return new Response(null, {
+        headers: { "content-length": "3", "x-mithril-resource-digest": digest },
+      });
+    return init?.method === "POST"
+      ? Response.json({ digest, size: bytes.length })
+      : new Response(bytes);
+  });
+  await client.enable();
+  const files = client.taskAttachments.forOwner("a");
+  expect(await files.putChunk("original", bytes)).toBe(digest);
+  expect(await files.hasChunk("original", digest, bytes.length)).toBe(true);
+  expect(await files.getChunk("original", digest)).toEqual(bytes);
+  expect(calls[0].url).toBe(
+    "https://api.mithril.fund/v1/workspace/resources/task/original/chunks",
+  );
+  expect(new Headers(calls[0].init?.headers).get("authorization")).toBe(
+    `Bearer ${tokenA}`,
+  );
+  expect(
+    new Headers(calls[0].init?.headers).get("x-mithril-workspace-owner"),
+  ).toBe("a");
+  expect(calls[0].init).toMatchObject({
+    credentials: "omit",
+    redirect: "error",
+  });
+  await expect(
+    client.taskAttachments.forOwner("b").getChunk("original", digest),
+  ).rejects.toThrow("owner changed");
+  await expect(
+    client.authorizedBinaryRequest(
+      "/v1/workspace/resources/task/original/manifests",
+    ),
+  ).rejects.toThrow("Unsupported");
+  await expect(
+    client.authorizedBinaryRequest(
+      "/v1/workspace/resources/task/original/chunks?url=https://other",
+    ),
+  ).rejects.toThrow("Unsupported");
+  expect(calls).toHaveLength(3);
+  delayed = true;
+  const pending = files.getChunk("original", digest);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  client.reset();
+  token = tokenB;
+  release!(new Response(bytes));
+  await expect(pending).rejects.toThrow("Account changed");
+});
+
 it("bounds resource bodies in main even when the server omits content-length", async () => {
   const { CHUNK_BYTES } = await import("@mithril/workspace/files");
   fetcher.mockImplementation(async (url: string) =>

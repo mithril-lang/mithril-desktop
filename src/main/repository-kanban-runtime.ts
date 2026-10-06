@@ -1,9 +1,14 @@
 import {
+  captureKanbanAttachments,
+  type KanbanAttachmentProjection,
+} from "./kanban-attachment-snapshot";
+import {
   portableKanbanTask,
   portableKanbanRun,
   kanbanDeviceFields,
 } from "./kanban-portable-record";
 import { restoreKanbanTask } from "./kanban-task-restore";
+import { validReplicaRecord as isReplicaRecord } from "@mithril/workspace/replica-sync";
 import { planKanbanDependencies } from "./kanban-dependency-replica";
 import { memoryFileId, memoryFileKinds } from "@mithril/workspace/memory-files";
 import {
@@ -108,6 +113,7 @@ export function kanbanRepositorySeed(
   root: string,
   profile: string,
   versions?: Map<string, string>,
+  attachmentProjection?: KanbanAttachmentProjection,
 ): RepositorySeed[] {
   checked(root);
   const base = join(root, "kanban", "boards");
@@ -158,6 +164,7 @@ export function kanbanRepositorySeed(
         if (graphTables.length > 1)
           throw Error("Ambiguous Kanban relationship schema; source retained");
         if (
+          !attachmentProjection &&
           tables.has("task_attachments") &&
           db.prepare("SELECT 1 FROM task_attachments LIMIT 1").get()
         )
@@ -182,7 +189,26 @@ export function kanbanRepositorySeed(
           comments = read("task_comments"),
           events = read("task_events"),
           runs = read("task_runs"),
+          attachments = read("task_attachments"),
           dependencies = graphTables.length ? read(graphTables[0], 20000) : [];
+        const taskIds = new Set(tasks.map((row) => String(row.id)));
+        if (
+          [comments, events, runs, attachments].some((rows) =>
+            rows.some(
+              (row) =>
+                typeof row.task_id !== "string" || !taskIds.has(row.task_id),
+            ),
+          ) ||
+          dependencies.some(
+            (row) =>
+              ![row.task_id, row.parent_id, row.child_id].some(
+                (id) => typeof id === "string" && taskIds.has(id),
+              ),
+          )
+        )
+          throw Error(
+            "Unassigned Kanban relationships require review; original records retained",
+          );
         versions?.set(
           "board:" + slug,
           createHash("sha256")
@@ -239,6 +265,11 @@ export function kanbanRepositorySeed(
                   : r.payload,
             }));
           const taskRuns = runs.filter((r) => r.task_id === id);
+          const rawAttachments = attachments.filter((r) => r.task_id === id);
+          const portableAttachments = rawAttachments.length
+            ? attachmentProjection!(slug, key, id, rawAttachments)
+            : [];
+
           versions?.set(
             "task:" + key,
             createHash("sha256")
@@ -254,6 +285,9 @@ export function kanbanRepositorySeed(
                       r.parent_id === id ||
                       r.child_id === id,
                   ),
+                  ...(rawAttachments.length
+                    ? [{ rows: rawAttachments, resources: portableAttachments }]
+                    : []),
                 ]),
               )
               .digest("hex"),
@@ -278,6 +312,9 @@ export function kanbanRepositorySeed(
                 .filter((r) => r.parent_id === id)
                 .map((r) => String(r.child_id)),
               latest_summary: taskRuns.at(-1)?.summary ?? null,
+              ...(rawAttachments.length
+                ? { attachments: portableAttachments }
+                : {}),
             }),
           });
         }
@@ -304,10 +341,41 @@ export async function nativeRepositorySeed(): Promise<{
     before.profile,
     before.userId,
   );
-  const documents = kanbanRepositorySeed(
-    process.env.HERMES_KANBAN_HOME?.trim() || profileHome(before.profile),
-    before.profile,
+  if (process.env.HERMES_KANBAN_ATTACHMENTS_ROOT?.trim())
+    throw Error(
+      "Custom Kanban attachments require a configured repository adapter",
+    );
+  const { HERMES_PYTHON } = await import("./installer");
+  const root =
+    process.env.HERMES_KANBAN_HOME?.trim() || profileHome(before.profile);
+  const capture = captureKanbanAttachments(
+    root,
+    HERMES_PYTHON,
+    join(app.getPath("userData"), "repository-task-captures"),
   );
+  let documents: RepositorySeed[];
+  try {
+    documents = kanbanRepositorySeed(
+      root,
+      before.profile,
+      undefined,
+      capture.project,
+    );
+    await capture.publish(
+      cloudWorkspace.taskAttachments.forOwner(before.userId),
+      async () => {
+        if (
+          JSON.stringify(before) !==
+          JSON.stringify(await cloudWorkspace.nativeContext())
+        )
+          throw Error(
+            "Workspace identity changed; original attachments retained",
+          );
+      },
+    );
+  } finally {
+    capture.dispose();
+  }
   const after = await cloudWorkspace.nativeContext();
   if (JSON.stringify(before) !== JSON.stringify(after))
     throw Error("Workspace identity changed");
@@ -345,9 +413,15 @@ export function kanbanReplicaSnapshot(
   profile: string,
   userId: string,
   replicaId: string,
+  attachmentProjection?: KanbanAttachmentProjection,
 ): import("@mithril/workspace/replica-sync").ReplicaSnapshot {
   const versions = new Map<string, string>();
-  const documents = kanbanRepositorySeed(root, profile, versions);
+  const documents = kanbanRepositorySeed(
+    root,
+    profile,
+    versions,
+    attachmentProjection,
+  );
   return {
     schemaVersion: 1,
     userId,
@@ -361,6 +435,71 @@ export function kanbanReplicaSnapshot(
     })),
   };
 }
+/** Recover completed metadata writes before source files are read; later missing files cannot strand a receipt. */
+function retainedTaskReceipt(
+  root: string,
+  userId: string,
+  replicaId: string,
+  write: import("@mithril/workspace/replica-sync").ReplicaWrite,
+): import("@mithril/workspace/replica-sync").ReplicaResult | null {
+  if (write.document.collection !== "task") return null;
+  const hint = write.expectedRecord?.body ?? write.document.body;
+  if (
+    !hint ||
+    typeof hint !== "object" ||
+    Array.isArray(hint) ||
+    typeof hint.board !== "string" ||
+    !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(hint.board)
+  )
+    return null;
+  const file =
+    hint.board === "default"
+      ? join(root, "kanban.db")
+      : join(root, "kanban", "boards", hint.board, "kanban.db");
+  checked(file);
+  if (!existsSync(file)) return null;
+  const db = new Database(file, { readonly: true, fileMustExist: true });
+  try {
+    if (
+      !db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='mithril_replica_receipts'",
+        )
+        .get()
+    )
+      return null;
+    const row = db
+      .prepare(
+        "SELECT fingerprint,receipt FROM mithril_replica_receipts WHERE operation_id=?",
+      )
+      .get(write.operationId) as
+      | { fingerprint: string; receipt: string }
+      | undefined;
+    if (!row) return null;
+    if (
+      row.fingerprint !==
+      createHash("sha256").update(JSON.stringify(write)).digest("hex")
+    )
+      throw Error("Replica operation was reused");
+    const receipt = JSON.parse(
+      row.receipt,
+    ) as import("@mithril/workspace/replica-sync").ReplicaResult;
+    if (
+      receipt.schemaVersion !== 1 ||
+      receipt.userId !== userId ||
+      receipt.replicaId !== replicaId ||
+      receipt.status !== "applied" ||
+      !isReplicaRecord(receipt.record) ||
+      receipt.record.collection !== "task" ||
+      receipt.record.id !== write.document.id
+    )
+      throw Error("Invalid retained task receipt; source retained");
+    return receipt;
+  } finally {
+    db.close();
+  }
+}
+
 /** Applies existing task metadata under the same SQLite writer lock as the device agent. */
 export function applyKanbanReplica(
   root: string,
@@ -368,10 +507,19 @@ export function applyKanbanReplica(
   userId: string,
   replicaId: string,
   write: import("@mithril/workspace/replica-sync").ReplicaWrite,
+  attachmentProjection?: KanbanAttachmentProjection,
 ): import("@mithril/workspace/replica-sync").ReplicaResult {
+  const retained = retainedTaskReceipt(root, userId, replicaId, write);
+  if (retained) return retained;
   const snapshot =
     (): import("@mithril/workspace/replica-sync").ReplicaSnapshot =>
-      kanbanReplicaSnapshot(root, profile, userId, replicaId);
+      kanbanReplicaSnapshot(
+        root,
+        profile,
+        userId,
+        replicaId,
+        attachmentProjection,
+      );
   const observed =
     snapshot().documents.find(
       (row) =>
@@ -679,6 +827,22 @@ export function applyKanbanReplica(
           .get(body.task.id) as Record<string, unknown>;
         const projected = portableKanbanTask(updated);
         const rawRuns = readRelated("task_runs");
+        const rawAttachments = readRelated("task_attachments");
+        const portableAttachments = rawAttachments.length
+          ? attachmentProjection!(
+              body.board,
+              write.document.id,
+              body.task.id,
+              rawAttachments,
+            )
+          : [];
+        if (
+          rawAttachments.length &&
+          !same(body.attachments, json(portableAttachments))
+        )
+          throw Error(
+            "Original attachment changed during task edit; update rolled back",
+          );
         const updatedRecord = {
           ...current,
           body: json({
@@ -706,6 +870,9 @@ export function applyKanbanReplica(
                 events,
                 rawRuns,
                 appliedGraph ?? body.dependencies,
+                ...(rawAttachments.length
+                  ? [{ rows: rawAttachments, resources: portableAttachments }]
+                  : []),
               ]),
             )
             .digest("hex"),
@@ -928,14 +1095,41 @@ export async function nativeReplicaSnapshot(): Promise<
   try {
     if (process.env.HERMES_KANBAN_DB?.trim())
       throw Error("Custom Kanban storage");
-    const kanban = kanbanReplicaSnapshot(
+    if (process.env.HERMES_KANBAN_ATTACHMENTS_ROOT?.trim())
+      throw Error(
+        "Custom Kanban attachments require a configured repository adapter",
+      );
+    const { HERMES_PYTHON } = await import("./installer");
+    const capture = captureKanbanAttachments(
       before.root,
-      before.profile,
-      before.userId,
-      before.replicaId,
+      HERMES_PYTHON,
+      join(app.getPath("userData"), "repository-task-captures"),
     );
-    snapshot.collections.push(...kanban.collections);
-    snapshot.documents.push(...kanban.documents);
+    try {
+      const kanban = kanbanReplicaSnapshot(
+        before.root,
+        before.profile,
+        before.userId,
+        before.replicaId,
+        capture.project,
+      );
+      await capture.publish(
+        cloudWorkspace.taskAttachments.forOwner(before.userId),
+        async () => {
+          if (
+            JSON.stringify(before.context) !==
+            JSON.stringify(await cloudWorkspace.nativeContext())
+          )
+            throw Error(
+              "Workspace identity changed; attachment files retained",
+            );
+        },
+      );
+      snapshot.collections.push(...kanban.collections);
+      snapshot.documents.push(...kanban.documents);
+    } finally {
+      capture.dispose();
+    }
   } catch {
     snapshot.warnings!.push(
       "Kanban source requires synchronization review; original records are retained",
@@ -1262,13 +1456,37 @@ export async function nativeReplicaApply(
         status: "deferred",
         record: null,
       };
-    result = applyKanbanReplica(
+    if (process.env.HERMES_KANBAN_ATTACHMENTS_ROOT?.trim())
+      return {
+        schemaVersion: 1,
+        userId: before.userId,
+        replicaId: before.replicaId,
+        status: "deferred",
+        record: null,
+      };
+    const { HERMES_PYTHON } = await import("./installer");
+    if (
+      JSON.stringify(before.context) !==
+      JSON.stringify(await cloudWorkspace.nativeContext(true))
+    )
+      throw Error("Workspace identity changed");
+    const capture = captureKanbanAttachments(
       before.root,
-      before.profile,
-      before.userId,
-      before.replicaId,
-      write,
+      HERMES_PYTHON,
+      join(app.getPath("userData"), "repository-task-captures"),
     );
+    try {
+      result = applyKanbanReplica(
+        before.root,
+        before.profile,
+        before.userId,
+        before.replicaId,
+        write,
+        capture.project,
+      );
+    } finally {
+      capture.dispose();
+    }
   }
   if (
     JSON.stringify(before.context) !==

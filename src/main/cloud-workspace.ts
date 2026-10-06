@@ -1,4 +1,8 @@
 import {
+  createTaskAttachmentTransport,
+  type TaskAttachmentTransport,
+} from "@mithril/workspace/task-attachments";
+import {
   createCapabilityResourceTransport,
   type CapabilityResourceTransport,
 } from "@mithril/workspace/capability-resources";
@@ -91,9 +95,13 @@ export class CloudWorkspace {
   } | null = null;
   private enabled = false;
   private generation = 0;
+  readonly taskAttachments: TaskAttachmentTransport;
   readonly files: ProjectFileTransport;
   readonly capabilityResources: CapabilityResourceTransport;
   constructor(private deps: Dependencies) {
+    this.taskAttachments = createTaskAttachmentTransport((path, init) =>
+      this.authorizedBinaryRequest(path, init),
+    );
     this.capabilityResources = createCapabilityResourceTransport((path, init) =>
       this.authorizedBinaryRequest(path, init),
     );
@@ -107,18 +115,25 @@ export class CloudWorkspace {
     init?: RequestInit,
   ): Promise<Response> {
     if (
-      !/^\/v1\/(?:workspace\/files(?:\/|$)|workspace\/resources\/capability\/[a-zA-Z0-9_-]{1,128}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
+      !/^\/v1\/(?:workspace\/files(?:\/|$)|workspace\/resources\/(?:capability|task)\/[a-zA-Z0-9_-]{1,128}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
         path,
       ) ||
       (!["GET", "POST"].includes(init?.method ?? "GET") &&
         !(
           init?.method === "HEAD" &&
-          /^\/v1\/workspace\/resources\/capability\/[a-zA-Z0-9_-]{1,128}\/chunks\/[a-f0-9]{64}$/.test(
+          /^\/v1\/workspace\/resources\/(?:capability|task)\/[a-zA-Z0-9_-]{1,128}\/chunks\/[a-f0-9]{64}$/.test(
             path,
           )
         ))
     )
       throw Error("Unsupported binary route");
+    if (
+      /^\/v1\/workspace\/resources\/task\//.test(path) &&
+      !/^\/v1\/workspace\/resources\/task\/[a-zA-Z0-9_-]{1,100}\/chunks(?:\/[a-f0-9]{64})?$/.test(
+        path,
+      )
+    )
+      throw Error("Unsupported task attachment route");
     const session = await this.session(),
       generation = this.generation;
     if (

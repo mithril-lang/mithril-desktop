@@ -136,6 +136,18 @@ The original Desktop timeline now reads a cloud projection layered over the unch
 
 [[src/main/native-history-cache.ts#replaceNativeHistoryCache]] checks the native snapshot under an immediate SQLite transaction before updating the cache. [[src/main/native-history-cache.ts#mergeNativeHistoryCache]] applies cloud text, reasoning, tool evidence, attachment bytes and tombstones only while the source item matches its saved native baseline. New device edits bypass stale overlays. Cache rows are owner-bound and become invisible on account invalidation; verified attachment bytes are stored in private owner-specific files. Separate native/cloud fingerprints in the durable replication journal prevent pulling a cloud edit and then echoing the old device text back. Data restoration never writes messages/executions or runs an agent. Native item removals become cloud tombstones. Full remote-only session reconstruction, title/deletion migration, conflict resolution and UI separation removal remain unfinished.
 
+### Remote-only history working copies (draft)
+
+Completed cloud-only sessions now reconstruct into a private account-bound working copy without requiring an installed native Agent.
+
+[[src/main/native-history-sync.ts#NativeHistorySync]] reads all bounded pages at one session revision, rejects missing/changed events and rechecks account identity before caching. Native source read failures are reported and retained while independent cloud reads continue; no source is adopted or deleted. The shared event projection preserves archived IDs/tombstones, completed reply text and inert tool evidence; raw events remain available alongside the projection. Older API tool checkpoints contain no arguments, so this change does not invent them.
+
+[[src/main/remote-history-store.ts#remoteHistoryStore]] stores SQLite working copies under private hashed owner/profile names in app data. [[src/main/native-history-cache.ts#replaceRemoteSessionCache]] preserves previous history on metadata deletion, rejects stale/inconsistent revisions and never modifies Agent session/message/execution tables. Verified attachment bytes use the existing account-bound cache path. Restart reopens the same copy; account changes close handles and invalidate access.
+
+Unchanged acknowledged revisions skip event/attachment downloads. Reconstruction counts are separate from data-write counts. The current cache refuses over 20000 events, 50 MiB of event data, or 50 MiB of attachment bytes instead of publishing a partial history; the original API records remain unchanged.
+
+Original sidebar/timeline selection, continuation, title/deletion CAS and conflict actions still need these working copies wired into their adapters before the remaining device-history dialog can be removed. This is a verified data foundation, not completed UI unification, publication or installed-device evidence.
+
 ### Original Markdown rendering
 
 The original Desktop Markdown component is shared with Web; a display-only normalization restores structurally unambiguous tables whose source lost newlines.

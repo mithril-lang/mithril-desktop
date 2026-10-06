@@ -14,6 +14,11 @@ import {
 } from "fs";
 import { dirname, join, resolve, basename } from "path";
 import { cloudChat, onCloudChatAccountChanged } from "./cloud-chat-runtime";
+import { sessionHistoryItems } from "@mithril/workspace/session-history";
+import {
+  remoteHistoryStore,
+  clearRemoteHistoryStores,
+} from "./remote-history-store";
 import { getConnectionConfig } from "./config";
 import { getDbConnection } from "./db";
 import { activeStateDbPath } from "./utils";
@@ -36,9 +41,12 @@ import {
   replaceNativeHistoryCache,
   setNativeHistoryCacheOwner,
   clearNativeHistoryCacheOwners,
+  replaceRemoteSessionCache,
+  remoteSessionCacheRevision,
 } from "./native-history-cache";
 import type { Attachment } from "../shared/attachments";
 onCloudChatAccountChanged(clearNativeHistoryCacheOwners);
+onCloudChatAccountChanged(clearRemoteHistoryStores);
 const root = (): string => join(app.getPath("userData"), "history-replication");
 function checked(path: string): void {
   let current = resolve(path);
@@ -230,23 +238,143 @@ async function portableItems(
   }
   return output;
 }
-export const nativeHistorySync = new NativeHistorySync({
+export async function materializeCloudHistory(
+  context: Awaited<ReturnType<typeof cloudChat.auth.nativeContext>>,
+  sessionId: string,
+  cloudItems: ArchivedHistoryItem[],
+  items: HistoryItem[] = [],
+): Promise<{ source: ArchivedHistoryItem; item: HistoryItem | null }[]> {
+  const materialized = [] as {
+    source: ArchivedHistoryItem;
+    item: HistoryItem | null;
+  }[];
+  const originals = new Map(
+    items.map((item) => [nativeHistoryItemId(item), item]),
+  );
+  let attachmentBytes = 0;
+  for (const value of cloudItems) {
+    const localAttachments: Attachment[] = [];
+    for (const file of value.deleted ? [] : (value.attachments ?? [])) {
+      attachmentBytes += file.size;
+      if (attachmentBytes > 50 * 1024 * 1024)
+        throw Error("History attachments exceed supported cache bound");
+      const directory = join(
+        root(),
+        "attachments",
+        createHash("sha256").update(context.userId).digest("hex"),
+      );
+      checked(directory);
+      mkdirSync(directory, { recursive: true, mode: 0o700 });
+      const path = join(directory, file.digest);
+      checked(path);
+      if (
+        existsSync(path) &&
+        (!lstatSync(path).isFile() || lstatSync(path).size !== file.size)
+      )
+        throw Error("Invalid cached attachment");
+      const bytes = existsSync(path)
+        ? readFileSync(path)
+        : await readHistoryAttachment(
+            cloudChat.historyFiles.forOwner(context.userId),
+            sessionId,
+            file,
+          );
+      if ((await digestBytes(bytes)) !== file.digest)
+        throw Error("Cached attachment digest mismatch");
+      if (!existsSync(path))
+        writeFileSync(path, bytes, { flag: "wx", mode: 0o600 });
+      localAttachments.push({
+        id: file.id,
+        kind:
+          file.kind === "image"
+            ? "image"
+            : file.kind === "text-file"
+              ? "text-file"
+              : "path-ref",
+        name: file.name,
+        mime: file.mime,
+        size: file.size,
+        ...(file.originalSize ? { originalSize: file.originalSize } : {}),
+        ...(file.kind === "image"
+          ? {
+              dataUrl: `data:${file.mime};base64,${Buffer.from(bytes).toString("base64")}`,
+            }
+          : file.kind === "text-file"
+            ? {
+                text: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+              }
+            : { path }),
+      });
+    }
+    materialized.push({
+      source: value,
+      item: materializeHistoryItem(
+        value,
+        originals.get(value.id),
+        localAttachments,
+      ),
+    });
+  }
+  return materialized;
+}
+
+const nativeHistorySync = new NativeHistorySync({
+  hasRemote: async (session, expected) => {
+    if (
+      JSON.stringify(expected) !==
+      JSON.stringify(await cloudChat.auth.nativeContext(true))
+    )
+      throw Error("History account changed");
+    return (
+      remoteSessionCacheRevision(
+        remoteHistoryStore(expected.userId, expected.profile),
+        session.id,
+      ) === session.revision
+    );
+  },
+  cacheRemote: async (session, events, expected) => {
+    if (
+      JSON.stringify(expected) !==
+      JSON.stringify(await cloudChat.auth.nativeContext(true))
+    )
+      throw Error("History account changed");
+    const materialized = session.deleted
+      ? []
+      : await materializeCloudHistory(
+          expected,
+          session.id,
+          sessionHistoryItems(events),
+        );
+    if (
+      JSON.stringify(expected) !==
+      JSON.stringify(await cloudChat.auth.nativeContext(true))
+    )
+      throw Error("History account changed");
+    const db = remoteHistoryStore(expected.userId, expected.profile);
+    replaceRemoteSessionCache(
+      db,
+      expected.userId,
+      session,
+      events,
+      materialized.flatMap((row) => (row.item ? [row.item] : [])),
+    );
+    setNativeHistoryCacheOwner(db.name, expected.userId);
+  },
   context: () => cloudChat.auth.nativeContext(true),
   transport: cloudChat,
   read,
   write,
   source: async () => {
     const context = await cloudChat.auth.nativeContext(true);
-    if (getConnectionConfig().mode !== "local")
-      throw Error("Native history storage unavailable");
+    if (getConnectionConfig().mode !== "local") return [];
+    checked(activeStateDbPath(context.profile));
+    const db = getDbConnection(true, context.profile);
+    if (!db) return [];
     bindRepositorySource(
       join(app.getPath("userData"), "repository-source-owners"),
       context.profile,
       context.userId,
     );
-    checked(activeStateDbPath(context.profile));
-    const db = getDbConnection(true, context.profile);
-    if (!db) return [];
     const sessions = db.transaction(() =>
       listSessions(1001, 0, context.profile).map((session) => {
         try {
@@ -274,75 +402,12 @@ export const nativeHistorySync = new NativeHistorySync({
       },
       cache: async (sessionId, cloudItems) => {
         if (error) throw Error(error);
-        const materialized = [] as {
-          source: ArchivedHistoryItem;
-          item: HistoryItem | null;
-        }[];
-        const originals = new Map(
-          items.map((item) => [nativeHistoryItemId(item), item]),
+        const materialized = await materializeCloudHistory(
+          context,
+          sessionId,
+          cloudItems,
+          items,
         );
-        for (const value of cloudItems) {
-          const localAttachments: Attachment[] = [];
-          for (const file of value.deleted ? [] : (value.attachments ?? [])) {
-            const directory = join(
-              root(),
-              "attachments",
-              createHash("sha256").update(context.userId).digest("hex"),
-            );
-            checked(directory);
-            mkdirSync(directory, { recursive: true, mode: 0o700 });
-            const path = join(directory, file.digest);
-            checked(path);
-            if (
-              existsSync(path) &&
-              (!lstatSync(path).isFile() || lstatSync(path).size !== file.size)
-            )
-              throw Error("Invalid cached attachment");
-            const bytes = existsSync(path)
-              ? readFileSync(path)
-              : await readHistoryAttachment(
-                  cloudChat.historyFiles.forOwner(context.userId),
-                  sessionId,
-                  file,
-                );
-            if ((await digestBytes(bytes)) !== file.digest)
-              throw Error("Cached attachment digest mismatch");
-            if (!existsSync(path))
-              writeFileSync(path, bytes, { flag: "wx", mode: 0o600 });
-            localAttachments.push({
-              id: file.id,
-              kind:
-                file.kind === "image"
-                  ? "image"
-                  : file.kind === "text-file"
-                    ? "text-file"
-                    : "path-ref",
-              name: file.name,
-              mime: file.mime,
-              size: file.size,
-              ...(file.originalSize ? { originalSize: file.originalSize } : {}),
-              ...(file.kind === "image"
-                ? {
-                    dataUrl: `data:${file.mime};base64,${Buffer.from(bytes).toString("base64")}`,
-                  }
-                : file.kind === "text-file"
-                  ? {
-                      text: new TextDecoder("utf-8", { fatal: true }).decode(
-                        bytes,
-                      ),
-                    }
-                  : { path }),
-            });
-          }
-          materialized.push({
-            source: value,
-            item: materializeHistoryItem(
-              value,
-              originals.get(value.id),
-              localAttachments,
-            ),
-          });
-        }
         if (
           JSON.stringify(context) !==
           JSON.stringify(await cloudChat.auth.nativeContext(true))

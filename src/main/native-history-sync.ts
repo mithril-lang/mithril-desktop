@@ -3,6 +3,10 @@ import { createHash } from "crypto";
 import {
   validateChatOperation,
   type ChatOperation,
+  type ChatSession,
+  type ChatEvent,
+  validateChatSession,
+  validateChatEvent,
 } from "@mithril/workspace/sessions";
 import type { SessionTransport } from "@mithril/workspace/session-sync";
 import {
@@ -39,6 +43,15 @@ export interface NativeHistoryPorts {
     actor: string;
   }>;
   source(): Promise<NativeHistorySource[]>;
+  cacheRemote?(
+    session: ChatSession,
+    events: ChatEvent[],
+    identity: Awaited<ReturnType<NativeHistoryPorts["context"]>>,
+  ): Promise<void>;
+  hasRemote?(
+    session: ChatSession,
+    identity: Awaited<ReturnType<NativeHistoryPorts["context"]>>,
+  ): Promise<boolean>;
   transport: SessionTransport;
   read(owner: string, profile: string): NativeHistoryJournal;
   write(owner: string, profile: string, journal: NativeHistoryJournal): void;
@@ -62,6 +75,7 @@ export class NativeHistorySync {
   private running: Promise<{
     userId: string;
     synced: number;
+    reconstructed: number;
     conflicts: string[];
     deferred: string[];
   }> | null = null;
@@ -69,6 +83,7 @@ export class NativeHistorySync {
   run(): Promise<{
     userId: string;
     synced: number;
+    reconstructed: number;
     conflicts: string[];
     deferred: string[];
   }> {
@@ -81,6 +96,7 @@ export class NativeHistorySync {
   private async pass(): Promise<{
     userId: string;
     synced: number;
+    reconstructed: number;
     conflicts: string[];
     deferred: string[];
   }> {
@@ -105,7 +121,19 @@ export class NativeHistorySync {
       await check();
       this.ports.write(identity.userId, identity.profile, state);
     };
-    const source = await this.ports.source();
+    let source: NativeHistorySource[];
+    let sourceFailure: string | null = null;
+    try {
+      source = await this.ports.source();
+    } catch (error) {
+      await check();
+      if (!this.ports.cacheRemote) throw error;
+      source = [];
+      sourceFailure =
+        error instanceof Error
+          ? error.message
+          : "Native source unavailable; source retained";
+    }
     await check();
     if (
       source.length > 1000 ||
@@ -117,12 +145,20 @@ export class NativeHistorySync {
     const list = await this.ports.transport.list();
     await check();
     if (list.userId !== identity.userId) throw Error("History owner mismatch");
+    if (
+      list.sessions.length > 1000 ||
+      list.sessions.some((session) => !validateChatSession(session)) ||
+      new Set(list.sessions.map((session) => session.id)).size !==
+        list.sessions.length
+    )
+      throw Error("Invalid cloud session inventory");
     const sessions = new Map(list.sessions.map((s) => [s.id, s]));
     const outcome = {
       userId: identity.userId,
       synced: 0,
+      reconstructed: 0,
       conflicts: [] as string[],
-      deferred: [] as string[],
+      deferred: sourceFailure ? [sourceFailure] : ([] as string[]),
     };
     for (const native of source) {
       const sid = nativeCloudSessionId(identity.profile, native.id);
@@ -382,6 +418,93 @@ export class NativeHistorySync {
         outcome.deferred.push(
           `${sid}: ${error instanceof Error ? error.message : "History unavailable"}`,
         );
+      }
+    }
+    if (this.ports.cacheRemote) {
+      const mapped = new Set(
+        source.map((native) =>
+          nativeCloudSessionId(identity.profile, native.id),
+        ),
+      );
+      for (const session of sessions.values()) {
+        if (mapped.has(session.id)) continue;
+        try {
+          if (await this.ports.hasRemote?.(session, identity)) {
+            await check();
+            continue;
+          }
+          if (session.deleted) {
+            await check();
+            await this.ports.cacheRemote(session, [], identity);
+            await check();
+            outcome.reconstructed++;
+            continue;
+          }
+          if (
+            session.activeTurn &&
+            ["running", "uncertain"].includes(session.activeTurn.status)
+          ) {
+            outcome.deferred.push(session.id);
+            continue;
+          }
+          const events: ChatEvent[] = [];
+          let after = 0;
+          let eventBytes = 0;
+          for (let page = 0; ; page++) {
+            if (page >= 1000)
+              throw Error("Cloud history exceeds supported page bound");
+            const snapshot = await this.ports.transport.events(
+              session.id,
+              after,
+            );
+            await check();
+            if (
+              snapshot.userId !== identity.userId ||
+              snapshot.session.id !== session.id ||
+              !validateChatSession(snapshot.session) ||
+              snapshot.session.revision !== session.revision ||
+              snapshot.session.eventSeq !== session.eventSeq ||
+              snapshot.session.title !== session.title ||
+              snapshot.session.model !== session.model ||
+              snapshot.session.deleted ||
+              JSON.stringify(snapshot.session.activeTurn) !==
+                JSON.stringify(session.activeTurn)
+            )
+              throw Error("Cloud history changed during reconstruction");
+            let last = after;
+            for (const event of snapshot.events) {
+              if (
+                !validateChatEvent(event) ||
+                event.seq !== last + 1 ||
+                event.seq > session.eventSeq
+              )
+                throw Error("Invalid cloud history checkpoint");
+              last = event.seq;
+              eventBytes += Buffer.byteLength(JSON.stringify(event));
+              if (eventBytes > 50 * 1024 * 1024)
+                throw Error("Cloud history exceeds supported byte bound");
+              events.push(event);
+              if (events.length > 20000)
+                throw Error("Cloud history exceeds supported event bound");
+            }
+            if (!snapshot.hasMore) {
+              if (last !== session.eventSeq)
+                throw Error("Incomplete cloud history checkpoint");
+              break;
+            }
+            if (snapshot.nextAfter !== last || last <= after)
+              throw Error("Invalid cloud history cursor");
+            after = last;
+          }
+          await this.ports.cacheRemote(session, events, identity);
+          await check();
+          outcome.reconstructed++;
+        } catch (error) {
+          await check();
+          outcome.deferred.push(
+            `${session.id}: ${error instanceof Error ? error.message : "Cloud history unavailable"}`,
+          );
+        }
       }
     }
     return { ...outcome, conflicts: [...new Set(outcome.conflicts)] };

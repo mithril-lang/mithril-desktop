@@ -103,6 +103,12 @@ Cloud edits and tombstones update the original Desktop timeline through a checke
 
 Flattened archived tables with a consistent GFM separator render as a table through the same Desktop/Web Markdown component. Fenced examples and ambiguous pipes remain literal; stored transcript text is unchanged.
 
+## Remote-only chat reconstruction
+
+Reconstruct complete owner-bound remote timelines into a display cache without modifying agent sessions, messages or executions.
+
+Changed revisions, incomplete pages and changed accounts preserve the previous cache. Metadata tombstones retain original history for recovery.
+
 ## Strict Capability skill sources
 
 Strict source reads preserve full skill bodies and refuse invalid encodings or symlinks instead of publishing partial snapshots. Existing native skill operations retain their original behavior.

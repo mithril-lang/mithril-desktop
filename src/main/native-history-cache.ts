@@ -3,8 +3,15 @@ import type Database from "better-sqlite3";
 import type { HistoryItem } from "./sessions";
 import type { ArchivedHistoryItem } from "@mithril/workspace/history";
 import type { Attachment } from "../shared/attachments";
+import {
+  validateChatSession,
+  validateChatEvent,
+  type ChatSession,
+  type ChatEvent,
+} from "@mithril/workspace/sessions";
 
 const TABLE = "mithril_history_cache";
+const REMOTE_TABLE = "mithril_remote_session_cache";
 const owners = new Map<string, string>();
 export function setNativeHistoryCacheOwner(path: string, owner: string): void {
   owners.set(path, owner);
@@ -170,4 +177,107 @@ export function deleteNativeHistoryCache(
       .get(TABLE)
   )
     db.prepare(`DELETE FROM ${TABLE} WHERE session_id=?`).run(sessionId);
+}
+
+/** Remote-only sessions are materialized caches, never agent sessions/executions. */
+export function replaceRemoteSessionCache(
+  db: Database.Database,
+  owner: string,
+  session: ChatSession,
+  events: ChatEvent[],
+  items: HistoryItem[],
+): void {
+  if (
+    !owner ||
+    owner.length > 128 ||
+    !validateChatSession(session) ||
+    events.length > 20000 ||
+    events.some(
+      (event, index) => !validateChatEvent(event) || event.seq !== index + 1,
+    ) ||
+    (!session.deleted && events.length !== session.eventSeq)
+  )
+    throw Error("Invalid remote session cache");
+  db.transaction(() => {
+    db.exec(
+      `CREATE TABLE IF NOT EXISTS ${REMOTE_TABLE}(owner TEXT NOT NULL,session_id TEXT NOT NULL,revision INTEGER NOT NULL,body TEXT NOT NULL,PRIMARY KEY(owner,session_id))`,
+    );
+    const previous = db
+      .prepare(
+        `SELECT revision,body FROM ${REMOTE_TABLE} WHERE owner=? AND session_id=?`,
+      )
+      .get(owner, session.id) as { revision: number; body: string } | undefined;
+    const retained =
+      session.deleted && previous
+        ? (JSON.parse(previous.body) as {
+            events: ChatEvent[];
+            items: HistoryItem[];
+          })
+        : { events, items };
+    const serialized = JSON.stringify({
+      session,
+      events: retained.events,
+      items: retained.items,
+    });
+    if (Buffer.byteLength(serialized) > 50 * 1024 * 1024)
+      throw Error("Remote history exceeds supported cache bound");
+    if (previous && previous.revision > session.revision)
+      throw Error("Stale remote history reconstruction");
+    if (previous?.revision === session.revision && previous.body !== serialized)
+      throw Error("Inconsistent remote history revision");
+    db.prepare(
+      `INSERT INTO ${REMOTE_TABLE}(owner,session_id,revision,body) VALUES(?,?,?,?) ON CONFLICT(owner,session_id) DO UPDATE SET revision=excluded.revision,body=excluded.body`,
+    ).run(owner, session.id, session.revision, serialized);
+  }).immediate();
+}
+
+export function readRemoteSessionCache(
+  db: Database.Database,
+  sessionId: string,
+): { session: ChatSession; events: ChatEvent[]; items: HistoryItem[] } | null {
+  const owner = owners.get(db.name);
+  if (
+    !owner ||
+    !db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?")
+      .get(REMOTE_TABLE)
+  )
+    return null;
+  const row = db
+    .prepare(`SELECT body FROM ${REMOTE_TABLE} WHERE owner=? AND session_id=?`)
+    .get(owner, sessionId) as { body: string } | undefined;
+  if (!row) return null;
+  const value = JSON.parse(row.body) as {
+    session: ChatSession;
+    events: ChatEvent[];
+    items: HistoryItem[];
+  };
+  if (
+    !validateChatSession(value.session) ||
+    value.session.id !== sessionId ||
+    !Array.isArray(value.events) ||
+    !Array.isArray(value.items)
+  )
+    throw Error("Invalid retained remote history");
+  return value;
+}
+
+export function remoteSessionCacheRevision(
+  db: Database.Database,
+  sessionId: string,
+): number | null {
+  const owner = owners.get(db.name);
+  if (
+    !owner ||
+    !db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?")
+      .get(REMOTE_TABLE)
+  )
+    return null;
+  const row = db
+    .prepare(
+      `SELECT revision FROM ${REMOTE_TABLE} WHERE owner=? AND session_id=?`,
+    )
+    .get(owner, sessionId) as { revision: number } | undefined;
+  return row?.revision ?? null;
 }

@@ -48,6 +48,7 @@ export interface CloudChatAPI extends SessionTransport {
   syncNativeHistory(): Promise<{
     userId: string;
     synced: number;
+    reconstructed?: number;
     conflicts: string[];
     deferred: string[];
   }>;

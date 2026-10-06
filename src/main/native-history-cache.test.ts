@@ -6,8 +6,11 @@ import {
   clearNativeHistoryCacheOwners,
   mergeNativeHistoryCache,
   replaceNativeHistoryCache,
+  replaceRemoteSessionCache,
+  readRemoteSessionCache,
 } from "./native-history-cache";
 import type { HistoryItem } from "./sessions";
+import type { ChatSession, ChatEvent } from "@mithril/workspace/sessions";
 
 // @lat: [[cloud-workspace-tests#Cloud history working cache]]
 it("restores cloud edits and deletions into the original timeline while preserving agent data", () => {
@@ -87,5 +90,65 @@ it("checks native source under a transaction before changing the working cache",
       .prepare("SELECT 1 FROM sqlite_master WHERE name='mithril_history_cache'")
       .get(),
   ).toBeUndefined();
+  db.close();
+});
+
+// @lat: [[cloud-workspace-tests#Remote-only chat reconstruction]]
+it("retains remote metadata, raw events and original timeline across deletion without changing agent data", () => {
+  const db = new Database(":memory:");
+  db.exec(
+    "CREATE TABLE sessions(id TEXT);CREATE TABLE messages(id TEXT);CREATE TABLE executions(id TEXT)",
+  );
+  const session: ChatSession = {
+    id: "browser",
+    title: "Original title",
+    model: "mock",
+    revision: 2,
+    eventSeq: 1,
+    deleted: false,
+    activeTurn: null,
+  };
+  const events: ChatEvent[] = [
+    {
+      seq: 1,
+      type: "user",
+      turnId: "turn",
+      data: { content: "Full original content" },
+      createdAt: 1,
+    },
+  ];
+  const items: HistoryItem[] = [
+    { kind: "user", id: -42, content: "Full original content", timestamp: 1 },
+  ];
+  replaceRemoteSessionCache(db, "alice", session, events, items);
+  setNativeHistoryCacheOwner(db.name, "alice");
+  expect(readRemoteSessionCache(db, "browser")).toEqual({
+    session,
+    events,
+    items,
+  });
+  replaceRemoteSessionCache(
+    db,
+    "alice",
+    { ...session, revision: 3, deleted: true },
+    [],
+    [],
+  );
+  expect(readRemoteSessionCache(db, "browser")).toEqual({
+    session: { ...session, revision: 3, deleted: true },
+    events,
+    items,
+  });
+  expect(() =>
+    replaceRemoteSessionCache(db, "alice", session, events, items),
+  ).toThrow("Stale");
+  for (const table of ["sessions", "messages", "executions"])
+    expect(db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get()).toEqual({
+      count: 0,
+    });
+  setNativeHistoryCacheOwner(db.name, "bob");
+  expect(readRemoteSessionCache(db, "browser")).toBeNull();
+  clearNativeHistoryCacheOwners();
+  expect(readRemoteSessionCache(db, "browser")).toBeNull();
   db.close();
 });

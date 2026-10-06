@@ -1,6 +1,6 @@
 # Canonical Mithril chat
 
-Desktop keeps its native New Chat, Projects and history. Synchronized chat is an explicit sidebar entry backed by shared D1 checkpoints.
+The target Chat preserves the original Desktop composer and full timeline in both clients, backed by one cloud repository. The current canonical Chat and retained-native path remain transitional.
 
 This path uses the Mithril API model inventory and never selects retained local provider credentials.
 

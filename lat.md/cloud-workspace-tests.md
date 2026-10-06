@@ -419,3 +419,11 @@ Owner, operation, target deletion state and exact revision are checked again aft
 ## Other-owner native deletion isolation
 
 A native profile bound to another owner cannot supply deletion intents to the current account. Its outbox stays intact while verified current-owner cloud working copies remain available.
+
+## Explicit native reconnection recovery
+
+Automatic scoped reads never start authorization. An explicit reconnect after missing/expired Workspace permission opens the original Mithril account card without invoking device sign-in; account change closes it and resumes scoped data reads.
+
+## Transient reconnect never requests authorization
+
+A network failure retries the original transport and never opens an account prompt. No data mutation or permission grant occurs merely from reading or retrying the workspace.

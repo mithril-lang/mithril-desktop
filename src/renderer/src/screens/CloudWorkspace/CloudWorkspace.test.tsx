@@ -30,6 +30,7 @@ const snapshot = vi.fn(async () => ({
 let accountChanged: () => void;
 beforeEach(() => {
   vi.clearAllMocks();
+  enable.mockReset().mockResolvedValue({ userId: "user-a", enabled: true });
   snapshot.mockReset().mockResolvedValue({
     schemaVersion: 1,
     userId: "user-a",
@@ -174,4 +175,80 @@ it("applies cloud language and appearance through original native providers with
   expect(
     window.hermesAPI.cloudWorkspace.applyOperations,
   ).not.toHaveBeenCalled();
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Explicit native reconnection recovery]]
+it("opens the original account card only after explicit reconnect and resumes after authorization", async () => {
+  enable.mockRejectedValue(
+    new Error(
+      "Cloud connection requires explicit workspace:read authorization. Existing tokens are never upgraded automatically.",
+    ),
+  );
+  Object.assign(window.hermesAPI, {
+    getMithrilAccount: vi.fn(async () => null),
+    getMithrilFirstRunState: vi.fn(async () => ({ protection: "keychain" })),
+    mithrilDeviceLogin: vi.fn(),
+    onMithrilDeviceCode: vi.fn(() => () => undefined),
+  });
+  Object.assign(window.hermesAPI.cloudWorkspace, {
+    repository: {
+      page: vi.fn(async () => ({
+        schemaVersion: 1,
+        userId: "user-a",
+        documents: [],
+        nextAfter: null,
+      })),
+      apply: vi.fn(),
+    },
+    discoverDocuments: {
+      fetchRegistry: vi.fn(async () => ({
+        skills: [],
+        mcps: [],
+        agents: [],
+        workflows: [],
+        plugins: [],
+      })),
+      fetchRegistryDetail: vi.fn(),
+    },
+  });
+  render(<CloudWorkspace profile="default" initialView="discover" />);
+  await screen.findByText(/Cloud connection requires explicit workspace:read/);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(window.hermesAPI.mithrilDeviceLogin).not.toHaveBeenCalled();
+  expect(snapshot).not.toHaveBeenCalled();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Reconnect" }),
+  );
+  await screen.findByRole("dialog", { name: "Reconnect to Mithril" });
+  expect(
+    screen.getByRole("button", { name: "Sign in with browser" }),
+  ).toBeInTheDocument();
+  expect(window.hermesAPI.getMithrilAccount).toHaveBeenCalledWith("default");
+  expect(window.hermesAPI.mithrilDeviceLogin).not.toHaveBeenCalled();
+  enable.mockResolvedValue({ userId: "user-a", enabled: true });
+  accountChanged();
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  await waitFor(() => expect(snapshot).toHaveBeenCalled());
+  expect(
+    window.hermesAPI.cloudWorkspace.applyOperations,
+  ).not.toHaveBeenCalled();
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Transient reconnect never requests authorization]]
+it("keeps transient network reconnection on the existing transport without an account prompt", async () => {
+  enable.mockRejectedValue(
+    new Error(
+      "Workspace network unavailable; reconnect to check pending changes",
+    ),
+  );
+  render(<CloudWorkspace profile="default" />);
+  await screen.findByText(/Workspace network unavailable/);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Reconnect" }),
+  );
+  await waitFor(() => expect(enable).toHaveBeenCalledTimes(2));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(snapshot).not.toHaveBeenCalled();
 });

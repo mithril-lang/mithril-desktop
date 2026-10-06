@@ -1,3 +1,5 @@
+import * as Dialog from "@radix-ui/react-dialog";
+import MithrilAccountSection from "../../components/MithrilAccountSection";
 import { saveTaskAttachmentDownload } from "@mithril/workspace/task-attachment-download";
 import { useFont } from "../../components/FontProvider";
 import { useChatPreferences } from "../../components/ChatPreferencesProvider";
@@ -87,11 +89,14 @@ export default function CloudWorkspace({
     [setTheme, setLocale, setRounded, setFont, chat],
   );
   const [identityEpoch, setIdentityEpoch] = useState(0);
+  const [signInOpen, setSignInOpen] = useState(false);
+  useEffect(() => setSignInOpen(false), [profile]);
   useEffect(
     () =>
-      window.hermesAPI.onCloudWorkspaceAccountChanged(() =>
-        setIdentityEpoch((epoch) => epoch + 1),
-      ),
+      window.hermesAPI.onCloudWorkspaceAccountChanged(() => {
+        setSignInOpen(false);
+        setIdentityEpoch((epoch) => epoch + 1);
+      }),
     [],
   );
   const repositorySeed = useCallback(async () => {
@@ -103,46 +108,88 @@ export default function CloudWorkspace({
   const beforeConnect = useCallback(async () => {
     await window.hermesAPI.cloudWorkspace.enable();
   }, []);
+  const beforeReconnect = useCallback(async () => {
+    try {
+      await window.hermesAPI.cloudWorkspace.enable();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "";
+      if (
+        /Cloud connection requires explicit (workspace:read|workspace:write) authorization/.test(
+          message,
+        ) ||
+        message.includes("Sign in to your Mithril account first") ||
+        message.includes("Workspace sign-in expired or access refused")
+      )
+        setSignInOpen(true);
+      throw cause;
+    }
+  }, []);
   return (
-    <WorkspaceApp
-      key={profile}
-      initialView={initialView}
-      embedded={embedded}
-      discoverFocus={discoverFocus}
-      autoConnect
-      repositoryTransport={window.hermesAPI.cloudWorkspace.repository}
-      repositorySeed={repositorySeed}
-      capabilitySeed={window.hermesAPI.cloudWorkspace.capabilitySnapshot}
-      capabilityRuntime={window.hermesAPI}
-      capabilityResources={window.hermesAPI.cloudWorkspace.capabilityResources}
-      memoryProfile={profile}
-      memorySeed={window.hermesAPI.cloudWorkspace.memorySnapshot}
-      memoryRuntime={window.hermesAPI}
-      transport={window.hermesAPI.cloudWorkspace}
-      fileTransport={window.hermesAPI.cloudWorkspace.files}
-      taskAttachmentDownloads={taskAttachmentDownloads}
-      folderAdapter={window.hermesAPI.projectFolderSync}
-      runtimeAdapter={window.hermesAPI.nativeWorkspace}
-      settingsRuntime={{
-        gpu: window.hermesAPI,
-        spellcheck: chat,
-        wrapSettings: (children) => (
-          <NativeSettingsProvider key={profile} profile={profile}>
-            {children}
-          </NativeSettingsProvider>
-        ),
-        renderPane: (section) => <NativeSettingsPane section={section} />,
-      }}
-      onOpenNativeSection={onOpenNativeSection}
-      onOpenChat={onOpenChat}
-      beforeConnect={beforeConnect}
-      afterDisconnect={() => window.hermesAPI.cloudWorkspace.disable()}
-      identityEpoch={`${profile}:${identityEpoch}`}
-      discoverDocuments={window.hermesAPI.cloudWorkspace.discoverDocuments}
-      loadRegistrySkill={window.hermesAPI.cloudWorkspace.registrySkill}
-      onPreferences={preferences}
-      locale={locale}
-      active={active}
-    />
+    <>
+      <WorkspaceApp
+        key={profile}
+        initialView={initialView}
+        embedded={embedded}
+        discoverFocus={discoverFocus}
+        autoConnect
+        repositoryTransport={window.hermesAPI.cloudWorkspace.repository}
+        repositorySeed={repositorySeed}
+        capabilitySeed={window.hermesAPI.cloudWorkspace.capabilitySnapshot}
+        capabilityRuntime={window.hermesAPI}
+        capabilityResources={
+          window.hermesAPI.cloudWorkspace.capabilityResources
+        }
+        memoryProfile={profile}
+        memorySeed={window.hermesAPI.cloudWorkspace.memorySnapshot}
+        memoryRuntime={window.hermesAPI}
+        transport={window.hermesAPI.cloudWorkspace}
+        fileTransport={window.hermesAPI.cloudWorkspace.files}
+        taskAttachmentDownloads={taskAttachmentDownloads}
+        folderAdapter={window.hermesAPI.projectFolderSync}
+        runtimeAdapter={window.hermesAPI.nativeWorkspace}
+        settingsRuntime={{
+          gpu: window.hermesAPI,
+          spellcheck: chat,
+          wrapSettings: (children) => (
+            <NativeSettingsProvider key={profile} profile={profile}>
+              {children}
+            </NativeSettingsProvider>
+          ),
+          renderPane: (section) => <NativeSettingsPane section={section} />,
+        }}
+        onOpenNativeSection={onOpenNativeSection}
+        onOpenChat={onOpenChat}
+        beforeConnect={beforeConnect}
+        beforeReconnect={beforeReconnect}
+        afterDisconnect={() => window.hermesAPI.cloudWorkspace.disable()}
+        identityEpoch={`${profile}:${identityEpoch}`}
+        discoverDocuments={window.hermesAPI.cloudWorkspace.discoverDocuments}
+        loadRegistrySkill={window.hermesAPI.cloudWorkspace.registrySkill}
+        onPreferences={preferences}
+        locale={locale}
+        active={active}
+      />
+      <Dialog.Root open={signInOpen} onOpenChange={setSignInOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="device-history-backdrop" />
+          <Dialog.Content
+            className="device-history-dialog"
+            aria-describedby={undefined}
+          >
+            <Dialog.Title>
+              {locale.startsWith("ja")
+                ? "Mithril に再接続"
+                : "Reconnect to Mithril"}
+            </Dialog.Title>
+            <Dialog.Close asChild>
+              <button type="button" className="device-history-close">
+                {locale.startsWith("ja") ? "閉じる" : "Close"}
+              </button>
+            </Dialog.Close>
+            <MithrilAccountSection key={profile} profile={profile} />
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </>
   );
 }

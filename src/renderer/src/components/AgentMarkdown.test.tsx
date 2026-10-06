@@ -124,7 +124,7 @@ it("renders flattened archived tables with the original shared Markdown componen
   const { container } = render(
     <AgentMarkdown>
       {
-        "安定稼働中: | 項目 | 状態 ||------|------|| Cron | `whitehat-ops-scan` ok || Script | 4/5 local |"
+        "安定稼働中: | 項目 | 状態 ||------|------|| Cron | `whitehat-ops-scan` `*/30 * * * *` ok || Script | `mithril-whitehat-ops` 4/5 local |"
       }
     </AgentMarkdown>,
   );

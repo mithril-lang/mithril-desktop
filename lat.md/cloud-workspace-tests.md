@@ -101,7 +101,7 @@ Cloud edits and tombstones update the original Desktop timeline through a checke
 
 ## Original Markdown table rendering
 
-Flattened archived tables with a consistent GFM separator render as a table through the same Desktop/Web Markdown component. Fenced examples and ambiguous pipes remain literal; stored transcript text is unchanged.
+Flattened archived tables with multiple inline code values and a consistent GFM separator render as a table through the same Desktop/Web Markdown component. Fenced examples and ambiguous pipes remain literal; stored transcript text is unchanged.
 
 ## Remote-only chat reconstruction
 

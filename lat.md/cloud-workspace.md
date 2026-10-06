@@ -317,3 +317,9 @@ The component retains original grouping, pin disclosures, pagination, inline ren
 API-backed Chat now uses the original shared Desktop history list and menu. Cloud snapshots bypass native caches and device pins; project membership uses API IDs and names.
 
 The owner-scoped browser journal retains placement and rename/delete/restore operation IDs before writes. Reload restores metadata without replay; explicit reconnect checks receipts using the same IDs. Conflicts retain their CAS operation until explicit atomic replacement or discard. The journal rejects execution requests. Native orphan rows and working-copy continuation still need wiring before removing the separate history dialog.
+
+## Connection state and Markdown code spans
+
+Shared repository screens keep an explicit connection state until the account is verified, rather than substituting a portable-record editor. Table restoration pairs actual inline code delimiters before validating compact row seams.
+
+Settings, Memory, Capability, Kanban and Discover retain their canonical Desktop route through slow or failed authentication. Reconnect is explicit; connection rendering does not mutate records or invoke tools. Multiple code spans in table values no longer misclassify a row seam as code. Source transcript text remains unchanged.

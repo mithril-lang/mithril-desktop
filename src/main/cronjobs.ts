@@ -1,4 +1,8 @@
 import { projectLocalSchedules } from "./local-schedule-preview";
+import {
+  captureOriginalCronFile,
+  type OriginalCronFile,
+} from "./cron-source-files";
 import type { NativeScheduleDraft } from "@mithril/workspace/schedules";
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
@@ -483,15 +487,20 @@ export async function triggerCronJob(
 }
 
 /** Explicit local-only projection: no SSH, external delivery or script is read into the cloud draft. */
+export function readOriginalCronSource(
+  profile: string,
+): OriginalCronFile | null {
+  if (isRemoteMode())
+    throw Error("Original remote schedule source unavailable");
+  return captureOriginalCronFile(profileHome(profile), profile);
+}
+
+/** Existing preview remains read-only; complete capture precedes its restricted projection. */
 export async function previewLocalSchedules(
   profile: string,
 ): Promise<NativeScheduleDraft[]> {
-  const raw = JSON.parse(
-    await readFile(jobsFilePath(profile), "utf8").catch((error) => {
-      if (error.code === "ENOENT") return "[]";
-      throw error;
-    }),
-  ) as unknown;
+  const raw =
+    captureOriginalCronFile(profileHome(profile), profile)?.file ?? [];
   const rows = Array.isArray(raw)
     ? raw
     : raw && typeof raw === "object" && "jobs" in raw

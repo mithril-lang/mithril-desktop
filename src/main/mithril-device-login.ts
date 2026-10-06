@@ -78,6 +78,15 @@ async function post(
   return { ok: res.ok, status: res.status, data };
 }
 
+const workspaceLoginScopes = [
+  "inference",
+  "billing:read",
+  "workspace:read",
+  "workspace:write",
+  "chat:read",
+  "chat:write",
+] as const;
+
 export async function startMithrilDeviceLogin(
   profile: string | undefined,
   onCode: (info: MithrilDeviceCode) => void,
@@ -93,10 +102,10 @@ export async function startMithrilDeviceLogin(
     } catch {
       /* keep the default label */
     }
-    // Only ask for what the desktop uses: inference and the balance readout.
+    // The browser explicitly approves the API-backed Chat and Workspace connection.
     const start = await post(
       "/v1/device/code",
-      { device_name: name, scope: "inference billing:read" },
+      { device_name: name, scope: workspaceLoginScopes.join(" ") },
       fetchImpl,
     );
     const d = start.data as Record<string, string | number>;
@@ -136,18 +145,30 @@ export async function startMithrilDeviceLogin(
       if (Date.now() > deadline)
         return { status: "refused", error: "device_expired" };
       let action: MithrilPollAction;
+      let grantedScopes: string[] = [];
       try {
         const res = await post(
           "/v1/device/token",
           { device_code: d.device_code },
           fetchImpl,
         );
+        grantedScopes =
+          typeof res.data.scope === "string" ? res.data.scope.split(/\s+/) : [];
         action = interpretMithrilTokenResponse(res.ok, res.status, res.data);
       } catch {
         continue; // transient network error: keep polling until the deadline
       }
       if (state.cancelled) break;
       if (action.kind === "success") {
+        // A low-assurance approval may grant only inference/billing. Keep the previous
+        // credential rather than falsely presenting that as a connected workspace.
+        if (
+          !workspaceLoginScopes.every((scope) => grantedScopes.includes(scope))
+        )
+          return {
+            status: "refused",
+            error: "device_workspace_authorization_required",
+          };
         // Verified against /v1/me, stored encrypted, mirrored into the agent env.
         return connectMithrilAccount(action.accessToken, profile, fetchImpl);
       }

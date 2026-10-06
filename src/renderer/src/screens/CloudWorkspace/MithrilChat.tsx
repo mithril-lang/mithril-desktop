@@ -9,6 +9,7 @@ export default function MithrilChat({
   sidebarNavigation,
   onSidebarSelect,
   onSidebarProjects,
+  onConnectAccount,
   visible = true,
   locale = "en",
 }: {
@@ -17,6 +18,7 @@ export default function MithrilChat({
   sidebarNavigation?: ReactNode;
   onSidebarSelect?: () => void;
   onSidebarProjects?: () => void;
+  onConnectAccount?: () => void;
   visible?: boolean;
   locale?: string;
 }): React.JSX.Element {
@@ -24,6 +26,8 @@ export default function MithrilChat({
   useEffect(() => {
     setSidebarTarget(document.getElementById("cloud-session-sidebar"));
   }, []);
+  const [identityChecked, setIdentityChecked] = useState(false);
+  const [connectionError, setConnectionError] = useState("");
   const [epoch, setEpoch] = useState(0);
   const [accountId, setAccountId] = useState<string | null>(null);
   useEffect(
@@ -36,12 +40,22 @@ export default function MithrilChat({
   useEffect(() => {
     let canceled = false;
     setAccountId(null);
+    setConnectionError("");
+    setIdentityChecked(false);
     void window.hermesAPI.cloudChat
       .status()
       .then((status) => {
         if (!canceled) setAccountId(status.userId);
       })
-      .catch(() => {});
+      .catch((error) => {
+        if (!canceled)
+          setConnectionError(
+            error instanceof Error ? error.message : "Sign-in unavailable",
+          );
+      })
+      .finally(() => {
+        if (!canceled) setIdentityChecked(true);
+      });
     return () => {
       canceled = true;
     };
@@ -58,6 +72,23 @@ export default function MithrilChat({
   );
   return (
     <div>
+      {identityChecked && !accountId && onConnectAccount && (
+        <div className="session-notice">
+          <button type="button" onClick={onConnectAccount}>
+            {locale.startsWith("ja")
+              ? "Mithril アカウントに接続"
+              : "Connect Mithril account"}
+          </button>
+        </div>
+      )}
+      {connectionError && (
+        <div className="session-notice" role="alert">
+          <p>{connectionError}</p>
+          <button type="button" onClick={() => setEpoch((value) => value + 1)}>
+            {locale.startsWith("ja") ? "再接続" : "Reconnect"}
+          </button>
+        </div>
+      )}
       <ChatSessions
         sidebarTarget={sidebarTarget}
         sidebarNavigation={sidebarNavigation}

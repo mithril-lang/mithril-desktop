@@ -1,4 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import MithrilChat from "./MithrilChat";
 const enable = vi.fn(async () => ({ userId: "owner", enabled: true }));
@@ -107,4 +113,19 @@ describe("Default shared Mithril Chat", () => {
     await waitFor(() => expect(enable).toHaveBeenCalledTimes(2));
     expect(apply).not.toHaveBeenCalled();
   });
+});
+
+it("shows failed identity checks and offers account setup without submitting a turn", async () => {
+  vi.mocked(window.hermesAPI.cloudChat.status).mockRejectedValueOnce(
+    new Error("Access refused"),
+  );
+  const connect = vi.fn();
+  render(<MithrilChat profile="default" onConnectAccount={connect} />);
+  await screen.findByText("Access refused");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Connect Mithril account" }),
+  );
+  expect(connect).toHaveBeenCalledOnce();
+  expect(enable).not.toHaveBeenCalled();
+  expect(apply).not.toHaveBeenCalled();
 });

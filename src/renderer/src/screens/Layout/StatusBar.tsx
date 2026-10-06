@@ -16,12 +16,15 @@ interface StatusInfo {
  */
 export function StatusBar({
   activeProfile,
+  cloud = false,
 }: {
   activeProfile: string;
+  cloud?: boolean;
 }): React.JSX.Element {
   const [info, setInfo] = useState<StatusInfo | null>(null);
 
   useEffect(() => {
+    if (cloud) return;
     let cancelled = false;
     async function load(): Promise<void> {
       const [profiles, conn] = await Promise.all([
@@ -47,42 +50,50 @@ export function StatusBar({
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [activeProfile]);
+  }, [activeProfile, cloud]);
 
   const isMac = window.electron?.process?.platform === "darwin";
   const mod = isMac ? "⌘" : "Ctrl";
 
   return (
     <footer className="status-bar" aria-label="Status">
-      <div className="status-bar-group">
-        <span
-          className={`status-dot ${info?.gatewayRunning ? "online" : "offline"}`}
-          aria-hidden="true"
-        />
-        <span className="status-item status-strong">
-          {info?.gatewayRunning ? "gateway" : "offline"}
-        </span>
-        <span className="status-sep" aria-hidden="true">
-          &middot;
-        </span>
-        <span className="status-item">{info?.mode ?? "local"}</span>
-        {info?.model ? (
-          <>
-            <span className="status-sep" aria-hidden="true">
-              &middot;
-            </span>
-            <span className="status-item">{info.model}</span>
-          </>
-        ) : null}
-        {info ? (
-          <>
-            <span className="status-sep" aria-hidden="true">
-              &middot;
-            </span>
-            <span className="status-item">{info.skillCount} skills</span>
-          </>
-        ) : null}
-      </div>
+      {cloud ? (
+        <div className="status-bar-group">
+          <span className="status-item">Workspace</span>
+          <span className="status-sep">·</span>
+          <span className="status-item">api.mithril.fund</span>
+        </div>
+      ) : (
+        <div className="status-bar-group">
+          <span
+            className={`status-dot ${info?.gatewayRunning ? "online" : "offline"}`}
+            aria-hidden="true"
+          />
+          <span className="status-item status-strong">
+            {info?.gatewayRunning ? "gateway" : "offline"}
+          </span>
+          <span className="status-sep" aria-hidden="true">
+            &middot;
+          </span>
+          <span className="status-item">{info?.mode ?? "local"}</span>
+          {info?.model ? (
+            <>
+              <span className="status-sep" aria-hidden="true">
+                &middot;
+              </span>
+              <span className="status-item">{info.model}</span>
+            </>
+          ) : null}
+          {info ? (
+            <>
+              <span className="status-sep" aria-hidden="true">
+                &middot;
+              </span>
+              <span className="status-item">{info.skillCount} skills</span>
+            </>
+          ) : null}
+        </div>
+      )}
       <div className="status-bar-group status-bar-hints">
         <span className="status-item">
           <kbd className="status-kbd">/</kbd> commands

@@ -56,6 +56,11 @@ export default function MithrilAccountSection({
           "Another sign-in is already in progress.",
           "別のサインインが進行中です。",
         );
+      case "device_workspace_authorization_required":
+        return label(
+          "Use your passkey to approve Chat and Workspace access. Your previous connection is unchanged.",
+          "パスキーで Chat・Workspace へのアクセスを承認してください。以前の接続はそのままです。",
+        );
       case "device_unavailable":
         return label(
           "Device sign-in is not available yet. Paste a token instead.",
@@ -183,8 +188,8 @@ export default function MithrilAccountSection({
       </h2>
       <p className="settings-section-hint">
         {label(
-          "Connect this desktop profile to Mithril Agent in your browser. You can also use a connection token.",
-          "ブラウザーで、このプロフィールを Mithril Agent に接続できます。接続トークンも使用できます。",
+          "Connect Chat and Workspace with your passkey in the browser. Device permissions stay on this device.",
+          "ブラウザーでパスキーを使って Chat・Workspace に接続します。端末の操作権限はこの端末で管理します。",
         )}
       </p>
       {protection === "reduced" && (

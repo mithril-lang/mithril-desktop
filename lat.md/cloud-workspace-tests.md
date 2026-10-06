@@ -64,6 +64,11 @@ Schedule tests cover fixed API routes, owner validation, scope refusal and local
 
 Credentials, absolute paths, scripts, delivery destinations and native tool grants are excluded. Calendar schedules require an explicit new interval; no background import starts a cloud run.
 
+## Stable disconnected identity
+
+Repeated denied sign-in or missing-scope checks preserve the error without repeatedly remounting the renderer.
+
+Explicit credential changes still notify disconnected renderers and invalidate in-flight requests.
 ## Security execution boundaries
 
 Security tests require explicit read/run scopes, fixed main-process API routes and tenant-checked snapshots. Renderer requests cannot carry credentials or executor policy.

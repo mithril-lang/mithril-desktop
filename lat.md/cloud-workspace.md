@@ -584,3 +584,11 @@ Original Cron files are captured completely before any projection, with their so
 [[src/main/cron-source-files.ts#captureOriginalCronFile]] reads the fixed profile's jobs.json through one opened inode, checks encoding, size, source identity and duplicate/malformed rows, and computes a byte-level source version. Array and object file shapes remain distinct. Missing storage is not a fabricated empty file. Symlinked files/directories and changed sources fail without repairing or writing the original store.
 
 [[src/main/cronjobs.ts#readOriginalCronSource]] remains main-process-only: retained source may contain private runtime bindings and is not admitted for cloud upload. The existing selected-schedule preview now starts from this complete capture instead of silently filtering malformed records. Tests use real temporary A-B-A profile files and verify exact metadata, untouched bytes, source revisions, legacy shape and unsafe-source refusal. Cloud field binding, locked restoration, original Schedules mounting and execution ownership remain required.
+
+### Original schedule source restoration (draft)
+
+[[src/main/cronjobs.ts#restoreOriginalCronSource]] sends locally bound original schedule files to the original Agent CLI on stdin. Restoration retains file shape and metadata, with byte-version CAS and durable private receipts.
+
+The Agent uses its original profile-scoped jobs lock in strict cross-process mode. Changed jobs take original fire fences before the jobs lock and defer immediately if another process owns a fence, including the pre-claim window. Lost acknowledgement retries do not overwrite newer native edits; pending writes recover on either side of the atomic rename. Active execution claims and pending occurrences defer restoration; foreign claims and unbound activation are refused. Windows UTF-8 BOM sources retain unknown metadata through capture and subsequent original saves.
+
+[[src/main/cron-source-restore.ts#parseOriginalCronRestoreResult]] checks the exact owner/profile/operation receipt and suppresses raw child errors. This main-process port is not exposed through raw-source IPC. The new Agent command must be included in the pinned Agent release before this port is usable; portable cloud field binding, continuous schedule reconciliation, original Schedules mounting and authoritative execution ownership remain required.

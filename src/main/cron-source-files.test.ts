@@ -66,6 +66,18 @@ it("retains the original array file shape and distinguishes a missing file from 
   writeFileSync(join(root, "cron", "jobs.json"), '{"jobs":[]}');
   expect(captureOriginalCronFile(root, "default")!.file).toEqual({ jobs: [] });
 });
+it("captures Windows BOM source metadata without changing its original bytes", () => {
+  const file = {
+    jobs: [{ id: "windows" }],
+    original_metadata: ["日本語", null],
+  };
+  const root = fixture(file);
+  const path = join(root, "cron", "jobs.json");
+  writeFileSync(path, "\uFEFF" + JSON.stringify(file));
+  const before = readFileSync(path);
+  expect(captureOriginalCronFile(root, "default")!.file).toEqual(file);
+  expect(readFileSync(path)).toEqual(before);
+});
 it("refuses malformed rows, duplicate identities and invalid encoding rather than silently dropping data", () => {
   for (const file of [
     { jobs: [{ id: "valid" }, null] },

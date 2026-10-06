@@ -4,6 +4,12 @@ import {
   type OriginalCronFile,
 } from "./cron-source-files";
 import type { NativeScheduleDraft } from "@mithril/workspace/schedules";
+import { validJson } from "@mithril/workspace/repository";
+import {
+  parseOriginalCronRestoreResult,
+  type OriginalCronRestoreRequest,
+  type OriginalCronRestoreResult,
+} from "./cron-source-restore";
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
@@ -332,20 +338,21 @@ export async function listCronJobs(
 function runCronCommand(
   args: string[],
   profile?: string,
+  nativeInput?: string,
 ): Promise<{ success: boolean; output: string; error?: string }> {
   const cliArgs = hermesCliArgs();
-  if (profile && profile !== "default") {
+  if (profile && (profile !== "default" || nativeInput !== undefined)) {
     cliArgs.push("-p", profile);
   }
   cliArgs.push("cron", ...args);
 
   return new Promise((resolve) => {
-    execFile(
+    const child = execFile(
       HERMES_PYTHON,
       cliArgs,
       {
         cwd: join(HERMES_HOME, "hermes-agent"),
-        timeout: 15000,
+        timeout: nativeInput === undefined ? 15000 : 40000,
         // keychain-held keys the agent can no longer read from .env
         env: { ...process.env, ...secureSpawnEnv(profile) },
         ...HIDDEN_SUBPROCESS_OPTIONS,
@@ -362,6 +369,11 @@ function runCronCommand(
         }
       },
     );
+    // Native source bodies stay on stdin, never in process arguments or logs.
+    if (nativeInput !== undefined) {
+      child.stdin?.on("error", () => {});
+      child.stdin?.end(nativeInput);
+    }
   });
 }
 
@@ -493,6 +505,42 @@ export function readOriginalCronSource(
   if (isRemoteMode())
     throw Error("Original remote schedule source unavailable");
   return captureOriginalCronFile(profileHome(profile), profile);
+}
+
+/** Main-process local restore only, after resource/execution binding. No IPC
+ * accepts this raw source and no cloud document is passed directly to this port.
+ */
+export async function restoreOriginalCronSource(
+  request: OriginalCronRestoreRequest,
+): Promise<OriginalCronRestoreResult> {
+  if (isRemoteMode())
+    return {
+      success: false,
+      error: "Original remote schedule restoration unavailable",
+    };
+  if (
+    ![request.owner, request.profile, request.operationId].every(
+      (value) =>
+        typeof value === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(value),
+    ) ||
+    request.profile.length > 64 ||
+    (request.expectedVersion !== null &&
+      !/^[a-f0-9]{64}$/.test(request.expectedVersion)) ||
+    !validJson(request.file)
+  )
+    return { success: false, error: "Invalid original schedule restoration" };
+  const input = JSON.stringify(request);
+  if (Buffer.byteLength(input) > 21 * 1024 * 1024)
+    return {
+      success: false,
+      error: "Schedule source exceeds synchronization capacity",
+    };
+  const result = await runCronCommand(
+    ["source-restore"],
+    request.profile,
+    input,
+  );
+  return parseOriginalCronRestoreResult(result.output, request);
 }
 
 /** Existing preview remains read-only; complete capture precedes its restricted projection. */

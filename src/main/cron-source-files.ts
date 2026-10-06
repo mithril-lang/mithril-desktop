@@ -75,7 +75,9 @@ export function captureOriginalCronFile(
     const text = bytes.toString("utf8");
     if (!Buffer.from(text).equals(bytes))
       throw Error("Unsupported schedule encoding; original file retained");
-    const file: unknown = JSON.parse(text);
+    const file: unknown = JSON.parse(
+      text.startsWith("\uFEFF") ? text.slice(1) : text,
+    );
     if (!validJson(file) || !file || typeof file !== "object")
       throw Error("Invalid schedule source; original file retained");
     const jobs = Array.isArray(file)

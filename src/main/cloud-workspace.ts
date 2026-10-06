@@ -1,4 +1,8 @@
 import {
+  createCapabilityResourceTransport,
+  type CapabilityResourceTransport,
+} from "@mithril/workspace/capability-resources";
+import {
   repositoryCollections,
   validRepositoryEdit,
   validRepositoryPage,
@@ -28,6 +32,8 @@ import {
   type SidebarSnapshot,
 } from "@mithril/workspace/sidebar";
 import {
+  CHUNK_BYTES,
+  MAX_MANIFEST_BYTES,
   createProjectFileTransport,
   type ProjectFileTransport,
 } from "@mithril/workspace/files";
@@ -80,7 +86,11 @@ export class CloudWorkspace {
   private enabled = false;
   private generation = 0;
   readonly files: ProjectFileTransport;
+  readonly capabilityResources: CapabilityResourceTransport;
   constructor(private deps: Dependencies) {
+    this.capabilityResources = createCapabilityResourceTransport((path, init) =>
+      this.authorizedBinaryRequest(path, init),
+    );
     this.files = createProjectFileTransport((path, init) =>
       this.authorizedBinaryRequest(path, init),
     );
@@ -91,7 +101,7 @@ export class CloudWorkspace {
     init?: RequestInit,
   ): Promise<Response> {
     if (
-      !/^\/v1\/(?:workspace\/files(?:\/|$)|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
+      !/^\/v1\/(?:workspace\/files(?:\/|$)|workspace\/resources\/capability\/[a-zA-Z0-9_-]{1,64}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
         path,
       ) ||
       !["GET", "POST"].includes(init?.method ?? "GET")
@@ -104,18 +114,45 @@ export class CloudWorkspace {
       !session.scopes.includes(this.deps.writeScope ?? "workspace:write")
     )
       throw new Error("Workspace write scope required");
+    const headers = new Headers(init?.headers);
+    const requestedOwner = headers.get("x-mithril-workspace-owner");
+    if (requestedOwner !== null && requestedOwner !== session.userId)
+      throw new Error("Workspace owner changed; file request rejected");
+    headers.set("x-mithril-workspace-owner", session.userId);
+    headers.set("authorization", `Bearer ${session.token}`);
     const response = await this.deps.fetch(`${this.deps.origin()}${path}`, {
       ...init,
       credentials: "omit",
       redirect: "error",
       signal: AbortSignal.timeout(60000),
-      headers: {
-        "x-mithril-workspace-owner": session.userId,
-        ...init?.headers,
-        authorization: `Bearer ${session.token}`,
-      },
+      headers,
     });
-    const bytes = await response.arrayBuffer();
+    const limit = /\/manifests(?:\/|$)/.test(path)
+      ? MAX_MANIFEST_BYTES
+      : CHUNK_BYTES;
+    if (Number(response.headers.get("content-length") ?? 0) > limit)
+      throw new Error("File response too large");
+    const reader = response.body?.getReader();
+    const parts: Uint8Array[] = [];
+    let size = 0;
+    try {
+      if (reader)
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.length;
+          if (size > limit) throw new Error("File response too large");
+          parts.push(value);
+        }
+    } finally {
+      await reader?.cancel().catch(() => {});
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const part of parts) {
+      bytes.set(part, offset);
+      offset += part.length;
+    }
     if (
       generation !== this.generation ||
       session.token !== this.deps.token() ||

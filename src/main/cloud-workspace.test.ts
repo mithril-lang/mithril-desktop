@@ -508,3 +508,110 @@ it("uses fixed security routes with explicit read/run scopes and rejects owner c
   );
   await expect(client.getSecurity()).rejects.toThrow("owner");
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Capability resource transport]]
+it("keeps Capability resource auth in main, checks owners and discards responses after account changes", async () => {
+  const { digestBytes } = await import("@mithril/workspace/files");
+  const bytes = new Uint8Array([0, 255, 3]);
+  const digest = await digestBytes(bytes);
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  let release: ((response: Response) => void) | undefined;
+  let delayed = false;
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: token === tokenB ? "b" : "a" },
+        scopes: ["workspace:read", "workspace:write"],
+      });
+    calls.push({ url, init });
+    if (delayed)
+      return new Promise<Response>((resolve) => {
+        release = resolve;
+      });
+    return init?.method === "POST"
+      ? Response.json({ digest, size: bytes.length })
+      : new Response(new Uint8Array(bytes));
+  });
+  await client.enable();
+  const resources = client.capabilityResources.forOwner("a");
+  expect(await resources.putChunk("capability-default", bytes)).toBe(digest);
+  expect(await resources.getChunk("capability-default", digest)).toEqual(bytes);
+  expect(calls[0].url).toBe(
+    "https://api.mithril.fund/v1/workspace/resources/capability/capability-default/chunks",
+  );
+  expect(new Headers(calls[0].init?.headers).get("authorization")).toBe(
+    `Bearer ${tokenA}`,
+  );
+  expect(
+    new Headers(calls[0].init?.headers).get("x-mithril-workspace-owner"),
+  ).toBe("a");
+  expect(new Headers(calls[0].init?.headers).get("content-type")).toBe(
+    "application/octet-stream",
+  );
+  expect(calls[0].init).toMatchObject({
+    credentials: "omit",
+    redirect: "error",
+  });
+  await expect(
+    client.capabilityResources
+      .forOwner("b")
+      .getChunk("capability-default", digest),
+  ).rejects.toThrow("owner changed");
+  await expect(
+    client.authorizedBinaryRequest("/v1/workspace/resources/project/p/chunks"),
+  ).rejects.toThrow("Unsupported");
+  await expect(
+    client.authorizedBinaryRequest(
+      "/v1/workspace/resources/capability/x/chunks?remote=https://other",
+    ),
+  ).rejects.toThrow("Unsupported");
+  expect(calls).toHaveLength(2);
+  delayed = true;
+  const pending = resources.getChunk("capability-default", digest);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  client.reset();
+  token = tokenB;
+  release!(new Response(new Uint8Array(bytes)));
+  await expect(pending).rejects.toThrow("Account changed");
+});
+
+it("refuses Capability resource uploads without write scope", async () => {
+  await client.enable();
+  fetcher.mockImplementation(async (url: string) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: "a" },
+        scopes: ["workspace:read"],
+      });
+    throw new Error("Storage must not be requested");
+  });
+  await expect(
+    client.capabilityResources
+      .forOwner("a")
+      .putChunk("capability-default", new Uint8Array([1])),
+  ).rejects.toThrow("write scope");
+  expect(fetcher.mock.calls.every((call) => call[0].endsWith("/v1/me"))).toBe(
+    true,
+  );
+});
+
+it("bounds resource bodies in main even when the server omits content-length", async () => {
+  const { CHUNK_BYTES } = await import("@mithril/workspace/files");
+  fetcher.mockImplementation(async (url: string) =>
+    url.endsWith("/v1/me")
+      ? reply({
+          via: "api_token",
+          user: { id: "a" },
+          scopes: ["workspace:read", "workspace:write"],
+        })
+      : new Response(new Uint8Array(CHUNK_BYTES + 1)),
+  );
+  await client.enable();
+  await expect(
+    client.capabilityResources
+      .forOwner("a")
+      .getChunk("capability-default", "a".repeat(64)),
+  ).rejects.toThrow("too large");
+});

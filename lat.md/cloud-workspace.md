@@ -239,3 +239,13 @@ Cloud toolset and public MCP changes now write back to the original selected-pro
 [[src/main/capability-config-replica.ts#applyCapabilityConfigReplica]] compares the observed repository version and captured raw config digest, then uses a fixed isolated interpreter, no-follow directory access, an advisory config lock, atomic replacement and recoverable local receipts. Completed retries do not overwrite newer native edits; interrupted receipts finish only from recorded before/after contents. Receipt names are excluded by the existing secret-file path filter, and their private native backups never enter repository bodies.
 
 The native dispatcher rechecks identity after loading the interpreter and adapter; public snapshots do not expose raw config or its digest. Read-back tests use the original MCP/toolset parsers. Full Skills/resource reconciliation, secret references, aggregate tombstone restoration and lock interoperability with external or older config writers remain required. Build/unit evidence is not installed-client or live synchronization verification.
+
+### Capability resource storage (draft)
+
+Original Skills require their relative scripts, assets and references in addition to SKILL.md.
+
+A separate owner-scoped Capability resource namespace in the Mithril API uses the existing private R2 binding without inventing Projects or changing legacy Capability v1 bodies.
+
+The shared manifest retains original relative directories and executable attributes, rejects credential paths and file/directory collisions, and verifies byte digests and limits. The main-process [[src/main/cloud-workspace.ts#CloudWorkspace]] exposes the typed resource transport; bearer credentials remain in main, owner changes fail closed, and observing bytes never installs or runs them. Deleted Capability documents retain recovery reads but refuse new uploads.
+
+This is a storage foundation. Automatic native resource scanning, durable manifest-pointer CAS, bidirectional safe file application and original Skills adapter integration remain unfinished. No new namespace is published or automatically uploaded by this draft.

@@ -112,3 +112,9 @@ These cases exercise [[src/main/skills.ts#getSkillContent]] and [[src/main/skill
 ## Capability snapshot identity
 
 The fixed Capability snapshot retains full skill bodies and excludes explicit credential/path fields. An owner change during the read rejects the snapshot; source reading never invokes runtime testing or installation.
+
+## Capability resource transport
+
+Capability resource uploads and downloads use the fixed Mithril API through the main process.
+
+Tests preserve binary content, owner and content-type headers, reject owner switches and unsupported namespaces, discard late account responses, and refuse uploads without workspace write scope. Storage reads never invoke installation or execution.

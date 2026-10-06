@@ -140,3 +140,7 @@ Compatible Fund API/App publication from `c1dfaa70e8da0fb8b955881bccdcae90369d8e
 ## Mithril Code (2026-10-06)
 
 The Code sidebar screen invokes the owned Hermes `mithril-code` plugin CLI through a bounded native IPC adapter. It needs a current Agent installation and explicitly configured runner authority for the selected profile; it does not relay Desktop's Mithril bearer or another profile's API keys. Only the user's Assemble and verify action starts paid inference. Source/logic/receipt stay reviewable; unknown outcomes are not automatically retried. Fund PR492's registered free pilot and source publication remain independently gated. See `lat.md/mithril-code.md`.
+
+# Shared Code workspace publication
+
+Code uses workspace 0.6.7's compiled Desktop composer, tabs, source navigation and receipt disclosure across Desktop, App and Code. Native execution stays in the active profile's Hermes plugin. GitHub saving and Pages publication are explicit operations in the same screen; the transient GitHub credential travels through a fixed GitHub-only Code API IPC route, never generic URL/file access. Source changes invalidate the saved version. CLJK edits do not compile runtime artifacts or inherit Jev's generation checks. Installer completion and actual configured-profile inference remain separately evidenced.

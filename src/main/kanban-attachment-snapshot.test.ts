@@ -1105,3 +1105,127 @@ it("restores every connected task file through the main owner-scoped route and r
     capture.dispose();
   }
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Attachment identity collision reconciliation]]
+it("retains existing files across attachment ID collisions, alias overlaps, updates and removal", async () => {
+  const f = fixture(),
+    capture = f.capture();
+  try {
+    const source = kanbanReplicaSnapshot(
+      f.root,
+      "default",
+      "alice",
+      "device",
+      capture.project,
+    ).documents.find((row) => row.collection === "task")!;
+    const body = structuredClone(source.body) as Record<string, JsonValue>;
+    (body.task as Record<string, JsonValue>).id = "aliased-task";
+    const row = (body.attachments as Record<string, JsonValue>[])[0];
+    row.task_id = "aliased-task";
+    (row.resource as Record<string, JsonValue>).taskId = "aliased-document";
+    const reader = { forOwner: () => reader, getChunk: async () => f.bytes };
+    const apply = async (
+      body: Record<string, JsonValue>,
+      operationId: string,
+      previous: typeof source | null,
+    ): Promise<ReturnType<typeof applyKanbanReplica>> => {
+      const plan = await prepareKanbanAttachmentWriteback(
+        f.root,
+        "/usr/bin/python3",
+        f.state,
+        "aliased-document",
+        body,
+        reader,
+        async () => {},
+      );
+      try {
+        return applyKanbanReplica(
+          f.root,
+          "default",
+          "alice",
+          "device",
+          {
+            operationId,
+            document: {
+              collection: "task",
+              id: "aliased-document",
+              body,
+              deleted: false,
+              revision: 1,
+              updatedAt: 1,
+            },
+            expectedRecord: previous,
+            expectedVersion: previous?.version ?? null,
+          },
+          capture.project,
+          plan,
+        );
+      } finally {
+        plan.dispose();
+      }
+    };
+    let accepted = await apply(body, "alias-create", null);
+    expect(accepted.status).toBe("applied");
+    const db = new Database(f.dbFile);
+    try {
+      const native = db
+        .prepare(
+          "SELECT id,stored_path FROM task_attachments WHERE task_id='aliased-task'",
+        )
+        .get() as { id: number; stored_path: string };
+      expect(native.id).not.toBe(9);
+      expect(readFileSync(native.stored_path)).toEqual(Buffer.from(f.bytes));
+      row.filename = "updated.bin";
+      accepted = await apply(body, "alias-update", accepted.record!);
+      expect(accepted.status).toBe("applied");
+      const extra = structuredClone(row);
+      extra.id = native.id;
+      extra.filename = "overlapping-id.bin";
+      (body.attachments as JsonValue[]).push(extra);
+      accepted = await apply(body, "alias-overlap", accepted.record!);
+      expect(accepted.status).toBe("applied");
+      expect(
+        kanbanReplicaSnapshot(
+          f.root,
+          "default",
+          "alice",
+          "device",
+          capture.project,
+        ).documents.find((r) => r.id === "aliased-document"),
+      ).toEqual(accepted.record);
+      body.attachments = [extra];
+      accepted = await apply(body, "alias-remove", accepted.record!);
+      expect(accepted.status).toBe("applied");
+      expect(
+        kanbanReplicaSnapshot(
+          f.root,
+          "default",
+          "alice",
+          "device",
+          capture.project,
+        ).documents.find((r) => r.id === "aliased-document"),
+      ).toEqual(accepted.record);
+      expect(
+        db.prepare("SELECT * FROM task_attachments WHERE id=9").get(),
+      ).toMatchObject({ task_id: f.taskId, stored_path: f.file });
+      expect(readFileSync(f.file)).toEqual(Buffer.from(f.bytes));
+      const remaining = db
+        .prepare("SELECT id FROM task_attachments WHERE task_id='aliased-task'")
+        .get() as { id: number };
+      db.prepare("DELETE FROM task_attachments WHERE id=?").run(remaining.id);
+      expect(() =>
+        kanbanReplicaSnapshot(
+          f.root,
+          "default",
+          "alice",
+          "device",
+          capture.project,
+        ),
+      ).toThrow("Mapped attachment source changed");
+    } finally {
+      db.close();
+    }
+  } finally {
+    capture.dispose();
+  }
+});

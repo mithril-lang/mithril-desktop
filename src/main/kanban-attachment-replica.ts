@@ -1,3 +1,7 @@
+import {
+  attachmentIdentities,
+  portableAttachmentRows,
+} from "./kanban-attachment-identity";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -116,6 +120,12 @@ export function orderedKanbanAttachments(
   taskId: string,
   rows: Record<string, unknown>[],
 ): Record<string, unknown>[] {
+  const aliases = new Map(
+    attachmentIdentities(db, taskId).map((row) => [
+      row.native_id,
+      row.cloud_id,
+    ]),
+  );
   if (
     !(
       db.prepare("PRAGMA table_info(mithril_attachment_projection)").all() as {
@@ -140,7 +150,9 @@ export function orderedKanbanAttachments(
     throw Error("Invalid attachment order marker");
   const rank = new Map(ids.map((id, index) => [id, index]));
   return [...rows].sort(
-    (a, b) => (rank.get(a.id) ?? ids.length) - (rank.get(b.id) ?? ids.length),
+    (a, b) =>
+      (rank.get(aliases.get(Number(a.id)) ?? a.id) ?? ids.length) -
+      (rank.get(aliases.get(Number(b.id)) ?? b.id) ?? ids.length),
   );
 }
 
@@ -228,17 +240,40 @@ export async function prepareKanbanAttachmentWriteback(
         const same = (a: unknown, b: unknown): boolean =>
           repositoryFingerprint({ body: a as JsonValue, deleted: false }) ===
           repositoryFingerprint({ body: b as JsonValue, deleted: false });
+        const aliases = attachmentIdentities(db, data.task.id);
+        const portableRaw = portableAttachmentRows(db, data.task.id, raw);
         if (
           raw.length !== current.length ||
-          raw.some((r) => !current.some((c) => c.id === r.id))
+          portableRaw.some((row) => !current.some((old) => old.id === row.id))
         )
           throw Error("Attachment source changed");
+        const nativeIds = new Map(
+          aliases.map((row) => [row.cloud_id, row.native_id]),
+        );
+        const nativeId = (id: number): number => nativeIds.get(id) ?? id;
+        const maximum = db
+          .prepare("SELECT MAX(id) AS id FROM task_attachments")
+          .get() as { id: number | null };
+        if (maximum.id !== null && !Number.isSafeInteger(maximum.id))
+          throw Error("Invalid attachment source ID");
+        let next =
+          Math.max(maximum.id ?? 0, ...incoming.map((row) => row.id)) + 1;
+        const mappings: { cloud: number; native: number }[] = [];
         for (const row of incoming) {
+          if (nativeIds.has(row.id)) continue;
           const collision = db
             .prepare("SELECT task_id FROM task_attachments WHERE id=?")
             .get(row.id) as { task_id: string } | undefined;
-          if (collision && collision.task_id !== data.task.id)
-            throw Error("Attachment ID belongs to another task");
+          if (
+            collision &&
+            (collision.task_id !== data.task.id ||
+              aliases.some((alias) => alias.native_id === row.id))
+          ) {
+            if (!Number.isSafeInteger(next))
+              throw Error("Attachment ID capacity exceeded");
+            nativeIds.set(row.id, next);
+            mappings.push({ cloud: row.id, native: next++ });
+          }
         }
         const changed = incoming.filter(
           (row) => !current.some((old) => same(old, row)),
@@ -306,19 +341,26 @@ export async function prepareKanbanAttachmentWriteback(
           ).run(data.task.id);
         for (const old of current)
           if (!incoming.some((row) => same(old, row))) {
-            const source = raw.find((r) => r.id === old.id)!;
+            const source = raw.find((r) => r.id === nativeId(old.id))!;
             db.prepare(
               "INSERT INTO mithril_attachment_history VALUES(?,?,?)",
             ).run(operationId, old.id, JSON.stringify(source));
             db.prepare(
               "DELETE FROM task_attachments WHERE id=? AND task_id=?",
-            ).run(old.id, data.task.id);
+            ).run(nativeId(old.id), data.task.id);
+            if (
+              !incoming.some((row) => row.id === old.id) &&
+              aliases.some((alias) => alias.cloud_id === old.id)
+            )
+              db.prepare(
+                "DELETE FROM mithril_attachment_ids WHERE task_id=? AND cloud_id=?",
+              ).run(data.task.id, old.id);
           }
         for (const row of changed)
           db.prepare(
             "INSERT INTO task_attachments(id,task_id,filename,stored_path,content_type,size,uploaded_by,created_at) VALUES(?,?,?,?,?,?,?,?)",
           ).run(
-            row.id,
+            nativeId(row.id),
             row.task_id,
             row.filename,
             resolve(directory, name(row)),
@@ -327,6 +369,17 @@ export async function prepareKanbanAttachmentWriteback(
             row.uploaded_by,
             row.created_at,
           );
+        if (mappings.length) {
+          db.exec(
+            "CREATE TABLE IF NOT EXISTS mithril_attachment_ids(task_id TEXT NOT NULL,cloud_id INTEGER NOT NULL,native_id INTEGER NOT NULL,PRIMARY KEY(task_id,cloud_id),UNIQUE(native_id))",
+          );
+          for (const row of mappings)
+            db.prepare("INSERT INTO mithril_attachment_ids VALUES(?,?,?)").run(
+              data.task.id,
+              row.cloud,
+              row.native,
+            );
+        }
       },
     };
   } catch (error) {

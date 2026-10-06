@@ -328,3 +328,8 @@ Repeated complete task pages must retain owner and revision equality. Wrong owne
 ## Connected component attachment restoration
 
 Main-owned group restoration verifies selected files before SQL writes, rolls back refused groups, preserves existing bytes and replays exact receipts offline.
+
+
+## Attachment identity collision reconciliation
+
+Cloud attachment IDs map to private SQLite keys without overwriting another task. Updates, alias overlaps and removals preserve exact projections; missing mapped rows refuse publication.

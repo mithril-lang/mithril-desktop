@@ -1,3 +1,4 @@
+import { portableAttachmentRows } from "./kanban-attachment-identity";
 import {
   restoreKanbanTaskGroup,
   selectKanbanTaskGroup,
@@ -221,6 +222,13 @@ export function kanbanRepositorySeed(
           )
         )
           throw Error("Mapped history task changed; records retained");
+        if (
+          read("mithril_attachment_ids").some(
+            (row) =>
+              typeof row.task_id !== "string" || !taskIds.has(row.task_id),
+          )
+        )
+          throw Error("Mapped attachment task changed; files retained");
         const attachmentMarkers = read("mithril_attachment_projection");
         if (
           attachmentMarkers.some(
@@ -306,7 +314,12 @@ export function kanbanRepositorySeed(
             attachments.filter((r) => r.task_id === id),
           );
           const portableAttachments = rawAttachments.length
-            ? attachmentProjection!(slug, key, id, rawAttachments)
+            ? attachmentProjection!(
+                slug,
+                key,
+                id,
+                portableAttachmentRows(db, id, rawAttachments),
+              )
             : [];
 
           versions?.set(
@@ -694,7 +707,7 @@ export function applyKanbanReplica(
                           value.board,
                           document.id,
                           value.task.id,
-                          rows,
+                          portableAttachmentRows(db, value.task.id, rows),
                         )
                       : [];
                     if (
@@ -733,7 +746,7 @@ export function applyKanbanReplica(
                             body.board,
                             write.document.id,
                             body.task.id,
-                            rows,
+                            portableAttachmentRows(db, body.task.id, rows),
                           )
                         : [];
                       if (
@@ -964,7 +977,7 @@ export function applyKanbanReplica(
               body.board,
               write.document.id,
               body.task.id,
-              rawAttachments,
+              portableAttachmentRows(db, body.task.id, rawAttachments),
             )
           : [];
         if (

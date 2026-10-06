@@ -481,3 +481,14 @@ The main process selects missing nodes read-only, verifies each selected task fi
 Refused groups roll back database rows and retain existing file bytes. Immutable unregistered files may remain after a transaction refusal; they never overwrite original files. Retained receipts replay without downloading again. The real-schema main-route invariant is [[cloud-workspace-tests#Cloud workspace tests#Connected component attachment restoration]].
 
 Local qualification: 2,625 Desktop tests / 281 files, including 31 targeted storage/attachment tests, passed. Node/web types, full lint, production build and lat check passed. The missing-credential fixture ran without OPENROUTER_API_KEY. Prior Desktop head 2881575 passed CI run 37515852708. This follow-up requires new-head CI, publication and installed multi-device qualification.
+
+
+## Attachment identity aliases (draft)
+
+Cloud attachment IDs now retain private SQLite aliases when another original task owns the same key.
+
+[[src/main/kanban-attachment-identity.ts#portableAttachmentRows]] projects cloud IDs while the original Desktop UI uses real SQLite keys. The writer allocates unused keys under its transaction, preserves existing rows and file bytes, and retains mappings across metadata replacements. Removed attachment mappings are retired with their rows; retained private history remains available. Cloud order uses mapped IDs. Missing mapped rows or tasks refuse publication rather than losing files.
+
+The collision, later alias overlap, replacement and removal invariant is [[cloud-workspace-tests#Cloud workspace tests#Attachment identity collision reconciliation]]. Reads and synchronization do not execute files or tasks. Installed and multi-device qualification remain required.
+
+Local alias qualification: 2,626 Desktop tests / 281 files and 32 targeted storage/attachment tests passed. Node/web types, production build and lat check passed. Missing-credential fixture isolated from OPENROUTER_API_KEY. Previous head ac92654 passed GitHub CI run 37516920103. New-head CI, publication and installed qualification remain outstanding.

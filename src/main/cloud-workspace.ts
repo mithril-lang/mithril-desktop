@@ -314,7 +314,10 @@ export class CloudWorkspace {
     }
   }
 
-  async repositoryPage(collection: RepositoryCollection, after?: string) {
+  async repositoryPage(
+    collection: RepositoryCollection,
+    after?: string,
+  ): Promise<import("@mithril/workspace/repository").RepositoryPage> {
     if (
       !repositoryCollections.includes(collection) ||
       (after !== undefined && !validId(after))
@@ -329,7 +332,9 @@ export class CloudWorkspace {
       throw Error("Invalid repository page");
     return value;
   }
-  async repositoryApply(edit: RepositoryEdit) {
+  async repositoryApply(
+    edit: RepositoryEdit,
+  ): Promise<import("@mithril/workspace/repository").RepositoryReceipt> {
     if (!validRepositoryEdit(edit)) throw Error("Invalid repository edit");
     const { value } = await this.authorizedRequest(
       `/v1/workspace/repository/${edit.collection}`,

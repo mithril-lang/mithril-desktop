@@ -63,7 +63,7 @@ it("reads every board with comments, run metadata, dependencies and stable IDs w
   expect(snapshot.filter((row) => row.collection === "board")).toHaveLength(2);
   expect(snapshot.filter((row) => row.collection === "task")).toHaveLength(2);
   expect(kanbanRepositorySeed(root, "default")).toEqual(snapshot);
-  const task = snapshot.find((row) => row.collection === "task")!.body as any;
+  const task = snapshot.find((row) => row.collection === "task")!.body;
   expect(task).toMatchObject({
     task: { skills: ["investigation"], workspace_path: null },
     comments: [{ body: "Full comment" }],
@@ -76,8 +76,11 @@ it("reads every board with comments, run metadata, dependencies and stable IDs w
   expect(JSON.stringify(snapshot)).not.toContain("/private/device/path");
   const db = new Database(join(root, "kanban.db"), { readonly: true });
   expect(
-    (db.prepare("SELECT workspace_path,claim_lock FROM tasks").get() as any)
-      .workspace_path,
+    (
+      db.prepare("SELECT workspace_path,claim_lock FROM tasks").get() as {
+        workspace_path: string;
+      }
+    ).workspace_path,
   ).toBe("/private/device/path");
   db.close();
 });

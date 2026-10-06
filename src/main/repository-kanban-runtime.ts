@@ -15,7 +15,7 @@ import { cloudWorkspace } from "./cloud-workspace-runtime";
 import { getConnectionConfig } from "./config";
 import { validBody, type JsonValue } from "@mithril/workspace/repository";
 import type { RepositorySeed } from "@mithril/workspace/repository-react";
-function checked(path: string) {
+function checked(path: string): void {
   let current = resolve(path);
   for (;;) {
     if (existsSync(current) && lstatSync(current).isSymbolicLink())
@@ -109,7 +109,7 @@ export function kanbanRepositorySeed(
           )
         )
           throw Error("Unsupported Kanban relationships; source data retained");
-        const read = (table: string) =>
+        const read = (table: string): Record<string, unknown>[] =>
           tables.has(table)
             ? (db.prepare(`SELECT * FROM ${table}`).all() as Record<
                 string,
@@ -184,7 +184,10 @@ export function kanbanRepositorySeed(
   }
   return documents;
 }
-export async function nativeRepositorySeed() {
+export async function nativeRepositorySeed(): Promise<{
+  userId: string;
+  documents: RepositorySeed[];
+}> {
   const before = await cloudWorkspace.nativeContext();
   if (getConnectionConfig().mode !== "local")
     return { userId: before.userId, documents: [] };

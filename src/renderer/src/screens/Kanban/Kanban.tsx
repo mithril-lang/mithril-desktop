@@ -7,7 +7,7 @@ export default function Kanban({
 }: {
   profile?: string;
   visible?: boolean;
-}) {
+}): React.JSX.Element {
   const { t } = useI18n();
   return (
     <OriginalKanban

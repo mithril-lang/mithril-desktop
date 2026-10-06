@@ -6,7 +6,7 @@ export default function Schedules({
 }: {
   profile?: string;
   visible?: boolean;
-}) {
+}): React.JSX.Element {
   const { t } = useI18n();
   return <OriginalSchedules api={window.hermesAPI} profile={profile} t={t} />;
 }

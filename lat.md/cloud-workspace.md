@@ -331,3 +331,9 @@ An owner-bound read-only IPC inventory adds unarchived source conversations to t
 Inventory reads do not bind a previously unowned profile, capture attachments, import records, or start inference. Unknown/different-owner sources remain reachable through the existing source-access dialog until migration and metadata action routing are complete. Source-row metadata/pin/project actions are disabled during that transition; cloud rows retain their API CAS actions. A closing shared context menu relinquishes key capture immediately, so inline rename can process Escape while the exit animation finishes.
 
 Cloud storage readiness is independent of model inventory. A provider failure keeps verified history readable; sending/creating execution still requires an available model. This prevents a model outage from hiding synchronized or original source conversations.
+
+## Original chat title reconciliation
+
+History replication records independent native/cloud title baselines. One-sided changes synchronize through existing non-executing rename operations or transactional native writeback; simultaneous edits remain a durable conflict.
+
+Native-to-cloud renames retain their operation ID before sending and recover receipts after restart. A newer source edit is never acknowledged by an older receipt. Cloud-to-native writeback compares the exact captured nullable title, preserves all source rows on schema/uniqueness conflicts, and records user title provenance where supported. Model/deletion reconciliation and conflict-resolution controls remain unfinished.

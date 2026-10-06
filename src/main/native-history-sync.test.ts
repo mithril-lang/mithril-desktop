@@ -21,6 +21,8 @@ function fixture(): {
   lose: () => void;
   owner: (value: string) => void;
   executions: () => number;
+  title: (value: string) => void;
+  currentTitle: () => string;
 } {
   const sessions = new Map<string, ChatSession>(),
     events = new Map<string, ChatEvent[]>(),
@@ -28,7 +30,8 @@ function fixture(): {
   let state: NativeHistoryJournal = { entries: {} },
     userId = "alice",
     lost = false,
-    executions = 0;
+    executions = 0,
+    nativeTitle = "Original chat";
   const items: ArchivedHistoryItem[] = [
     { id: "user_1", kind: "user", content: "Investigate", timestamp: 1 },
     {
@@ -66,7 +69,11 @@ function fixture(): {
     source: async () => [
       {
         id: "original",
-        title: "Original chat",
+        title: nativeTitle,
+        cacheTitle: async (title) => {
+          nativeTitle = title || "Chat";
+          return nativeTitle;
+        },
         model: "mock",
         items: async () => structuredClone(items),
       },
@@ -98,7 +105,7 @@ function fixture(): {
           session: sessions.get(id) ?? null,
         },
       apply: async (id, operation) => {
-        if (!["create", "history"].includes(operation.type)) {
+        if (!["create", "history", "rename"].includes(operation.type)) {
           executions++;
           throw Error("Unexpected execution");
         }
@@ -109,8 +116,10 @@ function fixture(): {
         const session: ChatSession = {
           id,
           title:
-            old?.title ??
-            (operation.type === "create" ? operation.data.title : ""),
+            operation.type === "rename" && accepted
+              ? operation.data.title
+              : (old?.title ??
+                (operation.type === "create" ? operation.data.title : "")),
           model: "mock",
           revision: accepted ? (old?.revision ?? 0) + 1 : old!.revision,
           eventSeq: old?.eventSeq ?? 0,
@@ -129,6 +138,21 @@ function fixture(): {
             });
             events.set(id, rows);
           }
+        if (accepted && operation.type === "rename") {
+          const rows = events.get(id) ?? [];
+          rows.push({
+            seq: ++session.eventSeq,
+            type: "metadata",
+            turnId: null,
+            data: {
+              title: session.title,
+              model: session.model,
+              deleted: "false",
+            },
+            createdAt: 1,
+          });
+          events.set(id, rows);
+        }
         if (accepted) sessions.set(id, session);
         const receipt: ChatOperationResponse = {
           schemaVersion: 1,
@@ -138,7 +162,7 @@ function fixture(): {
           session,
         };
         receipts.set(operation.operationId, receipt);
-        if (lost && operation.type === "history") {
+        if (lost && ["history", "rename"].includes(operation.type)) {
           lost = false;
           throw Error("Lost acknowledgement");
         }
@@ -159,6 +183,10 @@ function fixture(): {
       userId = value;
     },
     executions: () => executions,
+    title: (value) => {
+      nativeTitle = value;
+    },
+    currentTitle: () => nativeTitle,
   };
 }
 describe("automatic rich native history archival", () => {
@@ -573,4 +601,151 @@ it("avoids re-downloading unchanged acknowledged remote revisions while keeping 
     deferred: [],
   });
   expect(cache).toHaveBeenCalledOnce();
+});
+
+// @lat: [[cloud-workspace-tests#Bidirectional original chat titles]]
+it("reconciles native and cloud title edits without echo writes or execution", async () => {
+  const f = fixture(),
+    sid = nativeCloudSessionId("default", "original"),
+    sync = new NativeHistorySync(f.ports);
+  await sync.run();
+  const apply = vi.spyOn(f.ports.transport, "apply");
+  f.title("Native renamed");
+  expect((await sync.run()).conflicts).toEqual([]);
+  expect(f.sessions.get(sid)!.title).toBe("Native renamed");
+  expect(
+    apply.mock.calls.filter(([, op]) => op.type === "rename"),
+  ).toHaveLength(1);
+  await f.ports.transport.apply(sid, {
+    type: "rename",
+    operationId: crypto.randomUUID(),
+    baseRevision: f.sessions.get(sid)!.revision,
+    data: { title: "Cloud renamed" },
+  });
+  apply.mockClear();
+  expect((await sync.run()).conflicts).toEqual([]);
+  expect(f.currentTitle()).toBe("Cloud renamed");
+  await sync.run();
+  expect(apply).not.toHaveBeenCalled();
+  expect(f.executions()).toBe(0);
+});
+it("retains both concurrent title edits instead of overwriting either side", async () => {
+  const f = fixture(),
+    sid = nativeCloudSessionId("default", "original"),
+    sync = new NativeHistorySync(f.ports);
+  await sync.run();
+  f.title("Native draft");
+  await f.ports.transport.apply(sid, {
+    type: "rename",
+    operationId: crypto.randomUUID(),
+    baseRevision: f.sessions.get(sid)!.revision,
+    data: { title: "Cloud draft" },
+  });
+  const apply = vi.spyOn(f.ports.transport, "apply");
+  expect((await sync.run()).conflicts).toContain(sid);
+  expect(f.state().entries[sid].titleConflict).toEqual({
+    native: "Native draft",
+    cloud: "Cloud draft",
+  });
+  expect(f.currentTitle()).toBe("Native draft");
+  expect(f.sessions.get(sid)!.title).toBe("Cloud draft");
+  expect(apply).not.toHaveBeenCalled();
+  expect(f.executions()).toBe(0);
+});
+it("recovers a lost title acknowledgement after restart using the original operation ID", async () => {
+  const f = fixture(),
+    sid = nativeCloudSessionId("default", "original");
+  await new NativeHistorySync(f.ports).run();
+  f.title("Offline rename");
+  f.lose();
+  const apply = vi.spyOn(f.ports.transport, "apply");
+  expect((await new NativeHistorySync(f.ports).run()).deferred.length).toBe(1);
+  const pending = f.state().entries[sid].pending!;
+  expect(pending.operation.type).toBe("rename");
+  expect(f.sessions.get(sid)!.title).toBe("Offline rename");
+  await new NativeHistorySync(f.ports).run();
+  expect(apply).toHaveBeenCalledTimes(1);
+  expect(apply.mock.calls[0][1].operationId).toBe(
+    pending.operation.operationId,
+  );
+  expect(f.state().entries[sid].pending).toBeNull();
+  expect(f.executions()).toBe(0);
+});
+it("does not acknowledge a newer source title using an older lost receipt", async () => {
+  const f = fixture(),
+    sid = nativeCloudSessionId("default", "original");
+  await new NativeHistorySync(f.ports).run();
+  f.title("First rename");
+  f.lose();
+  await new NativeHistorySync(f.ports).run();
+  f.title("Newer rename");
+  await new NativeHistorySync(f.ports).run();
+  expect(f.sessions.get(sid)!.title).toBe("Newer rename");
+  expect(f.state().entries[sid].title).toEqual({
+    native: "Newer rename",
+    cloud: "Newer rename",
+  });
+  expect(f.executions()).toBe(0);
+});
+
+it("retains an unknown upgrade baseline until both independently preserved titles converge", async () => {
+  const f = fixture(),
+    sid = nativeCloudSessionId("default", "original"),
+    sync = new NativeHistorySync(f.ports);
+  await sync.run();
+  const journal = f.state();
+  delete journal.entries[sid].title;
+  f.ports.write("alice", "default", journal);
+  await f.ports.transport.apply(sid, {
+    type: "rename",
+    operationId: crypto.randomUUID(),
+    baseRevision: f.sessions.get(sid)!.revision,
+    data: { title: "Cloud edited before upgrade" },
+  });
+  expect((await sync.run()).conflicts).toContain(sid);
+  expect(f.currentTitle()).toBe("Original chat");
+  f.title("Cloud edited before upgrade");
+  expect((await sync.run()).conflicts).toEqual([]);
+  expect(f.state().entries[sid].titleConflict).toBeUndefined();
+});
+it("refuses a changing paginated checkpoint before any native title writeback", async () => {
+  const f = fixture(),
+    sid = nativeCloudSessionId("default", "original"),
+    sync = new NativeHistorySync(f.ports);
+  await sync.run();
+  const rows = f.events.get(sid)!,
+    session = f.sessions.get(sid)!;
+  f.ports.transport.events = async (_id, after = 0) => ({
+    schemaVersion: 1,
+    userId: "alice",
+    session: {
+      ...session,
+      title: after ? "Concurrent title" : "Original chat",
+      revision: session.revision + (after ? 1 : 0),
+    },
+    events: after ? rows.slice(1) : rows.slice(0, 1),
+    hasMore: !after,
+    nextAfter: after ? null : 1,
+  });
+  expect(
+    (await sync.run()).deferred.some((value) =>
+      value.includes("changed during pagination"),
+    ),
+  ).toBe(true);
+  expect(f.currentTitle()).toBe("Original chat");
+  expect(f.executions()).toBe(0);
+});
+
+it("retains an unsupported source title without storing an invalid pending operation", async () => {
+  const f = fixture(),
+    sid = nativeCloudSessionId("default", "original"),
+    sync = new NativeHistorySync(f.ports);
+  await sync.run();
+  f.title("x".repeat(513));
+  const apply = vi.spyOn(f.ports.transport, "apply");
+  expect((await sync.run()).deferred.length).toBe(1);
+  expect(f.state().entries[sid].pending).toBeNull();
+  expect(apply).not.toHaveBeenCalled();
+  expect(f.currentTitle()).toHaveLength(513);
+  expect(f.sessions.get(sid)!.title).toBe("Original chat");
 });

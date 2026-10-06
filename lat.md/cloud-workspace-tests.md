@@ -182,3 +182,11 @@ Cloud records supersede matching source IDs, including tombstones; account chang
 ## Read-only source inventory
 
 Only an existing owner-bound local profile produces stable source and cloud IDs. Tests reject account changes, another owner, and oversized inventories; reading never binds a source, captures messages, enables sync or starts execution.
+
+## Bidirectional original chat titles
+
+Native and cloud title changes reconcile against independent acknowledged baselines. Concurrent changes preserve both titles; restart recovers a lost acknowledgement with the same operation ID without executing work or acknowledging a newer edit.
+
+## Native title compare and swap
+
+Cloud title application checks the exact captured original title in a SQLite transaction. User title provenance protects against late automatic generation, while stale reads, duplicate titles and older schemas retain source records.

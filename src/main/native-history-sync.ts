@@ -20,6 +20,7 @@ export interface NativeHistorySource {
   model: string;
   items(sessionId: string): Promise<ArchivedHistoryItem[]>;
   cache?(sessionId: string, items: ArchivedHistoryItem[]): Promise<void>;
+  cacheTitle?(title: string): Promise<string>;
 }
 export interface NativeHistoryJournal {
   entries: Record<
@@ -27,6 +28,8 @@ export interface NativeHistoryJournal {
     {
       hashes: Record<string, string>;
       nativeHashes?: Record<string, string>;
+      title?: { native: string; cloud: string };
+      titleConflict?: { native: string; cloud: string };
       pending: {
         sessionId: string;
         operation: ChatOperation;
@@ -187,10 +190,26 @@ export class NativeHistorySync {
         journal.pending &&
         (journal.pending.sessionId !== sid ||
           !validateChatOperation(journal.pending.operation) ||
-          !["create", "history"].includes(journal.pending.operation.type) ||
+          !["create", "history", "rename"].includes(
+            journal.pending.operation.type,
+          ) ||
           typeof journal.pending.conflicted !== "boolean")
       )
         throw Error("Unsafe pending history operation");
+      for (const metadata of [journal.title, journal.titleConflict]) {
+        if (
+          metadata !== undefined &&
+          (!metadata ||
+            typeof metadata !== "object" ||
+            Array.isArray(metadata) ||
+            Object.keys(metadata).length !== 2 ||
+            typeof metadata.native !== "string" ||
+            metadata.native.length > 512 ||
+            typeof metadata.cloud !== "string" ||
+            metadata.cloud.length > 512)
+        )
+          throw Error("Invalid title journal");
+      }
       if (journal.pending?.conflicted) {
         outcome.conflicts.push(sid);
         continue;
@@ -211,10 +230,12 @@ export class NativeHistorySync {
             receipt = await this.ports.transport.apply(sid, pending.operation);
           await check();
           if (
+            receipt.schemaVersion !== 1 ||
             receipt.userId !== identity.userId ||
             receipt.operationId !== pending.operation.operationId ||
             !receipt.session ||
-            receipt.session.id !== sid
+            receipt.session.id !== sid ||
+            !validateChatSession(receipt.session)
           )
             throw Error("Invalid history receipt");
           if (receipt.status === "conflict") {
@@ -230,6 +251,21 @@ export class NativeHistorySync {
               journal.hashes[item.id] = fingerprint(item);
               (journal.nativeHashes ??= {})[item.id] = fingerprint(item);
             }
+          if (
+            pending.operation.type === "rename" ||
+            pending.operation.type === "create"
+          ) {
+            if (
+              receipt.session.revision !== pending.operation.baseRevision + 1 ||
+              receipt.session.title !== pending.operation.data.title
+            )
+              throw Error("Invalid title receipt");
+            journal.title = {
+              native: pending.operation.data.title,
+              cloud: receipt.session.title,
+            };
+            delete journal.titleConflict;
+          }
           sessions.set(sid, receipt.session);
           journal.pending = null;
           await persist();
@@ -245,13 +281,19 @@ export class NativeHistorySync {
               model: native.model || "native-history",
             },
           };
+          if (!validateChatOperation(operation))
+            throw Error(
+              "Native history operation cannot be represented; source retained",
+            );
           journal.pending = { sessionId: sid, operation, conflicted: false };
           await persist();
           const result = await this.ports.transport.apply(sid, operation);
           await check();
           if (
+            result.schemaVersion !== 1 ||
             result.userId !== identity.userId ||
             result.operationId !== operation.operationId ||
+            !validateChatSession(result.session) ||
             result.session.id !== sid
           )
             throw Error("Invalid history creation receipt");
@@ -261,6 +303,9 @@ export class NativeHistorySync {
             outcome.conflicts.push(sid);
             continue;
           }
+          if (result.session.title !== native.title)
+            throw Error("Invalid creation title receipt");
+          journal.title = { native: native.title, cloud: result.session.title };
           remote = result.session;
           sessions.set(sid, remote);
           journal.pending = null;
@@ -276,16 +321,28 @@ export class NativeHistorySync {
         }
         const history = [] as { type: string; data: Record<string, string> }[];
         let after = 0;
+        let checkpointIdentity: string | undefined;
         for (let page = 0; ; page++) {
           if (page >= 1000)
             throw Error("Native history exceeds supported page bound");
           const checkpoint = await this.ports.transport.events(sid, after);
           await check();
           if (
+            checkpoint.schemaVersion !== 1 ||
             checkpoint.userId !== identity.userId ||
-            checkpoint.session.id !== sid
+            !validateChatSession(checkpoint.session) ||
+            checkpoint.session.id !== sid ||
+            !Array.isArray(checkpoint.events) ||
+            !checkpoint.events.every(validateChatEvent)
           )
             throw Error("History checkpoint owner mismatch");
+          const version = JSON.stringify(checkpoint.session);
+          if (
+            checkpointIdentity !== undefined &&
+            checkpointIdentity !== version
+          )
+            throw Error("History checkpoint changed during pagination");
+          checkpointIdentity = version;
           remote = checkpoint.session;
           if (
             remote.deleted ||
@@ -311,6 +368,88 @@ export class NativeHistorySync {
             throw Error("Invalid history checkpoint cursor");
           after = checkpoint.nextAfter;
         }
+        // Three-way title reconciliation uses independent native/cloud baselines.
+        // A pending operation always keeps its original ID across lost receipts.
+        if (!journal.title) {
+          if (native.title === remote.title) {
+            journal.title = { native: native.title, cloud: remote.title };
+            delete journal.titleConflict;
+          } else
+            journal.titleConflict = {
+              native: native.title,
+              cloud: remote.title,
+            };
+        } else {
+          const localChanged = native.title !== journal.title.native;
+          const remoteChanged = remote.title !== journal.title.cloud;
+          if (native.title === remote.title) {
+            journal.title = { native: native.title, cloud: remote.title };
+            delete journal.titleConflict;
+          } else if (localChanged && remoteChanged) {
+            journal.titleConflict = {
+              native: native.title,
+              cloud: remote.title,
+            };
+          } else if (!journal.titleConflict && localChanged) {
+            const operation: ChatOperation = {
+              type: "rename",
+              operationId: crypto.randomUUID(),
+              baseRevision: remote.revision,
+              data: { title: native.title },
+            };
+            if (!validateChatOperation(operation))
+              throw Error(
+                "Native history operation cannot be represented; source retained",
+              );
+            journal.pending = { sessionId: sid, operation, conflicted: false };
+            await persist();
+            const result = await this.ports.transport.apply(sid, operation);
+            await check();
+            if (
+              result.schemaVersion !== 1 ||
+              result.userId !== identity.userId ||
+              result.operationId !== operation.operationId ||
+              !result.session ||
+              result.session.id !== sid ||
+              !validateChatSession(result.session)
+            )
+              throw Error("Invalid title receipt");
+            if (result.status === "conflict") {
+              journal.pending.conflicted = true;
+              await persist();
+              outcome.conflicts.push(sid);
+              continue;
+            }
+            if (
+              result.status !== "accepted" ||
+              result.session.revision !== operation.baseRevision + 1 ||
+              result.session.title !== operation.data.title
+            )
+              throw Error("Title operation receipt remains unknown");
+            journal.title = {
+              native: operation.data.title,
+              cloud: result.session.title,
+            };
+            journal.pending = null;
+            remote = result.session;
+            sessions.set(sid, remote);
+          } else if (!journal.titleConflict && remoteChanged) {
+            if (!native.cacheTitle) {
+              outcome.deferred.push(`${sid}: Native title cache unavailable`);
+            } else {
+              const effective = await native.cacheTitle(remote.title);
+              await check();
+              if (typeof effective !== "string" || effective.length > 512)
+                throw Error("Invalid native title acknowledgement");
+              journal.title = { native: effective, cloud: remote.title };
+            }
+          }
+        }
+        if (journal.titleConflict) {
+          journal.titleConflict = { native: native.title, cloud: remote.title };
+          outcome.conflicts.push(sid);
+        }
+        await persist();
         const stored = new Map(
           archivedHistory(history, true).map((item) => [item.id, item]),
         );
@@ -385,13 +524,19 @@ export class NativeHistorySync {
             baseRevision: remote.revision,
             data: { title: remote.title, model: remote.model, items: batch },
           };
+          if (!validateChatOperation(operation))
+            throw Error(
+              "Native history operation cannot be represented; source retained",
+            );
           journal.pending = { sessionId: sid, operation, conflicted: false };
           await persist();
           const result = await this.ports.transport.apply(sid, operation);
           await check();
           if (
+            result.schemaVersion !== 1 ||
             result.userId !== identity.userId ||
             result.operationId !== operation.operationId ||
+            !validateChatSession(result.session) ||
             result.session.id !== sid
           )
             throw Error("Invalid history operation receipt");

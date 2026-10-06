@@ -1,4 +1,8 @@
 import {
+  restoreKanbanTaskGroup,
+  readStableKanbanTasks,
+} from "./kanban-task-group-restore";
+import {
   hasPendingKanbanBoard,
   pendingKanbanBoards,
   initializeKanbanBoardMetadata,
@@ -551,6 +555,7 @@ export function applyKanbanReplica(
   attachmentWriteback?: KanbanAttachmentWriteback,
   boardPython?: string,
   boardMetadataReplacement = false,
+  groupDocuments?: import("@mithril/workspace/repository").RepositoryDocument[],
 ): import("@mithril/workspace/replica-sync").ReplicaResult {
   const retained = retainedTaskReceipt(root, userId, replicaId, write);
   if (retained) return retained;
@@ -654,43 +659,47 @@ export function applyKanbanReplica(
           )
             return result("conflict", current);
           if (write.document.deleted) return result("deferred");
-          const restored = restoreKanbanTask(
-            db,
-            write.document.id,
-            write.document.body,
-            attachmentWriteback
-              ? () => {
-                  attachmentWriteback.apply(db, [], [], write.operationId);
-                  const rows = orderedKanbanAttachments(
-                    db,
-                    body.task.id,
-                    db
-                      .prepare("SELECT * FROM task_attachments WHERE task_id=?")
-                      .all(body.task.id) as Record<string, unknown>[],
-                  );
-                  const resources = rows.length
-                    ? attachmentProjection!(
-                        body.board,
-                        write.document.id,
+          const restored = groupDocuments
+            ? restoreKanbanTaskGroup(db, write.document, groupDocuments)
+            : restoreKanbanTask(
+                db,
+                write.document.id,
+                write.document.body,
+                attachmentWriteback
+                  ? () => {
+                      attachmentWriteback.apply(db, [], [], write.operationId);
+                      const rows = orderedKanbanAttachments(
+                        db,
                         body.task.id,
-                        rows,
+                        db
+                          .prepare(
+                            "SELECT * FROM task_attachments WHERE task_id=?",
+                          )
+                          .all(body.task.id) as Record<string, unknown>[],
+                      );
+                      const resources = rows.length
+                        ? attachmentProjection!(
+                            body.board,
+                            write.document.id,
+                            body.task.id,
+                            rows,
+                          )
+                        : [];
+                      if (
+                        repositoryFingerprint({
+                          body: resources as unknown as JsonValue,
+                          deleted: false,
+                        }) !==
+                        repositoryFingerprint({
+                          body: body.attachments ?? [],
+                          deleted: false,
+                        })
                       )
-                    : [];
-                  if (
-                    repositoryFingerprint({
-                      body: resources as unknown as JsonValue,
-                      deleted: false,
-                    }) !==
-                    repositoryFingerprint({
-                      body: body.attachments ?? [],
-                      deleted: false,
-                    })
-                  )
-                    throw Error("Restored attachment projection changed");
-                  return { rows, resources };
-                }
-              : undefined,
-          );
+                        throw Error("Restored attachment projection changed");
+                      return { rows, resources };
+                    }
+                  : undefined,
+              );
           if (!restored) return result("deferred");
           const record = {
             collection: "task" as const,
@@ -1617,6 +1626,24 @@ export async function nativeReplicaApply(
           },
         );
       }
+      const incoming = write.document.body as Record<string, JsonValue>;
+      const groupDocuments =
+        write.document.collection === "task" &&
+        write.expectedRecord === null &&
+        Array.isArray(incoming.dependencies) &&
+        incoming.dependencies.length
+          ? await readStableKanbanTasks(
+              (after) => cloudWorkspace.repositoryPage("task", after),
+              before.userId,
+              async () => {
+                if (
+                  JSON.stringify(before.context) !==
+                  JSON.stringify(await cloudWorkspace.nativeContext(true))
+                )
+                  throw Error("Workspace identity changed");
+              },
+            )
+          : undefined;
       result = applyKanbanReplica(
         before.root,
         before.profile,
@@ -1627,6 +1654,7 @@ export async function nativeReplicaApply(
         attachments,
         HERMES_PYTHON,
         supportsKanbanMetadataReplacement(HERMES_REPO),
+        groupDocuments,
       );
     } finally {
       attachments?.dispose();

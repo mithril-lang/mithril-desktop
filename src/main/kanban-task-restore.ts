@@ -14,6 +14,7 @@ function restoreTask(
     rows: Record<string, unknown>[];
     resources: TaskAttachment[];
   },
+  deferGraph = false,
 ): { body: JsonValue; version: string } | null {
   if (!db.inTransaction)
     throw Error("Task restoration requires a writer transaction");
@@ -150,13 +151,15 @@ function restoreTask(
     task.id,
     documentId,
   );
-  const graph = planKanbanDependencies(db, task.id, {
-    dependencies: incoming.dependencies ?? [],
-    parents: incoming.parents ?? [],
-    children: incoming.children ?? [],
-  });
-  if (!graph) return null;
-  const dependencies = graph.apply();
+  const graph = deferGraph
+    ? undefined
+    : planKanbanDependencies(db, task.id, {
+        dependencies: incoming.dependencies ?? [],
+        parents: incoming.parents ?? [],
+        children: incoming.children ?? [],
+      });
+  if (!deferGraph && !graph) return null;
+  const dependencies = graph?.apply() ?? [];
   const projected = portableKanbanTask(raw);
   const history = restoreHistory();
   const attachments = restoreAttachments?.();

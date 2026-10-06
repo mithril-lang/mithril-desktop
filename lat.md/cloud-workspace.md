@@ -462,3 +462,11 @@ New tasks can restore complete dependency rows when their original board already
 [[src/main/kanban-task-restore.ts#restoreKanbanTask]] uses a nested writer savepoint so any deferred restoration rolls back inserted task, identity, history and graph rows. The existing schema-complete graph planner validates endpoints, cycle and execution ownership, then graph rows join the ordinary source fingerprint and receipt. Missing endpoints still require a connected-component restoration protocol; an empty new device with only mutually dependent cloud records is not yet qualified. No dispatcher or task promotion occurs.
 
 New task graph local qualification: 2,622 tests / 281 files passed with the missing-credential fixture isolated from OPENROUTER_API_KEY. Node/web types, full lint and lat check passed. The targeted 34-test storage/graph/attachment suite also passed; original user storage and production APIs were untouched.
+
+## Connected missing task reconstruction (draft)
+
+The native working-copy adapter now restores missing connected tasks together rather than waiting indefinitely for each missing endpoint.
+
+[[src/main/kanban-task-group-restore.ts#readStableKanbanTasks]] checks bounded complete task pages twice with owner and account guards. [[src/main/kanban-task-group-restore.ts#restoreKanbanTaskGroup]] resolves missing nodes, validates reciprocal edges, stages inactive tasks/history/identity under a writer savepoint and applies the original dependency planner. Exact final projections precede the retained root-operation receipt; incomplete or inconsistent components roll back. Native reads and restoration never dispatch work. Attachment-bearing components still require per-node verified byte plans, and installed/multi-device qualification remains required.
+
+Connected-component local qualification: 2,624 Desktop tests / 281 files passed with the missing-credential fixture isolated from OPENROUTER_API_KEY. The final 30-test storage/attachment rerun includes interrupted admission, absent endpoints, execution-state refusal, exact source/receipt equality and repeat cloud owner/revision reads. Node/web types, full lint, production build and lat check passed. Previous head 5749324 passed GitHub CI run 37514655442; this new component head needs its own CI and installed qualification.

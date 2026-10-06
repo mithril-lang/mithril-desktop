@@ -316,3 +316,11 @@ Interrupted publication recovers the exact prepared operation before source reco
 ## New task dependency reconstruction
 
 New inactive tasks restore graph edges with exact source receipts. Missing or runnable endpoints defer without partial task, graph, mapping or receipt writes; private endpoint state stays unchanged.
+
+## Connected task group restoration
+
+Missing connected task nodes restore together with original relationships and history. Incomplete components leave no partial source; fresh snapshots equal the accepted receipt and complete cloud bodies, and retries do not duplicate history.
+
+## Stable task component inventory
+
+Repeated complete task pages must retain owner and revision equality. Wrong owners and changing cloud documents refuse component adoption before native storage writes.

@@ -1448,3 +1448,178 @@ it("restores new inactive task dependencies with exact source receipts and rolls
     db.close();
   }
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Connected task group restoration]]
+it("restores an entire absent task component atomically with source equality and retained receipt", async () => {
+  const { kanbanReplicaSnapshot, applyKanbanReplica } =
+    await import("./repository-kanban-runtime");
+  const sourceRoot = realpathSync(
+    mkdtempSync(join(tmpdir(), "mithril-graph-source-")),
+  );
+  const targetRoot = realpathSync(
+    mkdtempSync(join(tmpdir(), "mithril-graph-target-")),
+  );
+  roots.push(sourceRoot, targetRoot);
+  const schema = readFileSync(
+    join(process.cwd(), "tests/fixtures/agent-kanban-schema.sql"),
+    "utf8",
+  );
+  for (const root of [sourceRoot, targetRoot]) {
+    const db = new Database(join(root, "kanban.db"));
+    db.exec(schema);
+    db.close();
+  }
+  const source = new Database(join(sourceRoot, "kanban.db"));
+  source.exec(
+    "INSERT INTO tasks(id,title,status,created_at) VALUES('a','A','todo',1),('b','B','todo',2),('c','C','todo',3);INSERT INTO task_links VALUES('a','b'),('b','c');INSERT INTO task_comments(task_id,author,body,created_at) VALUES('b','alice','Original comment',4)",
+  );
+  source.close();
+  const documents = kanbanReplicaSnapshot(
+    sourceRoot,
+    "default",
+    "alice",
+    "device",
+  )
+    .documents.filter((row) => row.collection === "task")
+    .map((row) => ({
+      collection: row.collection,
+      id: row.id,
+      body: row.body,
+      deleted: false,
+      revision: 1,
+      updatedAt: 1,
+    }));
+  const requested = documents.find(
+    (row) => (row.body as { task: { id: string } }).task.id === "b",
+  )!;
+  const write = {
+    operationId: "component",
+    document: requested,
+    expectedRecord: null,
+    expectedVersion: null,
+  };
+  const apply = (docs = documents): ReturnType<typeof applyKanbanReplica> =>
+    applyKanbanReplica(
+      targetRoot,
+      "default",
+      "alice",
+      "device",
+      write,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      docs,
+    );
+  const incomplete = documents.filter(
+    (row) => (row.body as { task: { id: string } }).task.id !== "c",
+  );
+  expect(apply(incomplete).status).toBe("deferred");
+  const target = new Database(join(targetRoot, "kanban.db"));
+  try {
+    expect(target.prepare("SELECT * FROM tasks").all()).toEqual([]);
+    expect(target.prepare("SELECT * FROM task_links").all()).toEqual([]);
+    expect(target.prepare("SELECT * FROM task_comments").all()).toEqual([]);
+    const executable = documents.map((document) => {
+      const body = document.body as Record<
+        string,
+        import("@mithril/workspace/repository").JsonValue
+      >;
+      const task = body.task as Record<
+        string,
+        import("@mithril/workspace/repository").JsonValue
+      >;
+      return task.id === "c"
+        ? {
+            ...document,
+            body: { ...body, task: { ...task, status: "running" } },
+          }
+        : document;
+    });
+    expect(apply(executable).status).toBe("deferred");
+    expect(target.prepare("SELECT * FROM tasks").all()).toEqual([]);
+    expect(target.prepare("SELECT * FROM task_comments").all()).toEqual([]);
+    expect(
+      target
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE name='mithril_repository_task_ids'",
+        )
+        .all(),
+    ).toEqual([]);
+    const result = apply();
+    expect(result.status).toBe("applied");
+    const snapshot = kanbanReplicaSnapshot(
+      targetRoot,
+      "default",
+      "alice",
+      "device",
+    );
+    expect(result.record).toEqual(
+      snapshot.documents.find((row) => row.id === requested.id),
+    );
+    expect(
+      snapshot.documents
+        .filter((row) => row.collection === "task")
+        .map((row) => ({ id: row.id, body: row.body }))
+        .sort((a, b) => a.id.localeCompare(b.id)),
+    ).toEqual(
+      documents
+        .map((row) => ({ id: row.id, body: row.body }))
+        .sort((a, b) => a.id.localeCompare(b.id)),
+    );
+    expect(apply()).toEqual(result);
+    expect(
+      target.prepare("SELECT COUNT(*) AS count FROM task_comments").get(),
+    ).toEqual({ count: 1 });
+  } finally {
+    target.close();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Stable task component inventory]]
+it("requires complete repeated cloud inventories with the same owner and revisions", async () => {
+  const { readStableKanbanTasks } = await import("./kanban-task-group-restore");
+  const document = {
+    collection: "task" as const,
+    id: "task-a",
+    body: { task: { id: "a" } },
+    deleted: false,
+    revision: 1,
+    updatedAt: 1,
+  };
+  const guard = vi.fn(async () => undefined);
+  const page = vi.fn(async () => ({
+    schemaVersion: 1 as const,
+    userId: "alice",
+    documents: [document],
+    nextAfter: null,
+  }));
+  expect(await readStableKanbanTasks(page, "alice", guard)).toEqual([document]);
+  expect(page).toHaveBeenCalledTimes(2);
+  expect(guard).toHaveBeenCalledTimes(4);
+  page.mockResolvedValueOnce({
+    schemaVersion: 1,
+    userId: "bob",
+    documents: [document],
+    nextAfter: null,
+  });
+  await expect(readStableKanbanTasks(page, "alice", guard)).rejects.toThrow(
+    "owner/page",
+  );
+  page
+    .mockResolvedValueOnce({
+      schemaVersion: 1,
+      userId: "alice",
+      documents: [document],
+      nextAfter: null,
+    })
+    .mockResolvedValueOnce({
+      schemaVersion: 1,
+      userId: "alice",
+      documents: [{ ...document, revision: 2 }],
+      nextAfter: null,
+    });
+  await expect(readStableKanbanTasks(page, "alice", guard)).rejects.toThrow(
+    "revisions changed",
+  );
+});

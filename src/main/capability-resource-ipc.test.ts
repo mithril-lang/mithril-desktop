@@ -30,7 +30,11 @@ function fixture(): {
   };
   forOwner.mockReturnValue(resources);
   registerCapabilityResourceIPC(
-    (channel, handler) => handlers.set(channel, handler),
+    {
+      handle: (channel, handler) => {
+        handlers.set(channel, handler);
+      },
+    },
     trusted,
     resources,
   );

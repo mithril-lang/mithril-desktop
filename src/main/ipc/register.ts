@@ -140,6 +140,8 @@ import {
 import { mithrilFirstRunState } from "../first-run";
 import { MITHRIL_TOKEN_PLACEHOLDER } from "../secure-env";
 import { mithrilChat } from "../mithril-chat";
+import { codeHarness } from "../code-harness";
+import { codeApi, codeServiceRun, codeServiceStatus } from "../code-api";
 import {
   cancelMithrilDeviceLogin,
   startMithrilDeviceLogin,
@@ -1205,6 +1207,22 @@ export function registerIpcHandlers(context: IpcContext): void {
     mithrilFirstRunState(profile?.trim() || getActiveProfileNameSync()),
   );
   ipcMain.handle(
+    "mithril-code-service-run",
+    (_event, goal: unknown, credentials: unknown) =>
+      codeServiceRun(goal, credentials),
+  );
+  ipcMain.handle("mithril-code-service-status", () => codeServiceStatus());
+  ipcMain.handle(
+    "mithril-code-api",
+    (_event, path: unknown, body: unknown, credentials: unknown) =>
+      codeApi(path, body, credentials),
+  );
+  ipcMain.handle(
+    "mithril-code",
+    (_event, action: unknown, goal: unknown, profile?: string) =>
+      codeHarness(action, goal, profile?.trim() || getActiveProfileNameSync()),
+  );
+  ipcMain.handle(
     "mithril-chat",
     (
       _event,
@@ -1306,7 +1324,7 @@ export function registerIpcHandlers(context: IpcContext): void {
   folderTimer.unref();
   app.once("before-quit", () => clearInterval(folderTimer));
   registerCapabilityResourceIPC(
-    (channel, handler) => ipcMain.handle(channel, handler),
+    ipcMain,
     trustedWorkspaceSender,
     cloudWorkspace.capabilityResources,
   );

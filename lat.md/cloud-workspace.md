@@ -337,3 +337,9 @@ Cloud storage readiness is independent of model inventory. A provider failure ke
 History replication records independent native/cloud title baselines. One-sided changes synchronize through existing non-executing rename operations or transactional native writeback; simultaneous edits remain a durable conflict.
 
 Native-to-cloud renames retain their operation ID before sending and recover receipts after restart. A newer source edit is never acknowledged by an older receipt. Cloud-to-native writeback compares the exact captured nullable title, preserves all source rows on schema/uniqueness conflicts, and records user title provenance where supported. The existing synchronization disclosure compares both titles and provides explicit choices. Each choice revalidates the exact pair, cloud revision and owner/profile before native CAS or a durable API rename; changed conflicts require fresh review. Model/deletion reconciliation and non-title operation conflicts remain unfinished.
+
+## Native Kanban dependency writeback
+
+Existing task dependencies now reconcile with the cloud document under the task's SQLite CAS and writer transaction. Graph rows and original metadata are retained; unrelated edges remain untouched.
+
+The adapter validates endpoint IDs, duplicate edges, parent/child projections and cycles across the current board. Missing endpoints and ready/scheduled/running or claimed tasks defer until their working copies are safe. Graph edits do not promote tasks, dispatch agents or replay run history. Task metadata, relationship changes and durable receipts commit together; a database failure or SQLite value coercion rolls all of them back. Read-back returns the exact resulting source graph and fingerprint. New board/task creation and historical run writeback remain unfinished.

@@ -359,3 +359,146 @@ it("reads an existing profile binding without adopting another account", () => {
   );
   expect(repositorySourceOwned(root, "other", "bob")).toBe(false);
 });
+
+// @lat: [[cloud-workspace-tests#Dependency graph replica receipts]]
+it("reconciles dependency edits with task CAS and a durable receipt", async () => {
+  const { kanbanReplicaSnapshot, applyKanbanReplica } =
+    await import("./repository-kanban-runtime");
+  const root = realpathSync(
+    mkdtempSync(join(tmpdir(), "mithril-graph-write-")),
+  );
+  roots.push(root);
+  const db = new Database(join(root, "kanban.db"));
+  try {
+    db.exec(
+      "CREATE TABLE tasks(id TEXT PRIMARY KEY,title TEXT,status TEXT,workspace_path TEXT,claim_lock TEXT,archived INTEGER);CREATE TABLE task_dependencies(parent_id TEXT,child_id TEXT,created_at INTEGER,PRIMARY KEY(parent_id,child_id));INSERT INTO tasks VALUES('a','A','todo','/private/a',NULL,0),('b','B','todo',NULL,NULL,0),('c','C','todo',NULL,NULL,0);INSERT INTO task_dependencies VALUES('a','b',1);",
+    );
+    const get = (): import("@mithril/workspace/replica-sync").ReplicaRecord =>
+      kanbanReplicaSnapshot(root, "default", "alice", "device").documents.find(
+        (row) =>
+          row.collection === "task" &&
+          (row.body as { task: { id: string } }).task.id === "a",
+      )!;
+    const source = get(),
+      body = source.body as Record<
+        string,
+        import("@mithril/workspace/repository").JsonValue
+      >;
+    const write = {
+      operationId: "graph-choice",
+      expectedRecord: source,
+      expectedVersion: source.version,
+      document: {
+        collection: "task" as const,
+        id: source.id,
+        revision: 2,
+        updatedAt: 1,
+        deleted: false,
+        body: {
+          ...body,
+          dependencies: [{ parent_id: "a", child_id: "c", created_at: 2 }],
+          parents: [],
+          children: ["c"],
+        },
+      },
+    };
+    const result = applyKanbanReplica(
+      root,
+      "default",
+      "alice",
+      "device",
+      write,
+    );
+    expect(result.status).toBe("applied");
+    expect(result.record).toEqual(get());
+    expect(
+      applyKanbanReplica(root, "default", "alice", "device", write),
+    ).toEqual(result);
+    expect(
+      db.prepare("SELECT workspace_path,status FROM tasks WHERE id='a'").get(),
+    ).toEqual({ workspace_path: "/private/a", status: "todo" });
+    expect(db.prepare("SELECT * FROM task_dependencies").all()).toEqual([
+      { parent_id: "a", child_id: "c", created_at: 2 },
+    ]);
+    const stale = applyKanbanReplica(root, "default", "alice", "device", {
+      ...write,
+      operationId: "stale-graph-choice",
+    });
+    expect(stale.status).toBe("conflict");
+    expect(
+      db
+        .prepare("SELECT COUNT(*) AS count FROM mithril_replica_receipts")
+        .get(),
+    ).toEqual({ count: 1 });
+  } finally {
+    db.close();
+  }
+});
+
+it("rolls task metadata and dependency edits back if relationship insertion fails", async () => {
+  const { kanbanReplicaSnapshot, applyKanbanReplica } =
+    await import("./repository-kanban-runtime");
+  const root = realpathSync(
+    mkdtempSync(join(tmpdir(), "mithril-graph-rollback-")),
+  );
+  roots.push(root);
+  const db = new Database(join(root, "kanban.db"));
+  try {
+    db.exec(
+      "CREATE TABLE tasks(id TEXT PRIMARY KEY,title TEXT,status TEXT,workspace_path TEXT,claim_lock TEXT);CREATE TABLE task_dependencies(parent_id TEXT,child_id TEXT,created_at INTEGER UNIQUE);INSERT INTO tasks VALUES('a','A','todo',NULL,NULL),('b','B','todo',NULL,NULL),('c','C','todo',NULL,NULL);INSERT INTO task_dependencies VALUES('a','b',1),('b','c',2);",
+    );
+    const source = kanbanReplicaSnapshot(
+      root,
+      "default",
+      "alice",
+      "device",
+    ).documents.find(
+      (row) =>
+        row.collection === "task" &&
+        (row.body as { task: { id: string } }).task.id === "a",
+    )!;
+    const body = source.body as {
+      task: Record<string, import("@mithril/workspace/repository").JsonValue>;
+      [key: string]: import("@mithril/workspace/repository").JsonValue;
+    };
+    expect(() =>
+      applyKanbanReplica(root, "default", "alice", "device", {
+        operationId: "graph-rollback",
+        expectedRecord: source,
+        expectedVersion: source.version,
+        document: {
+          collection: "task",
+          id: source.id,
+          revision: 2,
+          updatedAt: 1,
+          deleted: false,
+          body: {
+            ...body,
+            task: { ...body.task, title: "Cloud edit" },
+            dependencies: [{ parent_id: "a", child_id: "c", created_at: 2 }],
+            parents: [],
+            children: ["c"],
+          },
+        },
+      }),
+    ).toThrow();
+    expect(db.prepare("SELECT title FROM tasks WHERE id='a'").get()).toEqual({
+      title: "A",
+    });
+    expect(
+      db.prepare("SELECT * FROM task_dependencies ORDER BY created_at").all(),
+    ).toEqual([
+      { parent_id: "a", child_id: "b", created_at: 1 },
+      { parent_id: "b", child_id: "c", created_at: 2 },
+    ]);
+    expect(
+      db
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE name='mithril_replica_receipts'",
+        )
+        .get(),
+    ).toBeUndefined();
+  } finally {
+    db.close();
+  }
+});

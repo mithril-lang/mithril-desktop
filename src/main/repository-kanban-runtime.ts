@@ -1,3 +1,4 @@
+import { planKanbanDependencies } from "./kanban-dependency-replica";
 import { memoryFileId, memoryFileKinds } from "@mithril/workspace/memory-files";
 import {
   memoryReplicaSnapshot,
@@ -409,7 +410,7 @@ export function applyKanbanReplica(
           incoming.task.id !== body.task.id
         )
           throw Error("Invalid task replica");
-        // Run receipts and dependency graphs need their own schema-aware adapter; never replay or erase them.
+        // Run receipts remain historical; graph writes are schema-checked data only.
         const same = (
           a: JsonValue | undefined,
           b: JsonValue | undefined,
@@ -423,11 +424,29 @@ export function applyKanbanReplica(
           ...Object.keys(incoming),
         ])) {
           if (
-            !["task", "comments", "events"].includes(key) &&
+            ![
+              "task",
+              "comments",
+              "events",
+              "dependencies",
+              "parents",
+              "children",
+            ].includes(key) &&
             !same(body[key], incoming[key])
           )
             return result("deferred", current);
         }
+        const graphChanged = ["dependencies", "parents", "children"].some(
+          (key) => !same(body[key], incoming[key]),
+        );
+        const graphPlan = graphChanged
+          ? planKanbanDependencies(db, body.task.id, {
+              dependencies: incoming.dependencies,
+              parents: incoming.parents,
+              children: incoming.children,
+            })
+          : undefined;
+        if (graphChanged && !graphPlan) return result("deferred", current);
         const additions: { table: string; values: Record<string, unknown> }[] =
           [];
         for (const [key, table] of [
@@ -563,6 +582,7 @@ export function applyKanbanReplica(
             `INSERT INTO ${addition.table} (${keys.map((key) => `"${key}"`).join(",")}) VALUES(${keys.map(() => "?").join(",")})`,
           ).run(...keys.map((key) => addition.values[key]));
         }
+        const appliedGraph = graphPlan?.apply();
         const readRelated = (table: string): Record<string, JsonValue>[] => {
           const exists = db
             .prepare(
@@ -595,7 +615,23 @@ export function applyKanbanReplica(
           projected.skills = JSON.parse(projected.skills);
         const updatedRecord = {
           ...current,
-          body: json({ ...body, task: projected, comments, events }),
+          body: json({
+            ...body,
+            ...(appliedGraph
+              ? {
+                  dependencies: appliedGraph,
+                  parents: appliedGraph
+                    .filter((edge) => edge.child_id === body.task.id)
+                    .map((edge) => edge.parent_id),
+                  children: appliedGraph
+                    .filter((edge) => edge.parent_id === body.task.id)
+                    .map((edge) => edge.child_id),
+                }
+              : {}),
+            task: projected,
+            comments,
+            events,
+          }),
           version: createHash("sha256")
             .update(
               JSON.stringify([
@@ -603,7 +639,7 @@ export function applyKanbanReplica(
                 comments,
                 events,
                 body.runs,
-                body.dependencies,
+                appliedGraph ?? body.dependencies,
               ]),
             )
             .digest("hex"),

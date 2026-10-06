@@ -198,3 +198,11 @@ Title choices compare the reviewed names, cloud revision and owner/profile befor
 ## Title conflict review interaction
 
 The synchronization disclosure shows both reviewed names and sends only a metadata choice with its account/profile and cloud revision. Account changes hide old titles immediately and ignore late resolution failures.
+
+## Native dependency graph reconciliation
+
+Dependency edits preserve other tasks' edges and schema metadata, reject cycles and inconsistent projections, and defer missing or runnable endpoints. Graph writes share the task's SQLite transaction and roll back on failure or SQLite value coercion.
+
+## Dependency graph replica receipts
+
+Task CAS guards dependency updates and durable receipts recover repeated operations without rewriting graph state. Returned fingerprints match fresh source snapshots; device paths and execution statuses remain unchanged.

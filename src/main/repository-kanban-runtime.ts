@@ -109,14 +109,21 @@ export function kanbanRepositorySeed(
           )
         )
           throw Error("Unsupported Kanban relationships; source data retained");
-        const read = (table: string): Record<string, unknown>[] =>
-          tables.has(table)
-            ? (db.prepare(`SELECT * FROM ${table}`).all() as Record<
-                string,
-                unknown
-              >[])
-            : [];
-        const tasks = read("tasks"),
+        const read = (
+          table: string,
+          limit = 20000,
+        ): Record<string, unknown>[] => {
+          if (!tables.has(table)) return [];
+          const rows = db
+            .prepare(`SELECT * FROM ${table} LIMIT ?`)
+            .all(limit + 1) as Record<string, unknown>[];
+          if (rows.length > limit)
+            throw Error(
+              "Kanban snapshot exceeds the supported bound; source data retained",
+            );
+          return rows;
+        };
+        const tasks = read("tasks", 1000),
           comments = read("task_comments"),
           events = read("task_events"),
           runs = read("task_runs"),

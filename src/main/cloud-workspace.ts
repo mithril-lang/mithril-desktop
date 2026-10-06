@@ -156,7 +156,7 @@ export class CloudWorkspace {
     if (notify) this.deps.changed();
   }
 
-  /** Main-process context only. Neither credential fingerprint nor profile is exposed through workspace IPC. */
+  /** Main-process context only. Credential fingerprints and epochs never leave main; fixed snapshots may include the profile identity. */
   async nativeContext(write = false): Promise<{
     userId: string;
     profile: string;

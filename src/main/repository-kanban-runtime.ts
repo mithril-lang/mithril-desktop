@@ -1,3 +1,8 @@
+import { memoryFileId, memoryFileKinds } from "@mithril/workspace/memory-files";
+import {
+  memoryReplicaSnapshot,
+  applyMemoryReplica,
+} from "./memory-replica-files";
 import { app } from "electron";
 import Database from "better-sqlite3";
 import {
@@ -600,10 +605,7 @@ async function replicaContext(write = false): Promise<{
   context: Awaited<ReturnType<typeof cloudWorkspace.nativeContext>>;
 }> {
   const context = await cloudWorkspace.nativeContext(write);
-  if (
-    getConnectionConfig().mode !== "local" ||
-    process.env.HERMES_KANBAN_DB?.trim()
-  )
+  if (getConnectionConfig().mode !== "local")
     throw Error("Native replica storage unavailable");
   const directory = join(app.getPath("userData"), "repository-source-owners");
   bindRepositorySource(directory, context.profile, context.userId);
@@ -616,16 +618,80 @@ async function replicaContext(write = false): Promise<{
     context,
   };
 }
+/** Fixed, account-bound original Memory files only; no directory scan or execution. */
+export async function nativeMemorySnapshot(): Promise<{
+  userId: string;
+  profile: string;
+  documents: import("@mithril/workspace/replica-sync").ReplicaRecord[];
+}> {
+  const before = await cloudWorkspace.nativeContext();
+  if (getConnectionConfig().mode !== "local")
+    throw Error("Memory source unavailable for this runtime");
+  bindRepositorySource(
+    join(app.getPath("userData"), "repository-source-owners"),
+    before.profile,
+    before.userId,
+  );
+  const documents = memoryReplicaSnapshot(
+    profileHome(before.profile),
+    before.profile,
+  );
+  if (
+    JSON.stringify(before) !==
+    JSON.stringify(await cloudWorkspace.nativeContext())
+  )
+    throw Error("Workspace identity changed");
+  return { userId: before.userId, profile: before.profile, documents };
+}
 export async function nativeReplicaSnapshot(): Promise<
   import("@mithril/workspace/replica-sync").ReplicaSnapshot
 > {
   const before = await replicaContext();
-  const snapshot = kanbanReplicaSnapshot(
-    before.root,
-    before.profile,
-    before.userId,
-    before.replicaId,
-  );
+  const snapshot: import("@mithril/workspace/replica-sync").ReplicaSnapshot = {
+    schemaVersion: 1,
+    userId: before.userId,
+    replicaId: before.replicaId,
+    complete: true,
+    collections: [],
+    documents: [],
+    warnings: [],
+  };
+  try {
+    if (process.env.HERMES_KANBAN_DB?.trim())
+      throw Error("Custom Kanban storage");
+    const kanban = kanbanReplicaSnapshot(
+      before.root,
+      before.profile,
+      before.userId,
+      before.replicaId,
+    );
+    snapshot.collections.push(...kanban.collections);
+    snapshot.documents.push(...kanban.documents);
+  } catch {
+    snapshot.warnings!.push(
+      "Kanban source requires synchronization review; original records are retained",
+    );
+  }
+  try {
+    const memory = memoryReplicaSnapshot(
+      profileHome(before.profile),
+      before.profile,
+    );
+    snapshot.collections.push("memory");
+    snapshot.recordScopes = [
+      {
+        collection: "memory",
+        ids: memoryFileKinds.map((kind) => memoryFileId(before.profile, kind)),
+      },
+    ];
+    snapshot.documents.push(...memory);
+  } catch {
+    snapshot.warnings!.push(
+      "Memory source requires synchronization review; original files are retained",
+    );
+  }
+  if (!snapshot.collections.length)
+    throw Error("Native sources require synchronization review");
   if (
     JSON.stringify(before.context) !==
     JSON.stringify(await cloudWorkspace.nativeContext())
@@ -663,13 +729,55 @@ export async function nativeReplicaApply(
     JSON.stringify(await cloudWorkspace.nativeContext(true))
   )
     throw Error("Workspace identity changed");
-  const result = applyKanbanReplica(
-    before.root,
-    before.profile,
-    before.userId,
-    before.replicaId,
-    write,
-  );
+  let result: import("@mithril/workspace/replica-sync").ReplicaResult;
+  if (write.document.collection === "memory") {
+    const { HERMES_PYTHON } = await import("./installer");
+    // Account changes during module loading must be checked before touching source files.
+    if (
+      JSON.stringify(before.context) !==
+      JSON.stringify(await cloudWorkspace.nativeContext(true))
+    )
+      throw Error("Workspace identity changed");
+    try {
+      result = applyMemoryReplica(
+        profileHome(before.profile),
+        before.profile,
+        before.userId,
+        before.replicaId,
+        HERMES_PYTHON,
+        write,
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "Memory operation was reused"
+      )
+        throw error;
+      result = {
+        schemaVersion: 1,
+        userId: before.userId,
+        replicaId: before.replicaId,
+        status: "deferred",
+        record: null,
+      };
+    }
+  } else {
+    if (process.env.HERMES_KANBAN_DB?.trim())
+      return {
+        schemaVersion: 1,
+        userId: before.userId,
+        replicaId: before.replicaId,
+        status: "deferred",
+        record: null,
+      };
+    result = applyKanbanReplica(
+      before.root,
+      before.profile,
+      before.userId,
+      before.replicaId,
+      write,
+    );
+  }
   if (
     JSON.stringify(before.context) !==
     JSON.stringify(await cloudWorkspace.nativeContext(true))

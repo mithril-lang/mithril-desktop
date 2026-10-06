@@ -1,8 +1,10 @@
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
-import { profileHome, safeWriteFile } from "./utils";
+import { profileHome } from "./utils";
 
-const DEFAULT_SOUL = `You are Hermes, a helpful AI assistant. You are friendly, knowledgeable, and always eager to help.
+import { writePersona } from "./memory";
+
+const DEFAULT_SOUL = `You are Mithril, a helpful AI assistant. You are friendly, knowledgeable, and always eager to help.
 
 You communicate clearly and concisely. When asked to perform tasks, you think step-by-step and explain your reasoning. You are honest about your limitations and ask for clarification when needed.
 
@@ -20,18 +22,16 @@ export function readSoul(profile?: string): string {
   }
 }
 
-export function writeSoul(content: string, profile?: string): boolean {
-  const soulFile = join(profileHome(profile), "SOUL.md");
-
-  try {
-    safeWriteFile(soulFile, content);
-    return true;
-  } catch {
-    return false;
-  }
+export function writeSoul(
+  content: string,
+  profile?: string,
+  expected?: string,
+): boolean {
+  return writePersona(content, profile, expected).success;
 }
 
-export function resetSoul(profile?: string): string {
-  writeSoul(DEFAULT_SOUL, profile);
+export function resetSoul(profile?: string, expected?: string): string {
+  const result = writePersona(DEFAULT_SOUL, profile, expected);
+  if (!result.success) throw new Error(result.error ?? "Persona unavailable");
   return DEFAULT_SOUL;
 }

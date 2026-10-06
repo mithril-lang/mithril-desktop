@@ -1,6 +1,7 @@
 import { synchronizeNativeHistory } from "../native-history-runtime";
 import {
   nativeRepositorySeed,
+  nativeMemorySnapshot,
   nativeReplicaSnapshot,
   nativeReplicaApply,
 } from "../repository-kanban-runtime";
@@ -1381,6 +1382,10 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("cloud-workspace-replica-apply", (event, write) => {
     trustedWorkspaceSender(event);
     return nativeReplicaApply(write);
+  });
+  ipcMain.handle("cloud-workspace-memory-snapshot", (event) => {
+    trustedWorkspaceSender(event);
+    return nativeMemorySnapshot();
   });
   ipcMain.handle("cloud-workspace-repository-seed", (event) => {
     trustedWorkspaceSender(event);
@@ -3292,17 +3297,24 @@ export function registerIpcHandlers(context: IpcContext): void {
     if (conn.mode === "ssh" && conn.ssh) return sshReadSoul(conn.ssh, profile);
     return readSoul(profile);
   });
-  ipcMain.handle("write-soul", (_event, content: string, profile?: string) => {
-    const conn = getConnectionConfig();
-    if (conn.mode === "ssh" && conn.ssh)
-      return sshWriteSoul(conn.ssh, content, profile);
-    return writeSoul(content, profile);
-  });
-  ipcMain.handle("reset-soul", (_event, profile?: string) => {
-    const conn = getConnectionConfig();
-    if (conn.mode === "ssh" && conn.ssh) return sshResetSoul(conn.ssh, profile);
-    return resetSoul(profile);
-  });
+  ipcMain.handle(
+    "write-soul",
+    (_event, content: string, profile?: string, expected?: string) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "ssh" && conn.ssh)
+        return sshWriteSoul(conn.ssh, content, profile);
+      return writeSoul(content, profile, expected);
+    },
+  );
+  ipcMain.handle(
+    "reset-soul",
+    (_event, profile?: string, expected?: string) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "ssh" && conn.ssh)
+        return sshResetSoul(conn.ssh, profile);
+      return resetSoul(profile, expected);
+    },
+  );
 
   // Tools
   ipcMain.handle("get-toolsets", (_event, profile?: string) => {

@@ -149,4 +149,15 @@ Desktop wrappers inject native APIs and translations; Electron globals are absen
 
 Load failures have a retry in the original screen. Provider credential/configuration errors are visible instead of reporting Saved, and stale responses are ignored after an API/profile change. Persona autosave retains failed edits, serializes saves, and passes the observed content to cloud adapters for compare-and-swap. Native credentials still use the native execution port; they are never repository fields.
 
-A separately tested rich Memory repository adapter preserves original entry delimiters, refuses edits without an observed snapshot, retains offline pending operations and rejects stale Persona saves. It is not yet wired as the default Memory surface: lossless existing-source migration and continuous native file reconciliation remain gates. The current stripped-down cloud Settings/Memory/Capability screens and remaining split navigation still require replacement. No production release is implied by this extraction.
+The default Memory route now mounts these original components using per-profile raw MEMORY.md, USER.md and SOUL.md records. Existing portable cloud notes appear in the same entry editor with stable IDs and their original title/scope/project metadata retained. The current stripped-down cloud Settings/Memory/Capability screens and remaining split navigation still require replacement. No production release is implied by this extraction.
+
+
+### Memory file reconciliation (draft)
+
+Fixed known Memory files synchronize through the shared three-way journal while original UI components remain the editor.
+
+[[src/main/memory-replica-files.ts#memoryReplicaSnapshot]] reads only the selected owner-bound profile files and configured capacities. Snapshots explicitly claim only that profile’s three record IDs; unavailable collections report warnings and cannot delete unrelated data. Credentials, configuration values, installation metadata and device paths are excluded from canonical bodies.
+
+[[src/main/memory-replica-files.ts#applyMemoryReplica]] uses the original Memory lock inodes, no-follow reads, source CAS, atomic file writes and durable operation receipts. Repeating a completed receipt never rewrites newer native contents; interrupted writes recover from their recorded before/after state. Tombstones preserve recoverable cloud bodies and deletion markers. Differing configured capacities defer pending shared Settings integration. Original Persona writes now use the same locks and observed text checks rather than an unlocked write.
+
+Web uses the same default Memory body and cloud records. Runtime provider credentials remain native execution ports; Web credential writes fail visibly. Clean Persona editors observe remote changes, while dirty drafts and entry bases remain frozen. This draft has no deployed or installed-release evidence; full original Settings/Capability, schedule execution ownership, remote-only chat history and remaining navigation unification still require work.

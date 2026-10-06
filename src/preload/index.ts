@@ -373,6 +373,7 @@ const hermesAPI = {
       apply: (write) =>
         ipcRenderer.invoke("cloud-workspace-replica-apply", write),
     },
+    memorySnapshot: () => ipcRenderer.invoke("cloud-workspace-memory-snapshot"),
     repositorySeed: () => ipcRenderer.invoke("cloud-workspace-repository-seed"),
     repository: {
       page: (collection, after) =>
@@ -1290,10 +1291,14 @@ const hermesAPI = {
   // Soul
   readSoul: (profile?: string): Promise<string> =>
     ipcRenderer.invoke("read-soul", profile),
-  writeSoul: (content: string, profile?: string): Promise<boolean> =>
-    ipcRenderer.invoke("write-soul", content, profile),
-  resetSoul: (profile?: string): Promise<string> =>
-    ipcRenderer.invoke("reset-soul", profile),
+  writeSoul: (
+    content: string,
+    profile?: string,
+    expected?: string,
+  ): Promise<boolean> =>
+    ipcRenderer.invoke("write-soul", content, profile, expected),
+  resetSoul: (profile?: string, expected?: string): Promise<string> =>
+    ipcRenderer.invoke("reset-soul", profile, expected),
 
   // Tools
   getToolsets: (

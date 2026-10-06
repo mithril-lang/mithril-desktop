@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CloudWorkspace } from "./cloud-workspace";
+import type { RepositoryEdit } from "@mithril/workspace/repository";
 import type { WorkspaceOperation } from "@mithril/workspace/protocol";
 
 const tokenA = `mf_${"a".repeat(43)}`;
@@ -73,6 +74,142 @@ beforeEach(() => {
 });
 
 describe("Desktop cloud workspace boundary", () => {
+  // @lat: [[discover#Original Discover#Shared marketplace]]
+  it("loads a verified Skill bundle through the main-owned API route and rejects changed accounts", async () => {
+    await client.enable();
+    const bytes = new TextEncoder().encode("# Original Skill");
+    const digest = Array.from(
+      new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+      (byte) => byte.toString(16).padStart(2, "0"),
+    ).join("");
+    const bundle = {
+      source: "hermes",
+      id: "apple-notes",
+      commit: "a".repeat(40),
+      directory: "apple/apple-notes",
+      license: "MIT",
+      files: [
+        {
+          path: "SKILL.md",
+          executable: false,
+          size: bytes.length,
+          digest,
+          base64: btoa("# Original Skill"),
+        },
+      ],
+    };
+    const item = {
+      id: "apple-notes",
+      registry: "hermes" as const,
+      name: "Notes",
+      description: "",
+      path: "../private",
+      artifact: { format: "git" as const, url: "https://evil.test" },
+    };
+    fetcher.mockImplementation(async (url: string) =>
+      url.endsWith("/v1/me")
+        ? reply({
+            via: "api_token",
+            scopes: ["workspace:read", "workspace:write"],
+            user: { id: "a" },
+          })
+        : reply(bundle),
+    );
+    expect(await client.registrySkill(item)).toEqual(bundle);
+    expect(fetcher).toHaveBeenLastCalledWith(
+      "https://api.mithril.fund/v1/discover/bundle/hermes/apple-notes",
+      expect.objectContaining({
+        credentials: "omit",
+        redirect: "error",
+        headers: expect.objectContaining({ authorization: `Bearer ${tokenA}` }),
+      }),
+    );
+    const count = fetcher.mock.calls.length;
+    await expect(
+      client.registrySkill({ ...item, id: "../private" }),
+    ).rejects.toThrow("Invalid registry entry");
+    expect(fetcher).toHaveBeenCalledTimes(count);
+    fetcher.mockImplementation(async (url: string) => {
+      if (url.endsWith("/v1/me"))
+        return reply({
+          via: "api_token",
+          scopes: ["workspace:read", "workspace:write"],
+          user: { id: "a" },
+        });
+      return {
+        ...reply(bundle),
+        json: async () => {
+          token = tokenB;
+          return bundle;
+        },
+      };
+    });
+    await expect(client.registrySkill(item)).rejects.toThrow("account changed");
+  });
+  // @lat: [[discover#Original Discover#Shared marketplace]]
+  it("reads original registry documents through fixed Mithril API routes without renderer URLs or credentials", async () => {
+    fetcher.mockResolvedValueOnce(
+      reply({ skills: [], mcps: [], agents: [], workflows: [], plugins: [] }),
+    );
+    await client.discoverDocuments.fetchRegistry();
+    expect(fetcher).toHaveBeenLastCalledWith(
+      "https://api.mithril.fund/v1/discover/registry",
+      expect.objectContaining({
+        credentials: "omit",
+        redirect: "error",
+        headers: { accept: "application/json" },
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      reply({ markdown: "# Full original detail" }),
+    );
+    expect(
+      await client.discoverDocuments.fetchRegistryDetail("skills", {
+        id: "apple-notes",
+        registry: "hermes",
+        name: "Notes",
+        description: "",
+        path: "../private",
+        artifact: { format: "git", url: "https://evil.test" },
+      }),
+    ).toEqual({ markdown: "# Full original detail" });
+    expect(fetcher).toHaveBeenLastCalledWith(
+      "https://api.mithril.fund/v1/discover/detail/skills/hermes/apple-notes",
+      expect.objectContaining({ credentials: "omit", redirect: "error" }),
+    );
+    expect(
+      fetcher.mock.calls.every(
+        ([, init]) => !new Headers(init?.headers).has("authorization"),
+      ),
+    ).toBe(true);
+    const count = fetcher.mock.calls.length;
+    await expect(
+      client.discoverDocuments.fetchRegistryDetail("skills", {
+        id: "../private",
+        registry: "hermes",
+        name: "",
+        description: "",
+      }),
+    ).rejects.toThrow("Invalid registry entry");
+    expect(fetcher).toHaveBeenCalledTimes(count);
+  });
+  // @lat: [[cloud-workspace-tests#Cloud workspace tests#Dedicated authorization scopes]]
+  it("rechecks write authorization before applying native replica data", async () => {
+    await client.enable();
+    fetcher.mockResolvedValueOnce(
+      reply({
+        via: "api_token",
+        user: { id: "a" },
+        scopes: ["workspace:read"],
+      }),
+    );
+    await expect(client.nativeContext(true)).rejects.toThrow(
+      "workspace:write authorization",
+    );
+    expect(fetcher.mock.calls.every((call) => call[0].endsWith("/v1/me"))).toBe(
+      true,
+    );
+  });
   // @lat: [[cloud-workspace-tests#Cloud workspace tests#Dedicated authorization scopes]]
   it("refuses inference-only and read-only credentials without upgrading them", async () => {
     fetcher.mockResolvedValueOnce(
@@ -490,4 +627,293 @@ it("uses fixed security routes with explicit read/run scopes and rejects owner c
       : reply({ schemaVersion: 1, userId: "b", targets: [], runs: [] }),
   );
   await expect(client.getSecurity()).rejects.toThrow("owner");
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Capability resource transport]]
+it("keeps Capability resource auth in main, checks owners and discards responses after account changes", async () => {
+  const { digestBytes } = await import("@mithril/workspace/files");
+  const bytes = new Uint8Array([0, 255, 3]);
+  const digest = await digestBytes(bytes);
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  let release: ((response: Response) => void) | undefined;
+  let delayed = false;
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: token === tokenB ? "b" : "a" },
+        scopes: ["workspace:read", "workspace:write"],
+      });
+    calls.push({ url, init });
+    if (delayed)
+      return new Promise<Response>((resolve) => {
+        release = resolve;
+      });
+    return init?.method === "POST"
+      ? Response.json({ digest, size: bytes.length })
+      : new Response(new Uint8Array(bytes));
+  });
+  await client.enable();
+  const resources = client.capabilityResources.forOwner("a");
+  expect(await resources.putChunk("capability-default", bytes)).toBe(digest);
+  expect(await resources.getChunk("capability-default", digest)).toEqual(bytes);
+  expect(calls[0].url).toBe(
+    "https://api.mithril.fund/v1/workspace/resources/capability/capability-default/chunks",
+  );
+  expect(new Headers(calls[0].init?.headers).get("authorization")).toBe(
+    `Bearer ${tokenA}`,
+  );
+  expect(
+    new Headers(calls[0].init?.headers).get("x-mithril-workspace-owner"),
+  ).toBe("a");
+  expect(new Headers(calls[0].init?.headers).get("content-type")).toBe(
+    "application/octet-stream",
+  );
+  expect(calls[0].init).toMatchObject({
+    credentials: "omit",
+    redirect: "error",
+  });
+  await expect(
+    client.capabilityResources
+      .forOwner("b")
+      .getChunk("capability-default", digest),
+  ).rejects.toThrow("owner changed");
+  await expect(
+    client.authorizedBinaryRequest("/v1/workspace/resources/project/p/chunks"),
+  ).rejects.toThrow("Unsupported");
+  await expect(
+    client.authorizedBinaryRequest(
+      "/v1/workspace/resources/capability/x/chunks?remote=https://other",
+    ),
+  ).rejects.toThrow("Unsupported");
+  expect(calls).toHaveLength(2);
+  delayed = true;
+  const pending = resources.getChunk("capability-default", digest);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  client.reset();
+  token = tokenB;
+  release!(new Response(new Uint8Array(bytes)));
+  await expect(pending).rejects.toThrow("Account changed");
+});
+
+it("refuses Capability resource uploads without write scope", async () => {
+  await client.enable();
+  fetcher.mockImplementation(async (url: string) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: "a" },
+        scopes: ["workspace:read"],
+      });
+    throw new Error("Storage must not be requested");
+  });
+  await expect(
+    client.capabilityResources
+      .forOwner("a")
+      .putChunk("capability-default", new Uint8Array([1])),
+  ).rejects.toThrow("write scope");
+  expect(fetcher.mock.calls.every((call) => call[0].endsWith("/v1/me"))).toBe(
+    true,
+  );
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Task attachment IPC authority]]
+it("keeps task attachment credentials in main and discards late data after account changes", async () => {
+  const { digestBytes } = await import("@mithril/workspace/files");
+  const bytes = new Uint8Array([0, 255, 7]),
+    digest = await digestBytes(bytes);
+  let release: ((response: Response) => void) | undefined;
+  let delayed = false;
+  const calls: { url: string; init?: RequestInit }[] = [];
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: token === tokenB ? "b" : "a" },
+        scopes: ["workspace:read", "workspace:write"],
+      });
+    calls.push({ url, init });
+    if (delayed)
+      return new Promise<Response>((resolve) => {
+        release = resolve;
+      });
+    if (init?.method === "HEAD")
+      return new Response(null, {
+        headers: { "content-length": "3", "x-mithril-resource-digest": digest },
+      });
+    return init?.method === "POST"
+      ? Response.json({ digest, size: bytes.length })
+      : new Response(bytes);
+  });
+  await client.enable();
+  const files = client.taskAttachments.forOwner("a");
+  expect(await files.putChunk("original", bytes)).toBe(digest);
+  expect(await files.hasChunk("original", digest, bytes.length)).toBe(true);
+  expect(await files.getChunk("original", digest)).toEqual(bytes);
+  expect(calls[0].url).toBe(
+    "https://api.mithril.fund/v1/workspace/resources/task/original/chunks",
+  );
+  expect(new Headers(calls[0].init?.headers).get("authorization")).toBe(
+    `Bearer ${tokenA}`,
+  );
+  expect(
+    new Headers(calls[0].init?.headers).get("x-mithril-workspace-owner"),
+  ).toBe("a");
+  expect(calls[0].init).toMatchObject({
+    credentials: "omit",
+    redirect: "error",
+  });
+  await expect(
+    client.taskAttachments.forOwner("b").getChunk("original", digest),
+  ).rejects.toThrow("owner changed");
+  await expect(
+    client.authorizedBinaryRequest(
+      "/v1/workspace/resources/task/original/manifests",
+    ),
+  ).rejects.toThrow("Unsupported");
+  await expect(
+    client.authorizedBinaryRequest(
+      "/v1/workspace/resources/task/original/chunks?url=https://other",
+    ),
+  ).rejects.toThrow("Unsupported");
+  expect(calls).toHaveLength(3);
+  delayed = true;
+  const pending = files.getChunk("original", digest);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  client.reset();
+  token = tokenB;
+  release!(new Response(bytes));
+  await expect(pending).rejects.toThrow("Account changed");
+});
+
+it("bounds resource bodies in main even when the server omits content-length", async () => {
+  const { CHUNK_BYTES } = await import("@mithril/workspace/files");
+  fetcher.mockImplementation(async (url: string) =>
+    url.endsWith("/v1/me")
+      ? reply({
+          via: "api_token",
+          user: { id: "a" },
+          scopes: ["workspace:read", "workspace:write"],
+        })
+      : new Response(new Uint8Array(CHUNK_BYTES + 1)),
+  );
+  await client.enable();
+  await expect(
+    client.capabilityResources
+      .forOwner("a")
+      .getChunk("capability-default", "a".repeat(64)),
+  ).rejects.toThrow("too large");
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Repository retained history]]
+it("reads retained repository bodies on the fixed authenticated route and refuses malformed history or missing Chat authority", async () => {
+  const original = fetcher.getMockImplementation()! as (
+    url: string,
+  ) => Promise<Response>;
+  let malformed = false;
+  fetcher.mockImplementation(async (url: string) => {
+    if (url.includes("/repository/capability/"))
+      return reply({
+        schemaVersion: 1,
+        userId: "a",
+        documents: [
+          {
+            collection: "capability",
+            id: malformed ? "wrong" : "capability-default",
+            revision: 2,
+            deleted: false,
+            updatedAt: 1,
+            body: { original: "Full Skill text" },
+          },
+        ],
+        nextBefore: null,
+      });
+    return original(url);
+  });
+  await client.enable();
+  expect(
+    (await client.repositoryHistory("capability", "capability-default", 3))
+      .documents[0].body,
+  ).toEqual({ original: "Full Skill text" });
+  expect(
+    fetcher.mock.calls.some(
+      (call) =>
+        call[0] ===
+        "https://api.mithril.fund/v1/workspace/repository/capability/capability-default/history?before=3",
+    ),
+  ).toBe(true);
+  malformed = true;
+  await expect(
+    client.repositoryHistory("capability", "capability-default", 3),
+  ).rejects.toThrow("Invalid repository history");
+  const count = fetcher.mock.calls.length;
+  await expect(
+    client.repositoryHistory("capability", "../another", 3),
+  ).rejects.toThrow();
+  expect(fetcher.mock.calls).toHaveLength(count);
+  await expect(client.repositoryHistory("chat", "session")).rejects.toThrow(
+    "chat:read",
+  );
+  expect(
+    fetcher.mock.calls.some((call) => call[0].includes("/repository/chat/")),
+  ).toBe(false);
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Capability migration transport]]
+it("preserves both migration revisions on the fixed native API transport and rejects malformed guards before requesting", async () => {
+  const original = fetcher.getMockImplementation()! as (
+    url: string,
+  ) => Promise<Response>;
+  let submitted: RepositoryEdit | undefined;
+  const edit: RepositoryEdit = {
+    collection: "capability",
+    id: "capability-default",
+    operationId: "migration-one",
+    baseRevision: 1,
+    deleted: false,
+    body: {
+      format: "mithril-capability-v2",
+      profile: "default",
+      skillStorage: "resources",
+      skills: [],
+      toolsets: [],
+      mcps: [],
+    },
+    capabilityMigration: {
+      profile: "default",
+      pointerRevision: 3,
+      manifest: "a".repeat(64),
+    },
+  };
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/repository/capability")) {
+      submitted = JSON.parse(String(init?.body));
+      return reply({
+        schemaVersion: 1,
+        userId: "a",
+        operationId: edit.operationId,
+        status: "accepted",
+        document: {
+          collection: edit.collection,
+          id: edit.id,
+          revision: 2,
+          body: edit.body,
+          deleted: false,
+          updatedAt: 1,
+        },
+      });
+    }
+    return original(url);
+  });
+  await client.enable();
+  expect((await client.repositoryApply(edit)).status).toBe("accepted");
+  expect(submitted).toEqual(edit);
+  const count = fetcher.mock.calls.length;
+  await expect(
+    client.repositoryApply({
+      ...edit,
+      capabilityMigration: { ...edit.capabilityMigration!, pointerRevision: 0 },
+    }),
+  ).rejects.toThrow("Invalid repository edit");
+  expect(fetcher.mock.calls).toHaveLength(count);
 });

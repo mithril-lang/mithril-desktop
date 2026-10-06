@@ -8,7 +8,7 @@ Desktop verifies commit-pinned Mithril Agent bootstraps on Unix and Windows befo
 
 [[src/main/installer-download.ts#verifiedInstallerCommand]] stages the Unix file under a unique temporary path and removes it on success, download failure, checksum mismatch, or installer failure. [[src/main/installer-download.ts#verifiedWindowsInstallerScript]] verifies the raw Windows bytes before making the UTF-8-BOM copy required by Windows PowerShell 5.1. [[src/main/installer.ts#runInstall]] treats every nonzero bootstrap exit as a failure rather than accepting an older surviving binary tree.
 
-The pin is Mithril Agent commit `4fda47e0bfa9595066608ea02de934e46ff32074`. Its `scripts/install.sh` SHA-256 is `0fbf2969c12b9ef9c90b81519814865faa9ee4e22056e2a9a4d0b1d5e59966e8`; `scripts/install.ps1` is `5204fb92ced8b94af58e9ce37151cbbbc489b3b03ca81830a57362362d3d20da`. Bump the commit and both digests together after review.
+The pin is Mithril Agent commit `806c0a473b9eaba74a97a8c0d5f8e5fe0bc9c30b`. Its `scripts/install.sh` SHA-256 is `0fbf2969c12b9ef9c90b81519814865faa9ee4e22056e2a9a4d0b1d5e59966e8`; `scripts/install.ps1` is `5204fb92ced8b94af58e9ce37151cbbbc489b3b03ca81830a57362362d3d20da`. Bump the commit and both digests together after review.
 
 [[tests/installer-download.test.ts]] executes the Unix pipeline with real checksum tools and a harmless downloaded fixture, and inspects the Windows verification order. [[tests/installer-verification-result.test.ts]] checks that verification failure cannot become success merely because binaries exist. Desktop exposes no copyable `curl | bash` or `irm` fallback; failure recovery stays on the same verified in-app retry path.
 

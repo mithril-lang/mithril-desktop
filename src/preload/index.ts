@@ -47,6 +47,41 @@ import type {
   SshDockerProvisionResult,
 } from "../shared/ssh-docker";
 
+function taskAttachmentAPI(
+  owner?: string,
+): import("@mithril/workspace/task-attachments").TaskAttachmentTransport {
+  return {
+    forOwner: (value) => taskAttachmentAPI(value),
+    getChunk: (id, digest) =>
+      ipcRenderer.invoke("task-attachments-get-chunk", id, digest, owner),
+    hasChunk: (id, digest, size) =>
+      ipcRenderer.invoke("task-attachments-has-chunk", id, digest, size, owner),
+    putChunk: (id, bytes) =>
+      ipcRenderer.invoke("task-attachments-put-chunk", id, bytes, owner),
+  };
+}
+
+function capabilityResourceAPI(
+  owner?: string,
+): import("@mithril/workspace/capability-resources").CapabilityResourceTransport {
+  return {
+    forOwner: (value) => capabilityResourceAPI(value),
+    getManifest: (id, digest) =>
+      ipcRenderer.invoke(
+        "capability-resources-get-manifest",
+        id,
+        digest,
+        owner,
+      ),
+    putManifest: (manifest) =>
+      ipcRenderer.invoke("capability-resources-put-manifest", manifest, owner),
+    getChunk: (id, digest) =>
+      ipcRenderer.invoke("capability-resources-get-chunk", id, digest, owner),
+    putChunk: (id, bytes) =>
+      ipcRenderer.invoke("capability-resources-put-chunk", id, bytes, owner),
+  };
+}
+
 function projectFileAPI(
   owner?: string,
 ): import("@mithril/workspace/files").ProjectFileTransport {
@@ -155,6 +190,16 @@ const electronAPI = {
     },
   },
 };
+
+function historyFilesForOwner(owner: string): CloudChatAPI["historyFiles"] {
+  return {
+    forOwner: historyFilesForOwner,
+    put: (id, bytes) =>
+      ipcRenderer.invoke("cloud-chat-file-put", owner, id, bytes),
+    get: (id, digest) =>
+      ipcRenderer.invoke("cloud-chat-file-get", owner, id, digest),
+  };
+}
 
 const hermesAPI = {
   // Installation
@@ -333,6 +378,21 @@ const hermesAPI = {
       ipcRenderer.invoke("cloud-chat-native-import", id, choices),
   } satisfies NativeSessionImportAPI,
   cloudChat: {
+    nativeHistoryInventory: () =>
+      ipcRenderer.invoke("cloud-chat-native-history-inventory"),
+    resolveNativeHistoryTitle: (request) =>
+      ipcRenderer.invoke("cloud-chat-native-title-resolve", request),
+    resolveNativeHistoryModel: (request) =>
+      ipcRenderer.invoke("cloud-chat-native-model-resolve", request),
+    resolveNativeHistoryVisibility: (request) =>
+      ipcRenderer.invoke("cloud-chat-native-visibility-resolve", request),
+    syncNativeHistory: () =>
+      ipcRenderer.invoke("cloud-chat-native-history-sync"),
+    historyFiles: {
+      forOwner: historyFilesForOwner,
+      put: () => Promise.reject(Error("Chat attachment owner required")),
+      get: () => Promise.reject(Error("Chat attachment owner required")),
+    },
     runtime: () => ipcRenderer.invoke("cloud-chat-runtime"),
     legacySnapshot: () => ipcRenderer.invoke("cloud-chat-legacy-snapshot"),
     status: () => ipcRenderer.invoke("cloud-chat-status"),
@@ -363,6 +423,32 @@ const hermesAPI = {
       ipcRenderer.invoke("project-folder-disconnect", projectId),
   },
   cloudWorkspace: {
+    replica: {
+      snapshot: () => ipcRenderer.invoke("cloud-workspace-replica-snapshot"),
+      apply: (write) =>
+        ipcRenderer.invoke("cloud-workspace-replica-apply", write),
+    },
+    capabilitySnapshot: () =>
+      ipcRenderer.invoke("cloud-workspace-capability-snapshot"),
+    memorySnapshot: () => ipcRenderer.invoke("cloud-workspace-memory-snapshot"),
+    repositorySeed: () => ipcRenderer.invoke("cloud-workspace-repository-seed"),
+    repository: {
+      history: (collection, id, before) =>
+        ipcRenderer.invoke(
+          "cloud-workspace-repository-history",
+          collection,
+          id,
+          before,
+        ),
+      page: (collection, after) =>
+        ipcRenderer.invoke(
+          "cloud-workspace-repository-page",
+          collection,
+          after,
+        ),
+      apply: (edit) =>
+        ipcRenderer.invoke("cloud-workspace-repository-apply", edit),
+    },
     previewSchedules: () =>
       ipcRenderer.invoke("cloud-workspace-local-schedules"),
     security: {
@@ -376,7 +462,16 @@ const hermesAPI = {
         ipcRenderer.invoke("cloud-workspace-schedule-edit", operation),
     },
     files: projectFileAPI(),
+    capabilityResources: capabilityResourceAPI(),
+    taskAttachments: taskAttachmentAPI(),
     catalog: () => ipcRenderer.invoke("cloud-workspace-catalog"),
+    registrySkill: (item) =>
+      ipcRenderer.invoke("cloud-workspace-registry-skill", item),
+    discoverDocuments: {
+      fetchRegistry: () => ipcRenderer.invoke("cloud-workspace-registry"),
+      fetchRegistryDetail: (kind, item) =>
+        ipcRenderer.invoke("cloud-workspace-registry-detail", kind, item),
+    },
     status: () => ipcRenderer.invoke("cloud-workspace-status"),
     enable: () => ipcRenderer.invoke("cloud-workspace-enable"),
     disable: () => ipcRenderer.invoke("cloud-workspace-disable"),
@@ -1269,10 +1364,14 @@ const hermesAPI = {
   // Soul
   readSoul: (profile?: string): Promise<string> =>
     ipcRenderer.invoke("read-soul", profile),
-  writeSoul: (content: string, profile?: string): Promise<boolean> =>
-    ipcRenderer.invoke("write-soul", content, profile),
-  resetSoul: (profile?: string): Promise<string> =>
-    ipcRenderer.invoke("reset-soul", profile),
+  writeSoul: (
+    content: string,
+    profile?: string,
+    expected?: string,
+  ): Promise<boolean> =>
+    ipcRenderer.invoke("write-soul", content, profile, expected),
+  resetSoul: (profile?: string, expected?: string): Promise<string> =>
+    ipcRenderer.invoke("reset-soul", profile, expected),
 
   // Tools
   getToolsets: (

@@ -10,6 +10,7 @@ vi.mock("../../components/useI18n", () => ({
 }));
 
 describe("SidebarSessionMenu", () => {
+  // @lat: [[cloud-workspace-tests#Shared original sidebar adapter]]
   it("offers a Copy session ID action for the selected row", () => {
     const onCopySessionId = vi.fn();
 

@@ -8,14 +8,31 @@ export interface CloudWorkspaceStatus {
 }
 
 export interface CloudWorkspaceAPI extends WorkspaceTransport {
+  replica: import("@mithril/workspace/replica-sync").ReplicaTransport;
+  capabilitySnapshot: import("@mithril/workspace/capability-data").CapabilitySeed;
+  memorySnapshot: import("@mithril/workspace/memory-files").MemorySeed;
+  repositorySeed(): Promise<{
+    userId: string;
+    documents: import("@mithril/workspace/repository-react").RepositorySeed[];
+  }>;
+  repository: import("@mithril/workspace/repository").RepositoryTransport;
   security: import("@mithril/workspace/security").SecurityTransport;
   schedules: import("@mithril/workspace/schedules").ScheduleTransport;
   previewSchedules(): Promise<{
     userId: string;
     drafts: import("@mithril/workspace/schedules").NativeScheduleDraft[];
   }>;
+  taskAttachments: import("@mithril/workspace/task-attachments").TaskAttachmentTransport;
   files: import("@mithril/workspace/files").ProjectFileTransport;
+  capabilityResources: import("@mithril/workspace/capability-resources").CapabilityResourceTransport;
   catalog(): Promise<import("@mithril/workspace/react").DiscoverItem[]>;
+  registrySkill(
+    item: import("@mithril/workspace/desktop-discover").RegistryItem,
+  ): Promise<import("@mithril/workspace/registry-bundle").RegistrySkillBundle>;
+  discoverDocuments: Pick<
+    import("@mithril/workspace/desktop-discover").DiscoverAPI,
+    "fetchRegistry" | "fetchRegistryDetail"
+  >;
   status(): Promise<CloudWorkspaceStatus>;
   enable(): Promise<CloudWorkspaceStatus>;
   disable(): Promise<void>;
@@ -29,6 +46,64 @@ import type {
   SessionNativeImportAdapter,
 } from "@mithril/workspace/sessions";
 export interface CloudChatAPI extends SessionTransport {
+  nativeHistoryInventory(): Promise<{
+    userId: string;
+    profile: string;
+    rows: Array<{ id: string; sourceId: string; title: string }>;
+  }>;
+  resolveNativeHistoryTitle(request: {
+    userId: string;
+    profile: string;
+    sessionId: string;
+    native: string;
+    cloud: string;
+    cloudRevision: number;
+    choice: "native" | "cloud";
+  }): ReturnType<CloudChatAPI["syncNativeHistory"]>;
+  resolveNativeHistoryModel(request: {
+    userId: string;
+    profile: string;
+    sessionId: string;
+    native: string;
+    cloud: string;
+    cloudRevision: number;
+    choice: "native" | "cloud";
+  }): ReturnType<CloudChatAPI["syncNativeHistory"]>;
+  resolveNativeHistoryVisibility(request: {
+    userId: string;
+    profile: string;
+    sessionId: string;
+    native: string;
+    cloud: string;
+    cloudRevision: number;
+    choice: "native" | "cloud";
+  }): ReturnType<CloudChatAPI["syncNativeHistory"]>;
+  syncNativeHistory(): Promise<{
+    userId: string;
+    synced: number;
+    reconstructed?: number;
+    conflicts: string[];
+    titleConflicts?: Array<{
+      sessionId: string;
+      native: string;
+      cloud: string;
+      cloudRevision: number;
+    }>;
+    modelConflicts?: Array<{
+      sessionId: string;
+      native: string;
+      cloud: string;
+      cloudRevision: number;
+    }>;
+    visibilityConflicts?: Array<{
+      sessionId: string;
+      native: string;
+      cloud: string;
+      cloudRevision: number;
+    }>;
+    deferred: string[];
+  }>;
+  historyFiles: import("@mithril/workspace/history").HistoryFileTransport;
   status(): Promise<CloudWorkspaceStatus>;
   enable(): Promise<CloudWorkspaceStatus>;
   disable(): Promise<void>;

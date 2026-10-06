@@ -1,3 +1,8 @@
+import { recordNativeHistoryDeletion } from "./native-history-deletions";
+import {
+  mergeNativeHistoryCache,
+  deleteNativeHistoryCache,
+} from "./native-history-cache";
 import Database from "better-sqlite3";
 import type { Attachment } from "../shared/attachments";
 import { isImageMime } from "../shared/attachments";
@@ -34,6 +39,7 @@ export interface SessionSummary {
   model: string;
   title: string | null;
   preview: string;
+  archived?: boolean;
 }
 
 export interface SessionMessage {
@@ -264,10 +270,12 @@ export function listSessions(
   limit = 30,
   offset = 0,
   profile?: unknown,
+  includeArchived = false,
 ): SessionSummary[] {
   const db = getDb(true, profile);
   if (!db) return [];
 
+  const supportsArchive = sessionVisibilityPredicate(db) !== "1 = 1";
   // Simple query without correlated subquery — titles come from session cache
   const rows = db
     .prepare(
@@ -278,9 +286,10 @@ export function listSessions(
         s.ended_at,
         s.message_count,
         s.model,
-        s.title
+        s.title,
+        ${supportsArchive ? "s.archived" : "0"} AS archived
       FROM sessions s
-      WHERE ${sessionVisibilityPredicate(db)}
+      WHERE ${includeArchived ? "1 = 1" : sessionVisibilityPredicate(db)}
       ORDER BY s.started_at DESC
       LIMIT ? OFFSET ?`,
     )
@@ -292,8 +301,15 @@ export function listSessions(
     message_count: number;
     model: string;
     title: string | null;
+    archived: number;
   }>;
 
+  if (
+    includeArchived &&
+    supportsArchive &&
+    rows.some((row) => row.archived !== 0 && row.archived !== 1)
+  )
+    throw Error("Unsupported native archive value");
   return rows.map((r) => ({
     id: r.id,
     source: r.source,
@@ -303,6 +319,9 @@ export function listSessions(
     model: r.model || "",
     title: r.title,
     preview: "",
+    ...(includeArchived && supportsArchive
+      ? { archived: r.archived === 1 }
+      : {}),
   }));
 }
 
@@ -679,8 +698,10 @@ export function mergeStoredPromptImageAttachments(
 export function getSessionMessages(
   sessionId: string,
   profile?: unknown,
+  sourceOnly = false,
+  existingDb?: Database.Database,
 ): HistoryItem[] {
-  const db = getDb(true, profile);
+  const db = existingDb ?? getDb(true, profile);
   if (!db) return [];
 
   const rows = db
@@ -699,7 +720,8 @@ export function getSessionMessages(
     items,
     loadPromptImageAttachments(db, sessionId),
   );
-  return applySessionLocalOverlays(sessionId, canonical, db);
+  const source = applySessionLocalOverlays(sessionId, canonical, db);
+  return sourceOnly ? source : mergeNativeHistoryCache(db, sessionId, source);
 }
 
 export function applySessionLocalOverlays(
@@ -758,6 +780,8 @@ function hasParentSessionColumn(db: Database.Database): boolean {
 }
 
 function deleteSessionRows(db: Database.Database, sessionId: string): number {
+  recordNativeHistoryDeletion(db, sessionId);
+  deleteNativeHistoryCache(db, sessionId);
   deletePromptImageAttachmentsForSession(db, sessionId);
   deleteSessionContinuationForSession(db, sessionId);
   // Unlink any child sessions first. better-sqlite3 enables

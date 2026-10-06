@@ -118,3 +118,17 @@ describe("AgentMarkdown", () => {
     expect(declared.container.querySelector(".chat-code-plain")).not.toBeNull();
   });
 });
+
+// @lat: [[cloud-workspace-tests#Original Markdown table rendering]]
+it("renders flattened archived tables with the original shared Markdown component", () => {
+  const { container } = render(
+    <AgentMarkdown>
+      {
+        "安定稼働中: | 項目 | 状態 ||------|------|| Cron | `whitehat-ops-scan` `*/30 * * * *` ok || Script | `mithril-whitehat-ops` 4/5 local |"
+      }
+    </AgentMarkdown>,
+  );
+  expect(container.querySelectorAll("table")).toHaveLength(1);
+  expect(container.querySelectorAll("tbody tr")).toHaveLength(2);
+  expect(container.querySelector("td")?.textContent).toBe("Cron");
+});

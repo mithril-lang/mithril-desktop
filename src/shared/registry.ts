@@ -1,118 +1,14 @@
-/**
- * Shared types for the "Discover" community marketplace. The catalog is served
- * from the hermes-registry GitHub repo and consumed by both the main process
- * (fetch + install) and the renderer (browse UI).
- */
-
-export type RegistryKind =
-  | "skills"
-  | "mcps"
-  | "agents"
-  | "workflows"
-  | "plugins";
-
-export type RegistrySource = "hermes" | "mithril";
-
-export interface RegistryArtifact {
-  format: "zip" | "git";
-  url: string;
-  commit?: string;
-  sha256?: string;
-  bytes?: number;
-}
-
-export interface RegistryItem {
-  /** Stable identifier, unique within its kind. */
-  id: string;
-  name: string;
-  description: string;
-  author?: string;
-  category?: string;
-  tags?: string[];
-  homepage?: string;
-  version?: string;
-  license?: string;
-  platforms?: string[];
-  /** Folder for this entry within the registry repo (e.g. "skills/apple/apple-notes"). */
-  path?: string;
-  /** Bundled skills only: install identifier for `hermes skills install`. */
-  source?: string;
-  /** Catalog that owns path/artifact resolution for this entry. */
-  registry?: RegistrySource;
-  installable?: boolean;
-  permissions?: string[];
-  artifact?: RegistryArtifact;
-  requirements?: { commands?: string[] };
-  tools?: string[];
-  /** Absolute raw URL of the entry's icon, when the registry provides one. */
-  icon?: string;
-}
-
-export interface RegistryCatalog {
-  skills: RegistryItem[];
-  mcps: RegistryItem[];
-  agents: RegistryItem[];
-  workflows: RegistryItem[];
-  plugins: RegistryItem[];
-}
-
-export interface InstalledRegistry {
-  skills: string[];
-  mcps: string[];
-  workflows: string[];
-  plugins: string[];
-}
-
-/** One labeled row in a structured (non-prose) detail view. */
-export interface RegistryDetailRow {
-  label: string;
-  /** Plain or monospace value. */
-  value?: string;
-  mono?: boolean;
-  /** Pill chips (e.g. tags, env keys, permissions). */
-  chips?: string[];
-}
-
-/**
- * Detail shown in the item modal: either a prose doc (markdown) or a
- * structured spec (lead paragraph + labeled rows) for manifest-only entries.
- */
-export interface RegistryDetail {
-  markdown?: string;
-  description?: string;
-  rows?: RegistryDetailRow[];
-}
-
-/**
- * Model registry (models.json) types. Served from the hermes-registry repo and
- * consumed by the Models screen to let users pick curated models.
- */
-export interface RegistryModel {
-  name: string;
-  label?: string;
-  description?: string;
-  context?: number;
-  maxOutput?: number;
-  modalities?: { input?: string[]; output?: string[] };
-  capabilities?: string[];
-}
-
-export interface RegistryModelProvider {
-  id: string;
-  name: string;
-  description?: string;
-  homepage?: string;
-  docs?: string;
-  apiBase?: string;
-  envKey?: string;
-  models: RegistryModel[];
-}
-
-export interface ModelRegistry {
-  schemaVersion?: string;
-  generated?: string;
-  providerCount?: number;
-  modelCount?: number;
-  providers: RegistryModelProvider[];
-  error?: string;
-}
+/** Canonical catalog contracts are shared with the original Web/Desktop marketplace component. */
+export type {
+  RegistryKind,
+  RegistrySource,
+  RegistryArtifact,
+  RegistryItem,
+  RegistryCatalog,
+  InstalledRegistry,
+  RegistryDetailRow,
+  RegistryDetail,
+  RegistryModel,
+  RegistryModelProvider,
+  ModelRegistry,
+} from "@mithril/workspace/desktop-discover";

@@ -103,6 +103,30 @@ afterEach(() => {
   rmSync(testHome, { recursive: true, force: true });
 });
 
+// @lat: [[cloud-workspace-tests#Complete native archive inventory]]
+it("exposes archived rows only to the explicit repository inventory and retains legacy read compatibility", () => {
+  const db = seedProfile();
+  addSession(db, "visible-source", 100);
+  addSession(db, "archived-source", 200);
+  db.prepare("UPDATE sessions SET archived=1 WHERE id=?").run(
+    "archived-source",
+  );
+  expect(listSessions().map((row) => row.id)).toEqual(["visible-source"]);
+  expect(
+    listSessions(1001, 0, "default", true).map((row) => [row.id, row.archived]),
+  ).toEqual([
+    ["archived-source", true],
+    ["visible-source", false],
+  ]);
+  expect(getSessionMessages("archived-source")[0].content).toBe(
+    "Message for archived-source",
+  );
+  db.prepare("UPDATE sessions SET archived=2 WHERE id=?").run(
+    "archived-source",
+  );
+  expect(() => listSessions(1001, 0, "default", true)).toThrow("Unsupported");
+});
+
 describe("native session archive visibility", () => {
   it("excludes archived sessions from the direct local list without deleting messages", () => {
     const db = seedProfile();

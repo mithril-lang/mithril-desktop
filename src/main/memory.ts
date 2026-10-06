@@ -151,7 +151,7 @@ export function readMemoryRaw(profile?: string): string {
 function mutate(
   content: MemoryMutation,
   profile?: string,
-  expected?: { memory: string; user: string },
+  expected?: { memory?: string; user?: string; soul?: string },
 ): { success: boolean; error?: string } {
   let config = "";
   try {
@@ -216,4 +216,17 @@ export function applyMemoryMutation(
   profile?: string,
 ): { success: boolean; error?: string } {
   return mutate(mutation, profile, expected);
+}
+
+/** Compare and write Persona under the same locks as cloud replica reconciliation. */
+export function writePersona(
+  content: string,
+  profile?: string,
+  expected?: string,
+): { success: boolean; error?: string } {
+  return mutate(
+    { action: "soul", content },
+    profile,
+    expected === undefined ? undefined : { soul: expected },
+  );
 }

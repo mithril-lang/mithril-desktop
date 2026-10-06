@@ -1,3 +1,7 @@
+import {
+  createHistoryFileTransport,
+  type HistoryFileTransport,
+} from "@mithril/workspace/history";
 import { CloudWorkspace } from "./cloud-workspace";
 import {
   chatId,
@@ -18,7 +22,12 @@ import type { SessionTransport } from "@mithril/workspace/session-sync";
 
 /** Fixed canonical D1 routes. No provider URLs or bearer credentials cross IPC. */
 export class CloudChat implements SessionTransport {
-  constructor(readonly auth: CloudWorkspace) {}
+  readonly historyFiles: HistoryFileTransport;
+  constructor(readonly auth: CloudWorkspace) {
+    this.historyFiles = createHistoryFileTransport((path, init) =>
+      auth.authorizedBinaryRequest(path, init),
+    );
+  }
   async list(): Promise<ChatSessionList> {
     const { value } = await this.auth.authorizedRequest("/v1/chat/sessions");
     const result = value as ChatSessionList;

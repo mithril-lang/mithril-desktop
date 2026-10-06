@@ -9,6 +9,7 @@ export default function MithrilChat({
   sidebarNavigation,
   onSidebarSelect,
   onSidebarProjects,
+  onSourceHistorySelect,
   onConnectAccount,
   visible = true,
   locale = "en",
@@ -18,6 +19,7 @@ export default function MithrilChat({
   sidebarNavigation?: ReactNode;
   onSidebarSelect?: () => void;
   onSidebarProjects?: () => void;
+  onSourceHistorySelect?: (sourceId: string) => void;
   onConnectAccount?: () => void;
   visible?: boolean;
   locale?: string;
@@ -60,6 +62,42 @@ export default function MithrilChat({
       canceled = true;
     };
   }, [profile, epoch]);
+  const [sourceInventory, setSourceInventory] = useState<{
+    userId: string;
+    profile: string;
+    rows: Array<{ id: string; sourceId: string; title: string }>;
+  }>();
+  useEffect(() => {
+    setSourceInventory(undefined);
+    if (!accountId || !onSourceHistorySelect) return;
+    let current = true,
+      busy = false;
+    const read = async (): Promise<void> => {
+      if (busy) return;
+      busy = true;
+      try {
+        const result =
+          await window.hermesAPI.cloudChat.nativeHistoryInventory();
+        if (
+          current &&
+          result.userId === accountId &&
+          result.profile === profile
+        )
+          setSourceInventory(result);
+      } catch {
+        // Source access remains in the existing history dialog during migration.
+        if (current) setSourceInventory(undefined);
+      } finally {
+        busy = false;
+      }
+    };
+    void read();
+    const timer = setInterval(() => void read(), 20_000);
+    return () => {
+      current = false;
+      clearInterval(timer);
+    };
+  }, [accountId, profile, epoch, onSourceHistorySelect]);
   const workspaceTransport = useMemo(
     () => ({
       ...window.hermesAPI.cloudWorkspace,
@@ -92,6 +130,8 @@ export default function MithrilChat({
       <ChatSessions
         sidebarTarget={sidebarTarget}
         sidebarNavigation={sidebarNavigation}
+        sidebarSourceInventory={sourceInventory}
+        onSidebarSourceSelect={onSourceHistorySelect}
         onSidebarSelect={onSidebarSelect}
         onSidebarProjects={onSidebarProjects}
         key={`${profile}:${initialSessionId ?? ""}`}
@@ -107,6 +147,7 @@ export default function MithrilChat({
         }}
         identityEpoch={`${profile}:${epoch}`}
         nativeImport={window.hermesAPI.nativeSessionImport}
+        historyFiles={window.hermesAPI.cloudChat.historyFiles}
         loadModels={() => window.hermesAPI.cloudChat.models()}
         loadRuntime={() => window.hermesAPI.cloudChat.runtime()}
         beforeConnect={async () => {

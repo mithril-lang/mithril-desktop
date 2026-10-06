@@ -1,3 +1,19 @@
+import { registerTaskAttachmentIPC } from "../task-attachment-ipc";
+import { registerCapabilityResourceIPC } from "../capability-resource-ipc";
+import {
+  synchronizeNativeHistory,
+  resolveNativeHistoryTitle,
+  resolveNativeHistoryModel,
+  resolveNativeHistoryVisibility,
+  nativeHistoryInventory,
+} from "../native-history-runtime";
+import {
+  nativeRepositorySeed,
+  nativeMemorySnapshot,
+  nativeCapabilitySnapshot,
+  nativeReplicaSnapshot,
+  nativeReplicaApply,
+} from "../repository-kanban-runtime";
 import { previewLocalSchedules } from "../cronjobs";
 import { ProjectFolderSync } from "../project-folder-sync";
 import { nativeSessionImport } from "../native-session-import-runtime";
@@ -1273,6 +1289,34 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudChat.models();
   });
+  ipcMain.handle("cloud-chat-file-put", (event, owner, id, bytes) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.historyFiles.forOwner(owner).put(id, bytes);
+  });
+  ipcMain.handle("cloud-chat-file-get", (event, owner, id, digest) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.historyFiles.forOwner(owner).get(id, digest);
+  });
+  ipcMain.handle("cloud-chat-native-history-inventory", (event) => {
+    trustedWorkspaceSender(event);
+    return nativeHistoryInventory();
+  });
+  ipcMain.handle("cloud-chat-native-title-resolve", (event, request) => {
+    trustedWorkspaceSender(event);
+    return resolveNativeHistoryTitle(request);
+  });
+  ipcMain.handle("cloud-chat-native-model-resolve", (event, request) => {
+    trustedWorkspaceSender(event);
+    return resolveNativeHistoryModel(request);
+  });
+  ipcMain.handle("cloud-chat-native-visibility-resolve", (event, request) => {
+    trustedWorkspaceSender(event);
+    return resolveNativeHistoryVisibility(request);
+  });
+  ipcMain.handle("cloud-chat-native-history-sync", (event) => {
+    trustedWorkspaceSender(event);
+    return synchronizeNativeHistory();
+  });
   ipcMain.handle("cloud-chat-list", (event) => {
     trustedWorkspaceSender(event);
     return cloudChat.list();
@@ -1302,6 +1346,16 @@ export function registerIpcHandlers(context: IpcContext): void {
   }, 15000);
   folderTimer.unref();
   app.once("before-quit", () => clearInterval(folderTimer));
+  registerTaskAttachmentIPC(
+    ipcMain,
+    trustedWorkspaceSender,
+    cloudWorkspace.taskAttachments,
+  );
+  registerCapabilityResourceIPC(
+    ipcMain,
+    trustedWorkspaceSender,
+    cloudWorkspace.capabilityResources,
+  );
   ipcMain.handle("project-files-status", (event) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.files.status();
@@ -1374,9 +1428,59 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return folderSync.disconnect(projectId);
   });
+  ipcMain.handle("cloud-workspace-replica-snapshot", (event) => {
+    trustedWorkspaceSender(event);
+    return nativeReplicaSnapshot();
+  });
+  ipcMain.handle("cloud-workspace-replica-apply", (event, write) => {
+    trustedWorkspaceSender(event);
+    return nativeReplicaApply(write);
+  });
+  ipcMain.handle("cloud-workspace-capability-snapshot", (event) => {
+    trustedWorkspaceSender(event);
+    return nativeCapabilitySnapshot();
+  });
+  ipcMain.handle("cloud-workspace-memory-snapshot", (event) => {
+    trustedWorkspaceSender(event);
+    return nativeMemorySnapshot();
+  });
+  ipcMain.handle("cloud-workspace-repository-seed", (event) => {
+    trustedWorkspaceSender(event);
+    return nativeRepositorySeed();
+  });
+  ipcMain.handle(
+    "cloud-workspace-repository-page",
+    (event, collection, after) => {
+      trustedWorkspaceSender(event);
+      return cloudWorkspace.repositoryPage(collection, after);
+    },
+  );
+  ipcMain.handle(
+    "cloud-workspace-repository-history",
+    (event, collection, id, before) => {
+      trustedWorkspaceSender(event);
+      return cloudWorkspace.repositoryHistory(collection, id, before);
+    },
+  );
+  ipcMain.handle("cloud-workspace-repository-apply", (event, edit) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.repositoryApply(edit);
+  });
   ipcMain.handle("cloud-workspace-catalog", (event) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.catalog();
+  });
+  ipcMain.handle("cloud-workspace-registry", (event) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.discoverDocuments.fetchRegistry();
+  });
+  ipcMain.handle("cloud-workspace-registry-skill", (event, item) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.registrySkill(item);
+  });
+  ipcMain.handle("cloud-workspace-registry-detail", (event, kind, item) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.discoverDocuments.fetchRegistryDetail(kind, item);
   });
   ipcMain.handle("cloud-workspace-status", (event) => {
     trustedWorkspaceSender(event);
@@ -3269,17 +3373,24 @@ export function registerIpcHandlers(context: IpcContext): void {
     if (conn.mode === "ssh" && conn.ssh) return sshReadSoul(conn.ssh, profile);
     return readSoul(profile);
   });
-  ipcMain.handle("write-soul", (_event, content: string, profile?: string) => {
-    const conn = getConnectionConfig();
-    if (conn.mode === "ssh" && conn.ssh)
-      return sshWriteSoul(conn.ssh, content, profile);
-    return writeSoul(content, profile);
-  });
-  ipcMain.handle("reset-soul", (_event, profile?: string) => {
-    const conn = getConnectionConfig();
-    if (conn.mode === "ssh" && conn.ssh) return sshResetSoul(conn.ssh, profile);
-    return resetSoul(profile);
-  });
+  ipcMain.handle(
+    "write-soul",
+    (_event, content: string, profile?: string, expected?: string) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "ssh" && conn.ssh)
+        return sshWriteSoul(conn.ssh, content, profile);
+      return writeSoul(content, profile, expected);
+    },
+  );
+  ipcMain.handle(
+    "reset-soul",
+    (_event, profile?: string, expected?: string) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "ssh" && conn.ssh)
+        return sshResetSoul(conn.ssh, profile);
+      return resetSoul(profile, expected);
+    },
+  );
 
   // Tools
   ipcMain.handle("get-toolsets", (_event, profile?: string) => {

@@ -1,108 +1,18 @@
-import { useState, useEffect, useCallback } from "react";
-import { Refresh } from "../../assets/icons";
+import { DesktopMemory } from "@mithril/workspace/desktop-memory";
 import { useI18n } from "../../components/useI18n";
-import { OrbLoader } from "../../components/OrbLoader";
-import Soul from "../Soul/Soul";
-import { CapacityCards } from "./CapacityCards";
-import { MemoryTabs } from "./MemoryTabs";
-import { MemoryEntries } from "./MemoryEntries";
-import { MemoryProfile } from "./MemoryProfile";
-import { MemoryProviders } from "./MemoryProviders";
-import type { MemoryData, MemoryProviderInfo, MemoryTab } from "./types";
-
-function Memory({ profile }: { profile?: string }): React.JSX.Element {
-  const { t } = useI18n();
-  const [data, setData] = useState<MemoryData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<MemoryTab>("entries");
-  const [error] = useState("");
-  const [memoryProvider, setMemoryProvider] = useState<string | null>(null);
-  const [providers, setProviders] = useState<MemoryProviderInfo[]>([]);
-
-  const loadData = useCallback(async () => {
-    const [d, provider, provs] = await Promise.all([
-      window.hermesAPI.readMemory(profile),
-      window.hermesAPI.getConfig("memory.provider", profile),
-      window.hermesAPI.discoverMemoryProviders(profile),
-    ]);
-    setData(d as MemoryData);
-    setMemoryProvider(provider);
-    setProviders(provs);
-    setLoading(false);
-  }, [profile]);
-
-  useEffect(() => {
-    setLoading(true);
-    loadData();
-  }, [loadData]);
-
-  if (loading || !data) {
-    return (
-      <div className="settings-container">
-        <h1 className="settings-header">{t("memory.title")}</h1>
-        <div style={{ display: "flex", justifyContent: "center", padding: 48 }}>
-          <OrbLoader state="searching" size={64} />
-        </div>
-      </div>
-    );
-  }
-
+import "@mithril/workspace/desktop-styles.css";
+export default function Memory({
+  profile,
+}: {
+  profile?: string;
+}): React.JSX.Element {
+  const { t, locale } = useI18n();
   return (
-    <div className="settings-container">
-      <div className="memory-header">
-        <div>
-          <h1 className="settings-header" style={{ marginBottom: 4 }}>
-            {t("memory.title")}
-          </h1>
-          <p className="memory-subtitle">{t("memory.subtitle")}</p>
-        </div>
-        <button className="btn btn-secondary btn-sm" onClick={loadData}>
-          <Refresh size={13} />
-        </button>
-      </div>
-
-      <CapacityCards data={data} />
-      <MemoryTabs activeTab={tab} onTabChange={setTab} />
-
-      {error && <div className="memory-error">{error}</div>}
-
-      {tab === "entries" && (
-        <MemoryEntries
-          key={profile}
-          entries={data.memory.entries}
-          expected={{ memory: data.memory.content, user: data.user.content }}
-          profile={profile}
-          onRefresh={loadData}
-        />
-      )}
-
-      {tab === "profile" && (
-        <MemoryProfile
-          key={profile}
-          content={data.user.content}
-          expected={{ memory: data.memory.content, user: data.user.content }}
-          charLimit={data.user.charLimit}
-          profile={profile}
-          onRefresh={loadData}
-        />
-      )}
-
-      {tab === "providers" && (
-        <MemoryProviders
-          providers={providers}
-          activeProvider={memoryProvider}
-          profile={profile}
-          onRefresh={loadData}
-        />
-      )}
-
-      {tab === "soul" && (
-        <div className="memory-soul-tab">
-          <Soul profile={profile} />
-        </div>
-      )}
-    </div>
+    <DesktopMemory
+      api={window.hermesAPI}
+      t={t}
+      locale={locale}
+      profile={profile}
+    />
   );
 }
-
-export default Memory;

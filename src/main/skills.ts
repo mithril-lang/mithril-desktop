@@ -8,6 +8,7 @@ import {
   realpathSync,
   rmSync,
   statSync,
+  lstatSync,
 } from "fs";
 import { isAbsolute, join, relative, resolve } from "path";
 import { homedir } from "os";
@@ -75,26 +76,46 @@ function parseSkillFrontmatter(content: string): {
  * Walk the skills directory to find all installed skills.
  * Structure: skills/<category>/<skill-name>/SKILL.md
  */
-export function listInstalledSkills(profile?: string): InstalledSkill[] {
+export function listInstalledSkills(
+  profile?: string,
+  strict = false,
+): InstalledSkill[] {
   const skillsDir = join(profileHome(profile), "skills");
   if (!existsSync(skillsDir)) return [];
 
   const skills: InstalledSkill[] = [];
+  const checked = (path: string): void => {
+    if (strict && lstatSync(path).isSymbolicLink())
+      throw Error("Unsafe skill source; original data retained");
+  };
+  checked(skillsDir);
 
   try {
     const categories = readdirSync(skillsDir);
+    if (strict && categories.length > 1000)
+      throw Error("Skill source too large");
 
     for (const category of categories) {
       const categoryPath = join(skillsDir, category);
+      checked(categoryPath);
       if (!statSync(categoryPath).isDirectory()) continue;
 
       const entries = readdirSync(categoryPath);
+      if (strict && entries.length > 20000)
+        throw Error("Skill source too large");
       for (const entry of entries) {
         const entryPath = join(categoryPath, entry);
+        checked(entryPath);
         if (!statSync(entryPath).isDirectory()) continue;
 
         const skillFile = join(entryPath, "SKILL.md");
         if (!existsSync(skillFile)) continue;
+        checked(skillFile);
+        if (
+          strict &&
+          (!statSync(skillFile).isFile() || statSync(skillFile).size > 1048576)
+        )
+          throw Error("Unsupported skill source");
 
         try {
           const content = readFileSync(skillFile, "utf-8").slice(0, 4000);
@@ -106,7 +127,8 @@ export function listInstalledSkills(profile?: string): InstalledSkill[] {
             description: meta.description || "",
             path: entryPath,
           });
-        } catch {
+        } catch (error) {
+          if (strict) throw error;
           skills.push({
             name: entry,
             category,
@@ -116,8 +138,8 @@ export function listInstalledSkills(profile?: string): InstalledSkill[] {
         }
       }
     }
-  } catch {
-    // ignore
+  } catch (error) {
+    if (strict) throw error;
   }
 
   return skills.sort(
@@ -166,17 +188,35 @@ function isAllowedSkillFile(skillFile: string): boolean {
 /**
  * Get the full content of a SKILL.md for the detail view.
  */
-export function getSkillContent(skillPath: string): string {
+export function getSkillContent(skillPath: string, strict = false): string {
   if (typeof skillPath !== "string" || skillPath.trim() === "") return "";
 
   const skillFile = resolve(skillPath, "SKILL.md");
-  if (!existsSync(skillFile)) return "";
+  if (!existsSync(skillFile)) {
+    if (strict) throw Error("Skill source disappeared");
+    return "";
+  }
 
   try {
     const realSkillFile = realpathSync(skillFile);
-    if (!isAllowedSkillFile(realSkillFile)) return "";
-    return readFileSync(realSkillFile, "utf-8");
-  } catch {
+    if (!isAllowedSkillFile(realSkillFile)) {
+      if (strict) throw Error("Unsupported skill source");
+      return "";
+    }
+    if (
+      strict &&
+      (lstatSync(skillFile).isSymbolicLink() ||
+        !statSync(realSkillFile).isFile() ||
+        statSync(realSkillFile).size > 1048576)
+    )
+      throw Error("Unsupported skill source");
+    const bytes = readFileSync(realSkillFile);
+    const content = bytes.toString("utf8");
+    if (strict && !Buffer.from(content).equals(bytes))
+      throw Error("Unsupported skill encoding");
+    return content;
+  } catch (error) {
+    if (strict) throw error;
     return "";
   }
 }

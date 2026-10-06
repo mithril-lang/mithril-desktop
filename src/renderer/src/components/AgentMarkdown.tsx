@@ -1,3 +1,4 @@
+import { restoreMarkdownTables } from "@mithril/workspace/markdown";
 import { memo } from "react";
 import { AgentMarkdown as SharedMarkdown } from "@mithril/design-system/react";
 import { useI18n } from "./useI18n";
@@ -39,7 +40,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
         },
       }}
     >
-      {children}
+      {restoreMarkdownTables(children)}
     </SharedMarkdown>
   );
 });

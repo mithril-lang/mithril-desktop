@@ -328,3 +328,32 @@ describe("setMessagingPlatformToolsetEnabled", () => {
     expect(getPlatformToolsets().telegram).toEqual(["browser"]);
   });
 });
+
+it("reads synchronized toolsets through the original native parser while retaining other platform and future keys", async () => {
+  const { planCapabilityConfig } =
+    await import("../src/main/capability-config-replica");
+  writeFileSync(
+    CONFIG_FILE,
+    "model:\n  default: retained\nplatform_toolsets:\n  cli:\n    - web\n    - future_tool\n  telegram:\n    - memory\n",
+  );
+  const source = {
+    format: "mithril-capability-v1" as const,
+    profile: "default",
+    toolsets: getToolsets("default"),
+    mcps: [],
+    skills: [],
+  };
+  const next = structuredClone(source);
+  next.toolsets.forEach((row) => {
+    row.enabled = row.key === "terminal";
+  });
+  writeFileSync(
+    CONFIG_FILE,
+    planCapabilityConfig(readFileSync(CONFIG_FILE, "utf8"), source, next),
+  );
+  expect(getToolsets("default")).toEqual(next.toolsets);
+  expect(readFileSync(CONFIG_FILE, "utf8")).toContain("    - future_tool");
+  expect(readFileSync(CONFIG_FILE, "utf8")).toContain(
+    "  telegram:\n    - memory",
+  );
+});

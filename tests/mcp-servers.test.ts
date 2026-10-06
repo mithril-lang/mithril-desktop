@@ -237,3 +237,26 @@ memory:
     enabled: false`);
   });
 });
+
+it("reads synchronized public descriptors through the actual native MCP parser without losing arguments", async () => {
+  const { planCapabilityConfig } =
+    await import("../src/main/capability-config-replica");
+  const { sharedCapabilityData } =
+    await import("@mithril/workspace/capability-data");
+  const raw =
+    'model:\n  default: retained\nmcp_servers:\n  public:\n    command: "node"\n    args:\n      - "old.js"\n    enabled: true\n';
+  const source = sharedCapabilityData(
+    "default",
+    [],
+    parseMcpServersFromConfig(raw),
+    [],
+  );
+  const next = structuredClone(source);
+  next.mcps[0].args = ["new.js", 'a "quoted" value', "relative\\path"];
+  next.mcps[0].enabled = false;
+  const updated = planCapabilityConfig(raw, source, next);
+  expect(
+    sharedCapabilityData("default", [], parseMcpServersFromConfig(updated), []),
+  ).toEqual(next);
+  expect(updated).toContain("default: retained");
+});

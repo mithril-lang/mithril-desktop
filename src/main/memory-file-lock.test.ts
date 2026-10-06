@@ -19,7 +19,7 @@ function fixture(): {
   home: string;
   mutate(
     mutation: MemoryMutation,
-    expected?: { memory: string; user: string },
+    expected?: { memory?: string; user?: string; soul?: string },
   ): ReturnType<typeof mutateMemoryFiles>;
   read(name: string): string;
 } {
@@ -77,6 +77,26 @@ describe("Hermes-compatible memory transaction", () => {
     expect(result.error).toContain("changed");
     expect(f.read("MEMORY.md")).toBe("First\n§\nSecond");
     expect(f.read("USER.md")).toBe("Person");
+  });
+  it("compares Persona independently and does not overwrite a cloud update", () => {
+    const f = fixture();
+    writeFileSync(join(f.home, "SOUL.md"), "Original persona");
+    expect(
+      f.mutate(
+        { action: "soul", content: "Updated persona" },
+        { soul: "Original persona" },
+      ).success,
+    ).toBe(true);
+    expect(
+      f.mutate(
+        { action: "soul", content: "Stale editor" },
+        { soul: "Original persona" },
+      ).error,
+    ).toContain("changed");
+    expect(readFileSync(join(f.home, "SOUL.md"), "utf8")).toBe(
+      "Updated persona",
+    );
+    expect(f.read("MEMORY.md")).toBe("First\n§\nSecond");
   });
   it("waits for an actual competing Hermes flock and rejects its newer contents", async () => {
     const f = fixture();

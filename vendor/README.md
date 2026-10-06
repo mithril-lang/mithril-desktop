@@ -1,20 +1,10 @@
 # Shared Mithril workspace
 
-`mithril-workspace-0.4.3.tgz` is the compiled npm pack artifact of
-[`mithril-lang/mithril-fund/packages/workspace`](https://github.com/mithril-lang/mithril-fund/tree/77d56db1818ec05ed87458e73428c0d440f113dd/packages/workspace),
-prepared in [Fund PR387](https://github.com/mithril-lang/mithril-fund/pull/387).
-It contains ESM, declarations, CSS, Office models/fonts and upstream licenses.
-Desktop consumes this renderer rather than maintaining a copy.
+The active dependency, mithril-workspace-0.6.13.tgz, is the compiled npm pack of the canonical Fund workspace package in PR457. Desktop and Web use the same original Desktop renderer bodies with platform adapters.
 
-SHA-256: `dfd816c9691d26bccfe9284f8174a87ac4fa3149347499544ba6eb49531df43d`.
+This archive combines the branch's canonical Chat/sidebar/Markdown/Memory/Capability/Settings/Discover/Kanban/Schedules bodies and rich sync protocols with current main's Code/Kuro and security changes. It also includes the owner-scoped task attachment protocol. The adapter stages private bytes before a repository CAS; observing data does not execute tools or install resources.
 
-This version consumes Desktop-derived ChatSurface, ChatTabs, ChatComposer,
-ToolActivity, ChatWelcome and WorkspaceNavigation from the same design-system
-revision pinned by both clients. Browser tab closing preserves the durable
-session. Platform operations stay adapter-owned.
+SHA-256: c475432e102da06f6686496d37c3bd83cd79af7287802c33d1438529fc6143fb.
+Pack entries: 381. The lock SHA-512 and every installed file were compared against this exact archive.
 
-To update, review the canonical package, build and `npm pack -w
-@mithril/workspace`, replace this artifact and update the file dependency and
-lock integrity. Run Desktop typechecks, tests, lint, production build and
-`lat check`; verify both consumers use the same renderer and protocol.
-The archive carries no credentials, consent or deployment operations.
+Update by building and packing the canonical package, selecting a fresh version, replacing the file dependency and regenerating the exact lock entry. Do not overlap a clean-output build with installation or dependent checks. Run renderer/protocol tests, types, lint, production build and lat check. The artifact and preview.28 are draft publication work; no installer or live API receipt is claimed.

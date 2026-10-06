@@ -1,4 +1,26 @@
 import {
+  createTaskAttachmentTransport,
+  type TaskAttachmentTransport,
+} from "@mithril/workspace/task-attachments";
+import {
+  createCapabilityResourceTransport,
+  type CapabilityResourceTransport,
+} from "@mithril/workspace/capability-resources";
+import { createDiscoverDocuments } from "@mithril/workspace/discover-documents";
+import {
+  registryBundleBytes,
+  type RegistrySkillBundle,
+} from "@mithril/workspace/registry-bundle";
+import {
+  repositoryCollections,
+  validRepositoryEdit,
+  validRepositoryPage,
+  validRepositoryReceipt,
+  validRepositoryHistory,
+  type RepositoryCollection,
+  type RepositoryEdit,
+} from "@mithril/workspace/repository";
+import {
   validSecuritySnapshot,
   validSecuritySubmit,
   type SecuritySnapshot,
@@ -20,6 +42,8 @@ import {
   type SidebarSnapshot,
 } from "@mithril/workspace/sidebar";
 import {
+  CHUNK_BYTES,
+  MAX_MANIFEST_BYTES,
   createProjectFileTransport,
   type ProjectFileTransport,
 } from "@mithril/workspace/files";
@@ -71,40 +95,137 @@ export class CloudWorkspace {
   } | null = null;
   private enabled = false;
   private generation = 0;
+  readonly taskAttachments: TaskAttachmentTransport;
   readonly files: ProjectFileTransport;
+  readonly capabilityResources: CapabilityResourceTransport;
   constructor(private deps: Dependencies) {
-    this.files = createProjectFileTransport(async (path, init) => {
-      const session = await this.session(),
-        generation = this.generation;
-      if (
-        init?.method === "POST" &&
-        !session.scopes.includes(this.deps.writeScope ?? "workspace:write")
+    this.taskAttachments = createTaskAttachmentTransport((path, init) =>
+      this.authorizedBinaryRequest(path, init),
+    );
+    this.capabilityResources = createCapabilityResourceTransport((path, init) =>
+      this.authorizedBinaryRequest(path, init),
+    );
+    this.files = createProjectFileTransport((path, init) =>
+      this.authorizedBinaryRequest(path, init),
+    );
+  }
+  /** Owner/generation-checked bytes for fixed file routes; credentials stay in main. */
+  async authorizedBinaryRequest(
+    path: string,
+    init?: RequestInit,
+  ): Promise<Response> {
+    if (
+      !/^\/v1\/(?:workspace\/files(?:\/|$)|workspace\/resources\/(?:capability|task)\/[a-zA-Z0-9_-]{1,128}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
+        path,
+      ) ||
+      (!["GET", "POST"].includes(init?.method ?? "GET") &&
+        !(
+          init?.method === "HEAD" &&
+          /^\/v1\/workspace\/resources\/(?:capability|task)\/[a-zA-Z0-9_-]{1,128}\/chunks\/[a-f0-9]{64}$/.test(
+            path,
+          )
+        ))
+    )
+      throw Error("Unsupported binary route");
+    if (
+      /^\/v1\/workspace\/resources\/task\//.test(path) &&
+      !/^\/v1\/workspace\/resources\/task\/[a-zA-Z0-9_-]{1,100}\/chunks(?:\/[a-f0-9]{64})?$/.test(
+        path,
       )
-        throw new Error("Workspace write scope required");
-      const response = await this.deps.fetch(`${this.deps.origin()}${path}`, {
-        ...init,
-        credentials: "omit",
-        redirect: "error",
-        signal: AbortSignal.timeout(60000),
-        headers: {
-          "x-mithril-workspace-owner": session.userId,
-          ...init?.headers,
-          authorization: `Bearer ${session.token}`,
-        },
-      });
-      const bytes = await response.arrayBuffer();
-      if (
-        generation !== this.generation ||
-        session.token !== this.deps.token() ||
-        session.profile !== this.deps.profile()
-      )
-        throw new Error("Account changed; file response discarded");
-      if (response.status === 401 || response.status === 403) this.reset(false);
-      return new Response(bytes, {
-        status: response.status,
-        headers: response.headers,
-      });
+    )
+      throw Error("Unsupported task attachment route");
+    const session = await this.session(),
+      generation = this.generation;
+    if (
+      init?.method === "POST" &&
+      !session.scopes.includes(this.deps.writeScope ?? "workspace:write")
+    )
+      throw new Error("Workspace write scope required");
+    const headers = new Headers(init?.headers);
+    const requestedOwner = headers.get("x-mithril-workspace-owner");
+    if (requestedOwner !== null && requestedOwner !== session.userId)
+      throw new Error("Workspace owner changed; file request rejected");
+    headers.set("x-mithril-workspace-owner", session.userId);
+    headers.set("authorization", `Bearer ${session.token}`);
+    const response = await this.deps.fetch(`${this.deps.origin()}${path}`, {
+      ...init,
+      credentials: "omit",
+      redirect: "error",
+      signal: AbortSignal.timeout(60000),
+      headers,
     });
+    const limit = /\/manifests(?:\/|$)/.test(path)
+      ? MAX_MANIFEST_BYTES
+      : CHUNK_BYTES;
+    if (Number(response.headers.get("content-length") ?? 0) > limit)
+      throw new Error("File response too large");
+    const reader = response.body?.getReader();
+    const parts: Uint8Array[] = [];
+    let size = 0;
+    try {
+      if (reader)
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.length;
+          if (size > limit) throw new Error("File response too large");
+          parts.push(value);
+        }
+    } finally {
+      await reader?.cancel().catch(() => {});
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const part of parts) {
+      bytes.set(part, offset);
+      offset += part.length;
+    }
+    if (
+      generation !== this.generation ||
+      session.token !== this.deps.token() ||
+      session.profile !== this.deps.profile()
+    )
+      throw new Error("Account changed; file response discarded");
+    if (response.status === 401 || response.status === 403) this.reset(false);
+    return new Response(bytes, {
+      status: response.status,
+      headers: response.headers,
+    });
+  }
+
+  // @lat: [[cloud-workspace#Cloud workspace#Canonical catalog]]
+  readonly discoverDocuments = createDiscoverDocuments((path) =>
+    this.deps.fetch(`${this.deps.origin()}${path}`, {
+      credentials: "omit",
+      redirect: "error",
+      signal: AbortSignal.timeout(60000),
+      headers: { accept: "application/json" },
+    }),
+  );
+
+  // @lat: [[discover#Original Discover#Shared marketplace]]
+  async registrySkill(
+    item: import("@mithril/workspace/desktop-discover").RegistryItem,
+  ): Promise<RegistrySkillBundle> {
+    if (
+      !item ||
+      !["hermes", "mithril"].includes(item.registry ?? "") ||
+      typeof item.id !== "string" ||
+      !/^[a-zA-Z0-9_-]{1,128}$/.test(item.id)
+    )
+      throw Error("Invalid registry entry");
+    const session = await this.session();
+    const bundle = (await this.request(
+      `/v1/discover/bundle/${item.registry}/${item.id}`,
+      session.token,
+      session.profile,
+      undefined,
+      60000,
+    )) as RegistrySkillBundle;
+    if (bundle?.source !== item.registry || bundle.id !== item.id)
+      throw Error("Registry selection changed");
+    await registryBundleBytes(bundle);
+    return bundle;
   }
 
   // @lat: [[cloud-workspace#Cloud workspace#Canonical catalog]]
@@ -134,8 +255,8 @@ export class CloudWorkspace {
     if (notify) this.deps.changed();
   }
 
-  /** Main-process context only. Neither credential fingerprint nor profile is exposed through workspace IPC. */
-  async nativeContext(): Promise<{
+  /** Main-process context only. Credential fingerprints and epochs never leave main; fixed snapshots may include the profile identity. */
+  async nativeContext(write = false): Promise<{
     userId: string;
     profile: string;
     epoch: number;
@@ -143,6 +264,13 @@ export class CloudWorkspace {
   }> {
     const epoch = this.generation;
     const identity = await this.session();
+    if (
+      write &&
+      !identity.scopes.includes(this.deps.writeScope ?? "workspace:write")
+    )
+      throw Error(
+        "Native replica writes require workspace:write authorization",
+      );
     if (
       epoch !== this.generation ||
       identity.token !== this.deps.token() ||
@@ -164,6 +292,7 @@ export class CloudWorkspace {
     token: string,
     profile: string,
     body?: unknown,
+    timeoutMs = 15000,
   ): Promise<unknown> {
     const generation = this.generation;
     if (token !== this.deps.token() || profile !== this.deps.profile()) {
@@ -182,7 +311,7 @@ export class CloudWorkspace {
         credentials: "omit",
         redirect: "error",
         cache: "no-store",
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(timeoutMs),
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
     } catch {
@@ -304,6 +433,60 @@ export class CloudWorkspace {
       this.reset(false);
       throw new Error("Workspace owner/schema mismatch");
     }
+  }
+
+  async repositoryPage(
+    collection: RepositoryCollection,
+    after?: string,
+  ): Promise<import("@mithril/workspace/repository").RepositoryPage> {
+    if (
+      !repositoryCollections.includes(collection) ||
+      (after !== undefined && !validId(after))
+    )
+      throw Error("Invalid repository page");
+    const { value } = await this.authorizedRequest(
+      `/v1/workspace/repository/${collection}${after ? `?after=${encodeURIComponent(after)}` : ""}`,
+      undefined,
+      collection === "chat" ? "chat:read" : undefined,
+    );
+    if (!validRepositoryPage(value, collection, after))
+      throw Error("Invalid repository page");
+    return value;
+  }
+  async repositoryHistory(
+    collection: RepositoryCollection,
+    id: string,
+    before = 0,
+  ): Promise<import("@mithril/workspace/repository").RepositoryHistory> {
+    if (
+      !repositoryCollections.includes(collection) ||
+      !validId(id) ||
+      id.length > 100 ||
+      !Number.isSafeInteger(before) ||
+      before < 0
+    )
+      throw Error("Invalid repository history");
+    const { value } = await this.authorizedRequest(
+      `/v1/workspace/repository/${collection}/${encodeURIComponent(id)}/history${before ? `?before=${before}` : ""}`,
+      undefined,
+      collection === "chat" ? "chat:read" : undefined,
+    );
+    if (!validRepositoryHistory(value, collection, id, before))
+      throw Error("Invalid repository history");
+    return value;
+  }
+  async repositoryApply(
+    edit: RepositoryEdit,
+  ): Promise<import("@mithril/workspace/repository").RepositoryReceipt> {
+    if (!validRepositoryEdit(edit)) throw Error("Invalid repository edit");
+    const { value } = await this.authorizedRequest(
+      `/v1/workspace/repository/${edit.collection}`,
+      edit,
+      edit.collection === "chat" ? "chat:write" : undefined,
+    );
+    if (!validRepositoryReceipt(value, edit))
+      throw Error("Invalid repository receipt");
+    return value;
   }
 
   /** Main-only authenticated transport; callers expose only fixed, schema-checked routes. */

@@ -35,6 +35,7 @@ import Gateway from "../Gateway/Gateway";
 import Providers from "../Providers/Providers";
 import Schedules from "../CloudWorkspace/CloudSchedules";
 import CloudWorkspace from "../CloudWorkspace/CloudWorkspace";
+import RepositoryReplication from "../CloudWorkspace/RepositoryReplication";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
 import { useSettingsModal } from "../../components/settings/SettingsModalContext";
@@ -320,18 +321,18 @@ function Layout({
       window.removeEventListener("navigation:goto", handleNavigation);
   }, [goTo]);
 
-  // Cmd/Ctrl+, opens the settings modal from anywhere (the conventional
-  // "preferences" shortcut).
+  // The conventional preferences shortcut uses the same original modal and
+  // account repository as the sidebar, avoiding a second preference store.
   useEffect(() => {
     const handleKey = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key === ",") {
         e.preventDefault();
-        openSettings(undefined, { profile: activeProfile });
+        goTo("cloud-settings");
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [openSettings, activeProfile]);
+  }, [goTo]);
 
   const focusDiscover = useCallback(
     (kind: "skills" | "mcps") => {
@@ -720,6 +721,11 @@ function Layout({
   );
   return (
     <div className="layout-shell">
+      <RepositoryReplication
+        profile={activeProfile}
+        locale={locale}
+        enabled={!remoteMode}
+      />
       <div className={`layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
         <aside className="sidebar">
           <div className="sidebar-brand">
@@ -1012,6 +1018,7 @@ function Layout({
                 sidebarNavigation={cloudSidebarNavigation}
                 onSidebarSelect={() => goTo("mithril-chat")}
                 onSidebarProjects={() => goTo("projects")}
+                onSourceHistorySelect={handleResumeSession}
                 onConnectAccount={() => goTo("providers")}
                 visible={view === "mithril-chat"}
               />

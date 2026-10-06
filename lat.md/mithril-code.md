@@ -33,3 +33,5 @@ Desktop explicitly offers a configured Hermes profile runner or the fixed Code s
 Code shares Kuro JS/Python source execution across App, Code and Desktop.
 
 The public App Kuro assets run in an opaque sandbox frame through a MessageChannel. No account, provider or GitHub credentials or Desktop IPC authority cross that boundary. Each explicit run gets a fresh bounded runtime; edits clear the displayed execution result. This is independent of the separate Node/NBB Jev generation runner. Python is not a Pages backend and CLJK is not compiled by this action.
+
+Desktop preserves the pinned public Kuro asset CSP through [[src/main/app/response-headers.ts#applyResponseHeaders]]. Its sandbox, restricted asset-only connections and blob worker policy remain authoritative; the local renderer keeps its own policy. Header tests verify this boundary and unchanged registry icon caching.

@@ -20,6 +20,7 @@ export function parseCodeHarnessResponse(output: string): CodeHarnessResponse {
       const allowed = [
         "invalid_goal",
         "runner_not_configured",
+        "mithril_quota_exhausted",
         "invalid_runner_url",
         "runner_authorization_required",
         "runner_busy",

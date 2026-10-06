@@ -139,8 +139,12 @@ Compatible Fund API/App publication from `c1dfaa70e8da0fb8b955881bccdcae90369d8e
 
 ## Mithril Code (2026-10-06)
 
-The Code sidebar screen invokes the owned Hermes `mithril-code` plugin CLI through a bounded native IPC adapter. It needs a current Agent installation and explicitly configured runner authority for the selected profile; it does not relay Desktop's Mithril bearer or another profile's API keys. Only the user's Assemble and verify action starts paid inference. Source/logic/receipt stay reviewable; unknown outcomes are not automatically retried. Fund PR492's registered free pilot and source publication remain independently gated. See `lat.md/mithril-code.md`.
+The Code sidebar screen invokes the owned Hermes mithril-code plugin through bounded native IPC. The selected profile's encrypted MITHRIL_API_KEY supplies its Mithril identity. Code generation calls api.mithril.fund through the owned typed-AST verifier; GitHub credentials stay separate. Model output must pass type/operation admission and 511 vectors. Unknown outcomes never retry. See lat.md/mithril-code.md.
 
 # Shared Code workspace publication
 
 Code uses workspace 0.6.7's compiled Desktop composer, tabs, source navigation and receipt disclosure across Desktop, App and Code. Native execution stays in the active profile's Hermes plugin. GitHub saving and Pages publication are explicit operations in the same screen; the transient GitHub credential travels through a fixed GitHub-only Code API IPC route, never generic URL/file access. Source changes invalidate the saved version. CLJK edits do not compile runtime artifacts or inherit Jev's generation checks. Installer completion and actual configured-profile inference remain separately evidenced.
+
+### Code Kuro runtime
+
+The shared Code screen can create editable JS/Python projects and explicitly run a source snapshot in App's public Kuro opaque-origin frame. No profile, cloud, GitHub or provider credential crosses the MessageChannel, and the frame has no trusted Desktop IPC authority. Editing clears its displayed execution result. Kuro source execution is separate from profile/service Jev generation; a successful Kuro run never certifies CLJK or a Python Pages backend. Preview.23 actual installed import/edit/GitHub/Pages proof is recorded in Fund's shared Code QA receipts; preview.25 carries this additional source runtime.

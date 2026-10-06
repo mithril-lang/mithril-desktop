@@ -104,18 +104,44 @@ function setup(): void {
   state.context.mockResolvedValue({ userId: "alice", profile: "default" });
 }
 // @lat: [[cloud-workspace-tests#Cloud workspace tests#Capability snapshot identity]]
-it("reads full owner-profile capability data without credentials, paths or execution", async () => {
+it("reads owner-profile configuration without duplicating Skill bytes, credentials, paths or execution", async () => {
   setup();
   const result = await nativeCapabilitySnapshot();
   expect(result).toMatchObject({
     userId: "alice",
     profile: "default",
-    body: { skills: [{ name: "Evidence" }] },
+    body: {
+      format: "mithril-capability-v2",
+      skillStorage: "resources",
+      skills: [],
+    },
   });
-  expect(result.body.skills[0].content.length).toBeGreaterThan(4000);
+  expect(result.body.toolsets[0].key).toBe("execution");
+  expect(result.body.mcps[0].name).toBe("evidence");
   expect(JSON.stringify(result)).not.toContain("PRIVATE_VALUE");
   expect(JSON.stringify(result)).not.toContain("/private/skill");
   expect(state.test).not.toHaveBeenCalled();
+  expect(state.install).not.toHaveBeenCalled();
+});
+it("creates a bounded configuration anchor while duplicate large Skills remain in original directories", async () => {
+  setup();
+  const content =
+    "---\nname: Same display name\n---\n" + "original ".repeat(60000);
+  for (const directory of ["first", "second", "third"]) {
+    const root = join(state.home, "skills", "research", directory);
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, "SKILL.md"), content);
+  }
+  const source = await nativeCapabilitySnapshot();
+  expect(JSON.stringify(source).length).toBeLessThan(10000);
+  expect(source.body.skills).toEqual([]);
+  for (const directory of ["first", "second", "third"])
+    expect(
+      readFileSync(
+        join(state.home, "skills", "research", directory, "SKILL.md"),
+        "utf8",
+      ),
+    ).toBe(content);
   expect(state.install).not.toHaveBeenCalled();
 });
 it("rejects an identity change during a source read", async () => {
@@ -133,7 +159,12 @@ it("feeds original Skill resources into a separate repository pointer without ex
     await import("@mithril/workspace/capability-resources");
   const root = join(state.home, "skills", "research", "actual-directory");
   mkdirSync(join(root, "assets"), { recursive: true });
-  writeFileSync(join(root, "SKILL.md"), "# Original\nSee assets/input.bin\n");
+  const markdown =
+    "---\nname: Duplicate display name\n---\n" + "original ".repeat(60000);
+  writeFileSync(join(root, "SKILL.md"), markdown);
+  const second = join(state.home, "skills", "research", "second-directory");
+  mkdirSync(second, { recursive: true });
+  writeFileSync(join(second, "SKILL.md"), markdown);
   writeFileSync(join(root, "assets", "input.bin"), new Uint8Array([0, 255, 3]));
   state.owner.mockReturnValue(state.resources);
   state.resources.getManifest.mockRejectedValue(
@@ -167,6 +198,7 @@ it("feeds original Skill resources into a separate repository pointer without ex
   ).toEqual([
     "research/actual-directory/SKILL.md",
     "research/actual-directory/assets/input.bin",
+    "research/second-directory/SKILL.md",
   ]);
   expect(state.test).not.toHaveBeenCalled();
   expect(state.install).not.toHaveBeenCalled();

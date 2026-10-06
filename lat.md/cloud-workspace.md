@@ -273,3 +273,9 @@ The original Skills component now reads full Markdown and original directory ide
 The shared adapter validates manifests and bytes before display. Path-specific removal uploads an immutable replacement manifest and publishes its pointer with repository CAS; duplicate display names cannot select a different directory. Scripts and assets survive unchanged for remaining Skills. Native renderer requests use [[src/main/capability-resource-ipc.ts#registerCapabilityResourceIPC]] with trusted sender checks, bounded arguments and main-owned owner-bound API transport. Credentials remain in main. No install or execution occurs during reads or synchronization.
 
 Original Skill installation, large legacy anchor bootstrap, Windows reconciliation and interoperability with older native writers remain unfinished. These source changes are unpublished.
+
+### Resource-backed configuration anchors (draft)
+
+Capability v2 keeps public configuration separate from original Skill files so large or duplicate-name Skills do not block initial configuration synchronization.
+
+The native source emits toolset and public MCP descriptors with `skillStorage: resources` and an empty inline list. Original files remain untouched and are captured through the existing owner-bound resource pointer path. The shared validator still accepts strict v1 bodies; initial seeding never replaces an existing cloud document. A v2 anchor without a pointer displays a synchronization error rather than an empty installed list. Existing populated v1 anchor migration and cross-format reconciliation remain unfinished and must preserve their history and native source.

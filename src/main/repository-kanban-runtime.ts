@@ -618,7 +618,7 @@ async function replicaContext(write = false): Promise<{
     context,
   };
 }
-/** Fixed original capability descriptors and installed skill bodies; no tests or installs run here. */
+/** Fixed original configuration descriptors; Skill bytes live in separate resources. No tests or installs run here. */
 async function nativeCapabilitySource(): Promise<
   Awaited<
     ReturnType<import("@mithril/workspace/capability-data").CapabilitySeed>
@@ -657,30 +657,19 @@ async function nativeCapabilitySource(): Promise<
     !Buffer.from(config.toString("utf8")).equals(config)
   )
     throw Error("Unsupported Capability configuration source");
-  const [
-    { getToolsets },
-    { listMcpServers },
-    { listInstalledSkills, getSkillContent },
-    { sharedCapabilityData },
-  ] = await Promise.all([
-    import("./tools"),
-    import("./mcp-servers"),
-    import("./skills"),
-    import("@mithril/workspace/capability-data"),
-  ]);
+  const [{ getToolsets }, { listMcpServers }, { resourceCapabilityData }] =
+    await Promise.all([
+      import("./tools"),
+      import("./mcp-servers"),
+      import("@mithril/workspace/capability-data"),
+    ]);
   const toolsets = getToolsets(before.profile);
   const mcps = await listMcpServers(before.profile);
-  const skills = listInstalledSkills(before.profile, true).map((skill) => ({
-    name: skill.name,
-    category: skill.category,
-    description: skill.description,
-    content: getSkillContent(skill.path, true),
-  }));
   assertSkillResourcesReady(join(home, "skills"), skillStateRoot);
   const afterConfig = readConfig();
   if (!config.equals(afterConfig))
     throw Error("Capability changed during snapshot; original source retained");
-  const body = sharedCapabilityData(before.profile, toolsets, mcps, skills);
+  const body = resourceCapabilityData(before.profile, toolsets, mcps);
   if (
     JSON.stringify(before) !==
     JSON.stringify(await cloudWorkspace.nativeContext())

@@ -111,7 +111,7 @@ These cases exercise [[src/main/skills.ts#getSkillContent]] and [[src/main/skill
 
 ## Capability snapshot identity
 
-The fixed Capability snapshot retains full skill bodies and excludes explicit credential/path fields. An owner change during the read rejects the snapshot; source reading never invokes runtime testing or installation.
+Capability snapshots keep configuration bounded and omit credential values and paths. Large duplicate-name Skills stay in original folders and the resource namespace. Owner changes reject reads; no installs run.
 
 ## Capability resource transport
 

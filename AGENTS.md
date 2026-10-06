@@ -130,3 +130,9 @@ After adapt, deploy, review, and merge to the default branch are finished, run t
 
 - Skill: `~/.cursor/skills/git-cleanup-conflict/SKILL.md`
 - Workspace rule: `/Users/junkawasaki/github/mithril-lang/.cursor/rules/remove-worktree-after-merge.mdc`
+
+## Security preview publication (2026-10-06)
+
+PR #49 is released as [v0.8.0-preview.20](https://github.com/mithril-lang/mithril-desktop/releases/tag/v0.8.0-preview.20), source `e092f1f8b67f31bba6a89ea69e0e1d0b31484718`, with workspace 0.6.5 and main-process security read/run transport. [Publish Preview Platforms run 37390951695](https://github.com/mithril-lang/mithril-desktop/actions/runs/37390951695) succeeded for Windows x64, Linux x64/ARM64, and notarized Developer ID Mac x64/ARM64; all installers, preview feeds and SHA256SUMS are on the prerelease. Windows is unsigned under the current unset WIN_SIGNING policy. Public `https://app.mithril.fund/download/` renders preview.20 for every platform.
+
+Compatible Fund API/App publication from `c1dfaa70e8da0fb8b955881bccdcae90369d8e83` and guarded D1 migration 0043 are verified. Authenticated Web Security refresh returned HTTP 200, schemaVersion 1, zero targets and zero jobs, without browser errors. No executor connection/token has been provisioned, and no installed Desktop security interaction or real-cloud scan is claimed. Existing Desktop tokens need explicit security:read/run scopes; credentials and scan policy stay on the separately scoped executor.

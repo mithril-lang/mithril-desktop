@@ -362,3 +362,11 @@ The fixed board/task attachment directory is opened with no-follow directory des
 Existing task metadata can reconcile while its attachments remain unchanged. SQLite CAS returns a fingerprint matching a fresh file-aware source snapshot, durable receipts recover retries before source-file reads even if a later file disappears, and an attachment change during an edit rolls back the update. Cloud attachment replacement/removal and remote file working-copy restoration remain deferred until complete file writeback exists. Windows and custom attachment roots require adapters; original data and routes remain reachable.
 
 This draft uses shared workspace 0.6.11, including the current main Code/Kuro and security changes, and reserves Desktop preview.28. Neither this draft package nor these new task routes have a production or installer publication receipt.
+
+## Kanban attachment downloads (draft)
+
+The original shared Kanban detail drawer lists registered files and explicitly saves verified bytes through browser/Electron consumer adapters. Reading or selecting a task never fetches or executes its attachments.
+
+[[src/main/task-attachment-ipc.ts#registerTaskAttachmentIPC]] exposes only owner-pinned chunk reads after trusted-sender validation. Main retains credentials and rejects stale accounts during requests. The shared repository adapter validates retained task/attachment identities, canonical chunk pointers and complete file hashes before saving. Account switches, deletion, attachment replacement or board changes during a read cancel the save. Both Chromium consumers use an octet-stream Blob download, never a HTML preview or native path navigation.
+
+This adds explicit download reachability to the same original drawer. Attachment upload/removal, remote original-directory restoration, Windows capture and installed save behavior still require implementation or live qualification. Draft artifact 0.6.12 and Desktop preview.28 are unpublished.

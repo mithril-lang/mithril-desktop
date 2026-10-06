@@ -1,6 +1,6 @@
 # Shared Mithril workspace
 
-The active dependency, mithril-workspace-0.6.11.tgz, is the compiled npm pack of the canonical Fund workspace package in PR457. Desktop and Web use the same original Desktop renderer bodies with platform adapters.
+The active dependency, mithril-workspace-0.6.12.tgz, is the compiled npm pack of the canonical Fund workspace package in PR457. Desktop and Web use the same original Desktop renderer bodies with platform adapters.
 
 This archive combines the branch's canonical Chat/sidebar/Markdown/Memory/Capability/Settings/Discover/Kanban/Schedules bodies and rich sync protocols with current main's Code/Kuro and security changes. It also includes the owner-scoped task attachment protocol. The adapter stages private bytes before a repository CAS; observing data does not execute tools or install resources.
 

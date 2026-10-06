@@ -1,3 +1,4 @@
+import { saveTaskAttachmentDownload } from "@mithril/workspace/task-attachments";
 import { useFont } from "../../components/FontProvider";
 import { useChatPreferences } from "../../components/ChatPreferencesProvider";
 import { THEMES, FONT_OPTIONS } from "../../constants";
@@ -15,6 +16,11 @@ import { useCallback, useEffect, useState } from "react";
 import { WorkspaceApp, type WorkspaceView } from "@mithril/workspace/react";
 import "@mithril/workspace/styles.css";
 import "@mithril/workspace/desktop-styles.css";
+
+const taskAttachmentDownloads = {
+  reader: window.hermesAPI.cloudWorkspace.taskAttachments,
+  save: saveTaskAttachmentDownload,
+};
 
 // @lat: [[cloud-workspace#Cloud workspace#Shared screens]]
 export default function CloudWorkspace({
@@ -111,6 +117,7 @@ export default function CloudWorkspace({
       memoryRuntime={window.hermesAPI}
       transport={window.hermesAPI.cloudWorkspace}
       fileTransport={window.hermesAPI.cloudWorkspace.files}
+      taskAttachmentDownloads={taskAttachmentDownloads}
       folderAdapter={window.hermesAPI.projectFolderSync}
       runtimeAdapter={window.hermesAPI.nativeWorkspace}
       settingsRuntime={{

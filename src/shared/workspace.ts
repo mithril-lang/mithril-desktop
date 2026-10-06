@@ -22,6 +22,7 @@ export interface CloudWorkspaceAPI extends WorkspaceTransport {
     userId: string;
     drafts: import("@mithril/workspace/schedules").NativeScheduleDraft[];
   }>;
+  taskAttachments: import("@mithril/workspace/task-attachments").TaskAttachmentReader;
   files: import("@mithril/workspace/files").ProjectFileTransport;
   capabilityResources: import("@mithril/workspace/capability-resources").CapabilityResourceTransport;
   catalog(): Promise<import("@mithril/workspace/react").DiscoverItem[]>;

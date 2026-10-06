@@ -234,3 +234,7 @@ Main-process task chunk requests pin the owner and keep credentials outside the 
 ## Kanban attachment publication barrier
 
 The native snapshot exposes task records only after every private byte upload is acknowledged for the expected owner. Failed publication omits the Kanban scope and preserves source files and attachment rows.
+
+## Task attachment download IPC
+
+Verify only read-only chunk access is exposed, with a mandatory owner and trusted renderer sender. Invalid owners, task identifiers and digests must be rejected before transport access.

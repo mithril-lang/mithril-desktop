@@ -1,3 +1,4 @@
+import { registerTaskAttachmentIPC } from "../task-attachment-ipc";
 import { registerCapabilityResourceIPC } from "../capability-resource-ipc";
 import {
   synchronizeNativeHistory,
@@ -1335,6 +1336,11 @@ export function registerIpcHandlers(context: IpcContext): void {
   }, 15000);
   folderTimer.unref();
   app.once("before-quit", () => clearInterval(folderTimer));
+  registerTaskAttachmentIPC(
+    ipcMain,
+    trustedWorkspaceSender,
+    cloudWorkspace.taskAttachments,
+  );
   registerCapabilityResourceIPC(
     ipcMain,
     trustedWorkspaceSender,

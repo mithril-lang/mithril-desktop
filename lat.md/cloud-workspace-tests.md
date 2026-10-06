@@ -272,3 +272,13 @@ Existing source directories, symlinks, device execution fields and failed public
 ## Concurrent board publication
 
 An exclusive directory publication never replaces another writer's board, even when it appears after staging. Retained receipts recover lost acknowledgements, original metadata edits change fingerprints, and another account cannot adopt the receipt.
+
+## Default board initialization
+
+A missing default database is initialized with the original schema and retained receipt while existing display metadata and current-board selection stay unchanged.
+
+Tests compare the acknowledged board with a fresh snapshot, restore a subsequent task, and verify private native metadata bytes survive without being uploaded.
+
+## Default board publication collision
+
+An atomic no-replace link preserves a default database created concurrently by another writer. Incompatible display metadata defers initialization rather than silently resetting it.

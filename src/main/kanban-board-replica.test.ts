@@ -264,3 +264,150 @@ it("never replaces a target created during publication and recovers an exact rec
     ),
   ).toThrow("Invalid retained task receipt");
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Default board initialization]]
+it("initializes a missing default DB without changing original display metadata, current selection or existing boards", () => {
+  const r = root(),
+    w = operation();
+  w.document.id = "default";
+  w.operationId = "initialize-default";
+  w.document.body = {
+    slug: "default",
+    name: "Default",
+    is_current: false,
+    total: 0,
+    counts: {},
+  };
+  mkdirSync(join(r, "kanban"), { recursive: true });
+  writeFileSync(join(r, "kanban", "current"), "another-board\n");
+  const result = apply(r, w);
+  expect(result.status).toBe("applied");
+  expect(result.record).toEqual(
+    kanbanReplicaSnapshot(r, "default", "alice", "replica").documents.find(
+      (d) => d.id === "default",
+    ),
+  );
+  expect(readFileSync(join(r, "kanban", "current"), "utf8")).toBe(
+    "another-board\n",
+  );
+  expect(existsSync(join(r, "kanban", "boards", "default", "board.json"))).toBe(
+    false,
+  );
+  const db = new Database(join(r, "kanban.db"));
+  expect(db.prepare("SELECT COUNT(*) AS n FROM tasks").get()).toEqual({ n: 0 });
+  expect(db.prepare("SELECT COUNT(*) AS n FROM task_runs").get()).toEqual({
+    n: 0,
+  });
+  db.close();
+  expect(apply(r, w)).toEqual(result);
+  expect(
+    applyKanbanReplica(r, "default", "alice", "replica", {
+      operationId: "task-in-default",
+      expectedRecord: null,
+      expectedVersion: null,
+      document: {
+        collection: "task",
+        id: "default-task",
+        revision: 1,
+        updatedAt: 1,
+        deleted: false,
+        body: {
+          board: "default",
+          task: {
+            id: "original-task",
+            title: "Default original task",
+            status: "todo",
+            created_at: 12,
+          },
+          comments: [],
+          events: [],
+          runs: [],
+          dependencies: [],
+          parents: [],
+          children: [],
+          latest_summary: null,
+        },
+      },
+    }).status,
+  ).toBe("applied");
+  const withMetadata = root(),
+    path = join(withMetadata, "kanban", "boards", "default", "board.json");
+  mkdirSync(join(withMetadata, "kanban", "boards", "default"), {
+    recursive: true,
+  });
+  writeFileSync(
+    path,
+    JSON.stringify({
+      name: "Original default",
+      description: "Keep original display",
+      default_workdir: "/private/original",
+    }),
+  );
+  const originalBytes = readFileSync(path, "utf8"),
+    incoming = {
+      ...w,
+      operationId: "default-with-native-metadata",
+      document: {
+        ...w.document,
+        body: kanbanBoardRecord(withMetadata, "default", []).body,
+      },
+    };
+  expect(apply(withMetadata, incoming).status).toBe("applied");
+  expect(readFileSync(path, "utf8")).toBe(originalBytes);
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Default board publication collision]]
+it("retains a concurrently created default database and refuses incompatible original metadata", () => {
+  const r = root(),
+    scripts = root(),
+    w = operation();
+  w.document.id = "default";
+  w.operationId = "default-collision";
+  w.document.body = {
+    slug: "default",
+    name: "Default",
+    is_current: false,
+    total: 0,
+    counts: {},
+  };
+  const wrapper = join(scripts, "default-writer.py"),
+    launcher = join(scripts, "python");
+  writeFileSync(
+    wrapper,
+    "import os,sys,sqlite3\nfile=os.path.join(sys.argv[-1],'kanban.db')\ndb=sqlite3.connect(file)\ndb.execute('CREATE TABLE original_marker(value TEXT)')\ndb.execute(\"INSERT INTO original_marker VALUES('other writer')\")\ndb.commit();db.close()\nos.execv(sys.executable,[sys.executable]+sys.argv[1:])\n",
+  );
+  writeFileSync(
+    launcher,
+    `#!/bin/sh\nexec /usr/bin/python3 -I '${wrapper}' "$@"\n`,
+  );
+  chmodSync(launcher, 0o700);
+  expect(
+    applyKanbanReplica(
+      r,
+      "default",
+      "alice",
+      "replica",
+      w,
+      undefined,
+      undefined,
+      launcher,
+    ).status,
+  ).toBe("conflict");
+  const original = new Database(join(r, "kanban.db"));
+  expect(original.prepare("SELECT value FROM original_marker").get()).toEqual({
+    value: "other writer",
+  });
+  expect(
+    original.prepare("SELECT name FROM sqlite_master WHERE name='tasks'").get(),
+  ).toBeUndefined();
+  original.close();
+  expect(readdirSync(r)).toEqual(["kanban.db"]);
+  const changed = root();
+  mkdirSync(join(changed, "kanban", "boards", "default"), { recursive: true });
+  writeFileSync(
+    join(changed, "kanban", "boards", "default", "board.json"),
+    JSON.stringify({ name: "Another original title" }),
+  );
+  expect(apply(changed, w).status).toBe("deferred");
+  expect(existsSync(join(changed, "kanban.db"))).toBe(false);
+});

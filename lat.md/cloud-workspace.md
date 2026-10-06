@@ -407,3 +407,11 @@ Cloud-created named boards now restore a complete original SQLite schema and boa
 [[src/main/kanban-board-replica.ts#restoreKanbanBoard]] stages empty original tables, portable display metadata and the retained operation receipt together. Exclusive Darwin/Linux directory publication refuses an existing or concurrently created board. Files and parent directories are synchronized before acknowledgement. Exact retries recover the published receipt before current metadata reads, and tasks then restore through the existing original working-copy adapter. [[src/main/kanban-board-replica.ts#kanbanBoardRecord]] retains display name, description, icon, color, project association, timestamps and archive flag; native work directories remain private but participate in source fingerprints. Reads do not switch boards, dispatch work or create subscriptions.
 
 This is named-board creation and metadata observation; original-board metadata writeback/archive, missing default-board initialization, dependent task graph reconstruction, Windows publication and installed/multi-device qualification remain incomplete.
+
+## Default board working-copy initialization (draft)
+
+A new device can initialize its missing default Kanban database from the canonical cloud board without resetting original display metadata or the selected board.
+
+[[src/main/kanban-board-replica.ts#restoreKanbanBoard]] admits a default board only when its portable metadata exactly matches the current original display projection. The complete empty original schema and owner-bound retained receipt are staged privately, then published with a no-replace hard link through directory descriptors. An existing or concurrently created database is never replaced. The original board.json and kanban/current remain byte-for-byte unchanged; later tasks use the ordinary task restoration route. Reading alone still creates no database.
+
+Custom cloud metadata that differs from original metadata still requires the pending file/SQLite transaction protocol. Existing-board edits, graph reconstruction, Windows publication and installed/offline/multi-device qualification remain unfinished.

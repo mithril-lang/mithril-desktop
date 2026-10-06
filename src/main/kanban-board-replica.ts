@@ -149,6 +149,92 @@ try:
  finally:os.close(sf)
 finally:os.close(fd)
 `;
+const publishDefault = String.raw`
+import os,sys,stat,errno
+source,root=sys.argv[1:]
+if os.path.dirname(source)!=root or not os.path.basename(source).startswith('.mithril-default-board-'):raise RuntimeError('Invalid default board publication')
+flags=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW
+fd=os.open('/',flags)
+try:
+ for part in os.path.abspath(root).split('/')[1:]:
+  nxt=os.open(part,flags,dir_fd=fd);os.close(fd);fd=nxt
+ sf=os.open(os.path.basename(source),flags,dir_fd=fd)
+ try:
+  f=os.open('kanban.db',os.O_RDONLY|os.O_NOFOLLOW,dir_fd=sf)
+  try:
+   if not stat.S_ISREG(os.fstat(f).st_mode):raise RuntimeError('Invalid default board file')
+   os.fsync(f)
+   if os.fstat(sf).st_ino!=os.stat(os.path.basename(source),dir_fd=fd,follow_symlinks=False).st_ino:raise RuntimeError('Default staging changed')
+   try:os.link('kanban.db','kanban.db',src_dir_fd=sf,dst_dir_fd=fd,follow_symlinks=False)
+   except FileExistsError:print('conflict')
+   else:os.fsync(fd);print('applied')
+  finally:os.close(f)
+ finally:os.close(sf)
+finally:os.close(fd)
+`;
+function initializeDefaultBoard(
+  root: string,
+  userId: string,
+  replicaId: string,
+  write: ReplicaWrite,
+  python: string,
+): ReplicaResult {
+  const result = (
+    status: ReplicaResult["status"],
+    record: ReplicaResult["record"] = null,
+  ): ReplicaResult => ({ schemaVersion: 1, userId, replicaId, status, record });
+  const observed = kanbanBoardRecord(root, "default", []);
+  if (
+    repositoryFingerprint({ body: observed.body, deleted: false }) !==
+    repositoryFingerprint(write.document)
+  )
+    return result("deferred");
+  checked(root);
+  const target = join(root, "kanban.db");
+  checked(target);
+  if (existsSync(target)) return result("conflict");
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  checked(root);
+  const stage = mkdtempSync(join(root, ".mithril-default-board-"));
+  try {
+    const accepted = result("applied", {
+      collection: "board",
+      id: "default",
+      body: observed.body,
+      deleted: false,
+      version: observed.version,
+    });
+    const db = new Database(join(stage, "kanban.db"));
+    try {
+      db.exec(schema);
+      db.exec(
+        "CREATE TABLE mithril_replica_receipts(operation_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,receipt TEXT NOT NULL)",
+      );
+      db.prepare("INSERT INTO mithril_replica_receipts VALUES(?,?,?)").run(
+        write.operationId,
+        createHash("sha256").update(JSON.stringify(write)).digest("hex"),
+        JSON.stringify(accepted),
+      );
+    } finally {
+      db.close();
+    }
+    if (kanbanBoardRecord(root, "default", []).version !== observed.version)
+      return result("conflict");
+    const status = execFileSync(
+      python,
+      ["-I", "-c", publishDefault, stage, root],
+      { encoding: "utf8", timeout: 10000 },
+    ).trim();
+    if (status === "conflict") return result("conflict");
+    if (status !== "applied")
+      throw Error("Default board publication not confirmed");
+    if (kanbanBoardRecord(root, "default", []).version !== observed.version)
+      throw Error("Default board metadata changed; receipt retained");
+    return accepted;
+  } finally {
+    if (existsSync(stage)) rmSync(stage, { recursive: true, force: true });
+  }
+}
 /** Publish an empty named board, complete schema and retained receipt without running Agent code. */
 export function restoreKanbanBoard(
   root: string,
@@ -174,7 +260,6 @@ export function restoreKanbanBoard(
   const body = value as Record<string, JsonValue>,
     slug = write.document.id;
   if (
-    slug === "default" ||
     !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(slug) ||
     body.slug !== slug ||
     typeof body.name !== "string" ||
@@ -198,6 +283,8 @@ export function restoreKanbanBoard(
     !validMetadata(body)
   )
     return result("deferred");
+  if (slug === "default")
+    return initializeDefaultBoard(root, userId, replicaId, write, python);
   const parent = join(root, "kanban", "boards"),
     target = join(parent, slug);
   checked(parent);

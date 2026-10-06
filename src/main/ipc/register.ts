@@ -1,3 +1,4 @@
+import { registerCapabilityResourceIPC } from "../capability-resource-ipc";
 import { synchronizeNativeHistory } from "../native-history-runtime";
 import {
   nativeRepositorySeed,
@@ -1304,6 +1305,11 @@ export function registerIpcHandlers(context: IpcContext): void {
   }, 15000);
   folderTimer.unref();
   app.once("before-quit", () => clearInterval(folderTimer));
+  registerCapabilityResourceIPC(
+    (channel, handler) => ipcMain.handle(channel, handler),
+    trustedWorkspaceSender,
+    cloudWorkspace.capabilityResources,
+  );
   ipcMain.handle("project-files-status", (event) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.files.status();

@@ -113,6 +113,7 @@ export default function CloudWorkspace({
       repositorySeed={repositorySeed}
       capabilitySeed={window.hermesAPI.cloudWorkspace.capabilitySnapshot}
       capabilityRuntime={window.hermesAPI}
+      capabilityResources={window.hermesAPI.cloudWorkspace.capabilityResources}
       memoryProfile={profile}
       memorySeed={window.hermesAPI.cloudWorkspace.memorySnapshot}
       memoryRuntime={window.hermesAPI}

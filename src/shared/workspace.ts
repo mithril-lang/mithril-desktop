@@ -23,6 +23,7 @@ export interface CloudWorkspaceAPI extends WorkspaceTransport {
     drafts: import("@mithril/workspace/schedules").NativeScheduleDraft[];
   }>;
   files: import("@mithril/workspace/files").ProjectFileTransport;
+  capabilityResources: import("@mithril/workspace/capability-resources").CapabilityResourceTransport;
   catalog(): Promise<import("@mithril/workspace/react").DiscoverItem[]>;
   status(): Promise<CloudWorkspaceStatus>;
   enable(): Promise<CloudWorkspaceStatus>;

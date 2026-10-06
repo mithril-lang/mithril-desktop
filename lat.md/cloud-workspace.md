@@ -91,6 +91,7 @@ No tokens enter the renderer. Cloud execution produces ordinary D1 Chat results;
 Desktop uses the shared Chat sidebar as its primary navigation. Projects, Office, Discover, Kanban and Schedules share one API-backed workspace; device history remains explicitly accessible for migration without uploading it automatically.
 
 The redundant Cloud Workspace navigation entry is removed. Cloud views show the API storage boundary in the footer rather than the unrelated local gateway state. Disconnected authorization failures remain visible and require explicit reconnection, without repeated account-change remounts.
+
 ## Security diagnostics
 
 [[src/main/cloud-workspace.ts#CloudWorkspace#getSecurity]] and [[src/main/cloud-workspace.ts#CloudWorkspace#submitSecurity]] expose fixed owner-scoped routes with explicit security read/run scopes. Executor tokens and cloud credentials never enter the renderer.
@@ -151,7 +152,6 @@ Load failures have a retry in the original screen. Provider credential/configura
 
 The default Memory route now mounts these original components using per-profile raw MEMORY.md, USER.md and SOUL.md records. Existing portable cloud notes appear in the same entry editor with stable IDs and their original title/scope/project metadata retained. The current stripped-down cloud Settings/Memory/Capability screens and remaining split navigation still require replacement. No production release is implied by this extraction.
 
-
 ### Memory file reconciliation (draft)
 
 Fixed known Memory files synchronize through the shared three-way journal while original UI components remain the editor.
@@ -162,17 +162,15 @@ Fixed known Memory files synchronize through the shared three-way journal while 
 
 Web uses the same default Memory body and cloud records. Runtime provider credentials remain native execution ports; Web credential writes fail visibly. Clean Persona editors observe remote changes, while dirty drafts and entry bases remain frozen. This draft has no deployed or installed-release evidence; full original Settings/Capability, schedule execution ownership, remote-only chat history and remaining navigation unification still require work.
 
-
 ### Original Capability components (draft)
 
 The original Tools, MCP editor and Skills browser now share one component body across platform consumers.
 
 [[src/renderer/src/screens/Tools/Tools.tsx#Tools]] and [[src/renderer/src/screens/Skills/Skills.tsx#Skills]] wrap workspace DesktopCapability/DesktopSkills. [[src/renderer/src/screens/Tools/useCapabilityPorts.tsx#useCapabilityPorts]] injects native IPC, existing translations, Markdown/media policy, confirmation and notifications. Shared components contain no Electron bridge access; their original tabs, toolset icons, MCP visual/JSON editor and skill details remain intact.
 
-Failed toolset changes do not falsely change the displayed enabled state. Skill storage failures exit loading and allow retry; load/detail epochs discard stale profile/API responses. Shared CSS and English/Japanese dictionaries support browser consumers. The default cloud route now mounts these original tabs against canonical per-profile descriptors and existing portable preferences. Native source snapshots preserve full skill bodies; env/auth values and skill filesystem paths are excluded. Reads never test or install tools. Editors hold captured revisions, offline saves retain durable operations, and tombstones require explicit restoration. Settings modal extraction is still unfinished.
+Failed toolset changes do not falsely change the displayed enabled state. Skill storage failures exit loading and allow retry; load/detail epochs discard stale profile/API responses. Shared CSS and English/Japanese dictionaries support browser consumers. The default cloud route now mounts these original tabs against canonical per-profile descriptors and existing portable preferences. Native source snapshots preserve full skill bodies; env/auth values and skill filesystem paths are excluded. Reads never test or install tools. Editors hold captured revisions, offline saves retain durable operations, and tombstones require explicit restoration. All original Settings section bodies are shared; remaining browser runtime ports and global preference observers still require integration.
 
 [[src/main/repository-kanban-runtime.ts#nativeCapabilitySnapshot]] binds the selected local profile to the signed-in owner, checks config size/encoding/consistency and reads installed skills in strict mode. Known credential-bearing descriptors and device command paths are retained locally with a visible warning. [[src/main/repository-kanban-runtime.ts#nativeReplicaSnapshot]] includes Capability source versions in three-way reconciliation. Cloud-to-native configuration application remains deferred unless the source already matches; safe writeback and secret references are required before claiming full bidirectional Capability synchronization. No production or installed-release proof is implied.
-
 
 ### Original Settings modal and general panes (draft)
 
@@ -182,7 +180,6 @@ Original modal navigation and general preference components now share one render
 
 The default cloud Settings route remains unfinished pending the other pane adapters and canonical preference synchronization. No native setting has been silently imported or cloud value falsely applied by this extraction.
 
-
 ### Data About Community and Logs shared bodies (draft)
 
 Original data actions, update cards, links and log viewer now share UI bodies with platform-owned effects.
@@ -190,7 +187,6 @@ Original data actions, update cards, links and log viewer now share UI bodies wi
 [[src/renderer/src/components/settings/DataPane.tsx#DataPane]], [[src/renderer/src/components/settings/AboutPane.tsx#AboutPane]], [[src/renderer/src/components/settings/CommunityPane.tsx#CommunityPane]] and [[src/renderer/src/components/settings/LogsPane.tsx#LogsPane]] inject existing SettingsDataContext and IPC into shared original components. About passes the selected profile into ConfigHealth. Explicit backup/import/migration and update buttons retain their existing handlers; none of these operations is invoked by rendering shared bodies.
 
 Log reads discard older selected-file/scope responses and expose errors with retry; diagnostic dump failures no longer leave their running flag stuck. Connection remains the sole native Settings body, and canonical cloud preferences/default Settings routing are still unfinished. No deployment or installer claim follows from these tests.
-
 
 ### Original Connection and SSH target controls (draft)
 
@@ -200,7 +196,6 @@ All nine Settings bodies share original UI with consumer-owned connection and ex
 
 Runtime credentials, host/key paths and transports remain device execution configuration. Default cloud Settings routing and canonical preferences/native cache reconciliation are still required; these components do not constitute complete synchronization or browser-native SSH support.
 
-
 ### Acknowledged appearance and language observation (draft)
 
 Confirmed account preferences apply through original presentation providers on initial load and refresh.
@@ -208,7 +203,6 @@ Confirmed account preferences apply through original presentation providers on i
 The shared workspace observes one live preferences record and delivers its acknowledged revision once per identity. Pending preferences edits suppress automatic application, and multiple legacy preference records remain visible for review instead of being selected by timestamps. Desktop [[src/renderer/src/screens/CloudWorkspace/CloudWorkspace.tsx#CloudWorkspace]] supplies the original Theme/I18n providers; Web uses its locale/theme providers. Observation does not queue writes or execute agents.
 
 This closes the existing read-side appearance/language gap. Full original preference fields, automatic provider-to-cloud writes, canonical record selection and default shared Settings routing remain required.
-
 
 ### Canonical presentation settings and default modal (draft)
 
@@ -220,7 +214,6 @@ Observed revisions and durable operation receipts preserve offline edits and con
 
 The five remaining default cloud Settings section adapters, automatic upload from the separate original native global Settings modal and full native cache reconciliation remain required. Browser notification/spellcheck effects also remain unfinished. Unit, route and build checks are draft source evidence; API/Web publication and installed-client verification remain separate release gates.
 
-
 ### Default Desktop Settings runtime panes (draft)
 
 All nine original Settings panes now mount in the normal Desktop cloud Settings modal with state retained across tabs.
@@ -228,7 +221,6 @@ All nine original Settings panes now mount in the normal Desktop cloud Settings 
 [[src/renderer/src/components/settings/SettingsModal.tsx#NativeSettingsProvider]] supplies the original SettingsDataContext once for the whole modal; [[src/renderer/src/components/settings/SettingsModal.tsx#NativeSettingsPane]] dispatches the same original bodies used by the global modal. [[src/renderer/src/screens/CloudWorkspace/CloudWorkspace.tsx#CloudWorkspace]] supplies those ports to the shared shell for Connection, Data, About/Updates, Community and Logs, while general preference controls use canonical cloud settings. The provider is keyed by the selected profile and mounts only when Settings opens.
 
 Backups/imports, updates, connection tests and links retain existing explicit native handlers. Opening or switching panes does not replay those actions. Runtime credentials stay outside presentation documents. Tests cover native backup result retention and explicit profile ownership; browser default-route fixtures cover consumer state retention across general/runtime tabs. Web’s five runtime pane adapters and native provider-to-cloud uploads remain unfinished. Source checks are not installed-client or publication evidence.
-
 
 ### Capability configuration writeback (draft)
 
@@ -248,7 +240,7 @@ A separate owner-scoped Capability resource namespace in the Mithril API uses th
 
 The shared manifest retains original relative directories and executable attributes, rejects credential paths and file/directory collisions, and verifies byte digests and limits. The main-process [[src/main/cloud-workspace.ts#CloudWorkspace]] exposes the typed resource transport; bearer credentials remain in main, owner changes fail closed, and observing bytes never installs or runs them. Deleted Capability documents retain recovery reads but refuse new uploads.
 
-The POSIX native replica now captures original directories and uploads immutable resources before publishing a pointer through repository CAS. POSIX file application now uses recoverable transactions. Windows capture and original Skills editor integration remain unfinished. This namespace remains unpublished.
+The POSIX native replica now captures original directories and uploads immutable resources before publishing a pointer through repository CAS. POSIX file application now uses recoverable transactions. Windows capture, original Skill installation and anchor bootstrap remain unfinished. This namespace remains unpublished.
 
 ### Original Skill directory capture (draft)
 
@@ -258,13 +250,13 @@ The main process uses a fixed isolated interpreter only to capture file data thr
 
 Immutable chunks and their manifest are uploaded through the fixed account-checked Mithril API before the resource pointer enters the durable repository outbox. Verified existing manifests avoid repeated uploads; identity checks surround each network step. API pointer edits require an existing owned manifest and use the existing repository CAS and receipts. This path stores data and never installs or executes a Skill.
 
-Verified native downloads and POSIX file transactions are implemented; original Skills editor integration remains unfinished. Descriptor capture currently supports POSIX; Windows capture fails closed until an equivalent safe directory-handle implementation exists. Resource publication also requires the canonical Capability anchor to exist. Large legacy inline Capability bodies and this bootstrap need a versioned resource-backed adapter before full synchronization and release.
+Verified native downloads and POSIX file transactions are implemented; original Skill installation and anchor bootstrap remain unfinished. Descriptor capture currently supports POSIX; Windows capture fails closed until an equivalent safe directory-handle implementation exists. Resource publication also requires the canonical Capability anchor to exist. Large legacy inline Capability bodies and this bootstrap need a versioned resource-backed adapter before full synchronization and release.
 
 ### Verified Skill resource download (draft)
 
 Cloud Skill bytes are verified in private staging before any future native file application.
 
-The main-only downloader validates the owned pointer and canonical manifest digest, downloads each immutable chunk once, and checks both chunk sizes/digests and full-file sizes and canonical chunk-list fingerprints. Identity guards surround requests and finish verification. Failures remove private staging and never touch original Skill files. The returned staging reader rechecks disk bytes. Native file application and original Skills editor wiring remain unfinished; this helper grants no install or execution authority.
+The main-only downloader validates the owned pointer and canonical manifest digest, downloads each immutable chunk once, and checks both chunk sizes/digests and full-file sizes and canonical chunk-list fingerprints. Identity guards surround requests and finish verification. Failures remove private staging and never touch original Skill files. The returned staging reader rechecks disk bytes. Verified bytes now feed POSIX file transactions and the original shared Skills reader; this helper grants no install or execution authority.
 
 ### Skill resource file transactions (draft)
 
@@ -272,4 +264,12 @@ Native Skill resource pointers now apply to original directories through recover
 
 A main-only fixed POSIX transaction locks private per-profile state, compares the original tree with the captured source, checks that parent directory descriptors remain attached to their original paths, and verifies cached chunks before source mutations. Atomic per-file replacements retain original paths, binary bytes and executable flags; deletions and replacements keep private backups. Credentials and other excluded files stay untouched. Durable pending/completed receipts support stable operation replay and interrupted before/after recovery. Intervening edits produce conflicts; incomplete transactions block both resource and inline Capability source reads so partial trees cannot be published. Recovery-only snapshot keys let the common engine replay the exact retained journal operation without claiming source completeness.
 
-A completed receipt returns its original result without overwriting later native edits. Account checks surround download/application and source binding remains unchanged. Directory replacement refuses removal of untracked contents. Older native writers do not yet participate in this private advisory lock; cross-writer interruption and conflict UX still need integration. Windows file application and aggregate pointer tombstones remain deferred; original Skills editor wiring and resource-backed bootstrap remain unfinished.
+A completed receipt returns its original result without overwriting later native edits. Account checks surround download/application and source binding remains unchanged. Directory replacement refuses removal of untracked contents. Older native writers do not yet participate in this private advisory lock; cross-writer interruption and conflict UX still need integration. Windows file application and aggregate pointer tombstones remain deferred; original Skill installation and resource-backed bootstrap remain unfinished.
+
+### Original Skills resource adapter (draft)
+
+The original Skills component now reads full Markdown and original directory identities from cloud resource pointers.
+
+The shared adapter validates manifests and bytes before display. Path-specific removal uploads an immutable replacement manifest and publishes its pointer with repository CAS; duplicate display names cannot select a different directory. Scripts and assets survive unchanged for remaining Skills. Native renderer requests use [[src/main/capability-resource-ipc.ts#registerCapabilityResourceIPC]] with trusted sender checks, bounded arguments and main-owned owner-bound API transport. Credentials remain in main. No install or execution occurs during reads or synchronization.
+
+Original Skill installation, large legacy anchor bootstrap, Windows reconciliation and interoperability with older native writers remain unfinished. These source changes are unpublished.

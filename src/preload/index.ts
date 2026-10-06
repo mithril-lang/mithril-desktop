@@ -47,6 +47,27 @@ import type {
   SshDockerProvisionResult,
 } from "../shared/ssh-docker";
 
+function capabilityResourceAPI(
+  owner?: string,
+): import("@mithril/workspace/capability-resources").CapabilityResourceTransport {
+  return {
+    forOwner: (value) => capabilityResourceAPI(value),
+    getManifest: (id, digest) =>
+      ipcRenderer.invoke(
+        "capability-resources-get-manifest",
+        id,
+        digest,
+        owner,
+      ),
+    putManifest: (manifest) =>
+      ipcRenderer.invoke("capability-resources-put-manifest", manifest, owner),
+    getChunk: (id, digest) =>
+      ipcRenderer.invoke("capability-resources-get-chunk", id, digest, owner),
+    putChunk: (id, bytes) =>
+      ipcRenderer.invoke("capability-resources-put-chunk", id, bytes, owner),
+  };
+}
+
 function projectFileAPI(
   owner?: string,
 ): import("@mithril/workspace/files").ProjectFileTransport {
@@ -400,6 +421,7 @@ const hermesAPI = {
         ipcRenderer.invoke("cloud-workspace-schedule-edit", operation),
     },
     files: projectFileAPI(),
+    capabilityResources: capabilityResourceAPI(),
     catalog: () => ipcRenderer.invoke("cloud-workspace-catalog"),
     status: () => ipcRenderer.invoke("cloud-workspace-status"),
     enable: () => ipcRenderer.invoke("cloud-workspace-enable"),

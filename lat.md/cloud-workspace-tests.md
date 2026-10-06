@@ -2,6 +2,7 @@
 lat:
   require-code-mention: true
 ---
+
 # Cloud workspace tests
 
 The main-process adapter enforces account-bound consent and a narrow portable-data boundary even when the renderer or network supplies invalid input.
@@ -69,6 +70,7 @@ Credentials, absolute paths, scripts, delivery destinations and native tool gran
 Repeated denied sign-in or missing-scope checks preserve the error without repeatedly remounting the renderer.
 
 Explicit credential changes still notify disconnected renderers and invalidate in-flight requests.
+
 ## Security execution boundaries
 
 Security tests require explicit read/run scopes, fixed main-process API routes and tenant-checked snapshots. Renderer requests cannot carry credentials or executor policy.
@@ -101,13 +103,11 @@ Cloud edits and tombstones update the original Desktop timeline through a checke
 
 Flattened archived tables with a consistent GFM separator render as a table through the same Desktop/Web Markdown component. Fenced examples and ambiguous pipes remain literal; stored transcript text is unchanged.
 
-
 ## Strict Capability skill sources
 
 Strict source reads preserve full skill bodies and refuse invalid encodings or symlinks instead of publishing partial snapshots. Existing native skill operations retain their original behavior.
 
 These cases exercise [[src/main/skills.ts#getSkillContent]] and [[src/main/skills.ts#listInstalledSkills]] using temporary owner-profile roots; no runtime installation occurs during synchronization.
-
 
 ## Capability snapshot identity
 
@@ -136,3 +136,9 @@ Corrupt chunks, inconsistent file fingerprints and account changes remove stagin
 Native transaction tests verify original relative paths, binary bytes, executable flags, credential retention and private backups.
 
 They cover source conflicts, moved-parent descriptor refusal, symlink refusal, interrupted before/after recovery (including a real interpreter exit after the first replacement), snapshot blocking, changed operation reuse and file/directory replacements.
+
+## Original Skills resource IPC
+
+Original Skills resource requests use validated arguments and trusted renderer checks before main-owned storage access.
+
+Tests verify explicit owner binding, binary forwarding, refusal of untrusted senders, oversized chunks, malformed manifests, endpoint-shaped IDs and invalid owner values. These ports expose no bearer credentials or arbitrary endpoints.

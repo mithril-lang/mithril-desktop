@@ -53,17 +53,13 @@ it("keeps original Data results across native tabs and runs only explicit profil
   expect(actions.backup).not.toHaveBeenCalled();
   expect(actions.imported).not.toHaveBeenCalled();
   expect(actions.migrate).not.toHaveBeenCalled();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Export Backup", exact: true }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Export Backup" }));
   expect(actions.backup).toHaveBeenCalledExactlyOnceWith("selected-profile");
   await screen.findByText("Backup created successfully");
-  fireEvent.click(
-    screen.getByRole("button", { name: "Community", exact: true }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Community" }));
   expect(document.querySelector(".settings-link-grid")).toBeTruthy();
   expect(actions.open).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Data", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Data" }));
   expect(screen.getByText("Backup created successfully")).toBeInTheDocument();
   expect(actions.backup).toHaveBeenCalledTimes(1);
 });

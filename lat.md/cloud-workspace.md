@@ -228,3 +228,14 @@ All nine original Settings panes now mount in the normal Desktop cloud Settings 
 [[src/renderer/src/components/settings/SettingsModal.tsx#NativeSettingsProvider]] supplies the original SettingsDataContext once for the whole modal; [[src/renderer/src/components/settings/SettingsModal.tsx#NativeSettingsPane]] dispatches the same original bodies used by the global modal. [[src/renderer/src/screens/CloudWorkspace/CloudWorkspace.tsx#CloudWorkspace]] supplies those ports to the shared shell for Connection, Data, About/Updates, Community and Logs, while general preference controls use canonical cloud settings. The provider is keyed by the selected profile and mounts only when Settings opens.
 
 Backups/imports, updates, connection tests and links retain existing explicit native handlers. Opening or switching panes does not replay those actions. Runtime credentials stay outside presentation documents. Tests cover native backup result retention and explicit profile ownership; browser default-route fixtures cover consumer state retention across general/runtime tabs. Web’s five runtime pane adapters and native provider-to-cloud uploads remain unfinished. Source checks are not installed-client or publication evidence.
+
+
+### Capability configuration writeback (draft)
+
+Cloud toolset and public MCP changes now write back to the original selected-profile configuration through the replica adapter.
+
+[[src/main/capability-config-replica.ts#planCapabilityConfig]] preserves unrelated YAML, other platform lists, future toolset keys, native auth/env values and unchanged unknown server fields. Existing MCP enabled-state changes retain credentials; redirecting credential-bearing descriptors, changing credential references, unsupported YAML, skill-file changes and aggregate Capability tombstones defer for review. Public MCP add/edit/remove is data-only and never runs a CLI, tests a server or installs dependencies.
+
+[[src/main/capability-config-replica.ts#applyCapabilityConfigReplica]] compares the observed repository version and captured raw config digest, then uses a fixed isolated interpreter, no-follow directory access, an advisory config lock, atomic replacement and recoverable local receipts. Completed retries do not overwrite newer native edits; interrupted receipts finish only from recorded before/after contents. Receipt names are excluded by the existing secret-file path filter, and their private native backups never enter repository bodies.
+
+The native dispatcher rechecks identity after loading the interpreter and adapter; public snapshots do not expose raw config or its digest. Read-back tests use the original MCP/toolset parsers. Full Skills/resource reconciliation, secret references, aggregate tombstone restoration and lock interoperability with external or older config writers remain required. Build/unit evidence is not installed-client or live synchronization verification.

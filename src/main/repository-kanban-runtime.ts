@@ -619,10 +619,10 @@ async function replicaContext(write = false): Promise<{
   };
 }
 /** Fixed original capability descriptors and installed skill bodies; no tests or installs run here. */
-export async function nativeCapabilitySnapshot(): Promise<
+async function nativeCapabilitySource(): Promise<
   Awaited<
     ReturnType<import("@mithril/workspace/capability-data").CapabilitySeed>
-  >
+  > & { configDigest: string }
 > {
   const before = await cloudWorkspace.nativeContext();
   if (getConnectionConfig().mode !== "local")
@@ -678,7 +678,20 @@ export async function nativeCapabilitySnapshot(): Promise<
     JSON.stringify(await cloudWorkspace.nativeContext())
   )
     throw Error("Workspace identity changed");
-  return { userId: before.userId, profile: before.profile, body };
+  return {
+    userId: before.userId,
+    profile: before.profile,
+    body,
+    configDigest: createHash("sha256").update(config).digest("hex"),
+  };
+}
+export async function nativeCapabilitySnapshot(): Promise<
+  Awaited<
+    ReturnType<import("@mithril/workspace/capability-data").CapabilitySeed>
+  >
+> {
+  const { userId, profile, body } = await nativeCapabilitySource();
+  return { userId, profile, body };
 }
 
 /** Fixed, account-bound original Memory files only; no directory scan or execution. */
@@ -818,29 +831,26 @@ export async function nativeReplicaApply(
     throw Error("Workspace identity changed");
   let result: import("@mithril/workspace/replica-sync").ReplicaResult;
   if (write.document.collection === "capability") {
-    const source = await nativeCapabilitySnapshot();
-    const { capabilityId } = await import("@mithril/workspace/capability-data");
-    const body = source.body as unknown as JsonValue;
-    const record: import("@mithril/workspace/replica-sync").ReplicaRecord = {
-      collection: "capability",
-      id: capabilityId(before.profile),
-      body,
-      deleted: false,
-      version: createHash("sha256")
-        .update(repositoryFingerprint({ body, deleted: false }))
-        .digest("hex"),
-    };
-    result = {
-      schemaVersion: 1,
-      userId: before.userId,
-      replicaId: before.replicaId,
-      status:
-        write.document.id === record.id &&
-        repositoryFingerprint(write.document) === repositoryFingerprint(record)
-          ? "applied"
-          : "deferred",
-      record,
-    };
+    const source = await nativeCapabilitySource();
+    const [{ HERMES_PYTHON }, { applyCapabilityConfigReplica }] =
+      await Promise.all([
+        import("./installer"),
+        import("./capability-config-replica"),
+      ]);
+    if (
+      JSON.stringify(before.context) !==
+      JSON.stringify(await cloudWorkspace.nativeContext(true))
+    )
+      throw Error("Workspace identity changed");
+    result = applyCapabilityConfigReplica(
+      profileHome(before.profile),
+      before.userId,
+      before.replicaId,
+      HERMES_PYTHON,
+      source.body,
+      write,
+      source.configDigest,
+    );
   } else if (write.document.collection === "memory") {
     const { HERMES_PYTHON } = await import("./installer");
     // Account changes during module loading must be checked before touching source files.

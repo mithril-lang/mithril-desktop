@@ -181,3 +181,12 @@ Original modal navigation and general preference components now share one render
 [[src/renderer/src/components/settings/SettingsModal.tsx#SettingsModal]] wraps the shared nine-section modal while retaining the existing native SettingsDataContext and remaining panes. Appearance, Language, Notifications and Privacy wrappers inject providers, GPU and analytics APIs into shared components. Native theme/font registries re-export shared choices. The existing AppModal and Toggle paths also re-export the shared original bodies for every native consumer. Original CSS remains compatible; the shared package also exports the modal/preference styles and all theme palettes for browser consumers.
 
 The default cloud Settings route remains unfinished pending the other pane adapters and canonical preference synchronization. No native setting has been silently imported or cloud value falsely applied by this extraction.
+
+
+### Data About Community and Logs shared bodies (draft)
+
+Original data actions, update cards, links and log viewer now share UI bodies with platform-owned effects.
+
+[[src/renderer/src/components/settings/DataPane.tsx#DataPane]], [[src/renderer/src/components/settings/AboutPane.tsx#AboutPane]], [[src/renderer/src/components/settings/CommunityPane.tsx#CommunityPane]] and [[src/renderer/src/components/settings/LogsPane.tsx#LogsPane]] inject existing SettingsDataContext and IPC into shared original components. About passes the selected profile into ConfigHealth. Explicit backup/import/migration and update buttons retain their existing handlers; none of these operations is invoked by rendering shared bodies.
+
+Log reads discard older selected-file/scope responses and expose errors with retry; diagnostic dump failures no longer leave their running flag stuck. Connection remains the sole native Settings body, and canonical cloud preferences/default Settings routing are still unfinished. No deployment or installer claim follows from these tests.

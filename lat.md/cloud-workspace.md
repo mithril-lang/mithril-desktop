@@ -161,3 +161,12 @@ Fixed known Memory files synchronize through the shared three-way journal while 
 [[src/main/memory-replica-files.ts#applyMemoryReplica]] uses the original Memory lock inodes, no-follow reads, source CAS, atomic file writes and durable operation receipts. Repeating a completed receipt never rewrites newer native contents; interrupted writes recover from their recorded before/after state. Tombstones preserve recoverable cloud bodies and deletion markers. Differing configured capacities defer pending shared Settings integration. Original Persona writes now use the same locks and observed text checks rather than an unlocked write.
 
 Web uses the same default Memory body and cloud records. Runtime provider credentials remain native execution ports; Web credential writes fail visibly. Clean Persona editors observe remote changes, while dirty drafts and entry bases remain frozen. This draft has no deployed or installed-release evidence; full original Settings/Capability, schedule execution ownership, remote-only chat history and remaining navigation unification still require work.
+
+
+### Original Capability components (draft)
+
+The original Tools, MCP editor and Skills browser now share one component body across platform consumers.
+
+[[src/renderer/src/screens/Tools/Tools.tsx#Tools]] and [[src/renderer/src/screens/Skills/Skills.tsx#Skills]] wrap workspace DesktopCapability/DesktopSkills. [[src/renderer/src/screens/Tools/useCapabilityPorts.tsx#useCapabilityPorts]] injects native IPC, existing translations, Markdown/media policy, confirmation and notifications. Shared components contain no Electron bridge access; their original tabs, toolset icons, MCP visual/JSON editor and skill details remain intact.
+
+Failed toolset changes do not falsely change the displayed enabled state. Skill storage failures exit loading and allow retry; load/detail epochs discard stale profile/API responses. Shared CSS and English/Japanese dictionaries support browser consumers. This extraction does not yet connect the default cloud Capability route to rich capability records or synchronize native MCP/skill configuration; execution and credential adapters remain outstanding. Settings modal extraction is also unfinished.

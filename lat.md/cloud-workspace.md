@@ -581,7 +581,7 @@ Preview.28 platform run 37530012973 succeeded. The prerelease contains all five 
 
 Original Cron files are captured completely before any projection, with their source shape and metadata preserved.
 
-[[src/main/cron-source-files.ts#captureOriginalCronFile]] reads the fixed profile's jobs.json through one opened inode, checks encoding, size, source identity and duplicate/malformed rows, and computes a byte-level source version. Array and object file shapes remain distinct. Missing storage is not a fabricated empty file. Symlinked files/directories and changed sources fail without repairing or writing the original store.
+[[src/main/cron-source-files.ts#captureOriginalCronFile]] reads the fixed profile's jobs.json through one opened inode, checks encoding, size, source identity and duplicate/malformed rows, and computes a byte-level source version. The final path check compares size and modification/change times with the opened descriptor, refusing in-place changes after its final read. Array and object file shapes remain distinct. Missing storage is not a fabricated empty file. Symlinked files/directories and changed sources fail without repairing or writing the original store.
 
 [[src/main/cronjobs.ts#readOriginalCronSource]] remains main-process-only: retained source may contain private runtime bindings and is not admitted for cloud upload. The existing selected-schedule preview now starts from this complete capture instead of silently filtering malformed records. Tests use real temporary A-B-A profile files and verify exact metadata, untouched bytes, source revisions, legacy shape and unsafe-source refusal. Cloud field binding, locked restoration, original Schedules mounting and execution ownership remain required.
 

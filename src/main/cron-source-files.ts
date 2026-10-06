@@ -69,7 +69,10 @@ export function captureOriginalCronFile(
       before.ino !== current.ino ||
       before.size !== after.size ||
       before.mtimeMs !== after.mtimeMs ||
-      before.ctimeMs !== after.ctimeMs
+      before.ctimeMs !== after.ctimeMs ||
+      after.size !== current.size ||
+      after.mtimeMs !== current.mtimeMs ||
+      after.ctimeMs !== current.ctimeMs
     )
       throw Error("Schedule source changed; original file retained");
     const text = bytes.toString("utf8");

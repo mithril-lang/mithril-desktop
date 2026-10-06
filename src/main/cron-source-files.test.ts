@@ -11,13 +11,40 @@ import {
 } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
+const captureRace = vi.hoisted(() => ({
+  stats: 0,
+  afterRead: null as (() => void) | null,
+}));
+vi.mock("fs", async (importOriginal) => {
+  const original = await importOriginal<typeof import("fs")>();
+  return {
+    ...original,
+    fstatSync: (...args: Parameters<typeof original.fstatSync>) => {
+      const result = original.fstatSync(...args);
+      captureRace.stats += 1;
+      if (captureRace.stats === 2) captureRace.afterRead?.();
+      return result;
+    },
+  };
+});
 import { captureOriginalCronFile } from "./cron-source-files";
 const roots: string[] = [];
 afterEach(() => {
+  captureRace.stats = 0;
+  captureRace.afterRead = null;
   roots
     .splice(0)
     .forEach((root) => rmSync(root, { recursive: true, force: true }));
+});
+it("refuses an in-place source change after the descriptor check without overwriting the newer file", () => {
+  const root = fixture({ jobs: [{ id: "original" }] });
+  const path = join(root, "cron", "jobs.json");
+  const newer = JSON.stringify({ jobs: [{ id: "newer-source" }] });
+  captureRace.stats = 0;
+  captureRace.afterRead = () => writeFileSync(path, newer);
+  expect(() => captureOriginalCronFile(root, "default")).toThrow("changed");
+  expect(readFileSync(path, "utf8")).toBe(newer);
 });
 function fixture(file: unknown): string {
   const root = realpathSync(

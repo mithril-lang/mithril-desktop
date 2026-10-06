@@ -144,3 +144,7 @@ The Code sidebar screen invokes the owned Hermes `mithril-code` plugin CLI throu
 # Shared Code workspace publication
 
 Code uses workspace 0.6.7's compiled Desktop composer, tabs, source navigation and receipt disclosure across Desktop, App and Code. Native execution stays in the active profile's Hermes plugin. GitHub saving and Pages publication are explicit operations in the same screen; the transient GitHub credential travels through a fixed GitHub-only Code API IPC route, never generic URL/file access. Source changes invalidate the saved version. CLJK edits do not compile runtime artifacts or inherit Jev's generation checks. Installer completion and actual configured-profile inference remain separately evidenced.
+
+### Code Kuro runtime
+
+The shared Code screen can create editable JS/Python projects and explicitly run a source snapshot in App's public Kuro opaque-origin frame. No profile, cloud, GitHub or provider credential crosses the MessageChannel, and the frame has no trusted Desktop IPC authority. Editing clears its displayed execution result. Kuro source execution is separate from profile/service Jev generation; a successful Kuro run never certifies CLJK or a Python Pages backend. Preview.23 actual installed import/edit/GitHub/Pages proof is recorded in Fund's shared Code QA receipts; preview.24 carries this additional source runtime.

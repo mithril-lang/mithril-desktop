@@ -1,5 +1,6 @@
 // @lat: [[mithril-code#Mithril Code#Review and measurements]]
 import { useMemo } from "react";
+import { browserCodeSandbox } from "@mithril/workspace/code-kuro";
 import { CodeWorkspace } from "@mithril/workspace/code-react";
 import type { CodeTransport } from "@mithril/workspace/code";
 import "@mithril/workspace/code-styles.css";
@@ -43,5 +44,12 @@ export default function Code({
     }),
     [profile],
   );
-  return <CodeWorkspace key={profile} transport={transport} locale={locale} />;
+  return (
+    <CodeWorkspace
+      key={profile}
+      transport={transport}
+      sandbox={browserCodeSandbox()}
+      locale={locale}
+    />
+  );
 }

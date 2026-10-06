@@ -190,3 +190,12 @@ Original data actions, update cards, links and log viewer now share UI bodies wi
 [[src/renderer/src/components/settings/DataPane.tsx#DataPane]], [[src/renderer/src/components/settings/AboutPane.tsx#AboutPane]], [[src/renderer/src/components/settings/CommunityPane.tsx#CommunityPane]] and [[src/renderer/src/components/settings/LogsPane.tsx#LogsPane]] inject existing SettingsDataContext and IPC into shared original components. About passes the selected profile into ConfigHealth. Explicit backup/import/migration and update buttons retain their existing handlers; none of these operations is invoked by rendering shared bodies.
 
 Log reads discard older selected-file/scope responses and expose errors with retry; diagnostic dump failures no longer leave their running flag stuck. Connection remains the sole native Settings body, and canonical cloud preferences/default Settings routing are still unfinished. No deployment or installer claim follows from these tests.
+
+
+### Original Connection and SSH target controls (draft)
+
+All nine Settings bodies share original UI with consumer-owned connection and execution effects.
+
+[[src/renderer/src/components/settings/ConnectionPane.tsx#ConnectionPane]] injects the existing SettingsDataContext, key generation and network writes into the shared named-connection editor. [[src/renderer/src/components/settings/SshDockerTargetSection.tsx#SshDockerTargetSection]] injects native inspection/provision APIs into the same target selector used by Settings and Welcome. Late results from a changed SSH host cannot select or persist a container for the current host; container selection retains the inspected list. Inspection and provisioning remain explicit actions.
+
+Runtime credentials, host/key paths and transports remain device execution configuration. Default cloud Settings routing and canonical preferences/native cache reconciliation are still required; these components do not constitute complete synchronization or browser-native SSH support.

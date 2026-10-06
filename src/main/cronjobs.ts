@@ -10,6 +10,12 @@ import {
   type OriginalCronRestoreRequest,
   type OriginalCronRestoreResult,
 } from "./cron-source-restore";
+import {
+  validOriginalCronPrepareRequest,
+  parseOriginalCronPrepareResult,
+  type OriginalCronPrepareRequest,
+  type OriginalCronPrepareResult,
+} from "./cron-source-prepare";
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
@@ -507,9 +513,27 @@ export function readOriginalCronSource(
   return captureOriginalCronFile(profileHome(profile), profile);
 }
 
-/** Main-process local restore only, after resource/execution binding. No IPC
- * accepts this raw source and no cloud document is passed directly to this port.
+/** Prepare through the original profile's parser without saving or executing.
+ * This main-process port does not expose raw source through renderer IPC.
  */
+export async function prepareOriginalCronSource(
+  request: OriginalCronPrepareRequest,
+): Promise<OriginalCronPrepareResult> {
+  if (isRemoteMode() || !validOriginalCronPrepareRequest(request))
+    return {
+      success: false,
+      error: "Original schedule preparation unavailable",
+    };
+  const captured = structuredClone(request);
+  const result = await runCronCommand(
+    ["source-prepare"],
+    captured.profile,
+    JSON.stringify(captured),
+  );
+  return parseOriginalCronPrepareResult(result.output, captured);
+}
+
+/** Local restore after resource/execution binding. No raw-source renderer IPC. */
 export async function restoreOriginalCronSource(
   request: OriginalCronRestoreRequest,
 ): Promise<OriginalCronRestoreResult> {

@@ -160,3 +160,9 @@ The Desktop test verifies the main-owned route and schema checking. D1 and share
 The native fixed-route API port preserves both configuration and Skill pointer revisions in the migration journal. Malformed guards cannot issue requests.
 
 Shared and D1 tests cover original content proof, simultaneous pointer changes, retained original history, missing acknowledgements and restart with the exact operation ID. Replica tests verify that identical post-migration content settles initial conflicts without native execution.
+
+## Shared original sidebar adapter
+
+The shared original list reads through its adapter without issuing metadata writes, retains stable session IDs for selection and copying, and rolls back a failed inline rename.
+
+Desktop's original context-menu interaction test must still pass through its shared wrapper.

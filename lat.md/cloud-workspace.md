@@ -305,3 +305,9 @@ The fixed main-process transport and trusted preload IPC expose at most two docu
 Acknowledged original Skill bytes and directory metadata allow automatic Capability v1-to-v2 migration while retaining full source history.
 
 The background reconciler prepares migration before native configuration writeback. Both configuration and Skill pointer revisions travel in the durable operation through existing trusted IPC; the API repeats the content proof and D1 admits both versions atomically. Generic writes cannot bypass migration admission. Lost acknowledgements retain the same operation ID, even after the pointer changes. Initial replica conflicts settle without execution when both copies become identical. Original inline Skills remain available until the resource transition is acknowledged; binary assets and duplicate directory identities remain in retained manifests.
+
+## Canonical Desktop sidebar component
+
+The original Desktop history list and context menu now live in the shared package. Desktop imports the canonical bodies and styles; its wrapper supplies IPC, translations and error reporting.
+
+The component retains original grouping, pin disclosures, pagination, inline rename rollback, project selection and delete confirmation. Extracting presentation does not change its storage authority. Connecting this body to the owner-scoped cloud sidebar and merging remaining native rows is still required before removing the history dialog.

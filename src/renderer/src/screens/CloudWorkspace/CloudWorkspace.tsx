@@ -1,3 +1,6 @@
+import { useTheme } from "../../components/ThemeProvider";
+import { useI18n } from "../../components/useI18n";
+import { APP_LOCALES, type AppLocale } from "../../../../shared/i18n";
 import { portableRepositorySeeds } from "@mithril/workspace/repository-migration";
 import type { RuntimeSection } from "@mithril/workspace/runtime";
 import { useCallback, useEffect, useState } from "react";
@@ -29,6 +32,24 @@ export default function CloudWorkspace({
   onOpenNativeSection?: (section: RuntimeSection) => void;
   onOpenChat?: () => void;
 }): React.JSX.Element {
+  const { setTheme } = useTheme();
+  const { setLocale } = useI18n();
+  const preferences = useCallback(
+    (data: Record<string, unknown>): void => {
+      if (
+        data.theme === "dark" ||
+        data.theme === "light" ||
+        data.theme === "system"
+      )
+        setTheme(data.theme);
+      if (
+        typeof data.locale === "string" &&
+        (APP_LOCALES as readonly string[]).includes(data.locale)
+      )
+        setLocale(data.locale as AppLocale);
+    },
+    [setTheme, setLocale],
+  );
   const [identityEpoch, setIdentityEpoch] = useState(0);
   useEffect(
     () =>
@@ -74,6 +95,7 @@ export default function CloudWorkspace({
       afterDisconnect={() => window.hermesAPI.cloudWorkspace.disable()}
       identityEpoch={`${profile}:${identityEpoch}`}
       loadCatalog={loadCatalog}
+      onPreferences={preferences}
       locale={locale}
       active={active}
     />

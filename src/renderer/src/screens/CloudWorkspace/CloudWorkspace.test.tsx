@@ -7,6 +7,17 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CloudWorkspace from "./CloudWorkspace";
+import type { WorkspaceRecord } from "@mithril/workspace/protocol";
+const preferences = vi.hoisted(() => ({
+  setTheme: vi.fn(),
+  setLocale: vi.fn(),
+}));
+vi.mock("../../components/ThemeProvider", () => ({
+  useTheme: () => ({ setTheme: preferences.setTheme }),
+}));
+vi.mock("../../components/useI18n", () => ({
+  useI18n: () => ({ setLocale: preferences.setLocale }),
+}));
 
 const enable = vi.fn(async () => ({ userId: "user-a", enabled: true }));
 const disable = vi.fn(async () => undefined);
@@ -14,11 +25,17 @@ const snapshot = vi.fn(async () => ({
   schemaVersion: 1,
   userId: "user-a",
   cursor: 0,
-  records: [],
+  records: [] as WorkspaceRecord[],
 }));
 let accountChanged: () => void;
 beforeEach(() => {
   vi.clearAllMocks();
+  snapshot.mockReset().mockResolvedValue({
+    schemaVersion: 1,
+    userId: "user-a",
+    cursor: 0,
+    records: [],
+  });
   Object.defineProperty(window, "hermesAPI", {
     configurable: true,
     value: {
@@ -87,4 +104,31 @@ describe("Desktop shared workspace", () => {
       window.hermesAPI.cloudWorkspace.applyOperations,
     ).not.toHaveBeenCalled();
   });
+});
+
+// @lat: [[cloud-workspace#Cloud workspace#Rich repository implementation in progress#Acknowledged appearance and language observation (draft)]]
+it("applies cloud language and appearance through original native providers without execution", async () => {
+  snapshot.mockResolvedValue({
+    schemaVersion: 1,
+    userId: "user-a",
+    cursor: 1,
+    records: [
+      {
+        id: "prefs",
+        kind: "preferences",
+        revision: 1,
+        data: { theme: "dark", locale: "ja" },
+        deleted: false,
+        updatedAt: 1,
+      },
+    ],
+  });
+  render(<CloudWorkspace profile="default" />);
+  await waitFor(() =>
+    expect(preferences.setTheme).toHaveBeenCalledWith("dark"),
+  );
+  expect(preferences.setLocale).toHaveBeenCalledWith("ja");
+  expect(
+    window.hermesAPI.cloudWorkspace.applyOperations,
+  ).not.toHaveBeenCalled();
 });

@@ -199,3 +199,12 @@ All nine Settings bodies share original UI with consumer-owned connection and ex
 [[src/renderer/src/components/settings/ConnectionPane.tsx#ConnectionPane]] injects the existing SettingsDataContext, key generation and network writes into the shared named-connection editor. [[src/renderer/src/components/settings/SshDockerTargetSection.tsx#SshDockerTargetSection]] injects native inspection/provision APIs into the same target selector used by Settings and Welcome. Late results from a changed SSH host cannot select or persist a container for the current host; container selection retains the inspected list. Inspection and provisioning remain explicit actions.
 
 Runtime credentials, host/key paths and transports remain device execution configuration. Default cloud Settings routing and canonical preferences/native cache reconciliation are still required; these components do not constitute complete synchronization or browser-native SSH support.
+
+
+### Acknowledged appearance and language observation (draft)
+
+Confirmed account preferences apply through original presentation providers on initial load and refresh.
+
+The shared workspace observes one live preferences record and delivers its acknowledged revision once per identity. Pending preferences edits suppress automatic application, and multiple legacy preference records remain visible for review instead of being selected by timestamps. Desktop [[src/renderer/src/screens/CloudWorkspace/CloudWorkspace.tsx#CloudWorkspace]] supplies the original Theme/I18n providers; Web uses its locale/theme providers. Observation does not queue writes or execute agents.
+
+This closes the existing read-side appearance/language gap. Full original preference fields, automatic provider-to-cloud writes, canonical record selection and default shared Settings routing remain required.

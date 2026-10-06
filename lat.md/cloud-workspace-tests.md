@@ -324,3 +324,7 @@ Missing connected task nodes restore together with original relationships and hi
 ## Stable task component inventory
 
 Repeated complete task pages must retain owner and revision equality. Wrong owners and changing cloud documents refuse component adoption before native storage writes.
+
+## Connected component attachment restoration
+
+Main-owned group restoration verifies selected files before SQL writes, rolls back refused groups, preserves existing bytes and replays exact receipts offline.

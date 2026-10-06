@@ -7,16 +7,85 @@ import {
   type JsonValue,
   type RepositoryDocument,
 } from "@mithril/workspace/repository";
+import type { TaskAttachment } from "@mithril/workspace/task-attachments";
 import { restoreKanbanTask } from "./kanban-task-restore";
 import { planKanbanDependencies } from "./kanban-dependency-replica";
 import { portableKanbanTask } from "./kanban-portable-record";
 import { projectKanbanHistory } from "./kanban-history-identity";
+
+/** Read-only selection; apply rechecks this inventory under its writer transaction. */
+export function selectKanbanTaskGroup(
+  db: Database.Database,
+  requested: RepositoryDocument,
+  documents: RepositoryDocument[],
+): Map<string, RepositoryDocument> | null {
+  const root = requested.body as Record<string, JsonValue>;
+  const rootTask = root.task as Record<string, JsonValue>;
+  if (
+    typeof rootTask?.id !== "string" ||
+    typeof root.board !== "string" ||
+    documents.length > 4096
+  )
+    return null;
+  const byTask = new Map<string, RepositoryDocument>();
+  for (const document of documents) {
+    const body = document.body as Record<string, JsonValue>;
+    const task = body?.task as Record<string, JsonValue>;
+    if (
+      document.collection !== "task" ||
+      document.deleted ||
+      body?.board !== root.board
+    )
+      continue;
+    if (typeof task?.id !== "string" || byTask.has(task.id)) return null;
+    byTask.set(task.id, document);
+  }
+  const retained = byTask.get(rootTask.id);
+  if (
+    !retained ||
+    retained.id !== requested.id ||
+    retained.revision !== requested.revision ||
+    repositoryFingerprint(retained) !== repositoryFingerprint(requested)
+  )
+    return null;
+  const nodes = new Map<string, RepositoryDocument>();
+  const queue = [rootTask.id];
+  for (let index = 0; index < queue.length; index++) {
+    const id = queue[index];
+    if (nodes.has(id)) continue;
+    if (db.prepare("SELECT 1 FROM tasks WHERE id=?").get(id)) continue;
+    const document = byTask.get(id);
+    if (!document || nodes.size >= 1000) return null;
+    nodes.set(id, document);
+    const body = document.body as Record<string, JsonValue>;
+    if (!Array.isArray(body.dependencies) || body.dependencies.length > 20000)
+      return null;
+    for (const value of body.dependencies) {
+      const edge = value as Record<string, JsonValue>;
+      if (
+        typeof edge?.parent_id !== "string" ||
+        typeof edge.child_id !== "string" ||
+        (edge.parent_id !== id && edge.child_id !== id)
+      )
+        return null;
+      if (queue.length > 80000) return null;
+      queue.push(edge.parent_id, edge.child_id);
+    }
+  }
+  if (!nodes.has(rootTask.id)) return null;
+  return nodes;
+}
 
 /** Restore missing connected nodes and their relationships in one writer savepoint. */
 export function restoreKanbanTaskGroup(
   db: Database.Database,
   requested: RepositoryDocument,
   documents: RepositoryDocument[],
+  restoreAttachments?: (
+    document: RepositoryDocument,
+  ) =>
+    | (() => { rows: Record<string, unknown>[]; resources: TaskAttachment[] })
+    | undefined,
 ): { body: JsonValue; version: string } | null {
   if (!db.inTransaction)
     throw Error("Task group requires a writer transaction");
@@ -26,64 +95,13 @@ export function restoreKanbanTaskGroup(
   };
   try {
     return db.transaction(() => {
-      const root = requested.body as Record<string, JsonValue>;
-      const rootTask = root.task as Record<string, JsonValue>;
-      if (
-        typeof rootTask?.id !== "string" ||
-        typeof root.board !== "string" ||
-        documents.length > 4096
-      )
-        return refuse();
-      const byTask = new Map<string, RepositoryDocument>();
-      for (const document of documents) {
-        const body = document.body as Record<string, JsonValue>;
-        const task = body?.task as Record<string, JsonValue>;
-        if (
-          document.collection !== "task" ||
-          document.deleted ||
-          body?.board !== root.board
-        )
-          continue;
-        if (typeof task?.id !== "string" || byTask.has(task.id))
-          return refuse();
-        byTask.set(task.id, document);
-      }
-      const retained = byTask.get(rootTask.id);
-      if (
-        !retained ||
-        retained.id !== requested.id ||
-        retained.revision !== requested.revision ||
-        repositoryFingerprint(retained) !== repositoryFingerprint(requested)
-      )
-        return refuse();
-      const nodes = new Map<string, RepositoryDocument>();
-      const queue = [rootTask.id];
-      for (let index = 0; index < queue.length; index++) {
-        const id = queue[index];
-        if (nodes.has(id)) continue;
-        if (db.prepare("SELECT 1 FROM tasks WHERE id=?").get(id)) continue;
-        const document = byTask.get(id);
-        if (!document || nodes.size >= 1000) return refuse();
-        nodes.set(id, document);
-        const body = document.body as Record<string, JsonValue>;
-        if (
-          !Array.isArray(body.dependencies) ||
-          body.dependencies.length > 20000
-        )
-          return refuse();
-        for (const value of body.dependencies) {
-          const edge = value as Record<string, JsonValue>;
-          if (
-            typeof edge?.parent_id !== "string" ||
-            typeof edge.child_id !== "string" ||
-            (edge.parent_id !== id && edge.child_id !== id)
-          )
-            return refuse();
-          if (queue.length > 80000) return refuse();
-          queue.push(edge.parent_id, edge.child_id);
-        }
-      }
-      if (!nodes.has(rootTask.id)) return refuse();
+      const nodes = selectKanbanTaskGroup(db, requested, documents);
+      if (!nodes) return refuse();
+      const rootTask = (requested.body as { task: { id: string } }).task;
+      const files = new Map<
+        string,
+        { rows: Record<string, unknown>[]; resources: TaskAttachment[] }
+      >();
       // Every new node must agree on shared edges before any source is committed.
       for (const [id, document] of nodes) {
         const body = document.body as Record<string, JsonValue>;
@@ -105,18 +123,28 @@ export function restoreKanbanTaskGroup(
           )
             return refuse();
         }
-        // Attachment-bearing components need preverified per-node byte plans.
-        if (Array.isArray(body.attachments) && body.attachments.length)
+        const attachmentPlan = restoreAttachments?.(document);
+        if (
+          Array.isArray(body.attachments) &&
+          body.attachments.length &&
+          !attachmentPlan
+        )
           return refuse();
         const staged = restoreKanbanTask(
           db,
           document.id,
           { ...body, dependencies: [], parents: [], children: [] },
-          undefined,
+          attachmentPlan
+            ? () => {
+                const value = attachmentPlan();
+                files.set(id, value);
+                return value;
+              }
+            : undefined,
           true,
         );
         if (!staged) return refuse();
-        if (body.attachments !== undefined) {
+        if (body.attachments !== undefined && !attachmentPlan) {
           if (!Array.isArray(body.attachments) || body.attachments.length)
             return refuse();
           db.exec(
@@ -174,8 +202,12 @@ export function restoreKanbanTaskGroup(
         const dependencies = edges.filter(
           (edge) => edge.parent_id === id || edge.child_id === id,
         );
+        const attachments = files.get(id);
         const restored = {
           ...body,
+          ...(attachments
+            ? { attachments: attachments.resources as unknown as JsonValue }
+            : {}),
           task: portableKanbanTask(task as Record<string, unknown>),
           comments: comments.portable,
           events: events.portable,
@@ -203,6 +235,14 @@ export function restoreKanbanTaskGroup(
                 events.raw,
                 runs.raw,
                 dependencies,
+                ...(attachments?.rows.length
+                  ? [
+                      {
+                        rows: attachments.rows,
+                        resources: attachments.resources,
+                      },
+                    ]
+                  : []),
               ]),
             )
             .digest("hex"),

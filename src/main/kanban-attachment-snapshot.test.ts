@@ -21,6 +21,7 @@ const runtime = vi.hoisted(() => ({
   state: "/unused",
   owner: "alice",
   files: vi.fn(),
+  pages: vi.fn(),
 }));
 vi.mock("electron", () => ({ app: { getPath: () => runtime.state } }));
 vi.mock("./utils", () => ({ profileHome: () => runtime.root }));
@@ -28,6 +29,7 @@ vi.mock("./cloud-workspace-runtime", () => ({
   cloudWorkspace: {
     nativeContext: async () => ({ userId: runtime.owner, profile: "default" }),
     taskAttachments: { forOwner: runtime.files },
+    repositoryPage: runtime.pages,
     capabilityResources: {
       forOwner: () => {
         throw Error("No fixture resource transport");
@@ -975,5 +977,131 @@ it("connects the main replica route to owner-pinned restoration and skips downlo
   } finally {
     capture.dispose();
     runtime.files.mockReset();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Connected component attachment restoration]]
+it("restores every connected task file through the main owner-scoped route and retains the original source on group refusal", async () => {
+  const f = fixture(),
+    capture = f.capture();
+  runtime.root = f.root;
+  runtime.state = f.state;
+  runtime.owner = "alice";
+  try {
+    const source = kanbanReplicaSnapshot(
+      f.root,
+      "default",
+      "alice",
+      "device",
+      capture.project,
+    ).documents.find((row) => row.collection === "task")!;
+    const documents = ["a", "b"].map((id, index) => {
+      const body = structuredClone(source.body) as Record<string, JsonValue>;
+      (body.task as Record<string, JsonValue>).id = id;
+      (body.task as Record<string, JsonValue>).title = id;
+      body.dependencies = [{ parent_id: "a", child_id: "b" }];
+      body.parents = id === "b" ? ["a"] : [];
+      body.children = id === "a" ? ["b"] : [];
+      const row = (body.attachments as Record<string, JsonValue>[])[0];
+      row.id = 21 + index;
+      row.task_id = id;
+      const documentId = "cloud-component-" + id;
+      (row.resource as Record<string, JsonValue>).taskId = documentId;
+      return {
+        collection: "task" as const,
+        id: documentId,
+        body,
+        deleted: false,
+        revision: 1,
+        updatedAt: 1,
+      };
+    });
+    const operation = {
+      operationId: "component-files-main",
+      document: documents[0],
+      expectedRecord: null,
+      expectedVersion: null,
+    };
+    const reader = {
+      forOwner: () => reader,
+      getChunk: vi.fn(async () => f.bytes),
+    };
+    runtime.files.mockReturnValue(reader);
+    const unavailable = documents.map((document) =>
+      document.id.endsWith("b")
+        ? {
+            ...document,
+            body: {
+              ...document.body,
+              task: {
+                ...(document.body.task as Record<string, JsonValue>),
+                status: "running",
+              },
+            },
+          }
+        : document,
+    );
+    runtime.pages.mockResolvedValue({
+      schemaVersion: 1,
+      userId: "alice",
+      documents: unavailable,
+      nextAfter: null,
+    });
+    expect((await nativeReplicaApply(operation)).status).toBe("deferred");
+    const db = new Database(f.dbFile);
+    try {
+      expect(db.prepare("SELECT id FROM tasks ORDER BY id").all()).toEqual([
+        { id: f.taskId },
+      ]);
+      expect(
+        db.prepare("SELECT id FROM task_attachments ORDER BY id").all(),
+      ).toEqual([{ id: 9 }]);
+      expect(readFileSync(f.file)).toEqual(Buffer.from(f.bytes));
+      runtime.pages.mockResolvedValue({
+        schemaVersion: 1,
+        userId: "alice",
+        documents,
+        nextAfter: null,
+      });
+      const accepted = await nativeReplicaApply(operation);
+      expect(accepted.status).toBe("applied");
+      const fresh = f.capture();
+      try {
+        const snapshot = kanbanReplicaSnapshot(
+          f.root,
+          "default",
+          "alice",
+          accepted.replicaId,
+          fresh.project,
+        );
+        expect(accepted.record).toEqual(
+          snapshot.documents.find((row) => row.id === documents[0].id),
+        );
+        for (const document of documents)
+          expect(
+            snapshot.documents.find((row) => row.id === document.id)?.body,
+          ).toEqual(document.body);
+      } finally {
+        fresh.dispose();
+      }
+      const rows = db
+        .prepare(
+          "SELECT stored_path FROM task_attachments WHERE id IN (21,22) ORDER BY id",
+        )
+        .all() as { stored_path: string }[];
+      expect(rows).toHaveLength(2);
+      for (const row of rows)
+        expect(readFileSync(row.stored_path)).toEqual(Buffer.from(f.bytes));
+      const reads = reader.getChunk.mock.calls.length;
+      runtime.pages.mockRejectedValue(Error("Offline"));
+      reader.getChunk.mockRejectedValue(Error("Offline"));
+      expect(await nativeReplicaApply(operation)).toEqual(accepted);
+      expect(reader.getChunk.mock.calls.length).toBe(reads);
+      expect(readFileSync(f.file)).toEqual(Buffer.from(f.bytes));
+    } finally {
+      db.close();
+    }
+  } finally {
+    capture.dispose();
   }
 });

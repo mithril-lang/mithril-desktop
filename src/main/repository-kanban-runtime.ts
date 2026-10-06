@@ -1,5 +1,6 @@
 import {
   restoreKanbanTaskGroup,
+  selectKanbanTaskGroup,
   readStableKanbanTasks,
 } from "./kanban-task-group-restore";
 import {
@@ -556,6 +557,7 @@ export function applyKanbanReplica(
   boardPython?: string,
   boardMetadataReplacement = false,
   groupDocuments?: import("@mithril/workspace/repository").RepositoryDocument[],
+  groupAttachmentPlans?: Map<string, KanbanAttachmentWriteback>,
 ): import("@mithril/workspace/replica-sync").ReplicaResult {
   const retained = retainedTaskReceipt(root, userId, replicaId, write);
   if (retained) return retained;
@@ -660,7 +662,56 @@ export function applyKanbanReplica(
             return result("conflict", current);
           if (write.document.deleted) return result("deferred");
           const restored = groupDocuments
-            ? restoreKanbanTaskGroup(db, write.document, groupDocuments)
+            ? restoreKanbanTaskGroup(
+                db,
+                write.document,
+                groupDocuments,
+                (document) => {
+                  const plan =
+                    groupAttachmentPlans?.get(document.id) ??
+                    (document.id === write.document.id
+                      ? attachmentWriteback
+                      : undefined);
+                  if (!plan) return undefined;
+                  return () => {
+                    const value = document.body as {
+                      board: string;
+                      task: { id: string };
+                      attachments?: JsonValue;
+                    };
+                    plan.apply(db, [], [], write.operationId);
+                    const rows = orderedKanbanAttachments(
+                      db,
+                      value.task.id,
+                      db
+                        .prepare(
+                          "SELECT * FROM task_attachments WHERE task_id=?",
+                        )
+                        .all(value.task.id) as Record<string, unknown>[],
+                    );
+                    const resources = rows.length
+                      ? attachmentProjection!(
+                          value.board,
+                          document.id,
+                          value.task.id,
+                          rows,
+                        )
+                      : [];
+                    if (
+                      repositoryFingerprint({
+                        body: resources as unknown as JsonValue,
+                        deleted: false,
+                      }) !==
+                      repositoryFingerprint({
+                        body: value.attachments ?? [],
+                        deleted: false,
+                      })
+                    )
+                      throw Error("Restored attachment projection changed");
+                    return { rows, resources };
+                  };
+                },
+              )
             : restoreKanbanTask(
                 db,
                 write.document.id,
@@ -1581,6 +1632,7 @@ export async function nativeReplicaApply(
       join(app.getPath("userData"), "repository-task-captures"),
     );
     let attachments: KanbanAttachmentWriteback | undefined;
+    const groupAttachmentPlans = new Map<string, KanbanAttachmentWriteback>();
     try {
       const retained = retainedTaskReceipt(
         before.root,
@@ -1644,6 +1696,71 @@ export async function nativeReplicaApply(
               },
             )
           : undefined;
+      if (groupDocuments) {
+        const board = incoming.board;
+        if (
+          typeof board !== "string" ||
+          !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(board)
+        )
+          throw Error("Invalid native board");
+        const file =
+          board === "default"
+            ? join(before.root, "kanban.db")
+            : join(before.root, "kanban", "boards", board, "kanban.db");
+        checked(file);
+        if (!existsSync(file))
+          return {
+            schemaVersion: 1,
+            userId: before.userId,
+            replicaId: before.replicaId,
+            status: "deferred",
+            record: null,
+          };
+        const db = new Database(file, { readonly: true, fileMustExist: true });
+        let nodes: ReturnType<typeof selectKanbanTaskGroup>;
+        try {
+          nodes = selectKanbanTaskGroup(db, write.document, groupDocuments);
+        } finally {
+          db.close();
+        }
+        if (!nodes)
+          return {
+            schemaVersion: 1,
+            userId: before.userId,
+            replicaId: before.replicaId,
+            status: "deferred",
+            record: null,
+          };
+        for (const document of nodes.values()) {
+          if (
+            document.id === write.document.id ||
+            (document.body as Record<string, JsonValue>).attachments ===
+              undefined
+          )
+            continue;
+          const plan = await prepareKanbanAttachmentWriteback(
+            before.root,
+            HERMES_PYTHON,
+            join(app.getPath("userData"), "repository-task-restores"),
+            document.id,
+            document.body,
+            cloudWorkspace.taskAttachments.forOwner(before.userId),
+            async () => {
+              if (
+                JSON.stringify(before.context) !==
+                JSON.stringify(await cloudWorkspace.nativeContext(true))
+              )
+                throw Error("Workspace identity changed");
+            },
+          );
+          groupAttachmentPlans.set(document.id, plan);
+        }
+        if (
+          JSON.stringify(before.context) !==
+          JSON.stringify(await cloudWorkspace.nativeContext(true))
+        )
+          throw Error("Workspace identity changed");
+      }
       result = applyKanbanReplica(
         before.root,
         before.profile,
@@ -1655,9 +1772,11 @@ export async function nativeReplicaApply(
         HERMES_PYTHON,
         supportsKanbanMetadataReplacement(HERMES_REPO),
         groupDocuments,
+        groupAttachmentPlans,
       );
     } finally {
       attachments?.dispose();
+      for (const plan of groupAttachmentPlans.values()) plan.dispose();
       capture.dispose();
     }
   }

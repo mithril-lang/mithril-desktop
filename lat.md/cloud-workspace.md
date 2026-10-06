@@ -470,3 +470,14 @@ The native working-copy adapter now restores missing connected tasks together ra
 [[src/main/kanban-task-group-restore.ts#readStableKanbanTasks]] checks bounded complete task pages twice with owner and account guards. [[src/main/kanban-task-group-restore.ts#restoreKanbanTaskGroup]] resolves missing nodes, validates reciprocal edges, stages inactive tasks/history/identity under a writer savepoint and applies the original dependency planner. Exact final projections precede the retained root-operation receipt; incomplete or inconsistent components roll back. Native reads and restoration never dispatch work. Attachment-bearing components still require per-node verified byte plans, and installed/multi-device qualification remains required.
 
 Connected-component local qualification: 2,624 Desktop tests / 281 files passed with the missing-credential fixture isolated from OPENROUTER_API_KEY. The final 30-test storage/attachment rerun includes interrupted admission, absent endpoints, execution-state refusal, exact source/receipt equality and repeat cloud owner/revision reads. Node/web types, full lint, production build and lat check passed. Previous head 5749324 passed GitHub CI run 37514655442; this new component head needs its own CI and installed qualification.
+
+
+## Connected task attachment plans (draft)
+
+Missing connected tasks now prepare owner-pinned, verified file plans before restoring the original Kanban records and relationships.
+
+The main process selects missing nodes read-only, verifies each selected task file through the account-scoped API, then rechecks the group in the SQLite writer transaction. Original task history, attachment rows and graph edges commit with the root operation receipt. All preparation resources are disposed on refusal or completion. No file or tool is executed.
+
+Refused groups roll back database rows and retain existing file bytes. Immutable unregistered files may remain after a transaction refusal; they never overwrite original files. Retained receipts replay without downloading again. The real-schema main-route invariant is [[cloud-workspace-tests#Cloud workspace tests#Connected component attachment restoration]].
+
+Local qualification: 2,625 Desktop tests / 281 files, including 31 targeted storage/attachment tests, passed. Node/web types, full lint, production build and lat check passed. The missing-credential fixture ran without OPENROUTER_API_KEY. Prior Desktop head 2881575 passed CI run 37515852708. This follow-up requires new-head CI, publication and installed multi-device qualification.

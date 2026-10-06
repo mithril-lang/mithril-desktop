@@ -4,6 +4,10 @@ import {
 } from "@mithril/workspace/capability-resources";
 import { createDiscoverDocuments } from "@mithril/workspace/discover-documents";
 import {
+  registryBundleBytes,
+  type RegistrySkillBundle,
+} from "@mithril/workspace/registry-bundle";
+import {
   repositoryCollections,
   validRepositoryEdit,
   validRepositoryPage,
@@ -184,6 +188,31 @@ export class CloudWorkspace {
     }),
   );
 
+  // @lat: [[discover#Original Discover#Shared marketplace]]
+  async registrySkill(
+    item: import("@mithril/workspace/desktop-discover").RegistryItem,
+  ): Promise<RegistrySkillBundle> {
+    if (
+      !item ||
+      !["hermes", "mithril"].includes(item.registry ?? "") ||
+      typeof item.id !== "string" ||
+      !/^[a-zA-Z0-9_-]{1,128}$/.test(item.id)
+    )
+      throw Error("Invalid registry entry");
+    const session = await this.session();
+    const bundle = (await this.request(
+      `/v1/discover/bundle/${item.registry}/${item.id}`,
+      session.token,
+      session.profile,
+      undefined,
+      60000,
+    )) as RegistrySkillBundle;
+    if (bundle?.source !== item.registry || bundle.id !== item.id)
+      throw Error("Registry selection changed");
+    await registryBundleBytes(bundle);
+    return bundle;
+  }
+
   // @lat: [[cloud-workspace#Cloud workspace#Canonical catalog]]
   async catalog(): Promise<import("@mithril/workspace/react").DiscoverItem[]> {
     const response = await this.deps.fetch(
@@ -248,6 +277,7 @@ export class CloudWorkspace {
     token: string,
     profile: string,
     body?: unknown,
+    timeoutMs = 15000,
   ): Promise<unknown> {
     const generation = this.generation;
     if (token !== this.deps.token() || profile !== this.deps.profile()) {
@@ -266,7 +296,7 @@ export class CloudWorkspace {
         credentials: "omit",
         redirect: "error",
         cache: "no-store",
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(timeoutMs),
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
     } catch {

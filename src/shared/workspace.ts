@@ -25,6 +25,9 @@ export interface CloudWorkspaceAPI extends WorkspaceTransport {
   files: import("@mithril/workspace/files").ProjectFileTransport;
   capabilityResources: import("@mithril/workspace/capability-resources").CapabilityResourceTransport;
   catalog(): Promise<import("@mithril/workspace/react").DiscoverItem[]>;
+  registrySkill(
+    item: import("@mithril/workspace/desktop-discover").RegistryItem,
+  ): Promise<import("@mithril/workspace/registry-bundle").RegistrySkillBundle>;
   discoverDocuments: Pick<
     import("@mithril/workspace/desktop-discover").DiscoverAPI,
     "fetchRegistry" | "fetchRegistryDetail"

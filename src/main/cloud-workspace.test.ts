@@ -75,6 +75,78 @@ beforeEach(() => {
 
 describe("Desktop cloud workspace boundary", () => {
   // @lat: [[discover#Original Discover#Shared marketplace]]
+  it("loads a verified Skill bundle through the main-owned API route and rejects changed accounts", async () => {
+    await client.enable();
+    const bytes = new TextEncoder().encode("# Original Skill");
+    const digest = Array.from(
+      new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+      (byte) => byte.toString(16).padStart(2, "0"),
+    ).join("");
+    const bundle = {
+      source: "hermes",
+      id: "apple-notes",
+      commit: "a".repeat(40),
+      directory: "apple/apple-notes",
+      license: "MIT",
+      files: [
+        {
+          path: "SKILL.md",
+          executable: false,
+          size: bytes.length,
+          digest,
+          base64: btoa("# Original Skill"),
+        },
+      ],
+    };
+    const item = {
+      id: "apple-notes",
+      registry: "hermes" as const,
+      name: "Notes",
+      description: "",
+      path: "../private",
+      artifact: { format: "git" as const, url: "https://evil.test" },
+    };
+    fetcher.mockImplementation(async (url: string) =>
+      url.endsWith("/v1/me")
+        ? reply({
+            via: "api_token",
+            scopes: ["workspace:read", "workspace:write"],
+            user: { id: "a" },
+          })
+        : reply(bundle),
+    );
+    expect(await client.registrySkill(item)).toEqual(bundle);
+    expect(fetcher).toHaveBeenLastCalledWith(
+      "https://api.mithril.fund/v1/discover/bundle/hermes/apple-notes",
+      expect.objectContaining({
+        credentials: "omit",
+        redirect: "error",
+        headers: expect.objectContaining({ authorization: `Bearer ${tokenA}` }),
+      }),
+    );
+    const count = fetcher.mock.calls.length;
+    await expect(
+      client.registrySkill({ ...item, id: "../private" }),
+    ).rejects.toThrow("Invalid registry entry");
+    expect(fetcher).toHaveBeenCalledTimes(count);
+    fetcher.mockImplementation(async (url: string) => {
+      if (url.endsWith("/v1/me"))
+        return reply({
+          via: "api_token",
+          scopes: ["workspace:read", "workspace:write"],
+          user: { id: "a" },
+        });
+      return {
+        ...reply(bundle),
+        json: async () => {
+          token = tokenB;
+          return bundle;
+        },
+      };
+    });
+    await expect(client.registrySkill(item)).rejects.toThrow("account changed");
+  });
+  // @lat: [[discover#Original Discover#Shared marketplace]]
   it("reads original registry documents through fixed Mithril API routes without renderer URLs or credentials", async () => {
     fetcher.mockResolvedValueOnce(
       reply({ skills: [], mcps: [], agents: [], workflows: [], plugins: [] }),

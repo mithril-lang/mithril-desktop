@@ -129,6 +129,7 @@ export default function CloudWorkspace({
       afterDisconnect={() => window.hermesAPI.cloudWorkspace.disable()}
       identityEpoch={`${profile}:${identityEpoch}`}
       discoverDocuments={window.hermesAPI.cloudWorkspace.discoverDocuments}
+      loadRegistrySkill={window.hermesAPI.cloudWorkspace.registrySkill}
       onPreferences={preferences}
       locale={locale}
       active={active}

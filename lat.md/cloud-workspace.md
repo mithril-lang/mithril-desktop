@@ -140,7 +140,7 @@ The original Desktop timeline now reads a cloud projection layered over the unch
 
 The original Desktop Markdown component is shared with Web; a display-only normalization restores structurally unambiguous tables whose source lost newlines.
 
-Stored replies remain unchanged. The shared workspace normalizer leaves ordinary GFM, fenced examples, inline code and inconsistent column counts untouched. This repairs historical one-line tables without replacing the original renderer or changing their contents.
+Stored replies remain unchanged. The shared workspace normalizer restores both spaced and compact double-pipe row seams, validated against a separator and consistent column counts. Ordinary GFM, fenced examples, inline code with pipes and ambiguous columns remain untouched. Desktop and Web keep the original renderer.
 
 ### Original Memory component extraction (draft)
 
@@ -219,6 +219,8 @@ The five remaining default cloud Settings section adapters, automatic upload fro
 All nine original Settings panes now mount in the normal Desktop cloud Settings modal with state retained across tabs.
 
 [[src/renderer/src/components/settings/SettingsModal.tsx#NativeSettingsProvider]] supplies the original SettingsDataContext once for the whole modal; [[src/renderer/src/components/settings/SettingsModal.tsx#NativeSettingsPane]] dispatches the same original bodies used by the global modal. [[src/renderer/src/screens/CloudWorkspace/CloudWorkspace.tsx#CloudWorkspace]] supplies those ports to the shared shell for Connection, Data, About/Updates, Community and Logs, while general preference controls use canonical cloud settings. The provider is keyed by the selected profile and mounts only when Settings opens.
+
+The normal Cmd/Ctrl+, shortcut now navigates to this same Settings route as the sidebar. It no longer opens a competing global preference store. Explicit native execution setup dialogs remain reachable until their data and runtime adapters are complete.
 
 Backups/imports, updates, connection tests and links retain existing explicit native handlers. Opening or switching panes does not replay those actions. Runtime credentials stay outside presentation documents. Tests cover native backup result retention and explicit profile ownership; browser default-route fixtures cover consumer state retention across general/runtime tabs. Web’s five runtime pane adapters and native provider-to-cloud uploads remain unfinished. Source checks are not installed-client or publication evidence.
 

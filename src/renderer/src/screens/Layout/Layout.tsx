@@ -321,18 +321,18 @@ function Layout({
       window.removeEventListener("navigation:goto", handleNavigation);
   }, [goTo]);
 
-  // Cmd/Ctrl+, opens the settings modal from anywhere (the conventional
-  // "preferences" shortcut).
+  // The conventional preferences shortcut uses the same original modal and
+  // account repository as the sidebar, avoiding a second preference store.
   useEffect(() => {
     const handleKey = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key === ",") {
         e.preventDefault();
-        openSettings(undefined, { profile: activeProfile });
+        goTo("cloud-settings");
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [openSettings, activeProfile]);
+  }, [goTo]);
 
   const focusDiscover = useCallback(
     (kind: "skills" | "mcps") => {

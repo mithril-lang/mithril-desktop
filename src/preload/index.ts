@@ -442,6 +442,8 @@ const hermesAPI = {
     files: projectFileAPI(),
     capabilityResources: capabilityResourceAPI(),
     catalog: () => ipcRenderer.invoke("cloud-workspace-catalog"),
+    registrySkill: (item) =>
+      ipcRenderer.invoke("cloud-workspace-registry-skill", item),
     discoverDocuments: {
       fetchRegistry: () => ipcRenderer.invoke("cloud-workspace-registry"),
       fetchRegistryDetail: (kind, item) =>

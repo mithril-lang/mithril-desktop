@@ -1446,6 +1446,10 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudWorkspace.discoverDocuments.fetchRegistry();
   });
+  ipcMain.handle("cloud-workspace-registry-skill", (event, item) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.registrySkill(item);
+  });
   ipcMain.handle("cloud-workspace-registry-detail", (event, kind, item) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.discoverDocuments.fetchRegistryDetail(kind, item);

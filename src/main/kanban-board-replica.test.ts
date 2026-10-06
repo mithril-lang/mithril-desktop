@@ -1,0 +1,266 @@
+import { kanbanBoardRecord } from "./kanban-board-replica";
+import { afterEach, expect, it } from "vitest";
+import Database from "better-sqlite3";
+import {
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  symlinkSync,
+  existsSync,
+  chmodSync,
+  readdirSync,
+} from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import {
+  applyKanbanReplica,
+  kanbanReplicaSnapshot,
+} from "./repository-kanban-runtime";
+import type { ReplicaWrite } from "@mithril/workspace/replica-sync";
+const roots: string[] = [];
+afterEach(() =>
+  roots.splice(0).forEach((r) => rmSync(r, { recursive: true, force: true })),
+);
+function root(): string {
+  const r = realpathSync(mkdtempSync(join(tmpdir(), "mithril-board-replica-")));
+  roots.push(r);
+  return r;
+}
+function operation(): ReplicaWrite {
+  return {
+    operationId: "new-original-board",
+    expectedRecord: null,
+    expectedVersion: null,
+    document: {
+      collection: "board",
+      id: "evidence",
+      revision: 1,
+      updatedAt: 1,
+      deleted: false,
+      body: {
+        slug: "evidence",
+        name: "証拠整理",
+        is_current: false,
+        total: 0,
+        counts: {},
+        description: "Original display metadata",
+        icon: "folder",
+        color: "#123456",
+        archived: false,
+        project_id: null,
+        created_at: 123,
+      },
+    },
+  };
+}
+function apply(
+  r: string,
+  w = operation(),
+): ReturnType<typeof applyKanbanReplica> {
+  return applyKanbanReplica(
+    r,
+    "default",
+    "alice",
+    "replica",
+    w,
+    undefined,
+    undefined,
+    "/usr/bin/python3",
+  );
+}
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Cloud-created board working copy]]
+it("publishes the original empty schema, metadata and receipt together, then accepts tasks through the original working copy", () => {
+  const r = root(),
+    w = operation(),
+    result = apply(r, w);
+  expect(result.status).toBe("applied");
+  expect(kanbanBoardRecord(r, "original-work", []).body).toMatchObject({
+    name: "Original Work",
+  });
+  expect(result.record).toEqual(
+    kanbanReplicaSnapshot(r, "default", "alice", "replica").documents.find(
+      (d) => d.collection === "board",
+    ),
+  );
+  const file = join(r, "kanban", "boards", "evidence", "kanban.db"),
+    db = new Database(file);
+  expect(db.prepare("SELECT COUNT(*) AS n FROM tasks").get()).toEqual({ n: 0 });
+  expect(
+    db.prepare("SELECT COUNT(*) AS n FROM kanban_notify_subs").get(),
+  ).toEqual({ n: 0 });
+  expect(
+    db.prepare("SELECT COUNT(*) AS n FROM mithril_replica_receipts").get(),
+  ).toEqual({ n: 1 });
+  expect(
+    JSON.parse(
+      readFileSync(
+        join(r, "kanban", "boards", "evidence", "board.json"),
+        "utf8",
+      ),
+    ),
+  ).toMatchObject({
+    name: "証拠整理",
+    description: "Original display metadata",
+  });
+  db.close();
+  expect(apply(r, w)).toEqual(result);
+  expect(() =>
+    apply(r, {
+      ...w,
+      document: {
+        ...w.document,
+        body: { ...(w.document.body as object), name: "Changed operation" },
+      },
+    }),
+  ).toThrow("Replica operation was reused");
+  expect(
+    applyKanbanReplica(r, "default", "alice", "replica", {
+      operationId: "new-task-in-restored-board",
+      expectedRecord: null,
+      expectedVersion: null,
+      document: {
+        collection: "task",
+        id: "cloud-task",
+        revision: 1,
+        updatedAt: 1,
+        deleted: false,
+        body: {
+          board: "evidence",
+          task: {
+            id: "native-task",
+            title: "Restored task",
+            status: "todo",
+            created_at: 123,
+          },
+          comments: [],
+          events: [],
+          runs: [],
+          dependencies: [],
+          parents: [],
+          children: [],
+          latest_summary: null,
+        },
+      },
+    }).status,
+  ).toBe("applied");
+  const native = new Database(file, { readonly: true });
+  expect(native.prepare("SELECT id,title,status FROM tasks").get()).toEqual({
+    id: "native-task",
+    title: "Restored task",
+    status: "todo",
+  });
+  native.close();
+  expect(readdirSync(join(r, "kanban", "boards"))).toEqual(["evidence"]);
+});
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Board publication refusal]]
+it("retains existing directories and refuses symlinks, execution metadata and unsupported publication before creating a board", () => {
+  const r = root(),
+    target = join(r, "kanban", "boards", "evidence");
+  mkdirSync(target, { recursive: true });
+  writeFileSync(join(target, "original"), "retained");
+  expect(apply(r).status).toBe("conflict");
+  expect(readFileSync(join(target, "original"), "utf8")).toBe("retained");
+  expect(existsSync(join(target, "kanban.db"))).toBe(false);
+  const unsafe = root();
+  mkdirSync(join(unsafe, "kanban"));
+  symlinkSync(r, join(unsafe, "kanban", "boards"));
+  expect(() => apply(unsafe)).toThrow("Unsafe");
+  const rejected = root(),
+    w = operation();
+  expect(
+    apply(rejected, {
+      ...w,
+      document: {
+        ...w.document,
+        body: {
+          ...(w.document.body as object),
+          default_workdir: "/private/device",
+        },
+      },
+    }).status,
+  ).toBe("deferred");
+  expect(existsSync(join(rejected, "kanban"))).toBe(false);
+  const stopped = root();
+  expect(() =>
+    applyKanbanReplica(
+      stopped,
+      "default",
+      "alice",
+      "replica",
+      w,
+      undefined,
+      undefined,
+      "/missing/python",
+    ),
+  ).toThrow();
+  expect(existsSync(join(stopped, "kanban", "boards", "evidence"))).toBe(false);
+  expect(readdirSync(join(stopped, "kanban", "boards"))).toEqual([]);
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Concurrent board publication]]
+it("never replaces a target created during publication and recovers an exact receipt after acknowledgement loss", () => {
+  const r = root(),
+    scripts = root();
+  const wrapper = join(scripts, "publisher.py"),
+    launcher = join(scripts, "python");
+  writeFileSync(
+    wrapper,
+    "import os,sys\ntarget=sys.argv[-1]\nos.mkdir(target)\nopen(os.path.join(target,'winner'),'w').write('other writer')\nos.execv(sys.executable,[sys.executable]+sys.argv[1:])\n",
+  );
+  writeFileSync(
+    launcher,
+    `#!/bin/sh\nexec /usr/bin/python3 -I '${wrapper}' "$@"\n`,
+  );
+  chmodSync(launcher, 0o700);
+  const w = operation();
+  expect(
+    applyKanbanReplica(
+      r,
+      "default",
+      "alice",
+      "replica",
+      w,
+      undefined,
+      undefined,
+      launcher,
+    ).status,
+  ).toBe("conflict");
+  expect(
+    readFileSync(join(r, "kanban", "boards", "evidence", "winner"), "utf8"),
+  ).toBe("other writer");
+  expect(readdirSync(join(r, "kanban", "boards"))).toEqual(["evidence"]);
+  const restored = root(),
+    receipt = apply(restored, w);
+  writeFileSync(
+    join(restored, "kanban", "boards", "evidence", "board.json"),
+    JSON.stringify({
+      name: "Later original edit",
+      default_workdir: "/private/original",
+    }),
+  );
+  expect(apply(restored, w)).toEqual(receipt);
+  const fresh = kanbanReplicaSnapshot(
+    restored,
+    "default",
+    "alice",
+    "replica",
+  ).documents.find((d) => d.collection === "board")!;
+  expect(fresh.body).toMatchObject({ name: "Later original edit" });
+  expect(fresh.version).not.toBe(receipt.record!.version);
+  expect(JSON.stringify(fresh.body)).not.toContain("/private/original");
+  expect(() =>
+    applyKanbanReplica(
+      restored,
+      "default",
+      "bob",
+      "replica",
+      w,
+      undefined,
+      undefined,
+      "/usr/bin/python3",
+    ),
+  ).toThrow("Invalid retained task receipt");
+});

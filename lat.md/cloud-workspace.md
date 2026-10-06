@@ -399,3 +399,11 @@ Existing tasks can append terminal run receipts under the same CAS, preserving a
 Cloud history retains original IDs while the original SQLite working copy uses private collision-free row keys.
 
 [[src/main/kanban-history-identity.ts#projectKanbanHistory]] translates comment/event/run IDs and event-to-run references only in the portable projection. [[src/main/kanban-history-restore.ts#planKanbanHistoryRestore]] allocates safe native aliases and commits their mapping with task history and receipts. Existing original rows are never overwritten. Source fingerprints retain actual native IDs; canonical projections sort by cloud IDs. Later original Agent additions and new cloud IDs overlapping prior aliases converge without duplication. Scalar JSON payloads decode once. Missing mapped rows/tasks retain the source and stop publication. Active authority, board creation, attachment key collisions and installed qualification remain outstanding.
+
+## New named board working copies (draft)
+
+Cloud-created named boards now restore a complete original SQLite schema and board.json without running Agent code or creating a separate UI.
+
+[[src/main/kanban-board-replica.ts#restoreKanbanBoard]] stages empty original tables, portable display metadata and the retained operation receipt together. Exclusive Darwin/Linux directory publication refuses an existing or concurrently created board. Files and parent directories are synchronized before acknowledgement. Exact retries recover the published receipt before current metadata reads, and tasks then restore through the existing original working-copy adapter. [[src/main/kanban-board-replica.ts#kanbanBoardRecord]] retains display name, description, icon, color, project association, timestamps and archive flag; native work directories remain private but participate in source fingerprints. Reads do not switch boards, dispatch work or create subscriptions.
+
+This is named-board creation and metadata observation; original-board metadata writeback/archive, missing default-board initialization, dependent task graph reconstruction, Windows publication and installed/multi-device qualification remain incomplete.

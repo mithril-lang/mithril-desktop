@@ -1,3 +1,4 @@
+import { kanbanBoardRecord, restoreKanbanBoard } from "./kanban-board-replica";
 import {
   captureKanbanAttachments,
   type KanbanAttachmentProjection,
@@ -234,23 +235,9 @@ export function kanbanRepositorySeed(
           throw Error(
             "Unassigned Kanban relationships require review; original records retained",
           );
-        versions?.set(
-          "board:" + slug,
-          createHash("sha256")
-            .update(JSON.stringify([slug, tasks]))
-            .digest("hex"),
-        );
-        documents.push({
-          collection: "board",
-          id: slug,
-          body: json({
-            slug,
-            name: slug === "default" ? "Default" : slug,
-            is_current: false,
-            total: 0,
-            counts: {},
-          }),
-        });
+        const board = kanbanBoardRecord(root, slug, tasks);
+        versions?.set("board:" + slug, board.version);
+        documents.push({ collection: "board", id: slug, body: board.body });
         const identityRows = tables.has("mithril_repository_task_ids")
           ? (db
               .prepare(
@@ -480,20 +467,26 @@ function retainedTaskReceipt(
   replicaId: string,
   write: import("@mithril/workspace/replica-sync").ReplicaWrite,
 ): import("@mithril/workspace/replica-sync").ReplicaResult | null {
-  if (write.document.collection !== "task") return null;
+  if (!["task", "board"].includes(write.document.collection)) return null;
   const hint = write.expectedRecord?.body ?? write.document.body;
   if (
     !hint ||
     typeof hint !== "object" ||
     Array.isArray(hint) ||
-    typeof hint.board !== "string" ||
-    !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(hint.board)
+    typeof (write.document.collection === "board" ? hint.slug : hint.board) !==
+      "string" ||
+    !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(
+      String(write.document.collection === "board" ? hint.slug : hint.board),
+    )
   )
     return null;
+  const slug = String(
+    write.document.collection === "board" ? hint.slug : hint.board,
+  );
   const file =
-    hint.board === "default"
+    slug === "default"
       ? join(root, "kanban.db")
-      : join(root, "kanban", "boards", hint.board, "kanban.db");
+      : join(root, "kanban", "boards", slug, "kanban.db");
   checked(file);
   if (!existsSync(file)) return null;
   const db = new Database(file, { readonly: true, fileMustExist: true });
@@ -528,7 +521,7 @@ function retainedTaskReceipt(
       receipt.replicaId !== replicaId ||
       receipt.status !== "applied" ||
       !isReplicaRecord(receipt.record) ||
-      receipt.record.collection !== "task" ||
+      receipt.record.collection !== write.document.collection ||
       receipt.record.id !== write.document.id
     )
       throw Error("Invalid retained task receipt; source retained");
@@ -547,6 +540,7 @@ export function applyKanbanReplica(
   write: import("@mithril/workspace/replica-sync").ReplicaWrite,
   attachmentProjection?: KanbanAttachmentProjection,
   attachmentWriteback?: KanbanAttachmentWriteback,
+  boardPython?: string,
 ): import("@mithril/workspace/replica-sync").ReplicaResult {
   const retained = retainedTaskReceipt(root, userId, replicaId, write);
   if (retained) return retained;
@@ -575,6 +569,12 @@ export function applyKanbanReplica(
     status,
     record,
   });
+  if (write.document.collection === "board") {
+    if (observed) return result("conflict");
+    return boardPython
+      ? restoreKanbanBoard(root, userId, replicaId, write, boardPython)
+      : result("deferred");
+  }
   if (write.document.collection !== "task") return result("deferred");
   const body = (observed?.body ?? write.document.body) as {
     board: string;
@@ -1585,6 +1585,7 @@ export async function nativeReplicaApply(
         write,
         capture.project,
         attachments,
+        HERMES_PYTHON,
       );
     } finally {
       attachments?.dispose();

@@ -258,3 +258,17 @@ Invalid owners, identifiers, digests, sizes and byte payloads must be rejected b
 Original cloud history IDs survive collisions with another task's SQLite keys through private per-table identity mappings.
 
 Actual-schema tests preserve existing rows, remap event/run joins, append original Agent records, and converge both directions. Later cloud IDs may overlap a previously allocated native alias without overwriting it. Receipt replay preserves mappings; scalar JSON payloads decode exactly once. Missing mapped rows or tasks refuse publication rather than falsely acknowledge deleted history.
+
+## Cloud-created board working copy
+
+New named cloud boards restore the original Agent schema and display metadata as a complete directory with their retained receipt.
+
+Tests compare the accepted record with a fresh source snapshot, restore a subsequent task through the original working copy, verify no notifier subscriptions or work are created, and recover exact receipts without duplicate boards.
+
+## Board publication refusal
+
+Existing source directories, symlinks, device execution fields and failed publication retain their original contents and expose no partial board.
+
+## Concurrent board publication
+
+An exclusive directory publication never replaces another writer's board, even when it appears after staging. Retained receipts recover lost acknowledgements, original metadata edits change fingerprints, and another account cannot adopt the receipt.

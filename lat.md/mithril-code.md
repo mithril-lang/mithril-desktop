@@ -27,3 +27,9 @@ Desktop, App `/code` and Code use the compiled workspace `CodeWorkspace`, includ
 Desktop explicitly offers a configured Hermes profile runner or the fixed Code service. Selecting a destination never starts execution or silently falls back after a failure.
 
 [[src/main/code-api.ts#codeServiceRun]] validates a bounded brief and sends only the fixed To-do task to Code with the screen's GitHub/provider credentials. The service retains its existing authorization and model-cost policy. This choice needs no local device runtime and does not borrow the browser's session-only free allowance. [[src/main/code-api.ts#codeServiceStatus]] reads readiness without credentials or inference.
+
+## Kuro source execution
+
+Code shares Kuro JS/Python source execution across App, Code and Desktop.
+
+The public App Kuro assets run in an opaque sandbox frame through a MessageChannel. No account, provider or GitHub credentials or Desktop IPC authority cross that boundary. Each explicit run gets a fresh bounded runtime; edits clear the displayed execution result. This is independent of the separate Node/NBB Jev generation runner. Python is not a Pages backend and CLJK is not compiled by this action.

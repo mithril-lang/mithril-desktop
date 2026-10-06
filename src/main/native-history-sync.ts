@@ -15,12 +15,14 @@ export interface NativeHistorySource {
   title: string;
   model: string;
   items(sessionId: string): Promise<ArchivedHistoryItem[]>;
+  cache?(sessionId: string, items: ArchivedHistoryItem[]): Promise<void>;
 }
 export interface NativeHistoryJournal {
   entries: Record<
     string,
     {
       hashes: Record<string, string>;
+      nativeHashes?: Record<string, string>;
       pending: {
         sessionId: string;
         operation: ChatOperation;
@@ -129,11 +131,15 @@ export class NativeHistorySync {
         !journal ||
         typeof journal.hashes !== "object" ||
         !journal.hashes ||
-        Array.isArray(journal.hashes)
+        Array.isArray(journal.hashes) ||
+        (journal.nativeHashes !== undefined &&
+          (!journal.nativeHashes ||
+            typeof journal.nativeHashes !== "object" ||
+            Array.isArray(journal.nativeHashes)))
       )
         throw Error("Invalid history journal");
       if (
-        Object.entries(journal.hashes).some(
+        Object.entries({ ...journal.hashes, ...journal.nativeHashes }).some(
           ([key, value]) =>
             !/^[a-zA-Z0-9_-]{1,128}$/.test(key) ||
             typeof value !== "string" ||
@@ -184,8 +190,10 @@ export class NativeHistorySync {
           if (receipt.status !== "accepted")
             throw Error("History operation receipt remains unknown");
           if (pending.operation.type === "history")
-            for (const item of pending.operation.data.items)
+            for (const item of pending.operation.data.items) {
               journal.hashes[item.id] = fingerprint(item);
+              (journal.nativeHashes ??= {})[item.id] = fingerprint(item);
+            }
           sessions.set(sid, receipt.session);
           journal.pending = null;
           await persist();
@@ -268,7 +276,7 @@ export class NativeHistorySync {
           after = checkpoint.nextAfter;
         }
         const stored = new Map(
-          archivedHistory(history).map((item) => [item.id, item]),
+          archivedHistory(history, true).map((item) => [item.id, item]),
         );
         const items = await native.items(sid);
         await check();
@@ -281,21 +289,45 @@ export class NativeHistorySync {
             "Native history cannot be represented without loss; source retained",
           );
         const changed: ArchivedHistoryItem[] = [];
+        const cache: ArchivedHistoryItem[] = [];
+        const nativeHashes = (journal.nativeHashes ??= { ...journal.hashes });
         for (const item of items) {
           const local = fingerprint(item),
             cloud = stored.get(item.id);
           if (cloud && fingerprint(cloud) === local) {
             journal.hashes[item.id] = local;
+            nativeHashes[item.id] = local;
+            cache.push(cloud);
             continue;
           }
-          if (
-            (cloud && fingerprint(cloud) !== journal.hashes[item.id]) ||
-            (!cloud && journal.hashes[item.id])
-          ) {
+          const localChanged = local !== nativeHashes[item.id];
+          const cloudChanged =
+            cloud && fingerprint(cloud) !== journal.hashes[item.id];
+          if (cloudChanged && !localChanged && native.cache) {
+            cache.push(cloud);
+            continue;
+          }
+          if (cloudChanged || (!cloud && journal.hashes[item.id])) {
             outcome.conflicts.push(sid);
             continue;
           }
-          changed.push(item);
+          if (localChanged) changed.push(item);
+          else if (cloud) cache.push(cloud);
+        }
+        const sourceIds = new Set(items.map((item) => item.id));
+        for (const cloud of stored.values()) {
+          if (sourceIds.has(cloud.id)) continue;
+          if (!nativeHashes[cloud.id]) cache.push(cloud);
+          else if (!cloud.deleted) {
+            if (fingerprint(cloud) !== journal.hashes[cloud.id])
+              outcome.conflicts.push(sid);
+            else changed.push({ ...cloud, deleted: true });
+          }
+        }
+        if (native.cache) {
+          await native.cache(sid, cache);
+          await check();
+          for (const item of cache) journal.hashes[item.id] = fingerprint(item);
         }
         await persist();
         while (changed.length) {
@@ -335,7 +367,10 @@ export class NativeHistorySync {
           }
           if (result.status !== "accepted")
             throw Error("History operation receipt remains unknown");
-          for (const item of batch) journal.hashes[item.id] = fingerprint(item);
+          for (const item of batch) {
+            journal.hashes[item.id] = fingerprint(item);
+            nativeHashes[item.id] = fingerprint(item);
+          }
           remote = result.session;
           sessions.set(sid, remote);
           journal.pending = null;

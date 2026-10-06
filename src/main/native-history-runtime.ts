@@ -13,7 +13,7 @@ import {
   unlinkSync,
 } from "fs";
 import { dirname, join, resolve, basename } from "path";
-import { cloudChat } from "./cloud-chat-runtime";
+import { cloudChat, onCloudChatAccountChanged } from "./cloud-chat-runtime";
 import { getConnectionConfig } from "./config";
 import { getDbConnection } from "./db";
 import { activeStateDbPath } from "./utils";
@@ -28,8 +28,17 @@ import {
   writeHistoryAttachment,
   type ArchivedHistoryItem,
   type HistoryAttachment,
+  readHistoryAttachment,
 } from "@mithril/workspace/history";
+import {
+  nativeHistoryItemId,
+  materializeHistoryItem,
+  replaceNativeHistoryCache,
+  setNativeHistoryCacheOwner,
+  clearNativeHistoryCacheOwners,
+} from "./native-history-cache";
 import type { Attachment } from "../shared/attachments";
+onCloudChatAccountChanged(clearNativeHistoryCacheOwners);
 const root = (): string => join(app.getPath("userData"), "history-replication");
 function checked(path: string): void {
   let current = resolve(path);
@@ -139,14 +148,7 @@ async function portableItems(
     },
   };
   for (const item of items) {
-    const id =
-      item.kind +
-      "_" +
-      item.id +
-      (item.kind === "tool_call"
-        ? "_" +
-          createHash("sha256").update(item.callId).digest("hex").slice(0, 16)
-        : "");
+    const id = nativeHistoryItemId(item);
     const base = { id, kind: item.kind, timestamp: item.timestamp };
     let value: ArchivedHistoryItem;
     if (item.kind === "reasoning")
@@ -250,7 +252,7 @@ export const nativeHistorySync = new NativeHistorySync({
         try {
           return {
             session,
-            items: getSessionMessages(session.id, context.profile),
+            items: getSessionMessages(session.id, context.profile, true),
             error: null,
           };
         } catch {
@@ -269,6 +271,94 @@ export const nativeHistorySync = new NativeHistorySync({
       items: (sessionId) => {
         if (error) return Promise.reject(Error(error));
         return portableItems(context, sessionId, items);
+      },
+      cache: async (sessionId, cloudItems) => {
+        if (error) throw Error(error);
+        const materialized = [] as {
+          source: ArchivedHistoryItem;
+          item: HistoryItem | null;
+        }[];
+        const originals = new Map(
+          items.map((item) => [nativeHistoryItemId(item), item]),
+        );
+        for (const value of cloudItems) {
+          const localAttachments: Attachment[] = [];
+          for (const file of value.deleted ? [] : (value.attachments ?? [])) {
+            const directory = join(
+              root(),
+              "attachments",
+              createHash("sha256").update(context.userId).digest("hex"),
+            );
+            checked(directory);
+            mkdirSync(directory, { recursive: true, mode: 0o700 });
+            const path = join(directory, file.digest);
+            checked(path);
+            if (
+              existsSync(path) &&
+              (!lstatSync(path).isFile() || lstatSync(path).size !== file.size)
+            )
+              throw Error("Invalid cached attachment");
+            const bytes = existsSync(path)
+              ? readFileSync(path)
+              : await readHistoryAttachment(
+                  cloudChat.historyFiles.forOwner(context.userId),
+                  sessionId,
+                  file,
+                );
+            if ((await digestBytes(bytes)) !== file.digest)
+              throw Error("Cached attachment digest mismatch");
+            if (!existsSync(path))
+              writeFileSync(path, bytes, { flag: "wx", mode: 0o600 });
+            localAttachments.push({
+              id: file.id,
+              kind:
+                file.kind === "image"
+                  ? "image"
+                  : file.kind === "text-file"
+                    ? "text-file"
+                    : "path-ref",
+              name: file.name,
+              mime: file.mime,
+              size: file.size,
+              ...(file.originalSize ? { originalSize: file.originalSize } : {}),
+              ...(file.kind === "image"
+                ? {
+                    dataUrl: `data:${file.mime};base64,${Buffer.from(bytes).toString("base64")}`,
+                  }
+                : file.kind === "text-file"
+                  ? {
+                      text: new TextDecoder("utf-8", { fatal: true }).decode(
+                        bytes,
+                      ),
+                    }
+                  : { path }),
+            });
+          }
+          materialized.push({
+            source: value,
+            item: materializeHistoryItem(
+              value,
+              originals.get(value.id),
+              localAttachments,
+            ),
+          });
+        }
+        if (
+          JSON.stringify(context) !==
+          JSON.stringify(await cloudChat.auth.nativeContext(true))
+        )
+          throw Error("History account changed");
+        const writable = getDbConnection(false, context.profile);
+        if (!writable) throw Error("Native history cache unavailable");
+        setNativeHistoryCacheOwner(writable.name, context.userId);
+        replaceNativeHistoryCache(
+          writable,
+          session.id,
+          context.userId,
+          items,
+          () => getSessionMessages(session.id, context.profile, true, writable),
+          materialized,
+        );
       },
     }));
   },

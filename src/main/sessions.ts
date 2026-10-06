@@ -1,3 +1,7 @@
+import {
+  mergeNativeHistoryCache,
+  deleteNativeHistoryCache,
+} from "./native-history-cache";
 import Database from "better-sqlite3";
 import type { Attachment } from "../shared/attachments";
 import { isImageMime } from "../shared/attachments";
@@ -679,8 +683,10 @@ export function mergeStoredPromptImageAttachments(
 export function getSessionMessages(
   sessionId: string,
   profile?: unknown,
+  sourceOnly = false,
+  existingDb?: Database.Database,
 ): HistoryItem[] {
-  const db = getDb(true, profile);
+  const db = existingDb ?? getDb(true, profile);
   if (!db) return [];
 
   const rows = db
@@ -699,7 +705,8 @@ export function getSessionMessages(
     items,
     loadPromptImageAttachments(db, sessionId),
   );
-  return applySessionLocalOverlays(sessionId, canonical, db);
+  const source = applySessionLocalOverlays(sessionId, canonical, db);
+  return sourceOnly ? source : mergeNativeHistoryCache(db, sessionId, source);
 }
 
 export function applySessionLocalOverlays(
@@ -758,6 +765,7 @@ function hasParentSessionColumn(db: Database.Database): boolean {
 }
 
 function deleteSessionRows(db: Database.Database, sessionId: string): number {
+  deleteNativeHistoryCache(db, sessionId);
   deletePromptImageAttachmentsForSession(db, sessionId);
   deleteSessionContinuationForSession(db, sessionId);
   // Unlink any child sessions first. better-sqlite3 enables

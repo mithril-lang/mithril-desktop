@@ -301,4 +301,55 @@ describe("automatic rich native history archival", () => {
     expect(result.deferred[0]).toContain("Disk unavailable");
     expect(f.sessions.size).toBe(0);
   });
+  // @lat: [[cloud-workspace-tests#Cloud history working cache]]
+  it("pulls cloud-only edits to the working cache without echoing stale native data", async () => {
+    const f = fixture(),
+      sid = nativeCloudSessionId("default", "original");
+    let cache: ArchivedHistoryItem[] = [];
+    const source = f.ports.source;
+    f.ports.source = async () =>
+      (await source()).map((value) => ({
+        ...value,
+        cache: async (_sid, items) => {
+          cache = structuredClone(items);
+        },
+      }));
+    const sync = new NativeHistorySync(f.ports);
+    await sync.run();
+    const session = f.sessions.get(sid)!;
+    f.events.get(sid)!.push({
+      seq: ++session.eventSeq,
+      type: "history_item",
+      turnId: null,
+      createdAt: 1,
+      data: {
+        sourceId: "user_1",
+        payload: JSON.stringify({ ...f.items[0], content: "Cloud update" }),
+      },
+    });
+    session.revision++;
+    expect((await sync.run()).conflicts).toEqual([]);
+    expect(cache.find((item) => item.id === "user_1")?.content).toBe(
+      "Cloud update",
+    );
+    const count = f.events.get(sid)!.length;
+    expect((await sync.run()).synced).toBe(0);
+    expect(f.events.get(sid)).toHaveLength(count);
+    f.items[0].content = "New native edit";
+    expect((await sync.run()).synced).toBe(1);
+    expect(f.executions()).toBe(0);
+  });
+  // @lat: [[cloud-workspace-tests#Cloud history working cache]]
+  it("propagates removed native items as tombstones and never re-adds them on restart", async () => {
+    const f = fixture(),
+      sid = nativeCloudSessionId("default", "original");
+    await new NativeHistorySync(f.ports).run();
+    f.items.splice(0, 1);
+    expect((await new NativeHistorySync(f.ports).run()).synced).toBe(1);
+    expect(JSON.parse(f.events.get(sid)!.at(-1)!.data.payload).deleted).toBe(
+      true,
+    );
+    expect((await new NativeHistorySync(f.ports).run()).synced).toBe(0);
+    expect(f.executions()).toBe(0);
+  });
 });

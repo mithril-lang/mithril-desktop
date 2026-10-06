@@ -124,3 +124,9 @@ Tests preserve binary content, owner and content-type headers, reject owner swit
 Original Skill resources retain their actual category/directory tree, binary bytes, references and executable attributes without executing any script.
 
 Descriptor-based capture rejects symlinks, invalid Markdown, colliding paths and unavailable interpreters while retaining the source. Tests verify credential exclusions, stable manifests, staging cleanup, upload ordering, repeat-upload avoidance and account-change cancellation.
+
+## Verified Skill resource download
+
+Download tests verify private staging, immutable chunk deduplication, canonical manifests and complete file integrity before native application.
+
+Corrupt chunks, inconsistent file fingerprints and account changes remove staging without altering original files or executing scripts.

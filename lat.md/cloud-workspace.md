@@ -259,3 +259,9 @@ The main process uses a fixed isolated interpreter only to capture file data thr
 Immutable chunks and their manifest are uploaded through the fixed account-checked Mithril API before the resource pointer enters the durable repository outbox. Verified existing manifests avoid repeated uploads; identity checks surround each network step. API pointer edits require an existing owned manifest and use the existing repository CAS and receipts. This path stores data and never installs or executes a Skill.
 
 Native resource download/application and original Skills editor integration remain unfinished. Descriptor capture currently supports POSIX; Windows capture fails closed until an equivalent safe directory-handle implementation exists. Resource publication also requires the canonical Capability anchor to exist. Large legacy inline Capability bodies and this bootstrap need a versioned resource-backed adapter before full synchronization and release.
+
+### Verified Skill resource download (draft)
+
+Cloud Skill bytes are verified in private staging before any future native file application.
+
+The main-only downloader validates the owned pointer and canonical manifest digest, downloads each immutable chunk once, and checks both chunk sizes/digests and full-file sizes and canonical chunk-list fingerprints. Identity guards surround requests and finish verification. Failures remove private staging and never touch original Skill files. The returned staging reader rechecks disk bytes. Native file application and original Skills editor wiring remain unfinished; this helper grants no install or execution authority.

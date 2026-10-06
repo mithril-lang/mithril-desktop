@@ -10,6 +10,7 @@ import {
   openSync,
   readSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
@@ -17,6 +18,8 @@ import {
   validCapabilityResourceManifest,
   type CapabilityResourceManifest,
   type CapabilityResourceTransport,
+  validSkillResourcePointer,
+  type SkillResourcePointer,
 } from "@mithril/workspace/capability-resources";
 import { CHUNK_BYTES, MAX_MANIFEST_BYTES } from "@mithril/workspace/files";
 
@@ -171,43 +174,12 @@ export function captureSkillResources(
     const bytes = capabilityResourceManifestBytes(manifest);
     if (bytes.length > MAX_MANIFEST_BYTES)
       throw new Error("Skill resource manifest too large; source retained");
-    const allowed = new Set(manifest.files.flatMap((file) => file.chunks));
-    return {
+    return stagedResources(
+      stage,
       manifest,
-      excluded: Number(value.excluded),
-      digest: createHash("sha256").update(bytes).digest("hex"),
-      dispose,
-      readChunk(digest) {
-        if (!allowed.has(digest))
-          throw new Error("Unknown captured resource chunk");
-        checked(stage);
-        const path = join(stage, digest);
-        const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-        try {
-          const buffer = Buffer.alloc(CHUNK_BYTES + 1);
-          let size = 0;
-          for (;;) {
-            const count = readSync(
-              fd,
-              buffer,
-              size,
-              buffer.length - size,
-              size,
-            );
-            size += count;
-            if (size > CHUNK_BYTES)
-              throw new Error("Captured resource chunk too large");
-            if (!count) break;
-          }
-          const data = buffer.subarray(0, size);
-          if (createHash("sha256").update(data).digest("hex") !== digest)
-            throw new Error("Captured resource chunk changed; source retained");
-          return new Uint8Array(data);
-        } finally {
-          closeSync(fd);
-        }
-      },
-    };
+      createHash("sha256").update(bytes).digest("hex"),
+      Number(value.excluded),
+    );
   } catch (error) {
     dispose();
     throw error;
@@ -271,4 +243,118 @@ export async function publishSkillResources(
   if (digest !== capture.digest)
     throw new Error("Skill resource manifest integrity mismatch");
   return digest;
+}
+
+function stagedResources(
+  stage: string,
+  manifest: CapabilityResourceManifest,
+  digest: string,
+  excluded: number,
+): SkillResourceCapture {
+  const dispose = (): void => rmSync(stage, { recursive: true, force: true });
+  const allowed = new Set(manifest.files.flatMap((file) => file.chunks));
+  return {
+    manifest,
+    excluded,
+    digest,
+    dispose,
+    readChunk(digest) {
+      if (!allowed.has(digest))
+        throw new Error("Unknown captured resource chunk");
+      checked(stage);
+      const path = join(stage, digest);
+      const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+      try {
+        const buffer = Buffer.alloc(CHUNK_BYTES + 1);
+        let size = 0;
+        for (;;) {
+          const count = readSync(fd, buffer, size, buffer.length - size, size);
+          size += count;
+          if (size > CHUNK_BYTES)
+            throw new Error("Captured resource chunk too large");
+          if (!count) break;
+        }
+        const data = buffer.subarray(0, size);
+        if (createHash("sha256").update(data).digest("hex") !== digest)
+          throw new Error("Captured resource chunk changed; source retained");
+        return new Uint8Array(data);
+      } finally {
+        closeSync(fd);
+      }
+    },
+  };
+}
+
+// @lat: [[cloud-workspace#Cloud workspace#Rich repository implementation in progress#Verified Skill resource download (draft)]]
+export async function downloadSkillResources(
+  pointer: SkillResourcePointer,
+  transport: CapabilityResourceTransport,
+  stateRoot: string,
+  guard: () => Promise<void>,
+): Promise<SkillResourceCapture> {
+  if (!validSkillResourcePointer(pointer))
+    throw new Error("Invalid Skill resource pointer");
+  await guard();
+  const manifest = await transport.getManifest(
+    pointer.capabilityId,
+    pointer.manifest,
+  );
+  await guard();
+  if (
+    !validCapabilityResourceManifest(manifest) ||
+    manifest.capabilityId !== pointer.capabilityId ||
+    createHash("sha256")
+      .update(capabilityResourceManifestBytes(manifest))
+      .digest("hex") !== pointer.manifest
+  )
+    throw new Error("Skill resource manifest integrity mismatch");
+  checked(stateRoot);
+  mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
+  checked(stateRoot);
+  const stage = mkdtempSync(join(stateRoot, ".mithril-sync-skill-download-"));
+  const capture = stagedResources(stage, manifest, pointer.manifest, 0);
+  try {
+    const downloaded = new Set<string>();
+    for (const file of manifest.files) {
+      let size = 0;
+      for (let index = 0; index < file.chunks.length; index++) {
+        const digest = file.chunks[index];
+        await guard();
+        if (!downloaded.has(digest)) {
+          const bytes = await transport.getChunk(pointer.capabilityId, digest);
+          await guard();
+          if (
+            bytes.length > CHUNK_BYTES ||
+            createHash("sha256").update(bytes).digest("hex") !== digest
+          )
+            throw new Error("Skill resource chunk integrity mismatch");
+          checked(stage);
+          writeFileSync(join(stage, digest), bytes, {
+            mode: 0o600,
+            flag: "wx",
+          });
+          downloaded.add(digest);
+        }
+        const bytes = capture.readChunk(digest);
+        if (
+          bytes.length !==
+          Math.min(CHUNK_BYTES, file.size - index * CHUNK_BYTES)
+        )
+          throw new Error("Skill resource chunk size mismatch");
+        size += bytes.length;
+      }
+      if (
+        size !== file.size ||
+        createHash("sha256")
+          .update(JSON.stringify({ size, chunks: file.chunks }))
+          .digest("hex") !== file.digest
+      )
+        throw new Error("Skill resource file integrity mismatch");
+    }
+    await guard();
+    return capture;
+  } catch (error) {
+    capture.dispose();
+    throw error;
+  }
 }

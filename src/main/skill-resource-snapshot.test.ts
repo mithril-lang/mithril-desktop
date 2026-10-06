@@ -16,6 +16,7 @@ import { digestBytes } from "@mithril/workspace/files";
 import {
   captureSkillResources,
   publishSkillResources,
+  downloadSkillResources,
 } from "./skill-resource-snapshot";
 import { createCapabilityResourceTransport } from "@mithril/workspace/capability-resources";
 const roots: string[] = [];
@@ -209,4 +210,114 @@ it("preserves multi-chunk binary resources and refuses changed private chunk sta
   } finally {
     capture.dispose();
   }
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Verified Skill resource download]]
+it("validates downloaded trees before returning private staging and retains original files on cancellation or corrupt data", async () => {
+  const f = fixture();
+  const original = f.capture();
+  const pointer = {
+    format: "mithril-skill-resources-v1" as const,
+    profile: "default",
+    capabilityId: original.manifest.capabilityId,
+    manifest: original.digest,
+  };
+  let reads = 0;
+  const transport = {
+    forOwner() {
+      return this;
+    },
+    async getManifest() {
+      return original.manifest;
+    },
+    async getChunk(_id: string, digest: string) {
+      reads++;
+      return original.readChunk(digest);
+    },
+    async putManifest() {
+      throw new Error("must not upload");
+    },
+    async putChunk() {
+      throw new Error("must not upload");
+    },
+  };
+  const state = join(f.home, "downloads");
+  const downloaded = await downloadSkillResources(
+    pointer,
+    transport,
+    state,
+    async () => {},
+  );
+  expect(downloaded.digest).toBe(original.digest);
+  expect(downloaded.manifest).toEqual(original.manifest);
+  expect(reads).toBe(
+    new Set(original.manifest.files.flatMap((file) => file.chunks)).size,
+  );
+  downloaded.dispose();
+  expect(readdirSync(state)).toEqual([]);
+  await expect(
+    downloadSkillResources(
+      pointer,
+      {
+        ...transport,
+        async getChunk() {
+          return new Uint8Array([1]);
+        },
+      },
+      state,
+      async () => {},
+    ),
+  ).rejects.toThrow("integrity mismatch");
+  expect(readdirSync(state)).toEqual([]);
+  let changed = false;
+  await expect(
+    downloadSkillResources(
+      pointer,
+      {
+        ...transport,
+        async getChunk(id, digest) {
+          changed = true;
+          return transport.getChunk(id, digest);
+        },
+      },
+      state,
+      async () => {
+        if (changed) throw new Error("owner changed");
+      },
+    ),
+  ).rejects.toThrow("owner changed");
+  expect(readdirSync(state)).toEqual([]);
+  expect(readFileSync(join(f.skill, "scripts", "run.py"), "utf8")).toBe(
+    "raise Exception('must never execute')\n",
+  );
+  const wrong = {
+    ...original.manifest,
+    files: original.manifest.files.map((file) => ({
+      ...file,
+      digest: "f".repeat(64),
+    })),
+  };
+  const wrongPointer = {
+    ...pointer,
+    manifest: await digestBytes(
+      (
+        await import("@mithril/workspace/capability-resources")
+      ).capabilityResourceManifestBytes(wrong),
+    ),
+  };
+  await expect(
+    downloadSkillResources(
+      wrongPointer,
+      {
+        ...transport,
+        async getManifest() {
+          return wrong;
+        },
+      },
+      state,
+      async () => {},
+    ),
+  ).rejects.toThrow("file integrity mismatch");
+  expect(readdirSync(state)).toEqual([]);
+  original.dispose();
 });

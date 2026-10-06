@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { join } from "path";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  symlinkSync,
+  rmSync,
+} from "fs";
 
 const { execFileSync } = vi.hoisted(() => ({ execFileSync: vi.fn() }));
 
@@ -30,6 +37,7 @@ vi.mock("../src/main/installer", () => ({
 }));
 
 import {
+  listInstalledSkills,
   bundledSkillMarkdown,
   getSkillContent,
   installSkill,
@@ -147,5 +155,29 @@ describe("bundled message-spam skill", () => {
     expect(result).toEqual({ success: true });
     expect(existsSync(installed)).toBe(true);
     expect(readFileSync(installed, "utf-8")).toContain("register");
+  });
+});
+
+describe("strict Capability skill snapshots", () => {
+  // @lat: [[cloud-workspace-tests#Cloud workspace tests#Strict Capability skill sources]]
+  it("retains the full body and refuses invalid encodings rather than truncating", () => {
+    const root = writeSkill(
+      join(TEST_HOME, "skills", "snapshot", "long-body"),
+      "# Long body\n" + "evidence ".repeat(900),
+    );
+    expect(getSkillContent(root, true)).toHaveLength(
+      readFileSync(join(root, "SKILL.md")).length,
+    );
+    writeFileSync(join(root, "SKILL.md"), Buffer.from([0xff, 0xfe]));
+    expect(() => getSkillContent(root, true)).toThrow("encoding");
+    rmSync(root, { recursive: true });
+  });
+  it("rejects a symlinked source without returning a partial list", () => {
+    const root = join(TEST_HOME, "skills", "snapshot", "linked");
+    const target = writeSkill(join(TEST_HOME, "symlink-target"), "# Retained");
+    mkdirSync(join(root, ".."), { recursive: true });
+    symlinkSync(target, root, "dir");
+    expect(() => listInstalledSkills(undefined, true)).toThrow("Unsafe skill");
+    rmSync(root);
   });
 });

@@ -100,3 +100,15 @@ Cloud edits and tombstones update the original Desktop timeline through a checke
 ## Original Markdown table rendering
 
 Flattened archived tables with a consistent GFM separator render as a table through the same Desktop/Web Markdown component. Fenced examples and ambiguous pipes remain literal; stored transcript text is unchanged.
+
+
+## Strict Capability skill sources
+
+Strict source reads preserve full skill bodies and refuse invalid encodings or symlinks instead of publishing partial snapshots. Existing native skill operations retain their original behavior.
+
+These cases exercise [[src/main/skills.ts#getSkillContent]] and [[src/main/skills.ts#listInstalledSkills]] using temporary owner-profile roots; no runtime installation occurs during synchronization.
+
+
+## Capability snapshot identity
+
+The fixed Capability snapshot retains full skill bodies and excludes explicit credential/path fields. An owner change during the read rejects the snapshot; source reading never invokes runtime testing or installation.

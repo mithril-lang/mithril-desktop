@@ -373,6 +373,8 @@ const hermesAPI = {
       apply: (write) =>
         ipcRenderer.invoke("cloud-workspace-replica-apply", write),
     },
+    capabilitySnapshot: () =>
+      ipcRenderer.invoke("cloud-workspace-capability-snapshot"),
     memorySnapshot: () => ipcRenderer.invoke("cloud-workspace-memory-snapshot"),
     repositorySeed: () => ipcRenderer.invoke("cloud-workspace-repository-seed"),
     repository: {

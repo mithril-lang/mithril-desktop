@@ -618,6 +618,69 @@ async function replicaContext(write = false): Promise<{
     context,
   };
 }
+/** Fixed original capability descriptors and installed skill bodies; no tests or installs run here. */
+export async function nativeCapabilitySnapshot(): Promise<
+  Awaited<
+    ReturnType<import("@mithril/workspace/capability-data").CapabilitySeed>
+  >
+> {
+  const before = await cloudWorkspace.nativeContext();
+  if (getConnectionConfig().mode !== "local")
+    throw Error("Capability source unavailable for this runtime");
+  bindRepositorySource(
+    join(app.getPath("userData"), "repository-source-owners"),
+    before.profile,
+    before.userId,
+  );
+  const home = profileHome(before.profile);
+  checked(home);
+  const configFile = join(home, "config.yaml");
+  checked(configFile);
+  const readConfig = (): Buffer => {
+    checked(configFile);
+    if (!existsSync(configFile)) return Buffer.from("");
+    const stat = lstatSync(configFile);
+    if (!stat.isFile() || stat.size > 1048576)
+      throw Error("Unsupported Capability configuration source");
+    return readFileSync(configFile);
+  };
+  const config = readConfig();
+  if (
+    config.length > 1048576 ||
+    !Buffer.from(config.toString("utf8")).equals(config)
+  )
+    throw Error("Unsupported Capability configuration source");
+  const [
+    { getToolsets },
+    { listMcpServers },
+    { listInstalledSkills, getSkillContent },
+    { sharedCapabilityData },
+  ] = await Promise.all([
+    import("./tools"),
+    import("./mcp-servers"),
+    import("./skills"),
+    import("@mithril/workspace/capability-data"),
+  ]);
+  const toolsets = getToolsets(before.profile);
+  const mcps = await listMcpServers(before.profile);
+  const skills = listInstalledSkills(before.profile, true).map((skill) => ({
+    name: skill.name,
+    category: skill.category,
+    description: skill.description,
+    content: getSkillContent(skill.path, true),
+  }));
+  const afterConfig = readConfig();
+  if (!config.equals(afterConfig))
+    throw Error("Capability changed during snapshot; original source retained");
+  const body = sharedCapabilityData(before.profile, toolsets, mcps, skills);
+  if (
+    JSON.stringify(before) !==
+    JSON.stringify(await cloudWorkspace.nativeContext())
+  )
+    throw Error("Workspace identity changed");
+  return { userId: before.userId, profile: before.profile, body };
+}
+
 /** Fixed, account-bound original Memory files only; no directory scan or execution. */
 export async function nativeMemorySnapshot(): Promise<{
   userId: string;
@@ -690,6 +753,30 @@ export async function nativeReplicaSnapshot(): Promise<
       "Memory source requires synchronization review; original files are retained",
     );
   }
+  try {
+    const capability = await nativeCapabilitySnapshot();
+    const { capabilityId } = await import("@mithril/workspace/capability-data");
+    const id = capabilityId(before.profile);
+    snapshot.collections.push("capability");
+    (snapshot.recordScopes ??= []).push({
+      collection: "capability",
+      ids: [id],
+    });
+    const body = capability.body as unknown as JsonValue;
+    snapshot.documents.push({
+      collection: "capability",
+      id,
+      body,
+      deleted: false,
+      version: createHash("sha256")
+        .update(repositoryFingerprint({ body, deleted: false }))
+        .digest("hex"),
+    });
+  } catch {
+    snapshot.warnings!.push(
+      "Capability source requires synchronization review; original configuration is retained",
+    );
+  }
   if (!snapshot.collections.length)
     throw Error("Native sources require synchronization review");
   if (
@@ -730,7 +817,31 @@ export async function nativeReplicaApply(
   )
     throw Error("Workspace identity changed");
   let result: import("@mithril/workspace/replica-sync").ReplicaResult;
-  if (write.document.collection === "memory") {
+  if (write.document.collection === "capability") {
+    const source = await nativeCapabilitySnapshot();
+    const { capabilityId } = await import("@mithril/workspace/capability-data");
+    const body = source.body as unknown as JsonValue;
+    const record: import("@mithril/workspace/replica-sync").ReplicaRecord = {
+      collection: "capability",
+      id: capabilityId(before.profile),
+      body,
+      deleted: false,
+      version: createHash("sha256")
+        .update(repositoryFingerprint({ body, deleted: false }))
+        .digest("hex"),
+    };
+    result = {
+      schemaVersion: 1,
+      userId: before.userId,
+      replicaId: before.replicaId,
+      status:
+        write.document.id === record.id &&
+        repositoryFingerprint(write.document) === repositoryFingerprint(record)
+          ? "applied"
+          : "deferred",
+      record,
+    };
+  } else if (write.document.collection === "memory") {
     const { HERMES_PYTHON } = await import("./installer");
     // Account changes during module loading must be checked before touching source files.
     if (

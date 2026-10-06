@@ -2,6 +2,7 @@ import { synchronizeNativeHistory } from "../native-history-runtime";
 import {
   nativeRepositorySeed,
   nativeMemorySnapshot,
+  nativeCapabilitySnapshot,
   nativeReplicaSnapshot,
   nativeReplicaApply,
 } from "../repository-kanban-runtime";
@@ -1382,6 +1383,10 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("cloud-workspace-replica-apply", (event, write) => {
     trustedWorkspaceSender(event);
     return nativeReplicaApply(write);
+  });
+  ipcMain.handle("cloud-workspace-capability-snapshot", (event) => {
+    trustedWorkspaceSender(event);
+    return nativeCapabilitySnapshot();
   });
   ipcMain.handle("cloud-workspace-memory-snapshot", (event) => {
     trustedWorkspaceSender(event);

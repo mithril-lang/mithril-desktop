@@ -59,6 +59,8 @@ export default function CloudWorkspace({
       autoConnect
       repositoryTransport={window.hermesAPI.cloudWorkspace.repository}
       repositorySeed={repositorySeed}
+      capabilitySeed={window.hermesAPI.cloudWorkspace.capabilitySnapshot}
+      capabilityRuntime={window.hermesAPI}
       memoryProfile={profile}
       memorySeed={window.hermesAPI.cloudWorkspace.memorySnapshot}
       memoryRuntime={window.hermesAPI}

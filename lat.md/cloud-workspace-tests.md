@@ -282,3 +282,25 @@ Tests compare the acknowledged board with a fresh snapshot, restore a subsequent
 ## Default board publication collision
 
 An atomic no-replace link preserves a default database created concurrently by another writer. Incompatible display metadata defers initialization rather than silently resetting it.
+
+
+## Absent board metadata adoption
+
+Original display metadata can be adopted into an existing DB without changing tasks, execution ownership or the selected board.
+
+## Board metadata crash recovery
+
+A committed preparation hides incomplete sources and recovers the exact operation after filesystem publication fails to return. Different owners and changed operation contents cannot recover it; later task and display edits remain distinct.
+
+## Board metadata concurrent creation
+
+Exclusive publication retains another writer's newly created metadata and private settings, clears the uncommitted preparation, and returns the current source for reconciliation.
+
+## Board metadata preparation refusal
+
+Stale source versions cannot prepare metadata. Existing board files remain untouched, including their private execution directories.
+
+
+## Unpublished metadata recovery conflict
+
+Prepared metadata that never published cannot override later original task edits. Recovery releases the barrier and returns a source conflict; oversized UTF-8 display data cannot create an unreadable file.

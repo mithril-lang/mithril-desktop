@@ -415,3 +415,16 @@ A new device can initialize its missing default Kanban database from the canonic
 [[src/main/kanban-board-replica.ts#restoreKanbanBoard]] admits a default board only when its portable metadata exactly matches the current original display projection. The complete empty original schema and owner-bound retained receipt are staged privately, then published with a no-replace hard link through directory descriptors. An existing or concurrently created database is never replaced. The original board.json and kanban/current remain byte-for-byte unchanged; later tasks use the ordinary task restoration route. Reading alone still creates no database.
 
 Custom cloud metadata that differs from original metadata still requires the pending file/SQLite transaction protocol. Existing-board edits, graph reconstruction, Windows publication and installed/offline/multi-device qualification remain unfinished.
+
+
+## Recoverable original board metadata adoption (draft)
+
+Boards whose original display settings file is absent can adopt cloud names, descriptions and archive flags without replacing their task storage or UI.
+
+[[src/main/kanban-board-replica.ts#initializeKanbanBoardMetadata]] prepares an owner-bound operation under SQLite source CAS before exclusive file publication. A durable pending journal survives interruption; no-follow publication and read-back synchronize the file and parent directory before committing the receipt. Original tasks and execution state remain unchanged. Concurrent file creation returns its original projection and clears the pending preparation without replacement.
+
+[[src/main/kanban-board-replica.ts#hasPendingKanbanBoard]] prevents incomplete Kanban sources from publication. [[src/main/kanban-board-replica.ts#pendingKanbanBoards]] exposes only board recovery IDs to the existing durable-download reconciler. The main snapshot preserves these IDs and empty board scope alongside independent Memory and Capability scopes. Exact recovery checks operation contents and owner; later task changes do not invalidate a previously published historical receipt. Reads alone never prepare writes or execute work.
+
+Existing nonempty board.json updates still require recoverable replacement with retained external edits. Missing-default custom metadata adoption, dependent task graphs, Windows and installed/offline/multi-device qualification remain outstanding.
+
+Local qualification: 44 Native tests / 5 files passed, including source barriers, exact prepared-operation recovery, stale source refusal, publication collision, different-owner refusal, operation reuse, later original task/display edits and oversized UTF-8 metadata. Node/web types, full lint, production build and lat check passed. Existing nonempty metadata replacement and installed/authenticated publication remain unqualified.

@@ -1,4 +1,4 @@
-import { kanbanBoardRecord } from "./kanban-board-replica";
+import { kanbanBoardRecord, pendingKanbanBoards } from "./kanban-board-replica";
 import { afterEach, expect, it } from "vitest";
 import Database from "better-sqlite3";
 import {
@@ -12,6 +12,7 @@ import {
   existsSync,
   chmodSync,
   readdirSync,
+  unlinkSync,
 } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -410,4 +411,252 @@ it("retains a concurrently created default database and refuses incompatible ori
   );
   expect(apply(changed, w).status).toBe("deferred");
   expect(existsSync(join(changed, "kanban.db"))).toBe(false);
+});
+
+function metadataFixture(): {
+  r: string;
+  w: ReplicaWrite;
+  file: string;
+  db: string;
+} {
+  const r = root();
+  apply(r);
+  const file = join(r, "kanban", "boards", "evidence", "board.json");
+  unlinkSync(file);
+  const observed = kanbanReplicaSnapshot(
+    r,
+    "default",
+    "alice",
+    "replica",
+  ).documents.find((row) => row.collection === "board")!;
+  const w: ReplicaWrite = {
+    ...operation(),
+    operationId: "adopt-original-metadata",
+    expectedRecord: observed,
+    expectedVersion: observed.version,
+  };
+  return {
+    r,
+    w,
+    file,
+    db: join(r, "kanban", "boards", "evidence", "kanban.db"),
+  };
+}
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Absent board metadata adoption]]
+it("adopts cloud display metadata into an existing original DB without changing tasks, selection or dispatch", () => {
+  const { r, w, file, db: fileDb } = metadataFixture();
+  const db = new Database(fileDb);
+  db.prepare(
+    "INSERT INTO tasks(id,title,status,created_at) VALUES('original','Retained','todo',1)",
+  ).run();
+  db.close();
+  const observed = kanbanReplicaSnapshot(
+    r,
+    "default",
+    "alice",
+    "replica",
+  ).documents.find((row) => row.collection === "board")!;
+  w.expectedRecord = observed;
+  w.expectedVersion = observed.version;
+  writeFileSync(join(r, "kanban", "current"), "another-board\n");
+  const accepted = apply(r, w);
+  expect(accepted.status).toBe("applied");
+  expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({
+    name: "証拠整理",
+    description: "Original display metadata",
+  });
+  expect(accepted.record).toEqual(
+    kanbanReplicaSnapshot(r, "default", "alice", "replica").documents.find(
+      (row) => row.collection === "board",
+    ),
+  );
+  expect(apply(r, w)).toEqual(accepted);
+  expect(pendingKanbanBoards(r)).toEqual([]);
+  const original = new Database(fileDb, { readonly: true });
+  expect(original.prepare("SELECT id,title,status FROM tasks").all()).toEqual([
+    { id: "original", title: "Retained", status: "todo" },
+  ]);
+  expect(original.prepare("SELECT COUNT(*) AS n FROM task_runs").get()).toEqual(
+    { n: 0 },
+  );
+  original.close();
+  expect(readFileSync(join(r, "kanban", "current"), "utf8")).toBe(
+    "another-board\n",
+  );
+});
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Board metadata crash recovery]]
+it("recovers exact preparation after publication interruption and retains its receipt across later source edits", () => {
+  const { r, w, file, db: fileDb } = metadataFixture(),
+    wrapper = join(r, "interrupted-python");
+  writeFileSync(
+    wrapper,
+    '#!/usr/bin/python3\nimport subprocess,sys\np=subprocess.run(["/usr/bin/python3",*sys.argv[1:]])\nsys.exit(71)\n',
+  );
+  chmodSync(wrapper, 0o700);
+  expect(() =>
+    applyKanbanReplica(
+      r,
+      "default",
+      "alice",
+      "replica",
+      w,
+      undefined,
+      undefined,
+      wrapper,
+    ),
+  ).toThrow();
+  expect(existsSync(file)).toBe(true);
+  expect(pendingKanbanBoards(r)).toEqual(["evidence"]);
+  expect(() => kanbanReplicaSnapshot(r, "default", "alice", "replica")).toThrow(
+    "requires recovery",
+  );
+  expect(() =>
+    applyKanbanReplica(
+      r,
+      "default",
+      "bob",
+      "replica",
+      w,
+      undefined,
+      undefined,
+      "/usr/bin/python3",
+    ),
+  ).toThrow("owner");
+  expect(() =>
+    apply(r, {
+      ...w,
+      document: {
+        ...w.document,
+        body: { ...(w.document.body as object), name: "Changed operation" },
+      },
+    }),
+  ).toThrow("reused");
+  const db = new Database(fileDb);
+  db.prepare(
+    "INSERT INTO tasks(id,title,status,created_at) VALUES('later','Later original edit','todo',2)",
+  ).run();
+  db.close();
+  const accepted = apply(r, w);
+  expect(accepted.status).toBe("applied");
+  expect(pendingKanbanBoards(r)).toEqual([]);
+  expect(
+    kanbanReplicaSnapshot(r, "default", "alice", "replica").documents.some(
+      (row) => row.collection === "task",
+    ),
+  ).toBe(true);
+  writeFileSync(
+    file,
+    JSON.stringify({
+      slug: "evidence",
+      name: "Later name",
+      default_workdir: "/private/native",
+    }),
+  );
+  expect(apply(r, w)).toEqual(accepted);
+  expect(kanbanBoardRecord(r, "evidence", []).body).toMatchObject({
+    name: "Later name",
+  });
+});
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Board metadata concurrent creation]]
+it("preserves another writer metadata created during publication and resumes complete source reads", () => {
+  const { r, w, file } = metadataFixture(),
+    wrapper = join(r, "concurrent-python");
+  writeFileSync(
+    wrapper,
+    '#!/usr/bin/python3\nimport subprocess,sys,json\nwith open(sys.argv[-1],"x") as f:json.dump({"slug":"evidence","name":"Concurrent original","default_workdir":"/private/native"},f)\nsys.exit(subprocess.run(["/usr/bin/python3",*sys.argv[1:]]).returncode)\n',
+  );
+  chmodSync(wrapper, 0o700);
+  const result = applyKanbanReplica(
+    r,
+    "default",
+    "alice",
+    "replica",
+    w,
+    undefined,
+    undefined,
+    wrapper,
+  );
+  expect(result.status).toBe("conflict");
+  expect(result.record?.body).toMatchObject({ name: "Concurrent original" });
+  expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({
+    default_workdir: "/private/native",
+  });
+  expect(pendingKanbanBoards(r)).toEqual([]);
+  expect(kanbanReplicaSnapshot(r, "default", "alice", "replica").complete).toBe(
+    true,
+  );
+});
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Board metadata preparation refusal]]
+it("rejects stale metadata preparation and preserves existing files including private settings", () => {
+  const { r, w, file, db: fileDb } = metadataFixture();
+  const db = new Database(fileDb);
+  db.prepare(
+    "INSERT INTO tasks(id,title,status,created_at) VALUES('later','Later','todo',1)",
+  ).run();
+  db.close();
+  expect(apply(r, w).status).toBe("conflict");
+  expect(existsSync(file)).toBe(false);
+  expect(pendingKanbanBoards(r)).toEqual([]);
+  writeFileSync(
+    file,
+    JSON.stringify({
+      slug: "evidence",
+      name: "Original",
+      default_workdir: "/private/native",
+    }),
+  );
+  const original = readFileSync(file, "utf8");
+  expect(apply(r, w).status).toBe("deferred");
+  expect(readFileSync(file, "utf8")).toBe(original);
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Unpublished metadata recovery conflict]]
+it("abandons unpublished preparation if original tasks change before recovery without suppressing the new source", () => {
+  const { r, w, file, db: fileDb } = metadataFixture(),
+    wrapper = join(r, "before-publication-python");
+  writeFileSync(wrapper, "#!/usr/bin/python3\nimport sys\nsys.exit(71)\n");
+  chmodSync(wrapper, 0o700);
+  expect(() =>
+    applyKanbanReplica(
+      r,
+      "default",
+      "alice",
+      "replica",
+      w,
+      undefined,
+      undefined,
+      wrapper,
+    ),
+  ).toThrow();
+  expect(existsSync(file)).toBe(false);
+  expect(pendingKanbanBoards(r)).toEqual(["evidence"]);
+  const db = new Database(fileDb);
+  db.prepare(
+    "INSERT INTO tasks(id,title,status,created_at) VALUES('later','Retained original edit','todo',2)",
+  ).run();
+  db.close();
+  expect(apply(r, w).status).toBe("conflict");
+  expect(pendingKanbanBoards(r)).toEqual([]);
+  expect(existsSync(file)).toBe(false);
+  expect(
+    kanbanReplicaSnapshot(r, "default", "alice", "replica").documents.some(
+      (row) => row.collection === "task",
+    ),
+  ).toBe(true);
+  const oversized = metadataFixture();
+  expect(
+    apply(oversized.r, {
+      ...oversized.w,
+      document: {
+        ...oversized.w.document,
+        body: {
+          ...(oversized.w.document.body as object),
+          description: "界".repeat(16000),
+          icon: "界".repeat(16000),
+        },
+      },
+    }).status,
+  ).toBe("deferred");
+  expect(existsSync(oversized.file)).toBe(false);
+  expect(pendingKanbanBoards(oversized.r)).toEqual([]);
 });

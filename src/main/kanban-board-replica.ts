@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { execFileSync } from "child_process";
 import {
   existsSync,
+  readdirSync,
   lstatSync,
   readFileSync,
   mkdirSync,
@@ -20,9 +21,11 @@ import {
   repositoryFingerprint,
   type JsonValue,
 } from "@mithril/workspace/repository";
+import { validReplicaRecord } from "@mithril/workspace/replica-sync";
 import type {
   ReplicaWrite,
   ReplicaResult,
+  ReplicaRecord,
 } from "@mithril/workspace/replica-sync";
 const metadataFields = [
   "description",
@@ -300,6 +303,7 @@ export function restoreKanbanBoard(
       ),
     );
     const bytes = JSON.stringify(metadata) + "\n";
+    if (Buffer.byteLength(bytes) > 65536) return result("deferred");
     writeFileSync(join(stage, "board.json"), bytes, {
       flag: "wx",
       mode: 0o600,
@@ -350,5 +354,318 @@ export function restoreKanbanBoard(
     return accepted;
   } finally {
     if (existsSync(stage)) rmSync(stage, { recursive: true, force: true });
+  }
+}
+
+const publishMetadata = String.raw`
+import os,sys,stat
+source,target=sys.argv[1:]
+parent=os.path.dirname(source)
+if parent!=os.path.dirname(target) or not os.path.basename(source).startswith('.mithril-board-metadata-'):raise RuntimeError('Invalid metadata publication')
+flags=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW
+fd=os.open('/',flags)
+try:
+ for part in os.path.abspath(parent).split('/')[1:]:
+  nxt=os.open(part,flags,dir_fd=fd);os.close(fd);fd=nxt
+ sf=os.open(os.path.basename(source),flags,dir_fd=fd)
+ try:
+  f=os.open('board.json',os.O_RDONLY|os.O_NOFOLLOW,dir_fd=sf)
+  try:
+   if not stat.S_ISREG(os.fstat(f).st_mode):raise RuntimeError('Invalid metadata staging')
+   os.fsync(f)
+   if os.fstat(sf).st_ino!=os.stat(os.path.basename(source),dir_fd=fd,follow_symlinks=False).st_ino:raise RuntimeError('Metadata staging changed')
+   try:os.link('board.json',os.path.basename(target),src_dir_fd=sf,dst_dir_fd=fd,follow_symlinks=False)
+   except FileExistsError:print('conflict')
+   else:os.fsync(fd);print('applied')
+  finally:os.close(f)
+ finally:os.close(sf)
+finally:os.close(fd)
+`;
+const syncMetadata = String.raw`
+import os,sys,stat,hashlib
+file,digest=sys.argv[1:]
+flags=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW
+fd=os.open('/',flags)
+try:
+ for part in os.path.abspath(os.path.dirname(file)).split('/')[1:]:
+  nxt=os.open(part,flags,dir_fd=fd);os.close(fd);fd=nxt
+ f=os.open(os.path.basename(file),os.O_RDONLY|os.O_NOFOLLOW,dir_fd=fd)
+ try:
+  if not stat.S_ISREG(os.fstat(f).st_mode):raise RuntimeError('Invalid published metadata')
+  if hashlib.sha256(os.read(f,65537)).hexdigest()!=digest:raise RuntimeError('Published metadata changed')
+  os.fsync(f);os.fsync(fd)
+ finally:os.close(f)
+finally:os.close(fd)
+`;
+export function hasPendingKanbanBoard(db: Database.Database): boolean {
+  return (
+    !!db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='mithril_board_pending'",
+      )
+      .get() &&
+    !!db.prepare("SELECT 1 FROM mithril_board_pending LIMIT 1").get()
+  );
+}
+/** Recover only the durable operation prepared for this board before reading a complete source. */
+export function pendingKanbanBoards(root: string): string[] {
+  const base = join(root, "kanban", "boards");
+  checked(base);
+  const slugs = [
+    "default",
+    ...(existsSync(base) ? requireBoardNames(base) : []),
+  ];
+  return [...new Set(slugs)].filter((slug) => {
+    const file =
+      slug === "default"
+        ? join(root, "kanban.db")
+        : join(base, slug, "kanban.db");
+    checked(file);
+    if (!existsSync(file)) return false;
+    const db = new Database(file, { readonly: true, fileMustExist: true });
+    try {
+      return hasPendingKanbanBoard(db);
+    } finally {
+      db.close();
+    }
+  });
+}
+function requireBoardNames(base: string): string[] {
+  return readdirSync(base).filter((slug) =>
+    /^[a-z0-9][a-z0-9_-]{0,63}$/.test(slug),
+  );
+}
+/** Add absent original display metadata with a recoverable receipt, never replace another writer's file. */
+export function initializeKanbanBoardMetadata(
+  root: string,
+  userId: string,
+  replicaId: string,
+  write: ReplicaWrite,
+  python: string,
+): ReplicaResult {
+  const slug = write.document.id,
+    body = write.document.body;
+  const result = (
+    status: ReplicaResult["status"],
+    record: ReplicaRecord | null = null,
+  ): ReplicaResult => ({ schemaVersion: 1, userId, replicaId, status, record });
+  if (
+    !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(slug) ||
+    write.document.collection !== "board" ||
+    write.document.deleted ||
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    body.slug !== slug ||
+    typeof body.name !== "string" ||
+    !body.name.trim() ||
+    body.name.length > 512 ||
+    body.is_current !== false ||
+    body.total !== 0 ||
+    JSON.stringify(body.counts) !== "{}" ||
+    !validBody(body) ||
+    !validMetadata(body) ||
+    Object.keys(body).some(
+      (key) =>
+        ![
+          "slug",
+          "name",
+          "is_current",
+          "total",
+          "counts",
+          ...metadataFields,
+        ].includes(key),
+    )
+  )
+    return result("deferred");
+  const dbFile =
+    slug === "default"
+      ? join(root, "kanban.db")
+      : join(root, "kanban", "boards", slug, "kanban.db");
+  const parent = join(root, "kanban", "boards", slug),
+    file = join(parent, "board.json");
+  checked(dbFile);
+  checked(file);
+  if (!existsSync(dbFile)) return result("deferred");
+  const db = new Database(dbFile, { fileMustExist: true });
+  const fingerprint = createHash("sha256")
+    .update(JSON.stringify(write))
+    .digest("hex");
+  const desiredBytes =
+    JSON.stringify(
+      Object.fromEntries(
+        Object.entries(body).filter(
+          ([key]) => !["is_current", "total", "counts"].includes(key),
+        ),
+      ),
+    ) + "\n";
+  if (Buffer.byteLength(desiredBytes) > 65536) return result("deferred");
+  type Pending = { fingerprint: string; bytes: string; receipt: string };
+  try {
+    db.exec(
+      "CREATE TABLE IF NOT EXISTS mithril_board_pending(operation_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,bytes TEXT NOT NULL,receipt TEXT NOT NULL)",
+    );
+    const pending = db
+      .prepare(
+        "SELECT fingerprint,bytes,receipt FROM mithril_board_pending WHERE operation_id=?",
+      )
+      .get(write.operationId) as Pending | undefined;
+    let journal: Pending | undefined = pending;
+    if (journal && journal.fingerprint !== fingerprint)
+      throw Error("Replica operation was reused");
+    if (journal) {
+      const saved = JSON.parse(journal.receipt) as ReplicaResult;
+      if (
+        saved.schemaVersion !== 1 ||
+        !validReplicaRecord(saved.record) ||
+        saved.record.collection !== "board" ||
+        saved.record.deleted ||
+        repositoryFingerprint({ body: saved.record.body, deleted: false }) !==
+          repositoryFingerprint(write.document) ||
+        journal.bytes !== desiredBytes ||
+        saved.userId !== userId ||
+        saved.replicaId !== replicaId ||
+        saved.record?.id !== slug ||
+        saved.status !== "applied"
+      )
+        throw Error("Invalid board transaction owner");
+    } else {
+      if (hasPendingKanbanBoard(db)) return result("deferred");
+      const prepared = db
+        .transaction(() => {
+          const tasks = db.prepare("SELECT * FROM tasks LIMIT 1001").all();
+          if (tasks.length > 1000) return result("deferred");
+          const observed = kanbanBoardRecord(root, slug, tasks);
+          const record: ReplicaRecord = {
+            collection: "board",
+            id: slug,
+            ...observed,
+            deleted: false,
+          };
+          if (existsSync(file)) return result("deferred", record);
+          if (
+            !write.expectedRecord ||
+            write.expectedRecord.collection !== "board" ||
+            write.expectedRecord.id !== slug ||
+            write.expectedVersion !== observed.version ||
+            write.expectedRecord.version !== observed.version ||
+            repositoryFingerprint({
+              body: write.expectedRecord.body,
+              deleted: write.expectedRecord.deleted,
+            }) !==
+              repositoryFingerprint({ body: observed.body, deleted: false })
+          )
+            return result("conflict", record);
+          const bytes =
+            JSON.stringify(
+              Object.fromEntries(
+                Object.entries(body).filter(
+                  ([key]) => !["is_current", "total", "counts"].includes(key),
+                ),
+              ),
+            ) + "\n";
+          const accepted = result("applied", {
+            collection: "board",
+            id: slug,
+            body,
+            deleted: false,
+            version: createHash("sha256")
+              .update(JSON.stringify([slug, tasks, bytes]))
+              .digest("hex"),
+          });
+          journal = { fingerprint, bytes, receipt: JSON.stringify(accepted) };
+          db.prepare("INSERT INTO mithril_board_pending VALUES(?,?,?,?)").run(
+            write.operationId,
+            fingerprint,
+            bytes,
+            journal.receipt,
+          );
+          return null;
+        })
+        .immediate();
+      if (prepared) return prepared;
+    }
+    const retained = journal!;
+    // The committed preparation survives any interruption between filesystem and SQLite publication.
+    return db
+      .transaction(() => {
+        const tasks = db.prepare("SELECT * FROM tasks LIMIT 1001").all();
+        if (tasks.length > 1000) return result("deferred");
+        const observed = kanbanBoardRecord(root, slug, tasks);
+        const current: ReplicaRecord = {
+          collection: "board",
+          id: slug,
+          ...observed,
+          deleted: false,
+        };
+        const abandon = (): ReplicaResult => {
+          db.prepare(
+            "DELETE FROM mithril_board_pending WHERE operation_id=?",
+          ).run(write.operationId);
+          return result("conflict", current);
+        };
+        if (existsSync(file)) {
+          if (readFileSync(file, "utf8") !== retained.bytes) return abandon();
+        } else {
+          if (observed.version !== write.expectedVersion) return abandon();
+          mkdirSync(parent, { recursive: true, mode: 0o700 });
+          checked(parent);
+          const stage = mkdtempSync(join(parent, ".mithril-board-metadata-"));
+          try {
+            writeFileSync(join(stage, "board.json"), retained.bytes, {
+              flag: "wx",
+              mode: 0o600,
+            });
+            const status = execFileSync(
+              python,
+              ["-I", "-c", publishMetadata, stage, file],
+              { encoding: "utf8", timeout: 10000 },
+            ).trim();
+            if (status === "conflict") {
+              const next = kanbanBoardRecord(root, slug, tasks);
+              db.prepare(
+                "DELETE FROM mithril_board_pending WHERE operation_id=?",
+              ).run(write.operationId);
+              return result("conflict", {
+                collection: "board",
+                id: slug,
+                ...next,
+                deleted: false,
+              });
+            }
+            if (status !== "applied")
+              throw Error("Board metadata publication not confirmed");
+          } finally {
+            if (existsSync(stage))
+              rmSync(stage, { recursive: true, force: true });
+          }
+        }
+        execFileSync(
+          python,
+          [
+            "-I",
+            "-c",
+            syncMetadata,
+            file,
+            createHash("sha256").update(retained.bytes).digest("hex"),
+          ],
+          { encoding: "utf8", timeout: 10000 },
+        );
+        db.exec(
+          "CREATE TABLE IF NOT EXISTS mithril_replica_receipts(operation_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,receipt TEXT NOT NULL)",
+        );
+        db.prepare("INSERT INTO mithril_replica_receipts VALUES(?,?,?)").run(
+          write.operationId,
+          fingerprint,
+          retained.receipt,
+        );
+        db.prepare(
+          "DELETE FROM mithril_board_pending WHERE operation_id=?",
+        ).run(write.operationId);
+        return JSON.parse(retained.receipt) as ReplicaResult;
+      })
+      .immediate();
+  } finally {
+    db.close();
   }
 }

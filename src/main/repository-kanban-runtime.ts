@@ -1,4 +1,10 @@
-import { kanbanBoardRecord, restoreKanbanBoard } from "./kanban-board-replica";
+import {
+  hasPendingKanbanBoard,
+  pendingKanbanBoards,
+  initializeKanbanBoardMetadata,
+  kanbanBoardRecord,
+  restoreKanbanBoard,
+} from "./kanban-board-replica";
 import {
   captureKanbanAttachments,
   type KanbanAttachmentProjection,
@@ -143,6 +149,8 @@ export function kanbanRepositorySeed(
     const db = new Database(path, { readonly: true, fileMustExist: true });
     try {
       db.transaction(() => {
+        if (hasPendingKanbanBoard(db))
+          throw Error("Board metadata transaction requires recovery");
         const tables = new Set(
           (
             db
@@ -553,6 +561,23 @@ export function applyKanbanReplica(
         replicaId,
         attachmentProjection,
       );
+  if (write.document.collection === "board" && write.expectedRecord) {
+    return boardPython
+      ? initializeKanbanBoardMetadata(
+          root,
+          userId,
+          replicaId,
+          write,
+          boardPython,
+        )
+      : {
+          schemaVersion: 1,
+          userId,
+          replicaId,
+          status: "deferred",
+          record: null,
+        };
+  }
   const observed =
     snapshot().documents.find(
       (row) =>
@@ -1187,6 +1212,19 @@ export async function nativeReplicaSnapshot(): Promise<
       capture.dispose();
     }
   } catch {
+    try {
+      const boards = pendingKanbanBoards(before.root);
+      if (boards.length) {
+        snapshot.recoveryRecords = boards.map((id) => ({
+          collection: "board" as const,
+          id,
+        }));
+        snapshot.collections.push("board");
+        (snapshot.recordScopes ??= []).push({ collection: "board", ids: [] });
+      }
+    } catch {
+      // An unreadable Kanban DB retains its collection without suppressing independent sources.
+    }
     snapshot.warnings!.push(
       "Kanban source requires synchronization review; original records are retained",
     );
@@ -1197,12 +1235,10 @@ export async function nativeReplicaSnapshot(): Promise<
       before.profile,
     );
     snapshot.collections.push("memory");
-    snapshot.recordScopes = [
-      {
-        collection: "memory",
-        ids: memoryFileKinds.map((kind) => memoryFileId(before.profile, kind)),
-      },
-    ];
+    (snapshot.recordScopes ??= []).push({
+      collection: "memory",
+      ids: memoryFileKinds.map((kind) => memoryFileId(before.profile, kind)),
+    });
     snapshot.documents.push(...memory);
   } catch {
     snapshot.warnings!.push(
@@ -1262,9 +1298,10 @@ export async function nativeReplicaSnapshot(): Promise<
         capabilityId(before.profile),
       )
     ) {
-      snapshot.recoveryRecords = [
-        { collection: "capability", id: skillResourceId(before.profile) },
-      ];
+      (snapshot.recoveryRecords ??= []).push({
+        collection: "capability",
+        id: skillResourceId(before.profile),
+      });
       if (!snapshot.collections.includes("capability")) {
         snapshot.collections.push("capability");
         (snapshot.recordScopes ??= []).push({

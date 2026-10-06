@@ -143,7 +143,7 @@ export class CloudWorkspace {
   }
 
   /** Main-process context only. Neither credential fingerprint nor profile is exposed through workspace IPC. */
-  async nativeContext(): Promise<{
+  async nativeContext(write = false): Promise<{
     userId: string;
     profile: string;
     epoch: number;
@@ -151,6 +151,13 @@ export class CloudWorkspace {
   }> {
     const epoch = this.generation;
     const identity = await this.session();
+    if (
+      write &&
+      !identity.scopes.includes(this.deps.writeScope ?? "workspace:write")
+    )
+      throw Error(
+        "Native replica writes require workspace:write authorization",
+      );
     if (
       epoch !== this.generation ||
       identity.token !== this.deps.token() ||

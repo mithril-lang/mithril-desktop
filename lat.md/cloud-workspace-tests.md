@@ -80,3 +80,9 @@ Read every supported board in SQLite read transactions, retain comments, events,
 ## Native migration owner binding
 
 Bind a device profile's automatic migration source to its first authorized account. A later different account is refused without replacing that binding, while a separate profile can have its own owner.
+
+## Continuous Kanban replica
+
+The rich replica keeps a stable device/profile ID across restart.
+
+SQLite metadata writes use an immediate transaction, compare the full source version, preserve private paths and locks, and store operation receipts in the same transaction. Tests verify replay, stale-write rejection, claimed-task deferral and archival tombstones. Shared reconciliation tests verify disjoint-field merging, conflicting history preservation, restart after lost acknowledgement, deletion conflicts and independent progress while a record is busy.

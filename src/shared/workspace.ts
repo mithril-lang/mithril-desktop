@@ -8,6 +8,7 @@ export interface CloudWorkspaceStatus {
 }
 
 export interface CloudWorkspaceAPI extends WorkspaceTransport {
+  replica: import("@mithril/workspace/replica-sync").ReplicaTransport;
   repositorySeed(): Promise<{
     userId: string;
     documents: import("@mithril/workspace/repository-react").RepositorySeed[];

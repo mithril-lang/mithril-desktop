@@ -45,13 +45,7 @@ export default function CloudWorkspace({
     const portable = portableRepositorySeeds(
       await window.hermesAPI.cloudWorkspace.getSnapshot(),
     );
-    const native = await window.hermesAPI.cloudWorkspace.repositorySeed();
-    if (portable.userId !== native.userId)
-      throw Error("Workspace account changed");
-    return {
-      userId: portable.userId,
-      documents: [...portable.documents, ...native.documents],
-    };
+    return portable;
   }, []);
   const beforeConnect = useCallback(async () => {
     await window.hermesAPI.cloudWorkspace.enable();

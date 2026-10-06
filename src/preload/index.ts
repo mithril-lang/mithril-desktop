@@ -351,6 +351,11 @@ const hermesAPI = {
       ipcRenderer.invoke("project-folder-disconnect", projectId),
   },
   cloudWorkspace: {
+    replica: {
+      snapshot: () => ipcRenderer.invoke("cloud-workspace-replica-snapshot"),
+      apply: (write) =>
+        ipcRenderer.invoke("cloud-workspace-replica-apply", write),
+    },
     repositorySeed: () => ipcRenderer.invoke("cloud-workspace-repository-seed"),
     repository: {
       page: (collection, after) =>

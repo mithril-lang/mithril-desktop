@@ -33,6 +33,7 @@ import Gateway from "../Gateway/Gateway";
 import Providers from "../Providers/Providers";
 import Schedules from "../CloudWorkspace/CloudSchedules";
 import CloudWorkspace from "../CloudWorkspace/CloudWorkspace";
+import RepositoryReplication from "../CloudWorkspace/RepositoryReplication";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
 import { useSettingsModal } from "../../components/settings/SettingsModalContext";
@@ -717,6 +718,11 @@ function Layout({
   );
   return (
     <div className="layout-shell">
+      <RepositoryReplication
+        profile={activeProfile}
+        locale={locale}
+        enabled={!remoteMode}
+      />
       <div className={`layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
         <aside className="sidebar">
           <div className="sidebar-brand">

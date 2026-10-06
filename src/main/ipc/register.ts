@@ -1,4 +1,8 @@
-import { nativeRepositorySeed } from "../repository-kanban-runtime";
+import {
+  nativeRepositorySeed,
+  nativeReplicaSnapshot,
+  nativeReplicaApply,
+} from "../repository-kanban-runtime";
 import { previewLocalSchedules } from "../cronjobs";
 import { ProjectFolderSync } from "../project-folder-sync";
 import { nativeSessionImport } from "../native-session-import-runtime";
@@ -1356,6 +1360,14 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("project-folder-disconnect", (event, projectId) => {
     trustedWorkspaceSender(event);
     return folderSync.disconnect(projectId);
+  });
+  ipcMain.handle("cloud-workspace-replica-snapshot", (event) => {
+    trustedWorkspaceSender(event);
+    return nativeReplicaSnapshot();
+  });
+  ipcMain.handle("cloud-workspace-replica-apply", (event, write) => {
+    trustedWorkspaceSender(event);
+    return nativeReplicaApply(write);
   });
   ipcMain.handle("cloud-workspace-repository-seed", (event) => {
     trustedWorkspaceSender(event);

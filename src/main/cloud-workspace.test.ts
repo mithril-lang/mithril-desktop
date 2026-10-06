@@ -74,6 +74,23 @@ beforeEach(() => {
 
 describe("Desktop cloud workspace boundary", () => {
   // @lat: [[cloud-workspace-tests#Cloud workspace tests#Dedicated authorization scopes]]
+  it("rechecks write authorization before applying native replica data", async () => {
+    await client.enable();
+    fetcher.mockResolvedValueOnce(
+      reply({
+        via: "api_token",
+        user: { id: "a" },
+        scopes: ["workspace:read"],
+      }),
+    );
+    await expect(client.nativeContext(true)).rejects.toThrow(
+      "workspace:write authorization",
+    );
+    expect(fetcher.mock.calls.every((call) => call[0].endsWith("/v1/me"))).toBe(
+      true,
+    );
+  });
+  // @lat: [[cloud-workspace-tests#Cloud workspace tests#Dedicated authorization scopes]]
   it("refuses inference-only and read-only credentials without upgrading them", async () => {
     fetcher.mockResolvedValueOnce(
       reply({

@@ -387,3 +387,35 @@ Archive and restore use the original Agent compression ancestry/descendancy sema
 ## Archive synchronization guards
 
 Busy/uncertain cloud work prevents archival metadata dispatch. Changed cloud checkpoints and unsupported legacy archive schemas retain original visibility instead of silently overwriting it.
+
+## Atomic original session deletion intent
+
+Original single/batch deletion writes owner-bound outbox entries in its existing SQLite transaction. Children stay intact, repeated deletion retains operation IDs, and unmapped histories receive no invented cloud owner.
+
+## Deletion rollback preserves original source
+
+Failed original deletion rolls back its staged cloud intent, messages and child-link edits together. Existing source mappings cannot silently move to a different authenticated owner.
+
+## Durable original deletion acknowledgement
+
+First preparation retains its operation ID and base revision across reconnects. Exact owner/session/deletion/revision receipts are required before acknowledging the outbox, and retained receipts remain in original storage.
+
+## Original deletion receipt synchronization
+
+Physical native deletion uses its retained SQLite outbox and exact cloud receipt before acknowledgement. Failed transport suppresses cloud cache reconstruction, while accepted tombstones retain prior cloud history without replaying work.
+
+## Original deletion conflict and account guards
+
+Busy cloud work defers explicit native deletion; CAS conflicts preserve the first operation/revision. Owner changes before acknowledgement cannot consume another account's original intent or expose a pending conversation through cache reconstruction.
+
+## Absent deletion targets stay durably suppressed
+
+A missing cloud target does not erase a durable native deletion marker. Delayed creation is deleted with the original operation ID before its record can be reconstructed as a visible working copy.
+
+## Original deletion response admission
+
+Owner, operation, target deletion state and exact revision are checked again after transport. Invalid replies retain the original intent and suppress cache reconstruction; later valid receipts recover without a new operation.
+
+## Other-owner native deletion isolation
+
+A native profile bound to another owner cannot supply deletion intents to the current account. Its outbox stays intact while verified current-owner cloud working copies remain available.

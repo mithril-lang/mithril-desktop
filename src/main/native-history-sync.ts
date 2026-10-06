@@ -1,3 +1,4 @@
+import type { NativeHistoryDeletion } from "./native-history-deletions";
 import { repositoryFingerprint } from "@mithril/workspace/repository";
 import { createHash } from "crypto";
 import {
@@ -71,6 +72,21 @@ export interface NativeHistoryPorts {
     session: ChatSession,
     identity: Awaited<ReturnType<NativeHistoryPorts["context"]>>,
   ): Promise<boolean>;
+  deletions?: {
+    list(
+      identity: Awaited<ReturnType<NativeHistoryPorts["context"]>>,
+    ): Promise<NativeHistoryDeletion[]>;
+    prepare(
+      identity: Awaited<ReturnType<NativeHistoryPorts["context"]>>,
+      intent: NativeHistoryDeletion,
+      revision: number,
+    ): Promise<ChatOperation>;
+    acknowledge(
+      identity: Awaited<ReturnType<NativeHistoryPorts["context"]>>,
+      intent: NativeHistoryDeletion,
+      receipt: import("@mithril/workspace/sessions").ChatOperationResponse,
+    ): Promise<void>;
+  };
   transport: SessionTransport;
   read(owner: string, profile: string): NativeHistoryJournal;
   write(owner: string, profile: string, journal: NativeHistoryJournal): void;
@@ -1001,6 +1017,105 @@ export class NativeHistorySync {
         );
       }
     }
+    const deleting = new Set<string>();
+    if (this.ports.deletions) {
+      const intents = await this.ports.deletions.list(identity);
+      await check();
+      if (
+        intents.length > 1000 ||
+        new Set(intents.map((intent) => intent.sessionId)).size !==
+          intents.length ||
+        new Set(intents.map((intent) => intent.operationId)).size !==
+          intents.length ||
+        intents.some(
+          (intent) =>
+            intent.sessionId !==
+            nativeCloudSessionId(identity.profile, intent.sourceId),
+        )
+      )
+        throw Error("Invalid original deletion inventory");
+      for (const intent of intents) {
+        deleting.add(intent.sessionId);
+        try {
+          const current = sessions.get(intent.sessionId);
+          // Keep absent targets durably marked; a delayed creation must not resurrect them.
+          if (!current) continue;
+          let expectedRevision = intent.baseRevision;
+          let receipt = await this.ports.transport.receipt(
+            intent.sessionId,
+            intent.operationId,
+          );
+          await check();
+          if (
+            receipt.schemaVersion !== 1 ||
+            receipt.userId !== identity.userId ||
+            receipt.operationId !== intent.operationId
+          )
+            throw Error("Original deletion receipt owner mismatch");
+          if (receipt.status === "unknown") {
+            if (
+              current.activeTurn &&
+              ["running", "uncertain"].includes(current.activeTurn.status)
+            ) {
+              outcome.deferred.push(intent.sessionId);
+              continue;
+            }
+            const operation = await this.ports.deletions.prepare(
+              identity,
+              intent,
+              current.revision,
+            );
+            await check();
+            if (
+              !validateChatOperation(operation) ||
+              operation.type !== "delete" ||
+              operation.operationId !== intent.operationId ||
+              (intent.baseRevision !== null &&
+                operation.baseRevision !== intent.baseRevision)
+            )
+              throw Error("Invalid original deletion operation");
+            expectedRevision = operation.baseRevision;
+            receipt = await this.ports.transport.apply(
+              intent.sessionId,
+              operation,
+            );
+            await check();
+          }
+          if (
+            receipt.schemaVersion !== 1 ||
+            receipt.userId !== identity.userId ||
+            receipt.operationId !== intent.operationId
+          )
+            throw Error("Original deletion receipt owner mismatch");
+          if (receipt.status === "conflict") {
+            outcome.conflicts.push(intent.sessionId);
+            continue;
+          }
+          if (
+            receipt.status !== "accepted" ||
+            !validateChatSession(receipt.session) ||
+            receipt.session.id !== intent.sessionId ||
+            expectedRevision === null ||
+            receipt.session.revision !== expectedRevision + 1 ||
+            !receipt.session.deleted
+          )
+            throw Error("Original deletion receipt remains unknown");
+          await this.ports.deletions.acknowledge(identity, intent, {
+            ...receipt,
+            status: "accepted",
+            session: receipt.session,
+          });
+          await check();
+          sessions.set(intent.sessionId, receipt.session);
+          deleting.delete(intent.sessionId);
+        } catch (error) {
+          await check();
+          outcome.deferred.push(
+            `${intent.sessionId}: ${error instanceof Error ? error.message : "Original deletion unavailable"}`,
+          );
+        }
+      }
+    }
     if (this.ports.cacheRemote) {
       const mapped = new Set(
         source.map((native) =>
@@ -1008,7 +1123,7 @@ export class NativeHistorySync {
         ),
       );
       for (const session of sessions.values()) {
-        if (mapped.has(session.id)) continue;
+        if (mapped.has(session.id) || deleting.has(session.id)) continue;
         try {
           if (await this.ports.hasRemote?.(session, identity)) {
             await check();

@@ -1,3 +1,4 @@
+import { recordNativeHistoryDeletion } from "./native-history-deletions";
 import {
   mergeNativeHistoryCache,
   deleteNativeHistoryCache,
@@ -779,6 +780,7 @@ function hasParentSessionColumn(db: Database.Database): boolean {
 }
 
 function deleteSessionRows(db: Database.Database, sessionId: string): number {
+  recordNativeHistoryDeletion(db, sessionId);
   deleteNativeHistoryCache(db, sessionId);
   deletePromptImageAttachmentsForSession(db, sessionId);
   deleteSessionContinuationForSession(db, sessionId);

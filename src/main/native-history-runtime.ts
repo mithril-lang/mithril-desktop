@@ -1,4 +1,10 @@
 import {
+  bindNativeHistorySources,
+  nativeHistoryDeletions,
+  prepareNativeHistoryDeletion,
+  acknowledgeNativeHistoryDeletion,
+} from "./native-history-deletions";
+import {
   applyCloudSessionTitle,
   applyCloudSessionModel,
   applyCloudSessionArchive,
@@ -373,6 +379,81 @@ const nativeHistorySync = new NativeHistorySync({
   transport: cloudChat,
   read,
   write,
+  deletions: {
+    list: async (identity) => {
+      if (
+        JSON.stringify(identity) !==
+        JSON.stringify(await cloudChat.auth.nativeContext(true))
+      )
+        throw Error("History account changed");
+      if (getConnectionConfig().mode !== "local") return [];
+      checked(activeStateDbPath(identity.profile));
+      if (
+        !repositorySourceOwned(
+          join(app.getPath("userData"), "repository-source-owners"),
+          identity.profile,
+          identity.userId,
+        )
+      )
+        return [];
+      const db = getDbConnection(true, identity.profile);
+      return db
+        ? nativeHistoryDeletions(db, identity.userId, identity.profile)
+        : [];
+    },
+    prepare: async (identity, intent, revision) => {
+      if (
+        JSON.stringify(identity) !==
+        JSON.stringify(await cloudChat.auth.nativeContext(true))
+      )
+        throw Error("History account changed");
+      if (
+        getConnectionConfig().mode !== "local" ||
+        !repositorySourceOwned(
+          join(app.getPath("userData"), "repository-source-owners"),
+          identity.profile,
+          identity.userId,
+        )
+      )
+        throw Error("Native deletion owner unavailable");
+      checked(activeStateDbPath(identity.profile));
+      const db = getDbConnection(false, identity.profile);
+      if (!db) throw Error("Native deletion outbox unavailable");
+      return prepareNativeHistoryDeletion(
+        db,
+        identity.userId,
+        identity.profile,
+        intent,
+        revision,
+      );
+    },
+    acknowledge: async (identity, intent, receipt) => {
+      if (
+        JSON.stringify(identity) !==
+        JSON.stringify(await cloudChat.auth.nativeContext(true))
+      )
+        throw Error("History account changed");
+      if (
+        getConnectionConfig().mode !== "local" ||
+        !repositorySourceOwned(
+          join(app.getPath("userData"), "repository-source-owners"),
+          identity.profile,
+          identity.userId,
+        )
+      )
+        throw Error("Native deletion owner unavailable");
+      checked(activeStateDbPath(identity.profile));
+      const db = getDbConnection(false, identity.profile);
+      if (!db) throw Error("Native deletion outbox unavailable");
+      acknowledgeNativeHistoryDeletion(
+        db,
+        identity.userId,
+        identity.profile,
+        intent,
+        receipt,
+      );
+    },
+  },
   source: async () => {
     const context = await cloudChat.auth.nativeContext(true);
     if (getConnectionConfig().mode !== "local") return [];
@@ -401,6 +482,24 @@ const nativeHistorySync = new NativeHistorySync({
         }
       }),
     )();
+    if (
+      JSON.stringify(context) !==
+      JSON.stringify(await cloudChat.auth.nativeContext(true))
+    )
+      throw Error("History account changed");
+    if (getConnectionConfig().mode !== "local")
+      throw Error("Native history source changed");
+    const writable = getDbConnection(false, context.profile);
+    if (!writable) throw Error("Native history mapping unavailable");
+    bindNativeHistorySources(
+      writable,
+      context.userId,
+      context.profile,
+      sessions.map(({ session }) => ({
+        sourceId: session.id,
+        sessionId: nativeCloudSessionId(context.profile, session.id),
+      })),
+    );
     return sessions.map(({ session, items, error }) => ({
       id: session.id,
       title: session.title || "Chat",

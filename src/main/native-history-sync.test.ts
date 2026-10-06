@@ -1,3 +1,11 @@
+import Database from "better-sqlite3";
+import {
+  bindNativeHistorySources,
+  recordNativeHistoryDeletion,
+  nativeHistoryDeletions,
+  prepareNativeHistoryDeletion,
+  acknowledgeNativeHistoryDeletion,
+} from "./native-history-deletions";
 import { describe, expect, it } from "vitest";
 import {
   NativeHistorySync,
@@ -1188,4 +1196,251 @@ it("defers busy visibility, rejects changed checkpoints and retains legacy sourc
   expect((await legacySync.run()).deferred).toContain(sid);
   expect(legacy.currentArchive()).toBeUndefined();
   expect(legacy.executions()).toBe(0);
+});
+
+function deletedSourceFixture(): ReturnType<typeof fixture> & {
+  db: Database.Database;
+  remove(): void;
+} {
+  const f = fixture(),
+    db = new Database(":memory:"),
+    sid = nativeCloudSessionId("default", "original");
+  db.exec(
+    "CREATE TABLE sessions(id TEXT PRIMARY KEY);INSERT INTO sessions VALUES('original');",
+  );
+  bindNativeHistorySources(db, "alice", "default", [
+    { sourceId: "original", sessionId: sid },
+  ]);
+  f.ports.deletions = {
+    list: async (identity) =>
+      nativeHistoryDeletions(db, identity.userId, identity.profile),
+    prepare: async (identity, intent, revision) =>
+      prepareNativeHistoryDeletion(
+        db,
+        identity.userId,
+        identity.profile,
+        intent,
+        revision,
+      ),
+    acknowledge: async (identity, intent, receipt) =>
+      acknowledgeNativeHistoryDeletion(
+        db,
+        identity.userId,
+        identity.profile,
+        intent,
+        receipt,
+      ),
+  };
+  return {
+    ...f,
+    db,
+    remove: () => {
+      db.transaction(() => {
+        recordNativeHistoryDeletion(db, "original");
+        db.prepare("DELETE FROM sessions WHERE id='original'").run();
+      })();
+      f.ports.source = async () => [];
+    },
+  };
+}
+// @lat: [[cloud-workspace-tests#Original deletion receipt synchronization]]
+it("recovers a physical source deletion with the same receipt and prevents remote cache resurrection", async () => {
+  const f = deletedSourceFixture(),
+    sync = new NativeHistorySync(f.ports),
+    sid = nativeCloudSessionId("default", "original");
+  try {
+    await sync.run();
+    const history = structuredClone(f.events.get(sid));
+    f.remove();
+    f.lose();
+    const cache = vi.fn();
+    f.ports.cacheRemote = cache;
+    expect(
+      (await sync.run()).deferred.some((value) =>
+        value.includes("Lost acknowledgement"),
+      ),
+    ).toBe(true);
+    const intent = nativeHistoryDeletions(f.db, "alice", "default")[0];
+    expect(intent.baseRevision).not.toBeNull();
+    expect(cache).not.toHaveBeenCalled();
+    const receipt = vi.spyOn(f.ports.transport, "receipt");
+    expect((await new NativeHistorySync(f.ports).run()).deferred).toEqual([]);
+    expect(receipt).toHaveBeenCalledWith(sid, intent.operationId);
+    expect(nativeHistoryDeletions(f.db, "alice", "default")).toEqual([]);
+    expect(cache).toHaveBeenCalledWith(
+      expect.objectContaining({ id: sid, deleted: true }),
+      [],
+      expect.objectContaining({ userId: "alice" }),
+    );
+    expect(f.events.get(sid)!.slice(0, history!.length)).toEqual(history);
+    expect(f.executions()).toBe(0);
+  } finally {
+    f.db.close();
+  }
+});
+// @lat: [[cloud-workspace-tests#Original deletion conflict and account guards]]
+it("retains exact pending deletion on busy work, CAS conflict and account changes", async () => {
+  const f = deletedSourceFixture(),
+    sync = new NativeHistorySync(f.ports),
+    sid = nativeCloudSessionId("default", "original");
+  try {
+    await sync.run();
+    f.remove();
+    f.sessions.get(sid)!.activeTurn = {
+      id: "busy",
+      status: "running",
+      leaseExpiresAt: Date.now() + 1000,
+    };
+    const apply = vi.spyOn(f.ports.transport, "apply"),
+      cache = vi.fn();
+    f.ports.cacheRemote = cache;
+    expect((await sync.run()).deferred).toContain(sid);
+    expect(apply).not.toHaveBeenCalled();
+    expect(cache).not.toHaveBeenCalled();
+    f.sessions.get(sid)!.activeTurn = null;
+    const prepare = f.ports.deletions!.prepare;
+    f.ports.deletions!.prepare = async (...args) => {
+      const operation = await prepare(...args);
+      f.sessions.get(sid)!.revision++;
+      return operation;
+    };
+    expect((await sync.run()).conflicts).toContain(sid);
+    const intent = nativeHistoryDeletions(f.db, "alice", "default")[0];
+    expect(intent.baseRevision).not.toBeNull();
+    expect(cache).not.toHaveBeenCalled();
+    f.ports.deletions!.prepare = prepare;
+    const receipt = f.ports.transport.receipt;
+    f.ports.transport.receipt = async (...args) => {
+      const response = await receipt(...args);
+      f.owner("bob");
+      return response;
+    };
+    await expect(sync.run()).rejects.toThrow("account changed");
+    expect(nativeHistoryDeletions(f.db, "alice", "default")[0]).toEqual(intent);
+    expect(nativeHistoryDeletions(f.db, "bob", "default")).toEqual([]);
+    expect(f.executions()).toBe(0);
+  } finally {
+    f.db.close();
+  }
+});
+// @lat: [[cloud-workspace-tests#Absent deletion targets stay durably suppressed]]
+it("keeps absent targets suppressed until delayed cloud creation arrives", async () => {
+  const f = deletedSourceFixture(),
+    sync = new NativeHistorySync(f.ports),
+    sid = nativeCloudSessionId("default", "original");
+  try {
+    f.remove();
+    expect((await sync.run()).deferred).toEqual([]);
+    const intent = nativeHistoryDeletions(f.db, "alice", "default")[0];
+    expect(intent.baseRevision).toBeNull();
+    f.sessions.set(sid, {
+      id: sid,
+      title: "Delayed",
+      model: "mock",
+      revision: 1,
+      eventSeq: 0,
+      deleted: false,
+      activeTurn: null,
+    });
+    expect((await sync.run()).deferred).toEqual([]);
+    expect(f.sessions.get(sid)!.deleted).toBe(true);
+    expect(nativeHistoryDeletions(f.db, "alice", "default")).toEqual([]);
+    expect(f.executions()).toBe(0);
+  } finally {
+    f.db.close();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Original deletion response admission]]
+it("refuses spoofed or malformed deletion acknowledgements before consuming native intent", async () => {
+  for (const wrong of ["owner", "operation", "revision", "visible"] as const) {
+    const f = deletedSourceFixture(),
+      sync = new NativeHistorySync(f.ports),
+      sid = nativeCloudSessionId("default", "original");
+    try {
+      await sync.run();
+      f.remove();
+      const apply = f.ports.transport.apply;
+      f.ports.transport.apply = async (...args) => {
+        const response = await apply(...args);
+        return {
+          ...response,
+          userId: wrong === "owner" ? "bob" : response.userId,
+          operationId:
+            wrong === "operation" ? "other-op" : response.operationId,
+          session: {
+            ...response.session!,
+            revision:
+              response.session!.revision + (wrong === "revision" ? 1 : 0),
+            deleted: wrong === "visible" ? false : response.session!.deleted,
+          },
+        };
+      };
+      const ack = vi.spyOn(f.ports.deletions!, "acknowledge"),
+        cache = vi.fn();
+      f.ports.cacheRemote = cache;
+      expect((await sync.run()).deferred).not.toEqual([]);
+      expect(ack).not.toHaveBeenCalled();
+      expect(cache).not.toHaveBeenCalled();
+      expect(nativeHistoryDeletions(f.db, "alice", "default")).toHaveLength(1);
+      expect(f.sessions.get(sid)!.deleted).toBe(true);
+      f.ports.transport.apply = apply;
+      expect((await sync.run()).deferred).toEqual([]);
+      expect(nativeHistoryDeletions(f.db, "alice", "default")).toEqual([]);
+      expect(f.executions()).toBe(0);
+    } finally {
+      f.db.close();
+    }
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Other-owner native deletion isolation]]
+it("retains another owner's deletion intent while reconstructing only the current owner's cloud sessions", async () => {
+  const f = deletedSourceFixture(),
+    sync = new NativeHistorySync(f.ports);
+  try {
+    await sync.run();
+    f.remove();
+    const intent = nativeHistoryDeletions(f.db, "alice", "default")[0];
+    f.owner("bob");
+    f.ports.source = async () => {
+      throw Error("Native source belongs to another owner");
+    };
+    const session: ChatSession = {
+      id: "bob_session",
+      title: "Bob chat",
+      model: "mock",
+      revision: 1,
+      eventSeq: 0,
+      deleted: false,
+      activeTurn: null,
+    };
+    f.ports.transport.list = async () => ({
+      schemaVersion: 1,
+      userId: "bob",
+      sessions: [session],
+    });
+    f.ports.transport.events = async () => ({
+      schemaVersion: 1,
+      userId: "bob",
+      session,
+      events: [],
+      hasMore: false,
+      nextAfter: null,
+    });
+    const apply = vi.spyOn(f.ports.transport, "apply"),
+      cache = vi.fn();
+    f.ports.cacheRemote = cache;
+    const result = await sync.run();
+    expect(result.reconstructed).toBe(1);
+    expect(apply).not.toHaveBeenCalled();
+    expect(cache).toHaveBeenCalledWith(
+      session,
+      [],
+      expect.objectContaining({ userId: "bob" }),
+    );
+    expect(nativeHistoryDeletions(f.db, "alice", "default")[0]).toEqual(intent);
+  } finally {
+    f.db.close();
+  }
 });

@@ -1,6 +1,6 @@
 // Bootstrap and checkout are pinned to the reviewed Agent merge that Desktop
 // was tested against. Bump the commit and both digests together.
-export const PINNED_INSTALL_COMMIT = "4fda47e0bfa9595066608ea02de934e46ff32074";
+export const PINNED_INSTALL_COMMIT = "121883dae866ac84e0ef733395507a4c576c3bae";
 export const PINNED_INSTALL_SHA256 =
   "0fbf2969c12b9ef9c90b81519814865faa9ee4e22056e2a9a4d0b1d5e59966e8";
 export const PINNED_WINDOWS_INSTALL_SHA256 =

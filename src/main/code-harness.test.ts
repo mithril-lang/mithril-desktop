@@ -17,7 +17,7 @@ vi.mock("./utils", () => ({
   },
 }));
 vi.mock("./config", () => ({
-  readEnv: (profile: string) => ({ CODE_RUNNER_TOKEN: profile.repeat(32) }),
+  readEnv: (profile: string) => ({ MITHRIL_API_KEY: profile.repeat(32) }),
 }));
 vi.mock("./process-options", () => ({ HIDDEN_SUBPROCESS_OPTIONS: {} }));
 import { codeHarness } from "./code-harness";
@@ -28,7 +28,7 @@ fixture.script = join(fixture.root, "fixture.cjs");
 writeFileSync(
   fixture.script,
   `const assert=require('node:assert/strict'); const path=require('node:path');
-const profile=path.basename(process.env.HERMES_HOME);assert.equal(process.env.CODE_RUNNER_TOKEN,profile.repeat(32));
+const profile=path.basename(process.env.HERMES_HOME);assert.equal(process.env.MITHRIL_API_KEY,profile.repeat(32));
 assert.equal(process.env.OPENROUTER_API_KEY,undefined);assert.equal(process.argv[2],'mithril-code');
 let input='';process.stdin.on('data',chunk=>input+=chunk);process.stdin.on('end',()=>{
 assert.equal(JSON.parse(input).goal,process.argv[3]==='run'?'todo':'');

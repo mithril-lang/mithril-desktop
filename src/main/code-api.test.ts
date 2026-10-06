@@ -53,12 +53,15 @@ it("permits only fixed GitHub routes, forwards transient credentials and returns
     {
       method: "POST",
       headers: {
-        authorization: "Bearer run-token",
-        "x-openrouter-key": "provider-key",
+        "x-mithril-token": "provider-key",
       },
-      body: JSON.stringify({ template: "todo", goal: "todo" }),
+      body: expect.any(String),
     },
   ]);
+  expect(fetcher.mock.calls[1][1].headers).not.toHaveProperty("authorization");
+  expect(
+    JSON.parse(fetcher.mock.calls[1][1].body as string).request_id,
+  ).toMatch(/^[0-9a-f-]{36}$/);
   fetcher.mockRejectedValueOnce(Error("network"));
   expect(await codeApi("/api/github/commit", {}, { github: "token" })).toEqual({
     ok: false,

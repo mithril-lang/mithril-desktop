@@ -37,7 +37,7 @@ export async function codeHarness(
   if (running.has(home)) return { ok: false, error: "runner_busy" };
   running.add(home);
   try {
-    // Only the selected profile may provide the runner credential. No launch-profile API keys.
+    // Only the selected profile may provide the Mithril API credential. No launch-profile API keys.
     const env: NodeJS.ProcessEnv = {
       PATH: getEnhancedPath(),
       HOME: homedir(),
@@ -55,8 +55,8 @@ export async function codeHarness(
       "LANG",
     ])
       if (process.env[key]) env[key] = process.env[key];
-    const token = readEnv(profile).CODE_RUNNER_TOKEN;
-    if (token) env.CODE_RUNNER_TOKEN = token;
+    const token = readEnv(profile).MITHRIL_API_KEY;
+    if (token) env.MITHRIL_API_KEY = token;
     return await new Promise<CodeHarnessResponse>((resolve) => {
       const child = spawn(
         HERMES_PYTHON,

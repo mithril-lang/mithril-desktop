@@ -108,3 +108,11 @@ Jun's 2026-10-06 direction is one original Desktop UI and one collection per fea
 The target is documented in `mithril-fund/docs/design/desktop-cloud-repository.md`. Port original components, preserve rich records and full chat timelines, then wire both clients to an account-bound durable repository. SQLite/IndexedDB/folders become working caches; API D1/R2 remains authoritative. Automatic data retries must not replay tools or schedule occurrences.
 
 The preview.21 native-history and schedule dialogs, selected text import and parallel renderer remain implementation gaps. Do not hide those records or call the selected importer automatically as a shortcut. Their removal is gated on lossless read-back and access through the same repository. Runtime permissions and credentials stay in execution adapters.
+
+## Rich repository implementation in progress
+
+The work-in-progress repository preserves nested data and reuses original Kanban/Schedules component bodies. It is not the completed cloud-primary migration and has not been released.
+
+[[src/main/cloud-workspace.ts#CloudWorkspace#repositoryPage]] and [[src/main/cloud-workspace.ts#CloudWorkspace#repositoryApply]] expose fixed, owner-checked rich-document routes. [[src/main/repository-kanban-runtime.ts#kanbanRepositorySeed]] reads supported profile boards without dispatching an agent, switching the selected board or writing SQLite. Paths and live execution locks remain device-only. Each device profile is durably bound to its first authorized migration owner; a different signed-in account cannot silently adopt that source. Shared Kanban seeding retains existing cloud records and tombstones.
+
+Continuous native reconciliation and cloud-to-native writes are not implemented. Full chat/attachments, project bytes, cron delivery/executor ownership and remaining original surfaces still gate removal of the existing native dialogs. Keep this distinction from released preview.21 behavior and from the full target above.

@@ -1,4 +1,12 @@
 import {
+  repositoryCollections,
+  validRepositoryEdit,
+  validRepositoryPage,
+  validRepositoryReceipt,
+  type RepositoryCollection,
+  type RepositoryEdit,
+} from "@mithril/workspace/repository";
+import {
   validSecuritySnapshot,
   validSecuritySubmit,
   type SecuritySnapshot,
@@ -304,6 +312,33 @@ export class CloudWorkspace {
       this.reset(false);
       throw new Error("Workspace owner/schema mismatch");
     }
+  }
+
+  async repositoryPage(collection: RepositoryCollection, after?: string) {
+    if (
+      !repositoryCollections.includes(collection) ||
+      (after !== undefined && !validId(after))
+    )
+      throw Error("Invalid repository page");
+    const { value } = await this.authorizedRequest(
+      `/v1/workspace/repository/${collection}${after ? `?after=${encodeURIComponent(after)}` : ""}`,
+      undefined,
+      collection === "chat" ? "chat:read" : undefined,
+    );
+    if (!validRepositoryPage(value, collection, after))
+      throw Error("Invalid repository page");
+    return value;
+  }
+  async repositoryApply(edit: RepositoryEdit) {
+    if (!validRepositoryEdit(edit)) throw Error("Invalid repository edit");
+    const { value } = await this.authorizedRequest(
+      `/v1/workspace/repository/${edit.collection}`,
+      edit,
+      edit.collection === "chat" ? "chat:write" : undefined,
+    );
+    if (!validRepositoryReceipt(value, edit))
+      throw Error("Invalid repository receipt");
+    return value;
   }
 
   /** Main-only authenticated transport; callers expose only fixed, schema-checked routes. */

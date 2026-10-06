@@ -72,3 +72,11 @@ Explicit credential changes still notify disconnected renderers and invalidate i
 ## Security execution boundaries
 
 Security tests require explicit read/run scopes, fixed main-process API routes and tenant-checked snapshots. Renderer requests cannot carry credentials or executor policy.
+
+## Rich Kanban migration snapshot
+
+Read every supported board in SQLite read transactions, retain comments, events, runs and dependencies, preserve stable IDs, and keep paths and active execution locks on the device. Reading does not mutate the source DB or run an agent.
+
+## Native migration owner binding
+
+Bind a device profile's automatic migration source to its first authorized account. A later different account is refused without replacing that binding, while a separate profile can have its own owner.

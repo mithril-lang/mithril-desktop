@@ -8,6 +8,11 @@ export interface CloudWorkspaceStatus {
 }
 
 export interface CloudWorkspaceAPI extends WorkspaceTransport {
+  repositorySeed(): Promise<{
+    userId: string;
+    documents: import("@mithril/workspace/repository-react").RepositorySeed[];
+  }>;
+  repository: import("@mithril/workspace/repository").RepositoryTransport;
   security: import("@mithril/workspace/security").SecurityTransport;
   schedules: import("@mithril/workspace/schedules").ScheduleTransport;
   previewSchedules(): Promise<{

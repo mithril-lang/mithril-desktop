@@ -351,6 +351,17 @@ const hermesAPI = {
       ipcRenderer.invoke("project-folder-disconnect", projectId),
   },
   cloudWorkspace: {
+    repositorySeed: () => ipcRenderer.invoke("cloud-workspace-repository-seed"),
+    repository: {
+      page: (collection, after) =>
+        ipcRenderer.invoke(
+          "cloud-workspace-repository-page",
+          collection,
+          after,
+        ),
+      apply: (edit) =>
+        ipcRenderer.invoke("cloud-workspace-repository-apply", edit),
+    },
     previewSchedules: () =>
       ipcRenderer.invoke("cloud-workspace-local-schedules"),
     security: {

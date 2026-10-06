@@ -1,3 +1,4 @@
+import { portableRepositorySeeds } from "@mithril/workspace/repository-migration";
 import type { RuntimeSection } from "@mithril/workspace/runtime";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -6,6 +7,7 @@ import {
   type WorkspaceView,
 } from "@mithril/workspace/react";
 import "@mithril/workspace/styles.css";
+import "@mithril/workspace/desktop-styles.css";
 
 // @lat: [[cloud-workspace#Cloud workspace#Shared screens]]
 export default function CloudWorkspace({
@@ -39,6 +41,18 @@ export default function CloudWorkspace({
     (): Promise<DiscoverItem[]> => window.hermesAPI.cloudWorkspace.catalog(),
     [],
   );
+  const repositorySeed = useCallback(async () => {
+    const portable = portableRepositorySeeds(
+      await window.hermesAPI.cloudWorkspace.getSnapshot(),
+    );
+    const native = await window.hermesAPI.cloudWorkspace.repositorySeed();
+    if (portable.userId !== native.userId)
+      throw Error("Workspace account changed");
+    return {
+      userId: portable.userId,
+      documents: [...portable.documents, ...native.documents],
+    };
+  }, []);
   const beforeConnect = useCallback(async () => {
     await window.hermesAPI.cloudWorkspace.enable();
   }, []);
@@ -49,6 +63,8 @@ export default function CloudWorkspace({
       embedded={embedded}
       discoverFocus={discoverFocus}
       autoConnect
+      repositoryTransport={window.hermesAPI.cloudWorkspace.repository}
+      repositorySeed={repositorySeed}
       transport={window.hermesAPI.cloudWorkspace}
       fileTransport={window.hermesAPI.cloudWorkspace.files}
       folderAdapter={window.hermesAPI.projectFolderSync}

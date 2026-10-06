@@ -19,6 +19,7 @@ import "@mithril/workspace/desktop-styles.css";
 
 const taskAttachmentDownloads = {
   reader: window.hermesAPI.cloudWorkspace.taskAttachments,
+  writer: window.hermesAPI.cloudWorkspace.taskAttachments,
   save: saveTaskAttachmentDownload,
 };
 

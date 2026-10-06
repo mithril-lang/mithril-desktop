@@ -367,6 +367,15 @@ This draft uses shared workspace 0.6.11, including the current main Code/Kuro an
 
 The original shared Kanban detail drawer lists registered files and explicitly saves verified bytes through browser/Electron consumer adapters. Reading or selecting a task never fetches or executes its attachments.
 
-[[src/main/task-attachment-ipc.ts#registerTaskAttachmentIPC]] exposes only owner-pinned chunk reads after trusted-sender validation. Main retains credentials and rejects stale accounts during requests. The shared repository adapter validates retained task/attachment identities, canonical chunk pointers and complete file hashes before saving. Account switches, deletion, attachment replacement or board changes during a read cancel the save. Both Chromium consumers use an octet-stream Blob download, never a HTML preview or native path navigation.
+[[src/main/task-attachment-ipc.ts#registerTaskAttachmentIPC]] exposes owner-pinned chunk reads, metadata checks and bounded staging writes after trusted-sender validation. Main retains credentials and rejects stale accounts during requests. The shared repository adapter validates retained task/attachment identities, canonical chunk pointers and complete file hashes before saving. Account switches, deletion, attachment replacement or board changes during a read cancel the save. Both Chromium consumers use an octet-stream Blob download, never a HTML preview or native path navigation.
 
-This adds explicit download reachability to the same original drawer. Attachment upload/removal, remote original-directory restoration, Windows capture and installed save behavior still require implementation or live qualification. Draft artifact 0.6.12 and Desktop preview.28 are unpublished.
+This adds explicit download reachability to the same original drawer. Remote original-directory restoration, replacement controls, Windows capture and installed attachment behavior still require implementation or live qualification. Draft artifact 0.6.13 and Desktop preview.28 are unpublished.
+
+
+## Kanban attachment editing (draft)
+
+Original task details now accept selected files and remove reviewed attachment references through the same Web/Desktop component. Original metadata and history remain intact, and the cloud repository remains authoritative.
+
+Selected files are staged in bounded verified chunks before their metadata enters the durable repository outbox. The operation preserves original attachment IDs and complete task history. Owner switches, task changes, outstanding edits, byte failures and invalid aggregate sizes cancel metadata publication. Removed references remain recoverable through retained repository revisions and immutable resources; no R2 deletion or native file removal occurs from a UI action. The main IPC adapter allows only fixed task identifiers/digests and 8 MiB chunks, with main-owned scope and account checks. Merely reading a task does not upload, remove or execute files.
+
+The native file/SQLite adapter still defers changed attachment projections. Full bidirectional attachment writeback and complete reconstruction are required before this migration can be considered finished.

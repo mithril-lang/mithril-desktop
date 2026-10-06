@@ -47,13 +47,17 @@ import type {
   SshDockerProvisionResult,
 } from "../shared/ssh-docker";
 
-function taskAttachmentReader(
+function taskAttachmentAPI(
   owner?: string,
-): import("@mithril/workspace/task-attachments").TaskAttachmentReader {
+): import("@mithril/workspace/task-attachments").TaskAttachmentTransport {
   return {
-    forOwner: (value) => taskAttachmentReader(value),
+    forOwner: (value) => taskAttachmentAPI(value),
     getChunk: (id, digest) =>
       ipcRenderer.invoke("task-attachments-get-chunk", id, digest, owner),
+    hasChunk: (id, digest, size) =>
+      ipcRenderer.invoke("task-attachments-has-chunk", id, digest, size, owner),
+    putChunk: (id, bytes) =>
+      ipcRenderer.invoke("task-attachments-put-chunk", id, bytes, owner),
   };
 }
 
@@ -455,7 +459,7 @@ const hermesAPI = {
     },
     files: projectFileAPI(),
     capabilityResources: capabilityResourceAPI(),
-    taskAttachments: taskAttachmentReader(),
+    taskAttachments: taskAttachmentAPI(),
     catalog: () => ipcRenderer.invoke("cloud-workspace-catalog"),
     registrySkill: (item) =>
       ipcRenderer.invoke("cloud-workspace-registry-skill", item),

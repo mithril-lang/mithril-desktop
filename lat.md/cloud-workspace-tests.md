@@ -237,4 +237,6 @@ The native snapshot exposes task records only after every private byte upload is
 
 ## Task attachment download IPC
 
-Verify only read-only chunk access is exposed, with a mandatory owner and trusted renderer sender. Invalid owners, task identifiers and digests must be rejected before transport access.
+Verify bounded chunk reads, metadata checks and staging writes require a mandatory owner and trusted renderer sender.
+
+Invalid owners, identifiers, digests, sizes and byte payloads must be rejected before storage access. No deletion or filesystem path channel is exposed.

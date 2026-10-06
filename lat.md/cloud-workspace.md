@@ -140,3 +140,13 @@ The original Desktop timeline now reads a cloud projection layered over the unch
 The original Desktop Markdown component is shared with Web; a display-only normalization restores structurally unambiguous tables whose source lost newlines.
 
 Stored replies remain unchanged. The shared workspace normalizer leaves ordinary GFM, fenced examples, inline code and inconsistent column counts untouched. This repairs historical one-line tables without replacing the original renderer or changing their contents.
+
+### Original Memory component extraction (draft)
+
+The original Memory and Persona components now live in the shared workspace package.
+
+Desktop wrappers inject native APIs and translations; Electron globals are absent from shared component bodies. Capacity cards, entries, profile and providers retain their original controls. Original Memory/Soul CSS and scoped rules preserve the layout.
+
+Load failures have a retry in the original screen. Provider credential/configuration errors are visible instead of reporting Saved, and stale responses are ignored after an API/profile change. Persona autosave retains failed edits, serializes saves, and passes the observed content to cloud adapters for compare-and-swap. Native credentials still use the native execution port; they are never repository fields.
+
+A separately tested rich Memory repository adapter preserves original entry delimiters, refuses edits without an observed snapshot, retains offline pending operations and rejects stale Persona saves. It is not yet wired as the default Memory surface: lossless existing-source migration and continuous native file reconciliation remain gates. The current stripped-down cloud Settings/Memory/Capability screens and remaining split navigation still require replacement. No production release is implied by this extraction.

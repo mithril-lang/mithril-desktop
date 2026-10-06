@@ -2,11 +2,16 @@ import { portableKanbanTask } from "./kanban-portable-record";
 import type Database from "better-sqlite3";
 import { createHash } from "crypto";
 import { validBody, type JsonValue } from "@mithril/workspace/repository";
+import type { TaskAttachment } from "@mithril/workspace/task-attachments";
 /** Restore a cloud-created inactive task into an existing board, without CLI/hooks. */
 export function restoreKanbanTask(
   db: Database.Database,
   documentId: string,
   value: JsonValue,
+  restoreAttachments?: () => {
+    rows: Record<string, unknown>[];
+    resources: TaskAttachment[];
+  },
 ): { body: JsonValue; version: string } | null {
   if (!db.inTransaction)
     throw Error("Task restoration requires a writer transaction");
@@ -41,6 +46,7 @@ export function restoreKanbanTask(
     "children",
     "attachments",
   ]) {
+    if (field === "attachments" && restoreAttachments) continue;
     if (
       incoming[field] !== undefined &&
       (!Array.isArray(incoming[field]) ||
@@ -151,6 +157,7 @@ export function restoreKanbanTask(
     documentId,
   );
   const projected = portableKanbanTask(raw);
+  const attachments = restoreAttachments?.();
   const body = {
     board: incoming.board,
     task: projected,
@@ -161,10 +168,22 @@ export function restoreKanbanTask(
     parents: [],
     children: [],
     latest_summary: null,
-  } as JsonValue;
+    ...(attachments ? { attachments: attachments.resources } : {}),
+  };
   // Match the source snapshot's raw-row/relationship fingerprint.
   const version = createHash("sha256")
-    .update(JSON.stringify([raw, [], [], [], []]))
+    .update(
+      JSON.stringify([
+        raw,
+        [],
+        [],
+        [],
+        [],
+        ...(attachments?.rows.length
+          ? [{ rows: attachments.rows, resources: attachments.resources }]
+          : []),
+      ]),
+    )
     .digest("hex");
   if (!validBody(body)) throw Error("Restored task cannot be represented");
   return { body, version };

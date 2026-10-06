@@ -12,7 +12,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
 import { afterEach, expect, it, vi } from "vitest";
-import { digestBytes } from "@mithril/workspace/files";
+import { digestBytes, fileFingerprint } from "@mithril/workspace/files";
+import { prepareKanbanAttachmentWriteback } from "./kanban-attachment-replica";
 import type { JsonValue } from "@mithril/workspace/repository";
 import type { TaskAttachmentTransport } from "@mithril/workspace/task-attachments";
 const runtime = vi.hoisted(() => ({
@@ -44,6 +45,7 @@ import {
   kanbanReplicaSnapshot,
   applyKanbanReplica,
   nativeReplicaSnapshot,
+  nativeReplicaApply,
 } from "./repository-kanban-runtime";
 const roots: string[] = [];
 afterEach(() =>
@@ -472,6 +474,488 @@ it("exposes the native task snapshot only after all byte acknowledgements and re
     vi.unstubAllEnvs();
     runtime.root = "/unused";
     runtime.state = "/unused";
+    runtime.files.mockReset();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Kanban attachment file writeback]]
+it("restores added/replaced/removed cloud attachments into original rows, retains old files, and recovers SQL receipts", async () => {
+  for (const board of ["default", "evidence"]) {
+    const f = fixture(board),
+      capture = f.capture();
+    try {
+      let source = kanbanReplicaSnapshot(
+        f.root,
+        "default",
+        "alice",
+        "device",
+        capture.project,
+      ).documents.find((r) => r.collection === "task")!;
+      const original = structuredClone(source.body) as Record<
+        string,
+        JsonValue
+      >;
+      const originalRow = (
+        original.attachments as Record<string, JsonValue>[]
+      )[0]!;
+      const bytes = new Uint8Array([7, 8, 9, 0]),
+        digest = await digestBytes(bytes);
+      const replacement = {
+        ...originalRow,
+        filename: "New evidence.html",
+        size: bytes.length,
+        resource: {
+          format: "mithril-task-attachment-v1",
+          taskId: source.id,
+          size: bytes.length,
+          digest: await fileFingerprint(bytes.length, [digest]),
+          chunks: [digest],
+        },
+      };
+      const reader = {
+        forOwner: () => reader,
+        getChunk: vi.fn(async () => bytes),
+      };
+      const body = { ...original, attachments: [replacement] } as JsonValue;
+      const prepared = await prepareKanbanAttachmentWriteback(
+        f.root,
+        "/usr/bin/python3",
+        f.state,
+        source.id,
+        body,
+        reader,
+        async () => {},
+      );
+      const operation = {
+        operationId: "replace-files",
+        expectedVersion: source.version,
+        expectedRecord: source,
+        document: {
+          collection: "task" as const,
+          id: source.id,
+          body,
+          revision: 2,
+          deleted: false,
+          updatedAt: 2,
+        },
+      };
+      const applied = applyKanbanReplica(
+        f.root,
+        "default",
+        "alice",
+        "device",
+        operation,
+        capture.project,
+        prepared,
+      );
+      prepared.dispose();
+      expect(applied.status).toBe("applied");
+      source = kanbanReplicaSnapshot(
+        f.root,
+        "default",
+        "alice",
+        "device",
+        capture.project,
+      ).documents.find((r) => r.id === source.id)!;
+      expect(applied.record).toEqual(source);
+      const db = new Database(f.dbFile);
+      const row = db
+        .prepare("SELECT * FROM task_attachments WHERE id=9")
+        .get() as { stored_path: string; filename: string };
+      expect(row.filename).toBe("New evidence.html");
+      expect(readFileSync(row.stored_path)).toEqual(Buffer.from(bytes));
+      expect(readFileSync(f.file)).toEqual(Buffer.from(f.bytes));
+      expect(
+        db
+          .prepare("SELECT count(*) AS n FROM mithril_attachment_history")
+          .get(),
+      ).toEqual({ n: 1 });
+      db.close();
+      const added = {
+        ...replacement,
+        id: 2,
+        filename: "Empty.txt",
+        size: 0,
+        resource: {
+          format: "mithril-task-attachment-v1",
+          taskId: source.id,
+          size: 0,
+          digest: await fileFingerprint(0, []),
+          chunks: [],
+        },
+      };
+      const additionBody = {
+        ...(source.body as Record<string, JsonValue>),
+        attachments: [replacement, added],
+      } as JsonValue;
+      const addition = await prepareKanbanAttachmentWriteback(
+        f.root,
+        "/usr/bin/python3",
+        f.state,
+        source.id,
+        additionBody,
+        reader,
+        async () => {},
+      );
+      const addResult = applyKanbanReplica(
+        f.root,
+        "default",
+        "alice",
+        "device",
+        {
+          ...operation,
+          operationId: "add-empty",
+          expectedVersion: source.version,
+          expectedRecord: source,
+          document: { ...operation.document, body: additionBody },
+        },
+        capture.project,
+        addition,
+      );
+      addition.dispose();
+      expect(addResult.status).toBe("applied");
+      source = addResult.record!;
+      const removalBody = {
+        ...(source.body as Record<string, JsonValue>),
+        attachments: [],
+      } as JsonValue;
+      const removal = await prepareKanbanAttachmentWriteback(
+        f.root,
+        "/usr/bin/python3",
+        f.state,
+        source.id,
+        removalBody,
+        reader,
+        async () => {},
+      );
+      const removeOperation = {
+        ...operation,
+        operationId: "remove-files",
+        expectedVersion: source.version,
+        expectedRecord: source,
+        document: { ...operation.document, body: removalBody },
+      };
+      const removed = applyKanbanReplica(
+        f.root,
+        "default",
+        "alice",
+        "device",
+        removeOperation,
+        capture.project,
+        removal,
+      );
+      removal.dispose();
+      expect(removed.status).toBe("applied");
+      expect(removed.record).toEqual(
+        kanbanReplicaSnapshot(
+          f.root,
+          "default",
+          "alice",
+          "device",
+          capture.project,
+        ).documents.find((r) => r.id === source.id),
+      );
+      expect(readFileSync(row.stored_path)).toEqual(Buffer.from(bytes));
+      expect(readFileSync(f.file)).toEqual(Buffer.from(f.bytes));
+      rmSync(row.stored_path);
+      expect(
+        applyKanbanReplica(
+          f.root,
+          "default",
+          "alice",
+          "device",
+          removeOperation,
+          capture.project,
+        ),
+      ).toEqual(removed);
+      const audit = new Database(f.dbFile, { readonly: true });
+      expect(
+        audit.prepare("SELECT count(*) AS n FROM task_attachments").get(),
+      ).toEqual({ n: 0 });
+      expect(
+        audit
+          .prepare("SELECT count(*) AS n FROM mithril_attachment_history")
+          .get(),
+      ).toEqual({ n: 3 });
+      expect(
+        audit.prepare("SELECT count(*) AS n FROM task_runs").get(),
+      ).toEqual({ n: 0 });
+      audit.close();
+    } finally {
+      capture.dispose();
+    }
+  }
+});
+
+it("rejects corrupted bytes, owner changes, source conflicts and SQL coercion without replacing original attachments", async () => {
+  for (const mode of ["bytes", "owner", "source", "sql", "symlink"]) {
+    const f = fixture(),
+      capture = f.capture();
+    try {
+      const source = kanbanReplicaSnapshot(
+        f.root,
+        "default",
+        "alice",
+        "device",
+        capture.project,
+      ).documents.find((r) => r.collection === "task")!;
+      const body = structuredClone(source.body) as Record<string, JsonValue>;
+      const row = (body.attachments as Record<string, JsonValue>[])[0]!;
+      const bytes = new Uint8Array([8, 9, 10]),
+        digest = await digestBytes(bytes);
+      row.resource = {
+        format: "mithril-task-attachment-v1",
+        taskId: source.id,
+        size: 3,
+        digest: await fileFingerprint(3, [digest]),
+        chunks: [digest],
+      };
+      const reader = {
+        forOwner: () => reader,
+        getChunk: async () =>
+          mode === "bytes" ? new Uint8Array([1, 2, 3]) : bytes,
+      };
+      if (mode === "bytes" || mode === "owner") {
+        await expect(
+          prepareKanbanAttachmentWriteback(
+            f.root,
+            "/usr/bin/python3",
+            f.state,
+            source.id,
+            body,
+            reader,
+            async () => {
+              if (mode === "owner") throw Error("Owner changed");
+            },
+          ),
+        ).rejects.toThrow();
+      } else {
+        const prepared = await prepareKanbanAttachmentWriteback(
+          f.root,
+          "/usr/bin/python3",
+          f.state,
+          source.id,
+          body,
+          reader,
+          async () => {},
+        );
+        const db = new Database(f.dbFile);
+        if (mode === "source")
+          db.exec("UPDATE tasks SET title='External edit'");
+        if (mode === "sql")
+          db.exec(
+            "CREATE TRIGGER change_file AFTER INSERT ON task_attachments BEGIN UPDATE task_attachments SET filename='Coerced' WHERE id=NEW.id; END",
+          );
+        db.close();
+        if (mode === "symlink") {
+          const target = join(
+            f.root,
+            "kanban",
+            "attachments",
+            f.taskId,
+            `mithril-9-${(row.resource as Record<string, JsonValue>).digest}.bin`,
+          );
+          symlinkSync(f.file, target);
+        }
+        const apply = (): ReturnType<typeof applyKanbanReplica> =>
+          applyKanbanReplica(
+            f.root,
+            "default",
+            "alice",
+            "device",
+            {
+              operationId: mode,
+              expectedRecord: source,
+              expectedVersion: source.version,
+              document: {
+                collection: "task",
+                id: source.id,
+                body,
+                revision: 2,
+                deleted: false,
+                updatedAt: 2,
+              },
+            },
+            capture.project,
+            prepared,
+          );
+        if (mode === "source") expect(apply().status).toBe("conflict");
+        else expect(apply).toThrow();
+        prepared.dispose();
+      }
+      expect(readFileSync(f.file)).toEqual(Buffer.from(f.bytes));
+      const db = new Database(f.dbFile, { readonly: true });
+      expect(
+        db.prepare("SELECT stored_path FROM task_attachments WHERE id=9").get(),
+      ).toEqual({ stored_path: f.file });
+      expect(db.prepare("SELECT count(*) AS n FROM task_runs").get()).toEqual({
+        n: 0,
+      });
+      db.close();
+    } finally {
+      capture.dispose();
+    }
+  }
+});
+
+it("restores a cloud-created inactive task with files into the existing original board exactly once", async () => {
+  const f = fixture(),
+    capture = f.capture();
+  try {
+    const source = kanbanReplicaSnapshot(
+      f.root,
+      "default",
+      "alice",
+      "device",
+      capture.project,
+    ).documents.find((r) => r.collection === "task")!;
+    const body = structuredClone(source.body) as Record<string, JsonValue>;
+    (body.task as Record<string, JsonValue>).id = "new-cloud-task";
+    (body.task as Record<string, JsonValue>).title =
+      "Cloud task with original files";
+    const row = (body.attachments as Record<string, JsonValue>[])[0]!;
+    row.id = 20;
+    row.task_id = "new-cloud-task";
+    (row.resource as Record<string, JsonValue>).taskId = "new-cloud-record";
+    const reader = { forOwner: () => reader, getChunk: async () => f.bytes };
+    const prepared = await prepareKanbanAttachmentWriteback(
+      f.root,
+      "/usr/bin/python3",
+      f.state,
+      "new-cloud-record",
+      body,
+      reader,
+      async () => {},
+    );
+    const operation = {
+      operationId: "create-task-with-files",
+      expectedVersion: null,
+      expectedRecord: null,
+      document: {
+        collection: "task" as const,
+        id: "new-cloud-record",
+        body,
+        revision: 1,
+        deleted: false,
+        updatedAt: 1,
+      },
+    };
+    const accepted = applyKanbanReplica(
+      f.root,
+      "default",
+      "alice",
+      "device",
+      operation,
+      capture.project,
+      prepared,
+    );
+    prepared.dispose();
+    expect(accepted.status).toBe("applied");
+    expect(accepted.record).toEqual(
+      kanbanReplicaSnapshot(
+        f.root,
+        "default",
+        "alice",
+        "device",
+        capture.project,
+      ).documents.find((r) => r.id === "new-cloud-record"),
+    );
+    const db = new Database(f.dbFile, { readonly: true });
+    const restored = db
+      .prepare("SELECT stored_path FROM task_attachments WHERE id=20")
+      .get() as { stored_path: string };
+    expect(readFileSync(restored.stored_path)).toEqual(Buffer.from(f.bytes));
+    expect(db.prepare("SELECT count(*) AS n FROM tasks").get()).toEqual({
+      n: 2,
+    });
+    expect(db.prepare("SELECT count(*) AS n FROM task_runs").get()).toEqual({
+      n: 0,
+    });
+    db.close();
+    rmSync(restored.stored_path);
+    expect(
+      applyKanbanReplica(
+        f.root,
+        "default",
+        "alice",
+        "device",
+        operation,
+        capture.project,
+      ),
+    ).toEqual(accepted);
+  } finally {
+    capture.dispose();
+  }
+});
+
+it("connects the main replica route to owner-pinned restoration and skips downloads on retained receipts and unchanged files", async () => {
+  const f = fixture(),
+    capture = f.capture();
+  runtime.root = f.root;
+  runtime.state = f.state;
+  runtime.owner = "alice";
+  try {
+    const source = kanbanReplicaSnapshot(
+      f.root,
+      "default",
+      "alice",
+      "device",
+      capture.project,
+    ).documents.find((r) => r.collection === "task")!;
+    const body = structuredClone(source.body) as Record<string, JsonValue>;
+    (body.task as Record<string, JsonValue>).title = "Main route updated";
+    const operation = {
+      operationId: "main-route-title",
+      expectedRecord: source,
+      expectedVersion: source.version,
+      document: {
+        collection: "task" as const,
+        id: source.id,
+        body,
+        revision: 2,
+        deleted: false,
+        updatedAt: 2,
+      },
+    };
+    runtime.files.mockClear();
+    const title = await nativeReplicaApply(operation);
+    expect(title.status).toBe("applied");
+    expect(runtime.files).not.toHaveBeenCalled();
+    const replacement = structuredClone(title.record!.body) as Record<
+      string,
+      JsonValue
+    >;
+    const row = (replacement.attachments as Record<string, JsonValue>[])[0]!;
+    const bytes = new Uint8Array([20, 30, 40]),
+      digest = await digestBytes(bytes);
+    row.resource = {
+      format: "mithril-task-attachment-v1",
+      taskId: source.id,
+      size: 3,
+      digest: await fileFingerprint(3, [digest]),
+      chunks: [digest],
+    };
+    const reader = {
+      forOwner: () => reader,
+      getChunk: vi.fn(async () => bytes),
+    };
+    runtime.files.mockReturnValue(reader);
+    const update = {
+      ...operation,
+      operationId: "main-route-files",
+      expectedRecord: title.record!,
+      expectedVersion: title.record!.version,
+      document: { ...operation.document, body: replacement },
+    };
+    const accepted = await nativeReplicaApply(update);
+    expect(accepted.status).toBe("applied");
+    expect(runtime.files).toHaveBeenCalledWith("alice");
+    reader.getChunk.mockRejectedValue(Error("Offline"));
+    expect(await nativeReplicaApply(update)).toEqual(accepted);
+    expect(reader.getChunk).toHaveBeenCalledOnce();
+    expect(readFileSync(f.file)).toEqual(Buffer.from(f.bytes));
+  } finally {
+    capture.dispose();
     runtime.files.mockReset();
   }
 });

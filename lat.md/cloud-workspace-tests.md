@@ -230,6 +230,12 @@ Metadata edits preserve attached files and return exact file-aware source finger
 
 Main-process task chunk requests pin the owner and keep credentials outside the renderer. Unsupported routes and stale owners are rejected; late bytes are discarded after an account change.
 
+## Kanban attachment file writeback
+
+Cloud attachment additions, replacements and removals reconcile with the original SQLite task and fixed attachment directory, preserving source files and retained metadata.
+
+Default and named boards must match fresh source fingerprints. Corrupt bytes, account changes, source conflicts, symlinks and SQL coercion retain the old rows/files. New inactive tasks restore attached bytes without a dispatcher call; retained receipts recover after later file loss.
+
 
 ## Kanban attachment publication barrier
 

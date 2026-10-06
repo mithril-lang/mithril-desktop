@@ -1,6 +1,6 @@
 # Cloud workspace
 
-Desktop and Web consume one versioned Mithril workspace renderer and protocol, with signed-in automatic Cloud observation and explicitly selected native imports and no implicit import of local agent files.
+Desktop and Web should preserve the original Desktop UI through one account-scoped cloud data repository; the current shared cloud screens and native dialogs are transitional.
 
 ## Main process boundary
 
@@ -100,3 +100,11 @@ The shared Security screen selects provisioned targets, retains ambiguous reques
 Device schedule management opens in the same contextual dialog pattern as local history, instead of displaying a second schedule page beneath the cloud list. Existing device Cron jobs remain unchanged.
 
 Browser device login requests inference, billing read, Chat read/write and Workspace read/write with explicit browser approval. Partial grants are refused before credential replacement; existing credentials and native permissions are retained. A passkey is required by the API for workspace scopes.
+
+## Original Desktop UI with cloud storage
+
+Jun's 2026-10-06 direction is one original Desktop UI and one collection per feature, with storage synchronization behind adapters rather than Local, Legacy Device or Cloud Workspace navigation.
+
+The target is documented in `mithril-fund/docs/design/desktop-cloud-repository.md`. Port original components, preserve rich records and full chat timelines, then wire both clients to an account-bound durable repository. SQLite/IndexedDB/folders become working caches; API D1/R2 remains authoritative. Automatic data retries must not replay tools or schedule occurrences.
+
+The preview.21 native-history and schedule dialogs, selected text import and parallel renderer remain implementation gaps. Do not hide those records or call the selected importer automatically as a shortcut. Their removal is gated on lossless read-back and access through the same repository. Runtime permissions and credentials stay in execution adapters.

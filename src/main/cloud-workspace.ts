@@ -99,7 +99,7 @@ export class CloudWorkspace {
         session.profile !== this.deps.profile()
       )
         throw new Error("Account changed; file response discarded");
-      if (response.status === 401 || response.status === 403) this.reset();
+      if (response.status === 401 || response.status === 403) this.reset(false);
       return new Response(bytes, {
         status: response.status,
         headers: response.headers,
@@ -125,8 +125,9 @@ export class CloudWorkspace {
     return value;
   }
 
-  reset(): void {
-    const notify = this.identity !== null || this.enabled;
+  reset(explicitIdentityChange = true): void {
+    const notify =
+      explicitIdentityChange || this.identity !== null || this.enabled;
     this.generation++;
     this.identity = null;
     this.enabled = false;
@@ -166,7 +167,7 @@ export class CloudWorkspace {
   ): Promise<unknown> {
     const generation = this.generation;
     if (token !== this.deps.token() || profile !== this.deps.profile()) {
-      this.reset();
+      this.reset(false);
       throw new Error("Workspace account changed; enable sync again");
     }
     let response: Response;
@@ -193,11 +194,11 @@ export class CloudWorkspace {
       throw new Error("Workspace account changed; stale response discarded");
     }
     if (token !== this.deps.token() || profile !== this.deps.profile()) {
-      this.reset();
+      this.reset(false);
       throw new Error("Workspace account changed; enable sync again");
     }
     if (response.status === 401 || response.status === 403) {
-      this.reset();
+      this.reset(false);
       throw new Error("Workspace sign-in expired or access refused");
     }
     if (!response.ok)
@@ -207,7 +208,7 @@ export class CloudWorkspace {
       throw new Error("Workspace account changed; stale response discarded");
     }
     if (token !== this.deps.token() || profile !== this.deps.profile()) {
-      this.reset();
+      this.reset(false);
       throw new Error("Workspace account changed; enable sync again");
     }
     return value;
@@ -217,14 +218,14 @@ export class CloudWorkspace {
     const token = this.deps.token();
     const profile = this.deps.profile();
     if (!token || !/^mf_[A-Za-z0-9_-]{43}$/.test(token)) {
-      if (this.identity) this.reset();
+      if (this.identity) this.reset(false);
       return { userId: null, enabled: false };
     }
     if (
       this.identity &&
       (token !== this.identity.token || profile !== this.identity.profile)
     )
-      this.reset();
+      this.reset(false);
     const generation = this.generation;
     const me = (await this.request("/v1/me", token, profile)) as {
       user?: { id?: unknown };
@@ -240,12 +241,12 @@ export class CloudWorkspace {
       !Array.isArray(me.scopes) ||
       !me.scopes.every((scope) => typeof scope === "string")
     ) {
-      this.reset();
+      this.reset(false);
       throw new Error("Workspace identity response invalid");
     }
-    if (this.identity && this.identity.userId !== me.user.id) this.reset();
+    if (this.identity && this.identity.userId !== me.user.id) this.reset(false);
     if (!me.scopes.includes(this.deps.readScope ?? "workspace:read")) {
-      this.reset();
+      this.reset(false);
       throw new Error(
         `Cloud connection requires explicit ${this.deps.readScope ?? "workspace:read"} authorization. Existing tokens are never upgraded automatically.`,
       );
@@ -261,7 +262,7 @@ export class CloudWorkspace {
       this.identity &&
       (this.identity.token !== token || this.identity.profile !== profile)
     )
-      this.reset();
+      this.reset(false);
     const generation = this.generation;
     const status = await this.status();
     if (
@@ -300,7 +301,7 @@ export class CloudWorkspace {
     if (generation !== this.generation)
       throw new Error("Workspace account changed; stale response discarded");
     if (value?.schemaVersion !== 1 || value?.userId !== userId) {
-      this.reset();
+      this.reset(false);
       throw new Error("Workspace owner/schema mismatch");
     }
   }

@@ -439,6 +439,10 @@ it("does not emit an account-change loop for repeated rejected connections", asy
   await expect(client.enable()).rejects.toThrow("sign-in expired");
   await expect(client.enable()).rejects.toThrow("sign-in expired");
   expect(changed).not.toHaveBeenCalled();
+  client.reset(); // A newly stored credential must wake disconnected renderers.
+  expect(changed).toHaveBeenCalledTimes(1);
+  await expect(client.enable()).rejects.toThrow("sign-in expired");
+  expect(changed).toHaveBeenCalledTimes(1);
 });
 
 // @lat: [[cloud-workspace-tests#Cloud workspace tests#Security execution boundaries]]

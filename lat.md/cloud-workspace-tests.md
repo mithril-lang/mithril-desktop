@@ -66,7 +66,7 @@ Credentials, absolute paths, scripts, delivery destinations and native tool gran
 
 ## Stable disconnected identity
 
-Repeated denied sign-in or missing-scope checks preserve the disconnected error instead of emitting account-change events that remount the renderer indefinitely. Explicit resets still invalidate in-flight requests.
+Repeated denied sign-in or missing-scope checks preserve the disconnected error instead of emitting account-change events that remount the renderer indefinitely. Explicit credential changes still notify disconnected renderers and invalidate in-flight requests.
 ## Security execution boundaries
 
 Security tests require explicit read/run scopes, fixed main-process API routes and tenant-checked snapshots. Renderer requests cannot carry credentials or executor policy.

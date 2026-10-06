@@ -517,6 +517,25 @@ function Tools({
     }
   }
 
+  async function handleAddEvidenceMcp(): Promise<void> {
+    setMcpBusy("evidence");
+    setMcpError("");
+    setMcpMessage("");
+    try {
+      const result = await window.hermesAPI.installMithrilEvidenceMcp(profile);
+      if (!result.success) {
+        setMcpError(result.error || t("tools.mcpEvidenceAddFailed"));
+        return;
+      }
+      setMcpMessage(t("tools.mcpEvidenceAdded"));
+      await reloadMcp();
+    } catch (err) {
+      setMcpError((err as Error).message || t("tools.mcpEvidenceAddFailed"));
+    } finally {
+      setMcpBusy("");
+    }
+  }
+
   async function handleRemoveMcp(name: string): Promise<void> {
     if (!window.confirm(t("tools.mcpRemoveConfirm", { name }))) return;
     setMcpBusy(`remove:${name}`);
@@ -722,6 +741,18 @@ function Tools({
                     <TinyIcon kind="refresh" />
                     {t("tools.refresh")}
                   </button>
+                  {!mcpServers.some((s) => s.name === "mithril-evidence") && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      title={t("tools.mcpAddEvidenceHint")}
+                      disabled={mcpBusy === "evidence"}
+                      onClick={() => void handleAddEvidenceMcp()}
+                    >
+                      <TinyIcon kind="plus" />
+                      {t("tools.mcpAddEvidence")}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="btn btn-primary btn-sm"

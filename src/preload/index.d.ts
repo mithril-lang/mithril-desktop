@@ -1377,6 +1377,9 @@ interface HermesAPI {
     diagnostics: unknown[];
     error?: string;
   }>;
+  installMithrilEvidenceMcp: (
+    profile?: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   installMcpCatalogEntry: (
     name: string,
     env?: Record<string, string>,

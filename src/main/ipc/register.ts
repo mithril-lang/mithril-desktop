@@ -117,6 +117,7 @@ import {
   testMcpServer,
   type McpServerInput,
 } from "../mcp-servers";
+import { installMithrilEvidenceMcp } from "../mithril-evidence-mcp";
 import {
   runHermesAuthLogin,
   cancelHermesAuthLogin,
@@ -4054,6 +4055,10 @@ export function registerIpcHandlers(context: IpcContext): void {
     "install-mcp-catalog-entry",
     (_event, name: string, env?: Record<string, string>, profile?: string) =>
       installMcpCatalogEntry(name, env, profile),
+  );
+
+  ipcMain.handle("install-mithril-evidence-mcp", (_event, profile?: string) =>
+    installMithrilEvidenceMcp(profile),
   );
 
   // Discover marketplace (community registry)

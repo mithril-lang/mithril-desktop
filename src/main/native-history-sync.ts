@@ -32,6 +32,7 @@ export interface NativeHistorySource {
   items(sessionId: string): Promise<ArchivedHistoryItem[]>;
   cache?(sessionId: string, items: ArchivedHistoryItem[]): Promise<void>;
   cacheTitle?(title: string): Promise<string>;
+  cacheModel?(model: string): Promise<string>;
 }
 export interface NativeHistoryJournal {
   entries: Record<
@@ -40,6 +41,7 @@ export interface NativeHistoryJournal {
       hashes: Record<string, string>;
       nativeHashes?: Record<string, string>;
       title?: { native: string; cloud: string };
+      model?: { native: string; cloud: string };
       titleConflict?: { native: string; cloud: string };
       pending: {
         sessionId: string;
@@ -258,6 +260,20 @@ export class NativeHistorySync {
         )
           throw Error("Invalid title journal");
       }
+      if (
+        journal.model !== undefined &&
+        (!journal.model ||
+          typeof journal.model !== "object" ||
+          Array.isArray(journal.model) ||
+          Object.keys(journal.model).length !== 2 ||
+          typeof journal.model.native !== "string" ||
+          !journal.model.native ||
+          journal.model.native.length > 256 ||
+          typeof journal.model.cloud !== "string" ||
+          !journal.model.cloud ||
+          journal.model.cloud.length > 256)
+      )
+        throw Error("Invalid model journal");
       if (journal.pending?.conflicted) {
         outcome.conflicts.push(sid);
         continue;
@@ -294,6 +310,18 @@ export class NativeHistorySync {
           }
           if (receipt.status !== "accepted")
             throw Error("History operation receipt remains unknown");
+          if (pending.operation.type === "history") {
+            if (
+              receipt.session.revision !== pending.operation.baseRevision + 1 ||
+              receipt.session.model !== pending.operation.data.model
+            )
+              throw Error("Invalid model receipt");
+            if (pending.operation.data.items.length === 0)
+              journal.model = {
+                native: pending.operation.data.model,
+                cloud: receipt.session.model,
+              };
+          }
           if (pending.operation.type === "history")
             for (const item of pending.operation.data.items) {
               journal.hashes[item.id] = fingerprint(item);
@@ -354,6 +382,12 @@ export class NativeHistorySync {
           if (result.session.title !== native.title)
             throw Error("Invalid creation title receipt");
           journal.title = { native: native.title, cloud: result.session.title };
+          if (result.session.model !== (native.model || "native-history"))
+            throw Error("Invalid creation model receipt");
+          journal.model = {
+            native: native.model || "native-history",
+            cloud: result.session.model,
+          };
           remote = result.session;
           sessions.set(sid, remote);
           journal.pending = null;
@@ -535,6 +569,67 @@ export class NativeHistorySync {
             cloud: remote.title,
             cloudRevision: remote.revision,
           });
+        }
+        // Archived model metadata is independent of execution/provider authorization.
+        const model = native.model || "native-history";
+        if (typeof model !== "string" || model.length > 256)
+          throw Error("Invalid native history model");
+        if (model === remote.model)
+          journal.model = { native: model, cloud: remote.model };
+        else if (!journal.model) outcome.conflicts.push(sid);
+        else {
+          const localChanged = model !== journal.model.native,
+            cloudChanged = remote.model !== journal.model.cloud;
+          if (localChanged && cloudChanged) outcome.conflicts.push(sid);
+          else if (localChanged) {
+            const operation: ChatOperation = {
+              type: "history",
+              operationId: crypto.randomUUID(),
+              baseRevision: remote.revision,
+              data: { title: remote.title, model, items: [] },
+            };
+            if (!validateChatOperation(operation))
+              throw Error("Invalid model synchronization operation");
+            journal.pending = { sessionId: sid, operation, conflicted: false };
+            await persist();
+            const receipt = await this.ports.transport.apply(sid, operation);
+            await check();
+            if (
+              receipt.schemaVersion !== 1 ||
+              receipt.userId !== identity.userId ||
+              receipt.operationId !== operation.operationId ||
+              !validateChatSession(receipt.session) ||
+              receipt.session.id !== sid
+            )
+              throw Error("Invalid model receipt");
+            if (receipt.status === "conflict") {
+              journal.pending.conflicted = true;
+              await persist();
+              outcome.conflicts.push(sid);
+              continue;
+            }
+            if (
+              receipt.status !== "accepted" ||
+              receipt.session.revision !== operation.baseRevision + 1 ||
+              receipt.session.model !== model ||
+              receipt.session.title !== remote.title
+            )
+              throw Error("Model receipt remains unknown");
+            remote = receipt.session;
+            sessions.set(sid, remote);
+            journal.model = { native: model, cloud: remote.model };
+            journal.pending = null;
+          } else if (cloudChanged) {
+            if (!native.cacheModel)
+              outcome.deferred.push(`${sid}: Native model cache unavailable`);
+            else {
+              const cached = await native.cacheModel(remote.model);
+              await check();
+              if (cached !== remote.model)
+                throw Error("Invalid native model acknowledgement");
+              journal.model = { native: cached, cloud: remote.model };
+            }
+          }
         }
         await persist();
         const stored = new Map(

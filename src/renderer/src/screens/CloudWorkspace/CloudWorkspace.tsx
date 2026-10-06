@@ -1,4 +1,4 @@
-import { saveTaskAttachmentDownload } from "@mithril/workspace/task-attachments";
+import { saveTaskAttachmentDownload } from "@mithril/workspace/task-attachment-download";
 import { useFont } from "../../components/FontProvider";
 import { useChatPreferences } from "../../components/ChatPreferencesProvider";
 import { THEMES, FONT_OPTIONS } from "../../constants";

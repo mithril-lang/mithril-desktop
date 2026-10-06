@@ -23,6 +23,8 @@ function fixture(): {
   executions: () => number;
   title: (value: string) => void;
   currentTitle: () => string;
+  model: (value: string) => void;
+  currentModel: () => string;
 } {
   const sessions = new Map<string, ChatSession>(),
     events = new Map<string, ChatEvent[]>(),
@@ -31,7 +33,8 @@ function fixture(): {
     userId = "alice",
     lost = false,
     executions = 0,
-    nativeTitle = "Original chat";
+    nativeTitle = "Original chat",
+    nativeModel = "mock";
   const items: ArchivedHistoryItem[] = [
     { id: "user_1", kind: "user", content: "Investigate", timestamp: 1 },
     {
@@ -74,7 +77,11 @@ function fixture(): {
           nativeTitle = title || "Chat";
           return nativeTitle;
         },
-        model: "mock",
+        model: nativeModel,
+        cacheModel: async (model) => {
+          nativeModel = model;
+          return model;
+        },
         items: async () => structuredClone(items),
       },
     ],
@@ -120,7 +127,10 @@ function fixture(): {
               ? operation.data.title
               : (old?.title ??
                 (operation.type === "create" ? operation.data.title : "")),
-          model: "mock",
+          model:
+            operation.type === "history" || operation.type === "create"
+              ? operation.data.model
+              : (old?.model ?? "mock"),
           revision: accepted ? (old?.revision ?? 0) + 1 : old!.revision,
           eventSeq: old?.eventSeq ?? 0,
           deleted: false,
@@ -187,6 +197,10 @@ function fixture(): {
       nativeTitle = value;
     },
     currentTitle: () => nativeTitle,
+    model: (value) => {
+      nativeModel = value;
+    },
+    currentModel: () => nativeModel,
   };
 }
 describe("automatic rich native history archival", () => {
@@ -874,4 +888,52 @@ it("rejects a title choice after the cloud revision changes even if its title is
   expect(apply).not.toHaveBeenCalled();
   expect(f.currentTitle()).toBe("Native edit");
   expect(f.sessions.get(sid)!.title).toBe("Cloud edit");
+});
+
+// @lat: [[cloud-workspace-tests#Native history model reconciliation]]
+it("synchronizes archived models in both directions with exact replay, concurrent conflicts and no execution", async () => {
+  const f = fixture(),
+    sync = new NativeHistorySync(f.ports),
+    sid = nativeCloudSessionId("default", "original");
+  expect((await sync.run()).deferred).toEqual([]);
+  const count = f.events.get(sid)!.length,
+    items = structuredClone(f.items);
+  f.model("native-two");
+  f.lose();
+  expect((await sync.run()).deferred).not.toEqual([]);
+  const pending = f.state().entries[sid].pending!;
+  expect(pending.operation).toMatchObject({
+    type: "history",
+    data: { model: "native-two", items: [] },
+  });
+  expect((await sync.run()).deferred).toEqual([]);
+  expect(f.sessions.get(sid)!.model).toBe("native-two");
+  expect(f.events.get(sid)).toHaveLength(count);
+  expect(f.state().entries[sid].pending).toBeNull();
+  const remote = f.sessions.get(sid)!;
+  f.sessions.set(sid, {
+    ...remote,
+    model: "cloud-three",
+    revision: remote.revision + 1,
+  });
+  expect((await sync.run()).deferred).toEqual([]);
+  expect(f.currentModel()).toBe("cloud-three");
+  f.model("native-four");
+  f.sessions.set(sid, {
+    ...f.sessions.get(sid)!,
+    model: "cloud-four",
+    revision: f.sessions.get(sid)!.revision + 1,
+  });
+  expect((await sync.run()).conflicts).toContain(sid);
+  expect(f.currentModel()).toBe("native-four");
+  expect(f.sessions.get(sid)!.model).toBe("cloud-four");
+  f.items[0] = {
+    ...f.items[0],
+    content: "Later native content",
+  } as ArchivedHistoryItem;
+  await sync.run();
+  expect((await sync.run()).conflicts).toContain(sid);
+  expect(f.sessions.get(sid)!.model).toBe("cloud-four");
+  expect(f.executions()).toBe(0);
+  expect(f.items.slice(1)).toEqual(items.slice(1));
 });

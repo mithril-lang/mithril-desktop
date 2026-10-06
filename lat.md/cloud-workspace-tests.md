@@ -342,3 +342,12 @@ A missing default database adopts custom cloud display metadata through a durabl
 ## Custom default board recovery
 
 Interrupted default publication resumes with owner-bound exact receipts. Concurrent original metadata or tasks are retained instead of overwritten, and complete snapshots wait for recovery.
+
+
+## Native history model reconciliation
+
+Archived model metadata converges in both directions without turns or history duplication. Lost acknowledgements retain operation IDs; simultaneous model edits remain conflicts across later content sync.
+
+## Native model compare and swap
+
+Cloud model metadata replaces only the captured session model, preserving titles and other sessions. Stale or invalid updates retain original data.

@@ -1,4 +1,7 @@
-import { applyCloudSessionTitle } from "./native-history-title";
+import {
+  applyCloudSessionTitle,
+  applyCloudSessionModel,
+} from "./native-history-title";
 import { app } from "electron";
 import { createHash, randomUUID } from "crypto";
 import {
@@ -404,6 +407,21 @@ const nativeHistorySync = new NativeHistorySync({
       items: (sessionId) => {
         if (error) return Promise.reject(Error(error));
         return portableItems(context, sessionId, items);
+      },
+      cacheModel: async (model) => {
+        if (
+          JSON.stringify(context) !==
+          JSON.stringify(await cloudChat.auth.nativeContext(true))
+        )
+          throw Error("History account changed");
+        const writable = getDbConnection(false, context.profile);
+        if (!writable) throw Error("Native model cache unavailable");
+        return applyCloudSessionModel(
+          writable,
+          session.id,
+          session.model,
+          model,
+        );
       },
       cacheTitle: async (title) => {
         if (

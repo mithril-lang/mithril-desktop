@@ -32,3 +32,28 @@ export function applyCloudSessionTitle(
   })();
   return title || "Chat";
 }
+
+/** Update only archival model metadata under source CAS; this never selects a provider or executes a turn. */
+export function applyCloudSessionModel(
+  db: Database.Database,
+  id: string,
+  expected: string | null,
+  model: string,
+): string {
+  if (typeof model !== "string" || !model || model.length > 256)
+    throw Error("Invalid cloud model");
+  db.transaction(() => {
+    const row = db.prepare("SELECT model FROM sessions WHERE id=?").get(id) as
+      | { model: string | null }
+      | undefined;
+    if (!row || row.model !== expected)
+      throw Error("Native model changed; synchronization deferred");
+    if (
+      db
+        .prepare("UPDATE sessions SET model=? WHERE id=? AND model IS ?")
+        .run(model, id, expected).changes !== 1
+    )
+      throw Error("Native model changed; synchronization deferred");
+  })();
+  return model;
+}

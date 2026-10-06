@@ -503,3 +503,16 @@ A privately staged full-schema database contains the owner/replica-bound prepara
 [[cloud-workspace-tests#Cloud workspace tests#Custom default board initialization]] and [[cloud-workspace-tests#Cloud workspace tests#Custom default board recovery]] cover original schema, exact projections, interruptions before and after metadata publication, lost acknowledgement and concurrent native edits. Source snapshots report pending recovery rather than partial completion. No Agent command, dispatch or board switch occurs.
 
 Custom default qualification: 2,628 Desktop tests / 281 files and 34 targeted board/storage tests passed. Node/web types, full lint and production build passed. The missing-credential fixture ran without OPENROUTER_API_KEY. Previous head 3aaf9c7 passed CI run 37517609935. New-head CI, publication and installed multi-device qualification remain outstanding.
+
+
+## Archived chat model reconciliation (draft)
+
+Original chat models now reconcile independently from titles and transcript items without executing a turn.
+
+Native keeps separate native/cloud model baselines. A single-sided local edit uses a retained history operation with no items; a cloud edit updates only the captured original session model under SQLite CAS and account guards. Simultaneous edits remain conflicts across later transcript synchronization. A lost acknowledgement retries the original operation ID and validates its exact model receipt. Older journals with unequal models require review rather than choosing an origin implicitly.
+
+Workspace 0.6.14 admits empty archival history items; the compatible API stores its model metadata without adding an event or executing inference. Publish that API before the new Desktop consumer. The shared Chromium attachment download adapter now has its own browser-only package entry, keeping DOM types out of the Worker protocol. Native and Web reuse that same adapter.
+
+The invariants are [[cloud-workspace-tests#Cloud workspace tests#Native history model reconciliation]] and [[cloud-workspace-tests#Cloud workspace tests#Native model compare and swap]]. Model conflict controls, session deletion/continuation, remaining adapters and installed multi-device qualification remain outstanding.
+
+Model reconciliation qualification: 2,630 Desktop tests / 281 files and 35 targeted history/inventory tests passed. Node/web types, full lint, production build and lat check passed. The installed session protocol and browser attachment download entry match the packed Workspace 0.6.14 bytes (SHA256 5eb75951375249e2cc18e48af1d95ac631888b7eddb785d508abcb1bac442381). Custom-default head db36476 passed CI run 37518503782. This model slice remains unpublished; API compatibility must precede consumer publication.

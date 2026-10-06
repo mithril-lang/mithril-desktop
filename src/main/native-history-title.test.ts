@@ -1,6 +1,9 @@
 import Database from "better-sqlite3";
 import { expect, it } from "vitest";
-import { applyCloudSessionTitle } from "./native-history-title";
+import {
+  applyCloudSessionTitle,
+  applyCloudSessionModel,
+} from "./native-history-title";
 // @lat: [[cloud-workspace-tests#Native title compare and swap]]
 it("applies only to the captured original title and marks user provenance", () => {
   const db = new Database(":memory:");
@@ -55,6 +58,31 @@ it("supports older source schemas and a captured null title without changing oth
       title: "Cloud",
       model: "native-model",
     });
+  } finally {
+    db.close();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Native model compare and swap]]
+it("updates only archival model metadata under exact source CAS and retains title and other sessions", () => {
+  const db = new Database(":memory:");
+  try {
+    db.exec(
+      "CREATE TABLE sessions(id TEXT PRIMARY KEY,title TEXT,model TEXT);INSERT INTO sessions VALUES('one','Original','native-one'),('two','Other','retained');",
+    );
+    expect(applyCloudSessionModel(db, "one", "native-one", "cloud-two")).toBe(
+      "cloud-two",
+    );
+    expect(() =>
+      applyCloudSessionModel(db, "one", "native-one", "stale"),
+    ).toThrow("changed");
+    expect(() => applyCloudSessionModel(db, "one", "cloud-two", "")).toThrow(
+      "Invalid",
+    );
+    expect(db.prepare("SELECT * FROM sessions ORDER BY id").all()).toEqual([
+      { id: "one", title: "Original", model: "cloud-two" },
+      { id: "two", title: "Other", model: "retained" },
+    ]);
   } finally {
     db.close();
   }

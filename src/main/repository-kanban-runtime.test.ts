@@ -1,4 +1,11 @@
-import { mkdtempSync, mkdirSync, rmSync, realpathSync, existsSync } from "fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  realpathSync,
+  existsSync,
+  readFileSync,
+} from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import Database from "better-sqlite3";
@@ -498,6 +505,324 @@ it("rolls task metadata and dependency edits back if relationship insertion fail
         )
         .get(),
     ).toBeUndefined();
+  } finally {
+    db.close();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Cloud-created task reconstruction]]
+it("restores a Web-created task into the actual Agent schema with a stable repository ID and receipt", async () => {
+  const { kanbanReplicaSnapshot, applyKanbanReplica } =
+    await import("./repository-kanban-runtime");
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "mithril-real-task-")));
+  roots.push(root);
+  const db = new Database(join(root, "kanban.db"));
+  try {
+    db.exec(
+      readFileSync(
+        join(process.cwd(), "tests/fixtures/agent-kanban-schema.sql"),
+        "utf8",
+      ),
+    );
+    const task = {
+      id: "browser-task",
+      title: "Web created",
+      body: null,
+      assignee: null,
+      status: "todo",
+      priority: 0,
+      tenant: null,
+      workspace_kind: "scratch",
+      workspace_path: null,
+      created_by: "alice",
+      created_at: 10,
+      started_at: null,
+      completed_at: null,
+      result: null,
+      skills: [],
+      max_retries: null,
+    };
+    const write = {
+      operationId: "restore-browser-task",
+      expectedRecord: null,
+      expectedVersion: null,
+      document: {
+        collection: "task" as const,
+        id: "cloud-original-id",
+        revision: 1,
+        updatedAt: 10,
+        deleted: false,
+        body: {
+          board: "default",
+          task,
+          comments: [],
+          events: [],
+          runs: [],
+          parents: [],
+          children: [],
+          latest_summary: null,
+        },
+      },
+    };
+    const result = applyKanbanReplica(
+      root,
+      "default",
+      "alice",
+      "device",
+      write,
+    );
+    expect(result.status).toBe("applied");
+    const snapshot = kanbanReplicaSnapshot(root, "default", "alice", "device");
+    expect(snapshot.documents.find((row) => row.collection === "task")).toEqual(
+      result.record,
+    );
+    expect(result.record?.id).toBe("cloud-original-id");
+    expect(
+      applyKanbanReplica(root, "default", "alice", "device", write),
+    ).toEqual(result);
+    expect(db.prepare("SELECT COUNT(*) AS count FROM tasks").get()).toEqual({
+      count: 1,
+    });
+    expect(
+      db
+        .prepare(
+          "SELECT status,claim_lock,worker_pid,workspace_path FROM tasks",
+        )
+        .get(),
+    ).toEqual({
+      status: "todo",
+      claim_lock: null,
+      worker_pid: null,
+      workspace_path: null,
+    });
+    expect(
+      db.prepare("SELECT COUNT(*) AS count FROM task_events").get(),
+    ).toEqual({ count: 0 });
+    const after = snapshot.documents.find((row) => row.collection === "task")!;
+    const body = after.body as {
+      task: Record<string, import("@mithril/workspace/repository").JsonValue>;
+      [key: string]: import("@mithril/workspace/repository").JsonValue;
+    };
+    const edited = applyKanbanReplica(root, "default", "alice", "device", {
+      operationId: "rename-restored-task",
+      expectedVersion: after.version,
+      expectedRecord: after,
+      document: {
+        ...write.document,
+        revision: 2,
+        body: { ...body, task: { ...body.task, title: "Updated Web title" } },
+      },
+    });
+    expect(edited.status).toBe("applied");
+    expect(edited.record?.id).toBe("cloud-original-id");
+  } finally {
+    db.close();
+  }
+});
+it("does not create executable tasks, overwrite an existing raw ID or drop nonempty history", async () => {
+  const { applyKanbanReplica } = await import("./repository-kanban-runtime");
+  const root = realpathSync(
+    mkdtempSync(join(tmpdir(), "mithril-restore-guard-")),
+  );
+  roots.push(root);
+  const db = new Database(join(root, "kanban.db"));
+  try {
+    db.exec(
+      readFileSync(
+        join(process.cwd(), "tests/fixtures/agent-kanban-schema.sql"),
+        "utf8",
+      ),
+    );
+    const task = {
+      id: "source",
+      title: "Original",
+      status: "todo",
+      created_at: 1,
+      workspace_path: null,
+    };
+    const base = {
+      operationId: "restore",
+      expectedRecord: null,
+      expectedVersion: null,
+      document: {
+        collection: "task" as const,
+        id: "cloud-id",
+        revision: 1,
+        updatedAt: 1,
+        deleted: false,
+        body: {
+          board: "default",
+          task,
+          comments: [],
+          events: [],
+          runs: [],
+          parents: [],
+          children: [],
+          latest_summary: null,
+        },
+      },
+    };
+    for (const status of ["ready", "scheduled", "running"])
+      expect(
+        applyKanbanReplica(root, "default", "alice", "device", {
+          ...base,
+          operationId: "guard-" + status,
+          document: {
+            ...base.document,
+            body: { ...base.document.body, task: { ...task, status } },
+          },
+        }).status,
+      ).toBe("deferred");
+    expect(
+      applyKanbanReplica(root, "default", "alice", "device", {
+        ...base,
+        document: {
+          ...base.document,
+          body: {
+            ...base.document.body,
+            comments: [{ body: "Preserve history" }],
+          },
+        },
+      }).status,
+    ).toBe("deferred");
+    db.exec(
+      "INSERT INTO tasks(id,title,status,created_at) VALUES('source','Existing device','todo',1)",
+    );
+    expect(
+      applyKanbanReplica(root, "default", "alice", "device", base).status,
+    ).toBe("deferred");
+    expect(db.prepare("SELECT title FROM tasks").get()).toEqual({
+      title: "Existing device",
+    });
+  } finally {
+    db.close();
+  }
+});
+it("reads actual task_links and more than 20000 board-wide events without truncating individual histories", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "mithril-real-links-")));
+  roots.push(root);
+  const db = new Database(join(root, "kanban.db"));
+  try {
+    db.exec(
+      readFileSync(
+        join(process.cwd(), "tests/fixtures/agent-kanban-schema.sql"),
+        "utf8",
+      ),
+    );
+    db.exec(
+      "INSERT INTO tasks(id,title,status,created_at) VALUES('a','A','todo',1),('b','B','todo',1);INSERT INTO task_links VALUES('a','b')",
+    );
+    db.transaction(() => {
+      const insert = db.prepare(
+        "INSERT INTO task_events(task_id,kind,payload,created_at) VALUES(?,'changed','null',1)",
+      );
+      for (let i = 0; i < 21000; i++) insert.run(i % 2 ? "a" : "b");
+    })();
+    const source = kanbanRepositorySeed(root, "default");
+    const tasks = source.filter((row) => row.collection === "task");
+    expect(tasks).toHaveLength(2);
+    expect(
+      tasks.map((row) => (row.body as { events: unknown[] }).events.length),
+    ).toEqual([10500, 10500]);
+    expect(tasks[0].body).toMatchObject({ children: ["b"] });
+  } finally {
+    db.close();
+  }
+});
+
+it("retains populated native attachment tables until byte synchronization is connected", () => {
+  const root = realpathSync(
+    mkdtempSync(join(tmpdir(), "mithril-attachment-guard-")),
+  );
+  roots.push(root);
+  const db = new Database(join(root, "kanban.db"));
+  try {
+    db.exec(
+      readFileSync(
+        join(process.cwd(), "tests/fixtures/agent-kanban-schema.sql"),
+        "utf8",
+      ),
+    );
+    db.exec(
+      "INSERT INTO tasks(id,title,status,created_at) VALUES('a','A','todo',1);INSERT INTO task_attachments(task_id,filename,stored_path,size,created_at) VALUES('a','evidence.pdf','/private/retained.pdf',10,1)",
+    );
+    expect(() => kanbanRepositorySeed(root, "default")).toThrow(
+      "byte synchronization",
+    );
+    expect(
+      db.prepare("SELECT stored_path FROM task_attachments").get(),
+    ).toEqual({ stored_path: "/private/retained.pdf" });
+  } finally {
+    db.close();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Kanban device execution state isolation]]
+it("keeps device claims and process identities outside cloud task/run projections and preserves them during metadata edits", async () => {
+  const { kanbanReplicaSnapshot, applyKanbanReplica } =
+    await import("./repository-kanban-runtime");
+  const root = realpathSync(
+    mkdtempSync(join(tmpdir(), "mithril-runtime-state-")),
+  );
+  roots.push(root);
+  const db = new Database(join(root, "kanban.db"));
+  try {
+    db.exec(
+      readFileSync(
+        join(process.cwd(), "tests/fixtures/agent-kanban-schema.sql"),
+        "utf8",
+      ),
+    );
+    db.exec(
+      "INSERT INTO tasks(id,title,status,created_at,worker_pid,worker_started_at,claim_expires,last_heartbeat_at,current_run_id) VALUES('a','Original','done',1,42,43,44,45,1);INSERT INTO task_runs(id,task_id,status,started_at,claim_lock,worker_pid,worker_started_at,claim_expires,last_heartbeat_at,summary) VALUES(1,'a','done',1,'device-only-claim',52,53,54,55,'Retained result')",
+    );
+    const source = kanbanReplicaSnapshot(
+      root,
+      "default",
+      "alice",
+      "device",
+    ).documents.find((row) => row.collection === "task")!;
+    expect(JSON.stringify(source.body)).not.toContain("worker_pid");
+    expect(JSON.stringify(source.body)).not.toContain("device-only-claim");
+    const body = source.body as {
+      task: Record<string, import("@mithril/workspace/repository").JsonValue>;
+      [key: string]: import("@mithril/workspace/repository").JsonValue;
+    };
+    const result = applyKanbanReplica(root, "default", "alice", "device", {
+      operationId: "metadata-only",
+      expectedVersion: source.version,
+      expectedRecord: source,
+      document: {
+        collection: "task",
+        id: source.id,
+        revision: 2,
+        updatedAt: 2,
+        deleted: false,
+        body: { ...body, task: { ...body.task, title: "Cloud title" } },
+      },
+    });
+    expect(result.status).toBe("applied");
+    expect(result.record).toEqual(
+      kanbanReplicaSnapshot(root, "default", "alice", "device").documents.find(
+        (row) => row.collection === "task",
+      ),
+    );
+    expect(
+      db
+        .prepare(
+          "SELECT worker_pid,worker_started_at,claim_expires,last_heartbeat_at,current_run_id FROM tasks",
+        )
+        .get(),
+    ).toEqual({
+      worker_pid: 42,
+      worker_started_at: 43,
+      claim_expires: 44,
+      last_heartbeat_at: 45,
+      current_run_id: 1,
+    });
+    expect(
+      db.prepare("SELECT claim_lock,worker_pid FROM task_runs").get(),
+    ).toEqual({ claim_lock: "device-only-claim", worker_pid: 52 });
   } finally {
     db.close();
   }

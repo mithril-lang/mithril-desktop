@@ -1,3 +1,9 @@
+import {
+  portableKanbanTask,
+  portableKanbanRun,
+  kanbanDeviceFields,
+} from "./kanban-portable-record";
+import { restoreKanbanTask } from "./kanban-task-restore";
 import { planKanbanDependencies } from "./kanban-dependency-replica";
 import { memoryFileId, memoryFileKinds } from "@mithril/workspace/memory-files";
 import {
@@ -137,6 +143,8 @@ export function kanbanRepositorySeed(
           "task_events",
           "task_runs",
           "task_dependencies",
+          "task_links",
+          "task_attachments",
         ]);
         if (
           [...tables].some(
@@ -144,9 +152,21 @@ export function kanbanRepositorySeed(
           )
         )
           throw Error("Unsupported Kanban relationships; source data retained");
+        const graphTables = ["task_links", "task_dependencies"].filter((name) =>
+          tables.has(name),
+        );
+        if (graphTables.length > 1)
+          throw Error("Ambiguous Kanban relationship schema; source retained");
+        if (
+          tables.has("task_attachments") &&
+          db.prepare("SELECT 1 FROM task_attachments LIMIT 1").get()
+        )
+          throw Error(
+            "Kanban attachments require byte synchronization; original files retained",
+          );
         const read = (
           table: string,
-          limit = 20000,
+          limit = 100000,
         ): Record<string, unknown>[] => {
           if (!tables.has(table)) return [];
           const rows = db
@@ -162,7 +182,7 @@ export function kanbanRepositorySeed(
           comments = read("task_comments"),
           events = read("task_events"),
           runs = read("task_runs"),
-          dependencies = read("task_dependencies");
+          dependencies = graphTables.length ? read(graphTables[0], 20000) : [];
         versions?.set(
           "board:" + slug,
           createHash("sha256")
@@ -180,18 +200,35 @@ export function kanbanRepositorySeed(
             counts: {},
           }),
         });
+        const identityRows = tables.has("mithril_repository_task_ids")
+          ? (db
+              .prepare(
+                "SELECT task_id,document_id FROM mithril_repository_task_ids LIMIT 1001",
+              )
+              .all() as { task_id: string; document_id: string }[])
+          : [];
+        if (
+          identityRows.length > 1000 ||
+          identityRows.some(
+            (row) =>
+              typeof row.task_id !== "string" ||
+              !/^[a-zA-Z0-9_-]{1,100}$/.test(row.document_id),
+          ) ||
+          new Set(identityRows.map((row) => row.document_id)).size !==
+            identityRows.length
+        )
+          throw Error("Invalid Kanban repository identity map");
+        const identityMap = new Map(
+          identityRows.map((row) => [row.task_id, row.document_id]),
+        );
         for (const raw of tasks) {
-          const task = { ...raw, workspace_path: null };
-          delete (task as Record<string, unknown>).claim_lock;
-          for (const field of ["skills"])
-            if (typeof (task as Record<string, unknown>)[field] === "string")
-              (task as Record<string, unknown>)[field] = JSON.parse(
-                (task as Record<string, unknown>)[field] as string,
-              );
+          const task = portableKanbanTask(raw);
           const id = String(raw.id),
-            key = createHash("sha256")
-              .update(JSON.stringify([profile, slug, id]))
-              .digest("hex");
+            key =
+              identityMap.get(id) ??
+              createHash("sha256")
+                .update(JSON.stringify([profile, slug, id]))
+                .digest("hex");
           const taskEvents = events
             .filter((r) => r.task_id === id)
             .map((r) => ({
@@ -229,7 +266,7 @@ export function kanbanRepositorySeed(
               task,
               comments: comments.filter((r) => r.task_id === id),
               events: taskEvents,
-              runs: taskRuns,
+              runs: taskRuns.map(portableKanbanRun),
               dependencies: dependencies.filter(
                 (r) =>
                   r.task_id === id || r.parent_id === id || r.child_id === id,
@@ -351,9 +388,8 @@ export function applyKanbanReplica(
     status,
     record,
   });
-  if (!observed || write.document.collection !== "task")
-    return result("deferred");
-  const body = observed.body as {
+  if (write.document.collection !== "task") return result("deferred");
+  const body = (observed?.body ?? write.document.body) as {
     board: string;
     task: { id: string };
     [key: string]: JsonValue;
@@ -365,6 +401,7 @@ export function applyKanbanReplica(
       ? join(root, "kanban.db")
       : join(root, "kanban", "boards", body.board, "kanban.db");
   checked(file);
+  if (!existsSync(file)) return result("deferred");
   const db = new Database(file, { fileMustExist: true });
   db.pragma("busy_timeout = 5000");
   try {
@@ -392,8 +429,36 @@ export function applyKanbanReplica(
         }
         const current =
           snapshot().documents.find(
-            (row) => row.collection === "task" && row.id === observed.id,
+            (row) => row.collection === "task" && row.id === write.document.id,
           ) ?? null;
+        if (!observed) {
+          if (
+            current ||
+            write.expectedVersion !== null ||
+            write.expectedRecord !== null
+          )
+            return result("conflict", current);
+          if (write.document.deleted) return result("deferred");
+          const restored = restoreKanbanTask(
+            db,
+            write.document.id,
+            write.document.body,
+          );
+          if (!restored) return result("deferred");
+          const record = {
+            collection: "task" as const,
+            id: write.document.id,
+            deleted: false,
+            ...restored,
+          };
+          const accepted = result("applied", record);
+          db.prepare("INSERT INTO mithril_replica_receipts VALUES(?,?,?)").run(
+            write.operationId,
+            fingerprint,
+            JSON.stringify(accepted),
+          );
+          return accepted;
+        }
         if (!current || current.version !== write.expectedVersion)
           return result("conflict", current);
         const raw = db
@@ -514,7 +579,9 @@ export function applyKanbanReplica(
           typeof task.title !== "string" ||
           !task.title.trim() ||
           task.title.length > 512 ||
-          ("body" in task && typeof task.body !== "string") ||
+          ("body" in task &&
+            task.body !== null &&
+            typeof task.body !== "string") ||
           ("priority" in task &&
             (!Number.isSafeInteger(task.priority) ||
               Number(task.priority) < -100 ||
@@ -543,7 +610,10 @@ export function applyKanbanReplica(
           )
         )
           throw Error("Unsupported task field");
-        if (task.workspace_path !== null || "claim_lock" in task)
+        if (
+          task.workspace_path !== null ||
+          kanbanDeviceFields.some((field) => field in task)
+        )
           throw Error("Device paths and locks cannot be synchronized");
         if (
           task.status !== raw.status &&
@@ -554,7 +624,8 @@ export function applyKanbanReplica(
           return result("deferred", current);
         const values: Record<string, unknown> = {};
         for (const key of columns) {
-          if (["id", "workspace_path", "claim_lock"].includes(key)) continue;
+          if (["id", "workspace_path", ...kanbanDeviceFields].includes(key))
+            continue;
           if (!(key in task)) return result("deferred", current);
           const value = task[key];
           values[key] =
@@ -606,13 +677,8 @@ export function applyKanbanReplica(
         const updated = db
           .prepare("SELECT * FROM tasks WHERE id=?")
           .get(body.task.id) as Record<string, unknown>;
-        const projected: Record<string, unknown> = {
-          ...updated,
-          workspace_path: null,
-        };
-        delete (projected as Record<string, unknown>).claim_lock;
-        if (typeof projected.skills === "string")
-          projected.skills = JSON.parse(projected.skills);
+        const projected = portableKanbanTask(updated);
+        const rawRuns = readRelated("task_runs");
         const updatedRecord = {
           ...current,
           body: json({
@@ -638,7 +704,7 @@ export function applyKanbanReplica(
                 updated,
                 comments,
                 events,
-                body.runs,
+                rawRuns,
                 appliedGraph ?? body.dependencies,
               ]),
             )

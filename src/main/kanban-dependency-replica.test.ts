@@ -144,3 +144,20 @@ it("rolls back silent SQLite value coercion instead of acknowledging a different
     db.close();
   }
 });
+
+it("uses the installed Agent's task_links table and refuses ambiguous parallel graph stores", () => {
+  const db = fixture();
+  try {
+    db.exec("ALTER TABLE task_dependencies RENAME TO task_links");
+    db.transaction(() =>
+      planKanbanDependencies(db, "a", incoming)!.apply(),
+    ).immediate();
+    expect(
+      db.prepare("SELECT child_id FROM task_links WHERE parent_id='a'").get(),
+    ).toEqual({ child_id: "c" });
+    db.exec("CREATE TABLE task_dependencies(parent_id TEXT,child_id TEXT)");
+    expect(planKanbanDependencies(db, "a", incoming)).toBeNull();
+  } finally {
+    db.close();
+  }
+});

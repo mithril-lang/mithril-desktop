@@ -343,3 +343,11 @@ Native-to-cloud renames retain their operation ID before sending and recover rec
 Existing task dependencies now reconcile with the cloud document under the task's SQLite CAS and writer transaction. Graph rows and original metadata are retained; unrelated edges remain untouched.
 
 The adapter validates endpoint IDs, duplicate edges, parent/child projections and cycles across the current board. Missing endpoints and ready/scheduled/running or claimed tasks defer until their working copies are safe. Graph edits do not promote tasks, dispatch agents or replay run history. Task metadata, relationship changes and durable receipts commit together; a database failure or SQLite value coercion rolls all of them back. Read-back returns the exact resulting source graph and fingerprint. New board/task creation and historical run writeback remain unfinished.
+
+## Original Agent schema and new task working copies
+
+The installed Agent uses task_links, not the older task_dependencies fixture. Reconciliation now selects the single supported graph store and restores cloud-created inactive tasks into existing boards with stable cloud IDs and retained receipts.
+
+The checked-in schema fixture contains only upstream DDL and its MIT attribution; no user records. Empty attachment tables are supported, while populated ones remain explicitly deferred until complete byte synchronization exists. Board-wide relationship snapshots support up to 100000 rows, preserving more than 20000 total events without truncation; individual documents still enforce their JSON limits. Required native fields use existing schema defaults, unsupported fields defer, and value coercion rolls back. Ready/scheduled/running tasks, history-bearing reconstruction, board creation and attachment bytes remain unfinished.
+
+The task and run projections also exclude device claims, process IDs/fingerprints, heartbeats and current-run pointers. Native SQL updates never write these fields from cloud records. Source-version hashes still cover the complete raw rows, so execution changes invalidate stale metadata writes.

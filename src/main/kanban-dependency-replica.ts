@@ -14,7 +14,14 @@ export function planKanbanDependencies(
     children?: JsonValue;
   },
 ): { edges: Edge[]; apply(): Edge[] } | null {
-  const schema = db.prepare("PRAGMA table_info(task_dependencies)").all() as {
+  const tables = ["task_links", "task_dependencies"].filter((name) =>
+    db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?")
+      .get(name),
+  );
+  if (tables.length !== 1) return null;
+  const table = tables[0];
+  const schema = db.prepare(`PRAGMA table_info(${table})`).all() as {
     name: string;
   }[];
   const columns = schema.map((row) => row.name);
@@ -79,7 +86,7 @@ export function planKanbanDependencies(
   )
     throw Error("Inconsistent dependency projection");
   const original = db
-    .prepare("SELECT * FROM task_dependencies LIMIT 20001")
+    .prepare(`SELECT * FROM ${table} LIMIT 20001`)
     .all() as Edge[];
   if (original.length > 20000) return null;
   const old = original.filter(
@@ -159,11 +166,14 @@ export function planKanbanDependencies(
     apply: () => {
       if (!db.inTransaction)
         throw Error("Dependency writes require the task transaction");
-      db.prepare(
-        "DELETE FROM task_dependencies WHERE parent_id=? OR child_id=?",
-      ).run(taskId, taskId);
+      db.prepare(`DELETE FROM ${table} WHERE parent_id=? OR child_id=?`).run(
+        taskId,
+        taskId,
+      );
       const insert = db.prepare(
-        "INSERT INTO task_dependencies (" +
+        "INSERT INTO " +
+          table +
+          " (" +
           columns.map((key) => '"' + key + '"').join(",") +
           ") VALUES(" +
           columns.map(() => "?").join(",") +
@@ -171,7 +181,7 @@ export function planKanbanDependencies(
       );
       for (const edge of edges) insert.run(...columns.map((key) => edge[key]));
       const actual = db
-        .prepare("SELECT * FROM task_dependencies LIMIT 20001")
+        .prepare(`SELECT * FROM ${table} LIMIT 20001`)
         .all() as Edge[];
       const expected = new Set(
         graph.map((edge) =>

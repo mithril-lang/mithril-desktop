@@ -206,3 +206,11 @@ Dependency edits preserve other tasks' edges and schema metadata, reject cycles 
 ## Dependency graph replica receipts
 
 Task CAS guards dependency updates and durable receipts recover repeated operations without rewriting graph state. Returned fingerprints match fresh source snapshots; device paths and execution statuses remain unchanged.
+
+## Cloud-created task reconstruction
+
+Cloud-created inactive tasks retain IDs through restoration, receipt replay and later edits using the actual Agent schema fixture. Collisions, missing fields, nonempty history and executable state defer without overwriting source data.
+
+## Kanban device execution state isolation
+
+Cloud projections exclude task/run claim leases, PIDs, process fingerprints, heartbeat state and active-run pointers. Metadata edits preserve these native fields, while receipt fingerprints still detect changes to the full source rows.

@@ -279,3 +279,9 @@ Original Skill installation, large legacy anchor bootstrap, Windows reconciliati
 Capability v2 keeps public configuration separate from original Skill files so large or duplicate-name Skills do not block initial configuration synchronization.
 
 The native source emits toolset and public MCP descriptors with `skillStorage: resources` and an empty inline list. Original files remain untouched and are captured through the existing owner-bound resource pointer path. The shared validator still accepts strict v1 bodies; initial seeding never replaces an existing cloud document. A v2 anchor without a pointer displays a synchronization error rather than an empty installed list. Existing populated v1 anchor migration and cross-format reconciliation remain unfinished and must preserve their history and native source.
+
+### Retained repository history (draft)
+
+Original bodies remain readable through owner-scoped repository history, including Skill text and source metadata retained before migration.
+
+The fixed main-process transport and trusted preload IPC expose at most two documents per page. An exclusive revision cursor avoids shifted pages during concurrent edits; Chat also requires chat:read. Client validation and account generation checks reject foreign, malformed or stopped-owner replies without modifying caches or executing work. Populated v1 migration still needs verified resource matching and concurrency admission.

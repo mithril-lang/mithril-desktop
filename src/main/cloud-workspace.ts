@@ -7,6 +7,7 @@ import {
   validRepositoryEdit,
   validRepositoryPage,
   validRepositoryReceipt,
+  validRepositoryHistory,
   type RepositoryCollection,
   type RepositoryEdit,
 } from "@mithril/workspace/repository";
@@ -394,6 +395,28 @@ export class CloudWorkspace {
     );
     if (!validRepositoryPage(value, collection, after))
       throw Error("Invalid repository page");
+    return value;
+  }
+  async repositoryHistory(
+    collection: RepositoryCollection,
+    id: string,
+    before = 0,
+  ): Promise<import("@mithril/workspace/repository").RepositoryHistory> {
+    if (
+      !repositoryCollections.includes(collection) ||
+      !validId(id) ||
+      id.length > 100 ||
+      !Number.isSafeInteger(before) ||
+      before < 0
+    )
+      throw Error("Invalid repository history");
+    const { value } = await this.authorizedRequest(
+      `/v1/workspace/repository/${collection}/${encodeURIComponent(id)}/history${before ? `?before=${before}` : ""}`,
+      undefined,
+      collection === "chat" ? "chat:read" : undefined,
+    );
+    if (!validRepositoryHistory(value, collection, id, before))
+      throw Error("Invalid repository history");
     return value;
   }
   async repositoryApply(

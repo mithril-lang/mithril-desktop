@@ -411,6 +411,13 @@ const hermesAPI = {
     memorySnapshot: () => ipcRenderer.invoke("cloud-workspace-memory-snapshot"),
     repositorySeed: () => ipcRenderer.invoke("cloud-workspace-repository-seed"),
     repository: {
+      history: (collection, id, before) =>
+        ipcRenderer.invoke(
+          "cloud-workspace-repository-history",
+          collection,
+          id,
+          before,
+        ),
       page: (collection, after) =>
         ipcRenderer.invoke(
           "cloud-workspace-repository-page",

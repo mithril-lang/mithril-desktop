@@ -615,3 +615,57 @@ it("bounds resource bodies in main even when the server omits content-length", a
       .getChunk("capability-default", "a".repeat(64)),
   ).rejects.toThrow("too large");
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Repository retained history]]
+it("reads retained repository bodies on the fixed authenticated route and refuses malformed history or missing Chat authority", async () => {
+  const original = fetcher.getMockImplementation()! as (
+    url: string,
+  ) => Promise<Response>;
+  let malformed = false;
+  fetcher.mockImplementation(async (url: string) => {
+    if (url.includes("/repository/capability/"))
+      return reply({
+        schemaVersion: 1,
+        userId: "a",
+        documents: [
+          {
+            collection: "capability",
+            id: malformed ? "wrong" : "capability-default",
+            revision: 2,
+            deleted: false,
+            updatedAt: 1,
+            body: { original: "Full Skill text" },
+          },
+        ],
+        nextBefore: null,
+      });
+    return original(url);
+  });
+  await client.enable();
+  expect(
+    (await client.repositoryHistory("capability", "capability-default", 3))
+      .documents[0].body,
+  ).toEqual({ original: "Full Skill text" });
+  expect(
+    fetcher.mock.calls.some(
+      (call) =>
+        call[0] ===
+        "https://api.mithril.fund/v1/workspace/repository/capability/capability-default/history?before=3",
+    ),
+  ).toBe(true);
+  malformed = true;
+  await expect(
+    client.repositoryHistory("capability", "capability-default", 3),
+  ).rejects.toThrow("Invalid repository history");
+  const count = fetcher.mock.calls.length;
+  await expect(
+    client.repositoryHistory("capability", "../another", 3),
+  ).rejects.toThrow();
+  expect(fetcher.mock.calls).toHaveLength(count);
+  await expect(client.repositoryHistory("chat", "session")).rejects.toThrow(
+    "chat:read",
+  );
+  expect(
+    fetcher.mock.calls.some((call) => call[0].includes("/repository/chat/")),
+  ).toBe(false);
+});

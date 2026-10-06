@@ -142,3 +142,9 @@ They cover source conflicts, moved-parent descriptor refusal, symlink refusal, i
 Original Skills resource requests use validated arguments and trusted renderer checks before main-owned storage access.
 
 Tests verify explicit owner binding, binary forwarding, refusal of untrusted senders, oversized chunks, malformed manifests, endpoint-shaped IDs and invalid owner values. These ports expose no bearer credentials or arbitrary endpoints.
+
+## Repository retained history
+
+Original repository bodies use the fixed authenticated history route. Wrong identities and missing Chat authority reject reads before exposing retained text or replaying work.
+
+The Desktop test verifies the main-owned route and schema checking. D1 and shared client tests cover immutable original bodies, owner isolation, tombstones, descending pagination and concurrent edits.

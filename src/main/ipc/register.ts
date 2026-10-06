@@ -1427,6 +1427,13 @@ export function registerIpcHandlers(context: IpcContext): void {
       return cloudWorkspace.repositoryPage(collection, after);
     },
   );
+  ipcMain.handle(
+    "cloud-workspace-repository-history",
+    (event, collection, id, before) => {
+      trustedWorkspaceSender(event);
+      return cloudWorkspace.repositoryHistory(collection, id, before);
+    },
+  );
   ipcMain.handle("cloud-workspace-repository-apply", (event, edit) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.repositoryApply(edit);

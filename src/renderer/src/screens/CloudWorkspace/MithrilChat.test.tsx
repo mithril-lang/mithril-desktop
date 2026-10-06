@@ -4,14 +4,16 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import type { ChatSession } from "@mithril/workspace/sessions";
 import MithrilChat from "./MithrilChat";
 const enable = vi.fn(async () => ({ userId: "owner", enabled: true }));
 const list = vi.fn(async () => ({
   schemaVersion: 1,
   userId: "owner",
-  sessions: [],
+  sessions: [] as ChatSession[],
 }));
 const models = vi.fn(async () => [{ id: "mithril-model", available: true }]);
 const apply = vi.fn();
@@ -128,4 +130,43 @@ it("shows failed identity checks and offers account setup without submitting a t
   expect(connect).toHaveBeenCalledOnce();
   expect(enable).not.toHaveBeenCalled();
   expect(apply).not.toHaveBeenCalled();
+});
+
+// @lat: [[cloud-workspace-tests#Cloud sidebar original view and durable metadata]]
+it("renders the original shared history row and context menu through canonical cloud data without native cache reads", async () => {
+  list.mockResolvedValue({
+    schemaVersion: 1,
+    userId: "owner",
+    sessions: [
+      {
+        id: "cloud-chat",
+        title: "Cloud original row",
+        model: "mithril-model",
+        revision: 1,
+        eventSeq: 0,
+        deleted: false,
+        activeTurn: null,
+      },
+    ],
+  });
+  try {
+    render(
+      <>
+        <div id="cloud-session-sidebar" />
+        <MithrilChat profile="default" />
+      </>,
+    );
+    const row = await within(
+      document.getElementById("cloud-session-sidebar")!,
+    ).findByText("Cloud original row");
+    expect(row.closest(".sidebar-recent-session")).not.toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Options" }));
+    await screen.findByRole("menuitem", {
+      name: "Copy session ID",
+    });
+    expect(apply).not.toHaveBeenCalled();
+    expect(preview).not.toHaveBeenCalled();
+  } finally {
+    list.mockResolvedValue({ schemaVersion: 1, userId: "owner", sessions: [] });
+  }
 });

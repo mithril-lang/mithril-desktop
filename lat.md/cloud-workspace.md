@@ -311,3 +311,9 @@ The background reconciler prepares migration before native configuration writeba
 The original Desktop history list and context menu now live in the shared package. Desktop imports the canonical bodies and styles; its wrapper supplies IPC, translations and error reporting.
 
 The component retains original grouping, pin disclosures, pagination, inline rename rollback, project selection and delete confirmation. Extracting presentation does not change its storage authority. Connecting this body to the owner-scoped cloud sidebar and merging remaining native rows is still required before removing the history dialog.
+
+## Original cloud sidebar and retained metadata
+
+API-backed Chat now uses the original shared Desktop history list and menu. Cloud snapshots bypass native caches and device pins; project membership uses API IDs and names.
+
+The owner-scoped browser journal retains placement and rename/delete/restore operation IDs before writes. Reload restores metadata without replay; explicit reconnect checks receipts using the same IDs. Conflicts retain their CAS operation until explicit atomic replacement or discard. The journal rejects execution requests. Native orphan rows and working-copy continuation still need wiring before removing the separate history dialog.

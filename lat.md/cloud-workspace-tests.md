@@ -166,3 +166,9 @@ Shared and D1 tests cover original content proof, simultaneous pointer changes, 
 The shared original list reads through its adapter without issuing metadata writes, retains stable session IDs for selection and copying, and rolls back a failed inline rename.
 
 Desktop's original context-menu interaction test must still pass through its shared wrapper.
+
+## Cloud sidebar original view and durable metadata
+
+Shared UI tests verify the original menu's project and pin actions, receipt retries after reload, owner changes, newer revisions, and rename acknowledgement recovery without inference or tool replay.
+
+Storage tests verify account isolation, concurrent writes, original IDs across reopen, atomic replacement and rejection of execution requests or mutation of an existing ID. Desktop's wrapper must still pass its original menu interaction and compile with the matching shared tar.

@@ -4,6 +4,7 @@ This directory defines the high-level concepts, business logic, and architecture
 
 - [[chat-commands]] — how typed slash commands are routed through the gateway's `slash.exec`/`command.dispatch` pipeline instead of being sent as prompt text.
 - [[shared-chat-components]] — React chat components shared with Web App through a separate repo and platform adapters.
+- [[discover]] — the original marketplace screen and styles shared by Desktop and Web through platform adapters.
 - [[chat-input]] — the unified chat composer surface and its theme-aware animated border treatment.
 - [[chat-performance]] — how chat rendering stays responsive through contained transcript rows, batched textarea resizing, and fixed-row slash-command virtualization.
 - [[chat-experience-preferences]] — user-message Markdown plus persisted completion-sound and native multi-language spell-check preferences.

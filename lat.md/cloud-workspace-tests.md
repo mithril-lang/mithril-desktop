@@ -148,3 +148,9 @@ Tests verify explicit owner binding, binary forwarding, refusal of untrusted sen
 Original repository bodies use the fixed authenticated history route. Wrong identities and missing Chat authority reject reads before exposing retained text or replaying work.
 
 The Desktop test verifies the main-owned route and schema checking. D1 and shared client tests cover immutable original bodies, owner isolation, tombstones, descending pagination and concurrent edits.
+
+## Capability migration transport
+
+The native fixed-route API port preserves both configuration and Skill pointer revisions in the migration journal. Malformed guards cannot issue requests.
+
+Shared and D1 tests cover original content proof, simultaneous pointer changes, retained original history, missing acknowledgements and restart with the exact operation ID. Replica tests verify that identical post-migration content settles initial conflicts without native execution.

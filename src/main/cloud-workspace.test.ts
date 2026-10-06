@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CloudWorkspace } from "./cloud-workspace";
+import type { RepositoryEdit } from "@mithril/workspace/repository";
 import type { WorkspaceOperation } from "@mithril/workspace/protocol";
 
 const tokenA = `mf_${"a".repeat(43)}`;
@@ -668,4 +669,63 @@ it("reads retained repository bodies on the fixed authenticated route and refuse
   expect(
     fetcher.mock.calls.some((call) => call[0].includes("/repository/chat/")),
   ).toBe(false);
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Capability migration transport]]
+it("preserves both migration revisions on the fixed native API transport and rejects malformed guards before requesting", async () => {
+  const original = fetcher.getMockImplementation()! as (
+    url: string,
+  ) => Promise<Response>;
+  let submitted: RepositoryEdit | undefined;
+  const edit: RepositoryEdit = {
+    collection: "capability",
+    id: "capability-default",
+    operationId: "migration-one",
+    baseRevision: 1,
+    deleted: false,
+    body: {
+      format: "mithril-capability-v2",
+      profile: "default",
+      skillStorage: "resources",
+      skills: [],
+      toolsets: [],
+      mcps: [],
+    },
+    capabilityMigration: {
+      profile: "default",
+      pointerRevision: 3,
+      manifest: "a".repeat(64),
+    },
+  };
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/repository/capability")) {
+      submitted = JSON.parse(String(init?.body));
+      return reply({
+        schemaVersion: 1,
+        userId: "a",
+        operationId: edit.operationId,
+        status: "accepted",
+        document: {
+          collection: edit.collection,
+          id: edit.id,
+          revision: 2,
+          body: edit.body,
+          deleted: false,
+          updatedAt: 1,
+        },
+      });
+    }
+    return original(url);
+  });
+  await client.enable();
+  expect((await client.repositoryApply(edit)).status).toBe("accepted");
+  expect(submitted).toEqual(edit);
+  const count = fetcher.mock.calls.length;
+  await expect(
+    client.repositoryApply({
+      ...edit,
+      capabilityMigration: { ...edit.capabilityMigration!, pointerRevision: 0 },
+    }),
+  ).rejects.toThrow("Invalid repository edit");
+  expect(fetcher.mock.calls).toHaveLength(count);
 });

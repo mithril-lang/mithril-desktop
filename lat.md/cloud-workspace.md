@@ -278,10 +278,16 @@ Original Skill installation, large legacy anchor bootstrap, Windows reconciliati
 
 Capability v2 keeps public configuration separate from original Skill files so large or duplicate-name Skills do not block initial configuration synchronization.
 
-The native source emits toolset and public MCP descriptors with `skillStorage: resources` and an empty inline list. Original files remain untouched and are captured through the existing owner-bound resource pointer path. The shared validator still accepts strict v1 bodies; initial seeding never replaces an existing cloud document. A v2 anchor without a pointer displays a synchronization error rather than an empty installed list. Existing populated v1 anchor migration and cross-format reconciliation remain unfinished and must preserve their history and native source.
+The native source emits toolset and public MCP descriptors with `skillStorage: resources` and an empty inline list. Original files remain untouched and are captured through the existing owner-bound resource pointer path. The shared validator still accepts strict v1 bodies; initial seeding never replaces an existing cloud document. A v2 anchor without a pointer displays a synchronization error rather than an empty installed list. Populated v1 records use the history-preserving migration below; unmatched original content remains in the original inline presentation.
 
 ### Retained repository history (draft)
 
 Original bodies remain readable through owner-scoped repository history, including Skill text and source metadata retained before migration.
 
-The fixed main-process transport and trusted preload IPC expose at most two documents per page. An exclusive revision cursor avoids shifted pages during concurrent edits; Chat also requires chat:read. Client validation and account generation checks reject foreign, malformed or stopped-owner replies without modifying caches or executing work. Populated v1 migration still needs verified resource matching and concurrency admission.
+The fixed main-process transport and trusted preload IPC expose at most two documents per page. An exclusive revision cursor avoids shifted pages during concurrent edits; Chat also requires chat:read. Client validation and account generation checks reject foreign, malformed or stopped-owner replies without modifying caches or executing work. Populated v1 migration now uses retained history, verified original resources and joint D1 admission.
+
+### Automatic original Capability migration (draft)
+
+Acknowledged original Skill bytes and directory metadata allow automatic Capability v1-to-v2 migration while retaining full source history.
+
+The background reconciler prepares migration before native configuration writeback. Both configuration and Skill pointer revisions travel in the durable operation through existing trusted IPC; the API repeats the content proof and D1 admits both versions atomically. Generic writes cannot bypass migration admission. Lost acknowledgements retain the same operation ID, even after the pointer changes. Initial replica conflicts settle without execution when both copies become identical. Original inline Skills remain available until the resource transition is acknowledged; binary assets and duplicate directory identities remain in retained manifests.

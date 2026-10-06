@@ -90,6 +90,7 @@ export default function RepositoryReplication({
     window.hermesAPI.cloudWorkspace.repository,
     enabled ? window.hermesAPI.cloudWorkspace.replica : undefined,
     `${profile}:${epoch}`,
+    window.hermesAPI.cloudWorkspace.capabilityResources,
   );
   const ja = locale.startsWith("ja");
   const notice = connectionNotice || replication.notice || historyNotice;

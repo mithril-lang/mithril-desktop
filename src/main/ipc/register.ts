@@ -3,6 +3,7 @@ import { registerCapabilityResourceIPC } from "../capability-resource-ipc";
 import {
   synchronizeNativeHistory,
   resolveNativeHistoryTitle,
+  resolveNativeHistoryModel,
   nativeHistoryInventory,
 } from "../native-history-runtime";
 import {
@@ -1302,6 +1303,10 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("cloud-chat-native-title-resolve", (event, request) => {
     trustedWorkspaceSender(event);
     return resolveNativeHistoryTitle(request);
+  });
+  ipcMain.handle("cloud-chat-native-model-resolve", (event, request) => {
+    trustedWorkspaceSender(event);
+    return resolveNativeHistoryModel(request);
   });
   ipcMain.handle("cloud-chat-native-history-sync", (event) => {
     trustedWorkspaceSender(event);

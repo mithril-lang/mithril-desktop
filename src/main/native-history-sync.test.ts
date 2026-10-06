@@ -937,3 +937,84 @@ it("synchronizes archived models in both directions with exact replay, concurren
   expect(f.executions()).toBe(0);
   expect(f.items.slice(1)).toEqual(items.slice(1));
 });
+
+// @lat: [[cloud-workspace-tests#Reviewed model conflict resolution]]
+it("resolves reviewed models with exact retry and refuses stale or wrong-owner choices", async () => {
+  for (const choice of ["native", "cloud"] as const) {
+    const f = fixture(),
+      sync = new NativeHistorySync(f.ports),
+      sid = nativeCloudSessionId("default", "original");
+    await sync.run();
+    const count = f.events.get(sid)!.length;
+    f.model("native-edit");
+    f.sessions.set(sid, {
+      ...f.sessions.get(sid)!,
+      model: "cloud-edit",
+      revision: f.sessions.get(sid)!.revision + 1,
+    });
+    const review = (await sync.run()).modelConflicts[0];
+    expect(review).toMatchObject({
+      native: "native-edit",
+      cloud: "cloud-edit",
+    });
+    if (choice === "native") f.lose();
+    await sync.resolveModel({
+      ...review,
+      userId: "alice",
+      profile: "default",
+      choice,
+    });
+    const pending = f.state().entries[sid].pending;
+    if (choice === "native") {
+      expect(pending?.operation.data).toMatchObject({
+        model: "native-edit",
+        items: [],
+      });
+      const receipt = vi.spyOn(f.ports.transport, "receipt");
+      await new NativeHistorySync(f.ports).run();
+      expect(receipt).toHaveBeenCalledWith(sid, pending!.operation.operationId);
+    }
+    expect(f.currentModel()).toBe(
+      choice === "native" ? "native-edit" : "cloud-edit",
+    );
+    expect(f.sessions.get(sid)!.model).toBe(f.currentModel());
+    expect((await sync.run()).modelConflicts).toEqual([]);
+    expect(f.events.get(sid)).toHaveLength(count);
+    expect(f.executions()).toBe(0);
+  }
+  for (const change of ["native", "revision", "owner"] as const) {
+    const f = fixture(),
+      sync = new NativeHistorySync(f.ports),
+      sid = nativeCloudSessionId("default", "original");
+    await sync.run();
+    f.model("native-edit");
+    f.sessions.set(sid, {
+      ...f.sessions.get(sid)!,
+      model: "cloud-edit",
+      revision: f.sessions.get(sid)!.revision + 1,
+    });
+    const review = (await sync.run()).modelConflicts[0];
+    if (change === "native") f.model("newer-native");
+    if (change === "revision")
+      f.sessions.set(sid, {
+        ...f.sessions.get(sid)!,
+        revision: review.cloudRevision + 1,
+      });
+    if (change === "owner") f.owner("bob");
+    const apply = vi.spyOn(f.ports.transport, "apply");
+    await expect(
+      sync.resolveModel({
+        ...review,
+        userId: "alice",
+        profile: "default",
+        choice: "cloud",
+      }),
+    ).rejects.toThrow(change === "owner" ? "account changed" : "changed");
+    expect(f.currentModel()).toBe(
+      change === "native" ? "newer-native" : "native-edit",
+    );
+    expect(f.sessions.get(sid)!.model).toBe("cloud-edit");
+    expect(apply).not.toHaveBeenCalled();
+    expect(f.executions()).toBe(0);
+  }
+});

@@ -513,6 +513,14 @@ Native keeps separate native/cloud model baselines. A single-sided local edit us
 
 Workspace 0.6.14 admits empty archival history items; the compatible API stores its model metadata without adding an event or executing inference. Publish that API before the new Desktop consumer. The shared Chromium attachment download adapter now has its own browser-only package entry, keeping DOM types out of the Worker protocol. Native and Web reuse that same adapter.
 
-The invariants are [[cloud-workspace-tests#Cloud workspace tests#Native history model reconciliation]] and [[cloud-workspace-tests#Cloud workspace tests#Native model compare and swap]]. Model conflict controls, session deletion/continuation, remaining adapters and installed multi-device qualification remain outstanding.
+The invariants are [[cloud-workspace-tests#Cloud workspace tests#Native history model reconciliation]] and [[cloud-workspace-tests#Cloud workspace tests#Native model compare and swap]]. Reviewed model conflict controls are implemented below. Session deletion/continuation, remaining adapters and installed multi-device qualification remain outstanding.
 
 Model reconciliation qualification: 2,630 Desktop tests / 281 files and 35 targeted history/inventory tests passed. Node/web types, full lint, production build and lat check passed. The installed session protocol and browser attachment download entry match the packed Workspace 0.6.14 bytes (SHA256 5eb75951375249e2cc18e48af1d95ac631888b7eddb785d508abcb1bac442381). Custom-default head db36476 passed CI run 37518503782. This model slice remains unpublished; API compatibility must precede consumer publication.
+
+## Reviewed archived model choices
+
+The original synchronization disclosure now reviews conflicting archival model values alongside titles. It uses the same owner-bound background reconciler and never changes provider authorization or starts inference.
+
+[[cloud-workspace-tests#Cloud workspace tests#Reviewed model conflict resolution]] validates exact model choices, retained receipt replay and refusal after newer source/revision/account changes. [[cloud-workspace-tests#Cloud workspace tests#Model conflict review interaction]] covers the displayed pair, correct IPC dispatch and late old-owner result suppression. Main rechecks the captured values and cloud revision after complete history pagination; cloud choices use SQLite CAS, while source choices persist a metadata-only operation ID before transport.
+
+Reviewed model qualification: 2,632 Desktop tests / 281 files passed, including 27 history reconciler and 3 rendered synchronization notice tests. Node/web types, full lint, production build and lat check passed. Previous Desktop 4345803 (run 37520255213) and Fund dfdf0e19 (run 37520256452) passed CI. This additional review control remains unpublished pending latest-head CI and installed multi-device qualification.

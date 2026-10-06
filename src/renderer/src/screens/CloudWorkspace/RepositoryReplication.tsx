@@ -23,12 +23,16 @@ export default function RepositoryReplication({
       >["titleConflicts"]
     >
   >([]);
-  const [resolvingTitle, setResolvingTitle] = useState(false);
+  const [modelConflicts, setModelConflicts] = useState<typeof titleConflicts>(
+    [],
+  );
+  const [resolvingMetadata, setResolvingMetadata] = useState(false);
   useEffect(
     () =>
       window.hermesAPI.onCloudWorkspaceAccountChanged(() => {
         identityGeneration.current++;
         setTitleConflicts([]);
+        setModelConflicts([]);
         setHistoryNotice("");
         setOwner(null);
         setEpoch((value) => value + 1);
@@ -42,6 +46,7 @@ export default function RepositoryReplication({
     setOwner(null);
     setHistoryNotice("");
     setTitleConflicts([]);
+    setModelConflicts([]);
     if (enabled)
       void window.hermesAPI.cloudWorkspace
         .status()
@@ -77,6 +82,7 @@ export default function RepositoryReplication({
         if (result.userId !== owner) throw Error("History owner changed");
         if (active) {
           setTitleConflicts(result.titleConflicts ?? []);
+          setModelConflicts(result.modelConflicts ?? []);
           setHistoryNotice(
             result.conflicts.length || result.deferred.length
               ? locale.startsWith("ja")
@@ -110,18 +116,26 @@ export default function RepositoryReplication({
     `${profile}:${epoch}`,
     window.hermesAPI.cloudWorkspace.capabilityResources,
   );
-  const resolveTitle = async (
+  const resolveMetadata = async (
     conflict: (typeof titleConflicts)[number],
     choice: "native" | "cloud",
+    field: "title" | "model",
   ): Promise<void> => {
-    if (!owner || resolvingTitle) return;
+    if (!owner || resolvingMetadata) return;
     const capturedOwner = owner;
     const generation = identityGeneration.current;
-    setResolvingTitle(true);
+    setResolvingMetadata(true);
     try {
-      const result = await window.hermesAPI.cloudChat.resolveNativeHistoryTitle(
-        { ...conflict, userId: capturedOwner, profile, choice },
-      );
+      const resolver =
+        field === "title"
+          ? window.hermesAPI.cloudChat.resolveNativeHistoryTitle
+          : window.hermesAPI.cloudChat.resolveNativeHistoryModel;
+      const result = await resolver({
+        ...conflict,
+        userId: capturedOwner,
+        profile,
+        choice,
+      });
       if (generation !== identityGeneration.current) return;
       if (result.userId !== capturedOwner) throw Error("History owner changed");
       // A status refresh uses the current owner effect; avoid applying old-account results.
@@ -132,7 +146,7 @@ export default function RepositoryReplication({
           error instanceof Error ? error.message : String(error),
         );
     } finally {
-      setResolvingTitle(false);
+      setResolvingMetadata(false);
     }
   };
   const ja = locale.startsWith("ja");
@@ -141,6 +155,7 @@ export default function RepositoryReplication({
     !enabled ||
     (!notice &&
       !titleConflicts.length &&
+      !modelConflicts.length &&
       !replication.conflicts.length &&
       !replication.deferred)
   )
@@ -174,27 +189,52 @@ export default function RepositoryReplication({
           </p>
         </details>
       )}
-      {titleConflicts.map((conflict) => (
-        <details key={conflict.sessionId}>
-          <summary>
-            {ja ? "チャット名の変更を確認" : "Review chat title changes"}
-          </summary>
-          <p>{conflict.native}</p>
-          <p>{conflict.cloud}</p>
-          <button
-            disabled={resolvingTitle}
-            onClick={() => void resolveTitle(conflict, "native")}
-          >
-            {ja ? "この端末で編集した名前を使用" : "Use the name edited here"}
-          </button>
-          <button
-            disabled={resolvingTitle}
-            onClick={() => void resolveTitle(conflict, "cloud")}
-          >
-            {ja ? "同期された名前を使用" : "Use the synchronized name"}
-          </button>
-        </details>
-      ))}
+      {(
+        [
+          { field: "title", conflicts: titleConflicts },
+          { field: "model", conflicts: modelConflicts },
+        ] as const
+      ).flatMap(({ field, conflicts }) =>
+        conflicts.map((conflict) => (
+          <details key={`${field}:${conflict.sessionId}`}>
+            <summary>
+              {field === "title"
+                ? ja
+                  ? "チャット名の変更を確認"
+                  : "Review chat title changes"
+                : ja
+                  ? "モデル情報の変更を確認"
+                  : "Review model metadata changes"}
+            </summary>
+            <p>{conflict.native}</p>
+            <p>{conflict.cloud}</p>
+            <button
+              disabled={resolvingMetadata}
+              onClick={() => void resolveMetadata(conflict, "native", field)}
+            >
+              {field === "title"
+                ? ja
+                  ? "この端末で編集した名前を使用"
+                  : "Use the name edited here"
+                : ja
+                  ? "この端末で編集したモデル情報を使用"
+                  : "Use model metadata edited here"}
+            </button>
+            <button
+              disabled={resolvingMetadata}
+              onClick={() => void resolveMetadata(conflict, "cloud", field)}
+            >
+              {field === "title"
+                ? ja
+                  ? "同期された名前を使用"
+                  : "Use the synchronized name"
+                : ja
+                  ? "同期されたモデル情報を使用"
+                  : "Use synchronized model metadata"}
+            </button>
+          </details>
+        )),
+      )}
       {replication.conflicts.map((conflict) => (
         <details key={conflict.key}>
           <summary>

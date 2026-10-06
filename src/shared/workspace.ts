@@ -60,12 +60,27 @@ export interface CloudChatAPI extends SessionTransport {
     cloudRevision: number;
     choice: "native" | "cloud";
   }): ReturnType<CloudChatAPI["syncNativeHistory"]>;
+  resolveNativeHistoryModel(request: {
+    userId: string;
+    profile: string;
+    sessionId: string;
+    native: string;
+    cloud: string;
+    cloudRevision: number;
+    choice: "native" | "cloud";
+  }): ReturnType<CloudChatAPI["syncNativeHistory"]>;
   syncNativeHistory(): Promise<{
     userId: string;
     synced: number;
     reconstructed?: number;
     conflicts: string[];
     titleConflicts?: Array<{
+      sessionId: string;
+      native: string;
+      cloud: string;
+      cloudRevision: number;
+    }>;
+    modelConflicts?: Array<{
       sessionId: string;
       native: string;
       cloud: string;

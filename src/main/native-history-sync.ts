@@ -94,6 +94,7 @@ export class NativeHistorySync {
     reconstructed: number;
     conflicts: string[];
     titleConflicts: NativeTitleConflict[];
+    modelConflicts: NativeTitleConflict[];
     deferred: string[];
   }> | null = null;
   constructor(private ports: NativeHistoryPorts) {}
@@ -103,6 +104,7 @@ export class NativeHistorySync {
     reconstructed: number;
     conflicts: string[];
     titleConflicts: NativeTitleConflict[];
+    modelConflicts: NativeTitleConflict[];
     deferred: string[];
   }> {
     if (this.running) return this.running;
@@ -111,8 +113,19 @@ export class NativeHistorySync {
     });
     return this.running;
   }
-  async resolveTitle(
+  resolveTitle(
     request: NativeTitleResolution,
+  ): Promise<Awaited<ReturnType<NativeHistorySync["run"]>>> {
+    return this.resolveMetadata(request, "title");
+  }
+  resolveModel(
+    request: NativeTitleResolution,
+  ): Promise<Awaited<ReturnType<NativeHistorySync["run"]>>> {
+    return this.resolveMetadata(request, "model");
+  }
+  private async resolveMetadata(
+    request: NativeTitleResolution,
+    field: "title" | "model",
   ): Promise<Awaited<ReturnType<NativeHistorySync["run"]>>> {
     if (
       !request ||
@@ -122,27 +135,31 @@ export class NativeHistorySync {
       typeof request.sessionId !== "string" ||
       typeof request.native !== "string" ||
       typeof request.cloud !== "string" ||
-      request.native.length > 512 ||
-      request.cloud.length > 512 ||
+      request.native.length > (field === "model" ? 256 : 512) ||
+      request.cloud.length > (field === "model" ? 256 : 512) ||
+      (field === "model" && (!request.native || !request.cloud)) ||
       !Number.isSafeInteger(request.cloudRevision) ||
       request.cloudRevision < 1 ||
       !["native", "cloud"].includes(request.choice)
     )
-      throw Error("Invalid title resolution");
+      throw Error(`Invalid ${field} resolution`);
     // Serialize with background replication; never act on a renderer-supplied owner alone.
     const captured = structuredClone(request);
     while (this.running) await this.running.catch(() => undefined);
-    this.running = this.pass(captured).finally(() => {
+    this.running = this.pass({ ...captured, field }).finally(() => {
       this.running = null;
     });
     return this.running;
   }
-  private async pass(resolution?: NativeTitleResolution): Promise<{
+  private async pass(
+    resolution?: NativeTitleResolution & { field: "title" | "model" },
+  ): Promise<{
     userId: string;
     synced: number;
     reconstructed: number;
     conflicts: string[];
     titleConflicts: NativeTitleConflict[];
+    modelConflicts: NativeTitleConflict[];
     deferred: string[];
   }> {
     const identity = await this.ports.context();
@@ -151,7 +168,7 @@ export class NativeHistorySync {
       (resolution.userId !== identity.userId ||
         resolution.profile !== identity.profile)
     )
-      throw Error("Title resolution account changed");
+      throw Error(`${resolution.field} resolution account changed`);
     let resolved = false;
     const check = async (): Promise<void> => {
       if (
@@ -211,6 +228,7 @@ export class NativeHistorySync {
       reconstructed: 0,
       conflicts: [] as string[],
       titleConflicts: [] as NativeTitleConflict[],
+      modelConflicts: [] as NativeTitleConflict[],
       deferred: sourceFailure ? [sourceFailure] : ([] as string[]),
     };
     for (const native of source) {
@@ -452,7 +470,7 @@ export class NativeHistorySync {
         }
         // Three-way title reconciliation uses independent native/cloud baselines.
         // A pending operation always keeps its original ID across lost receipts.
-        if (resolution?.sessionId === sid) {
+        if (resolution?.field === "title" && resolution.sessionId === sid) {
           if (
             !journal.titleConflict ||
             journal.pending ||
@@ -481,7 +499,8 @@ export class NativeHistorySync {
         }
         if (
           resolved &&
-          resolution?.sessionId === sid &&
+          resolution?.field === "title" &&
+          resolution.sessionId === sid &&
           resolution.choice === "cloud"
         ) {
           // The source snapshot predates transactional writeback; do not echo it this pass.
@@ -574,13 +593,55 @@ export class NativeHistorySync {
         const model = native.model || "native-history";
         if (typeof model !== "string" || model.length > 256)
           throw Error("Invalid native history model");
-        if (model === remote.model)
+        const reportModelConflict = (session: ChatSession): void => {
+          outcome.conflicts.push(sid);
+          outcome.modelConflicts.push({
+            sessionId: sid,
+            native: model,
+            cloud: session.model,
+            cloudRevision: session.revision,
+          });
+        };
+        if (resolution?.field === "model" && resolution.sessionId === sid) {
+          const conflicted =
+            model !== remote.model &&
+            (!journal.model ||
+              (model !== journal.model.native &&
+                remote.model !== journal.model.cloud));
+          if (
+            !conflicted ||
+            journal.pending ||
+            model !== resolution.native ||
+            remote.model !== resolution.cloud ||
+            remote.revision !== resolution.cloudRevision
+          )
+            throw Error("Model conflict changed; review current models");
+          if (resolution.choice === "cloud") {
+            if (!native.cacheModel)
+              throw Error("Native model cache unavailable");
+            const cached = await native.cacheModel(remote.model);
+            await check();
+            if (cached !== remote.model)
+              throw Error("Invalid native model acknowledgement");
+            journal.model = { native: cached, cloud: remote.model };
+          } else journal.model = { native: remote.model, cloud: remote.model };
+          await persist();
+          resolved = true;
+        }
+        if (
+          resolved &&
+          resolution?.field === "model" &&
+          resolution.sessionId === sid &&
+          resolution.choice === "cloud"
+        ) {
+          // The source snapshot predates CAS writeback; never echo the reviewed old model.
+        } else if (model === remote.model)
           journal.model = { native: model, cloud: remote.model };
-        else if (!journal.model) outcome.conflicts.push(sid);
+        else if (!journal.model) reportModelConflict(remote);
         else {
           const localChanged = model !== journal.model.native,
             cloudChanged = remote.model !== journal.model.cloud;
-          if (localChanged && cloudChanged) outcome.conflicts.push(sid);
+          if (localChanged && cloudChanged) reportModelConflict(remote);
           else if (localChanged) {
             const operation: ChatOperation = {
               type: "history",
@@ -836,7 +897,7 @@ export class NativeHistorySync {
     }
     if (resolution && !resolved)
       throw Error(
-        "Title conflict changed or unavailable; review current titles",
+        `${resolution.field} conflict changed or unavailable; review current values`,
       );
     return { ...outcome, conflicts: [...new Set(outcome.conflicts)] };
   }

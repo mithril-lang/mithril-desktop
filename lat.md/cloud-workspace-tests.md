@@ -351,3 +351,11 @@ Archived model metadata converges in both directions without turns or history du
 ## Native model compare and swap
 
 Cloud model metadata replaces only the captured session model, preserving titles and other sessions. Stale or invalid updates retain original data.
+
+## Reviewed model conflict resolution
+
+Model choices compare the displayed values, owner/profile and cloud revision before metadata-only writeback. Lost acknowledgements retain the same operation ID; stale choices cannot overwrite newer edits or execute a turn.
+
+## Model conflict review interaction
+
+The existing synchronization disclosure shows both model values and sends the reviewed choice. Account changes clear private values and suppress late results.

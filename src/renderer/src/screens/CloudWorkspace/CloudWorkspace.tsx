@@ -12,11 +12,7 @@ import { APP_LOCALES, type AppLocale } from "../../../../shared/i18n";
 import { portableRepositorySeeds } from "@mithril/workspace/repository-migration";
 import type { RuntimeSection } from "@mithril/workspace/runtime";
 import { useCallback, useEffect, useState } from "react";
-import {
-  WorkspaceApp,
-  type DiscoverItem,
-  type WorkspaceView,
-} from "@mithril/workspace/react";
+import { WorkspaceApp, type WorkspaceView } from "@mithril/workspace/react";
 import "@mithril/workspace/styles.css";
 import "@mithril/workspace/desktop-styles.css";
 
@@ -89,10 +85,6 @@ export default function CloudWorkspace({
       ),
     [],
   );
-  const loadCatalog = useCallback(
-    (): Promise<DiscoverItem[]> => window.hermesAPI.cloudWorkspace.catalog(),
-    [],
-  );
   const repositorySeed = useCallback(async () => {
     const portable = portableRepositorySeeds(
       await window.hermesAPI.cloudWorkspace.getSnapshot(),
@@ -136,7 +128,7 @@ export default function CloudWorkspace({
       beforeConnect={beforeConnect}
       afterDisconnect={() => window.hermesAPI.cloudWorkspace.disable()}
       identityEpoch={`${profile}:${identityEpoch}`}
-      loadCatalog={loadCatalog}
+      discoverDocuments={window.hermesAPI.cloudWorkspace.discoverDocuments}
       onPreferences={preferences}
       locale={locale}
       active={active}

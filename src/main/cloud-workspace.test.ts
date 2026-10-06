@@ -74,6 +74,53 @@ beforeEach(() => {
 });
 
 describe("Desktop cloud workspace boundary", () => {
+  // @lat: [[discover#Original Discover#Shared marketplace]]
+  it("reads original registry documents through fixed Mithril API routes without renderer URLs or credentials", async () => {
+    fetcher.mockResolvedValueOnce(
+      reply({ skills: [], mcps: [], agents: [], workflows: [], plugins: [] }),
+    );
+    await client.discoverDocuments.fetchRegistry();
+    expect(fetcher).toHaveBeenLastCalledWith(
+      "https://api.mithril.fund/v1/discover/registry",
+      expect.objectContaining({
+        credentials: "omit",
+        redirect: "error",
+        headers: { accept: "application/json" },
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      reply({ markdown: "# Full original detail" }),
+    );
+    expect(
+      await client.discoverDocuments.fetchRegistryDetail("skills", {
+        id: "apple-notes",
+        registry: "hermes",
+        name: "Notes",
+        description: "",
+        path: "../private",
+        artifact: { format: "git", url: "https://evil.test" },
+      }),
+    ).toEqual({ markdown: "# Full original detail" });
+    expect(fetcher).toHaveBeenLastCalledWith(
+      "https://api.mithril.fund/v1/discover/detail/skills/hermes/apple-notes",
+      expect.objectContaining({ credentials: "omit", redirect: "error" }),
+    );
+    expect(
+      fetcher.mock.calls.every(
+        ([, init]) => !new Headers(init?.headers).has("authorization"),
+      ),
+    ).toBe(true);
+    const count = fetcher.mock.calls.length;
+    await expect(
+      client.discoverDocuments.fetchRegistryDetail("skills", {
+        id: "../private",
+        registry: "hermes",
+        name: "",
+        description: "",
+      }),
+    ).rejects.toThrow("Invalid registry entry");
+    expect(fetcher).toHaveBeenCalledTimes(count);
+  });
   // @lat: [[cloud-workspace-tests#Cloud workspace tests#Dedicated authorization scopes]]
   it("rechecks write authorization before applying native replica data", async () => {
     await client.enable();

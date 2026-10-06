@@ -2,6 +2,7 @@ import {
   createCapabilityResourceTransport,
   type CapabilityResourceTransport,
 } from "@mithril/workspace/capability-resources";
+import { createDiscoverDocuments } from "@mithril/workspace/discover-documents";
 import {
   repositoryCollections,
   validRepositoryEdit,
@@ -172,6 +173,16 @@ export class CloudWorkspace {
       headers: response.headers,
     });
   }
+
+  // @lat: [[cloud-workspace#Cloud workspace#Canonical catalog]]
+  readonly discoverDocuments = createDiscoverDocuments((path) =>
+    this.deps.fetch(`${this.deps.origin()}${path}`, {
+      credentials: "omit",
+      redirect: "error",
+      signal: AbortSignal.timeout(60000),
+      headers: { accept: "application/json" },
+    }),
+  );
 
   // @lat: [[cloud-workspace#Cloud workspace#Canonical catalog]]
   async catalog(): Promise<import("@mithril/workspace/react").DiscoverItem[]> {

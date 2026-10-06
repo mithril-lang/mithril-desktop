@@ -169,8 +169,8 @@ export function restoreKanbanTask(
     .update(
       JSON.stringify([
         raw,
-        history.comments,
-        history.events,
+        history.rawComments,
+        history.rawEvents,
         history.rawRuns,
         [],
         ...(attachments?.rows.length

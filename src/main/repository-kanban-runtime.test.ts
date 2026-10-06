@@ -947,7 +947,6 @@ it("retains the entire task restoration on invalid history, conflicting IDs, SQL
   const { kanbanReplicaSnapshot, applyKanbanReplica } =
     await import("./repository-kanban-runtime");
   for (const mode of [
-    "collision",
     "running",
     "lease",
     "duplicate",
@@ -1139,5 +1138,193 @@ it("appends terminal run receipts to an existing task without replacing prior hi
     ).toEqual({ summary: "Earlier failure" });
   } finally {
     db.close();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Historical row identity collisions]]
+it("reconciles colliding history IDs without overwriting existing rows, preserves event/run links and converges native additions back to the source", async () => {
+  const { kanbanReplicaSnapshot, applyKanbanReplica } =
+    await import("./repository-kanban-runtime");
+  const sourceRoot = realpathSync(
+      mkdtempSync(join(tmpdir(), "mithril-history-id-source-")),
+    ),
+    targetRoot = realpathSync(
+      mkdtempSync(join(tmpdir(), "mithril-history-id-target-")),
+    );
+  roots.push(sourceRoot, targetRoot);
+  const source = new Database(join(sourceRoot, "kanban.db")),
+    target = new Database(join(targetRoot, "kanban.db"));
+  try {
+    const schema = readFileSync(
+      join(process.cwd(), "tests/fixtures/agent-kanban-schema.sql"),
+      "utf8",
+    );
+    source.exec(schema);
+    target.exec(schema);
+    source.exec(
+      "INSERT INTO tasks(id,title,status,created_at) VALUES('remote','Remote history','done',1);INSERT INTO task_comments(id,task_id,author,body,created_at) VALUES(1,'remote','alice','Remote comment',1);INSERT INTO task_runs(id,task_id,status,started_at,ended_at,summary) VALUES(1,'remote','done',1,2,'Remote summary');INSERT INTO task_events(id,task_id,run_id,kind,payload,created_at) VALUES(1,'remote',1,'completed','\"Receipt 391\"',2)",
+    );
+    target.exec(
+      "INSERT INTO tasks(id,title,status,created_at) VALUES('existing','Existing history','done',1);INSERT INTO task_comments(id,task_id,author,body,created_at) VALUES(1,'existing','owner','Existing comment',1);INSERT INTO task_comments(id,task_id,author,body,created_at) VALUES(7,'existing','owner','Existing later comment',3);INSERT INTO task_runs(id,task_id,status,started_at,ended_at,summary) VALUES(1,'existing','done',1,2,'Existing summary');INSERT INTO task_runs(id,task_id,status,started_at,ended_at,summary) VALUES(7,'existing','failed',2,3,'Existing later run');INSERT INTO task_events(id,task_id,run_id,kind,payload,created_at) VALUES(1,'existing',1,'completed','{\"existing\":true}',2);INSERT INTO task_events(id,task_id,run_id,kind,payload,created_at) VALUES(7,'existing',7,'failed','{\"existing\":true}',3)",
+    );
+    const original = kanbanReplicaSnapshot(
+      sourceRoot,
+      "default",
+      "alice",
+      "source",
+    ).documents.find((r) => r.collection === "task")!;
+    const before = kanbanReplicaSnapshot(
+      targetRoot,
+      "default",
+      "alice",
+      "target",
+    ).documents.find((r) => r.collection === "task")!;
+    const operation = {
+      operationId: "colliding-history",
+      expectedRecord: null,
+      expectedVersion: null,
+      document: {
+        collection: "task" as const,
+        id: original.id,
+        body: original.body,
+        revision: 1,
+        deleted: false,
+        updatedAt: 2,
+      },
+    };
+    const accepted = applyKanbanReplica(
+      targetRoot,
+      "default",
+      "alice",
+      "target",
+      operation,
+    );
+    expect(accepted.status).toBe("applied");
+    expect(accepted.record?.body).toEqual(original.body);
+    expect(
+      applyKanbanReplica(targetRoot, "default", "alice", "target", operation),
+    ).toEqual(accepted);
+    expect(
+      kanbanReplicaSnapshot(
+        targetRoot,
+        "default",
+        "alice",
+        "target",
+      ).documents.find((r) => r.id === before.id),
+    ).toEqual(before);
+    expect(accepted.record).toEqual(
+      kanbanReplicaSnapshot(
+        targetRoot,
+        "default",
+        "alice",
+        "target",
+      ).documents.find((r) => r.id === original.id),
+    );
+    const identities = target
+      .prepare(
+        "SELECT table_name,cloud_id,native_id FROM mithril_history_ids ORDER BY table_name",
+      )
+      .all();
+    expect(identities).toEqual([
+      { table_name: "task_comments", cloud_id: 1, native_id: 8 },
+      { table_name: "task_events", cloud_id: 1, native_id: 8 },
+      { table_name: "task_runs", cloud_id: 1, native_id: 8 },
+    ]);
+    expect(
+      target
+        .prepare("SELECT id,run_id FROM task_events WHERE task_id='remote'")
+        .get(),
+    ).toEqual({ id: 8, run_id: 8 });
+    target.exec(
+      "INSERT INTO task_comments(task_id,author,body,created_at) VALUES('remote','native','Original Agent addition',5)",
+    );
+    const changed = kanbanReplicaSnapshot(
+      targetRoot,
+      "default",
+      "alice",
+      "target",
+    ).documents.find((r) => r.id === original.id)!;
+    expect(changed.body).toMatchObject({
+      comments: [
+        { id: 1, body: "Remote comment" },
+        { id: 9, body: "Original Agent addition" },
+      ],
+      events: [{ id: 1, run_id: 1, payload: "Receipt 391" }],
+    });
+    const mirrored = applyKanbanReplica(
+      sourceRoot,
+      "default",
+      "alice",
+      "source",
+      {
+        operationId: "native-addition-back",
+        expectedRecord: original,
+        expectedVersion: original.version,
+        document: { ...operation.document, body: changed.body, revision: 2 },
+      },
+    );
+    expect(mirrored.status).toBe("applied");
+    expect(mirrored.record?.body).toEqual(changed.body);
+    expect(mirrored.record).toEqual(
+      kanbanReplicaSnapshot(
+        sourceRoot,
+        "default",
+        "alice",
+        "source",
+      ).documents.find((r) => r.id === original.id),
+    );
+    source.exec(
+      "INSERT INTO task_comments(id,task_id,author,body,created_at) VALUES(8,'remote','source','Later original ID overlaps target alias',6)",
+    );
+    const sourceAdded = kanbanReplicaSnapshot(
+      sourceRoot,
+      "default",
+      "alice",
+      "source",
+    ).documents.find((r) => r.id === original.id)!;
+    const targetAdded = applyKanbanReplica(
+      targetRoot,
+      "default",
+      "alice",
+      "target",
+      {
+        operationId: "later-cloud-id-overlaps-alias",
+        expectedRecord: changed,
+        expectedVersion: changed.version,
+        document: {
+          ...operation.document,
+          body: sourceAdded.body,
+          revision: 3,
+        },
+      },
+    );
+    expect(targetAdded.status).toBe("applied");
+    expect(targetAdded.record?.body).toEqual(sourceAdded.body);
+    expect(
+      target.prepare("SELECT body FROM task_comments WHERE id=8").get(),
+    ).toEqual({ body: "Remote comment" });
+    expect(
+      target
+        .prepare(
+          "SELECT id,body FROM task_comments WHERE body='Later original ID overlaps target alias'",
+        )
+        .get(),
+    ).toEqual({ id: 10, body: "Later original ID overlaps target alias" });
+    target.exec("DELETE FROM task_comments WHERE id=8");
+    expect(() =>
+      kanbanReplicaSnapshot(targetRoot, "default", "alice", "target"),
+    ).toThrow("Mapped history source changed");
+    expect(
+      source.prepare("SELECT body FROM task_comments WHERE id=1").get(),
+    ).toEqual({ body: "Remote comment" });
+    target.exec(
+      "DELETE FROM task_comments WHERE task_id='remote';DELETE FROM task_events WHERE task_id='remote';DELETE FROM task_runs WHERE task_id='remote';DELETE FROM tasks WHERE id='remote'",
+    );
+    expect(() =>
+      kanbanReplicaSnapshot(targetRoot, "default", "alice", "target"),
+    ).toThrow("Mapped history task changed");
+  } finally {
+    source.close();
+    target.close();
   }
 });

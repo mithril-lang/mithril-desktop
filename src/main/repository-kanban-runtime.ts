@@ -4,9 +4,9 @@ import {
 } from "./kanban-attachment-snapshot";
 import {
   portableKanbanTask,
-  portableKanbanRun,
   kanbanDeviceFields,
 } from "./kanban-portable-record";
+import { projectKanbanHistory } from "./kanban-history-identity";
 import { planKanbanHistoryRestore } from "./kanban-history-restore";
 import { restoreKanbanTask } from "./kanban-task-restore";
 import {
@@ -199,6 +199,13 @@ export function kanbanRepositorySeed(
           attachments = read("task_attachments"),
           dependencies = graphTables.length ? read(graphTables[0], 20000) : [];
         const taskIds = new Set(tasks.map((row) => String(row.id)));
+        if (
+          read("mithril_history_ids", 300000).some(
+            (row) =>
+              typeof row.task_id !== "string" || !taskIds.has(row.task_id),
+          )
+        )
+          throw Error("Mapped history task changed; records retained");
         const attachmentMarkers = read("mithril_attachment_projection");
         if (
           attachmentMarkers.some(
@@ -256,6 +263,7 @@ export function kanbanRepositorySeed(
           identityRows.some(
             (row) =>
               typeof row.task_id !== "string" ||
+              !taskIds.has(row.task_id) ||
               !/^[a-zA-Z0-9_-]{1,100}$/.test(row.document_id),
           ) ||
           new Set(identityRows.map((row) => row.document_id)).size !==
@@ -273,16 +281,24 @@ export function kanbanRepositorySeed(
               createHash("sha256")
                 .update(JSON.stringify([profile, slug, id]))
                 .digest("hex");
-          const taskEvents = events
-            .filter((r) => r.task_id === id)
-            .map((r) => ({
-              ...r,
-              payload:
-                typeof r.payload === "string"
-                  ? JSON.parse(r.payload)
-                  : r.payload,
-            }));
-          const taskRuns = runs.filter((r) => r.task_id === id);
+          const taskComments = projectKanbanHistory(
+            db,
+            id,
+            "task_comments",
+            comments.filter((r) => r.task_id === id),
+          );
+          const taskEvents = projectKanbanHistory(
+            db,
+            id,
+            "task_events",
+            events.filter((r) => r.task_id === id),
+          );
+          const taskRuns = projectKanbanHistory(
+            db,
+            id,
+            "task_runs",
+            runs.filter((r) => r.task_id === id),
+          );
           const rawAttachments = orderedKanbanAttachments(
             db,
             id,
@@ -298,9 +314,9 @@ export function kanbanRepositorySeed(
               .update(
                 JSON.stringify([
                   raw,
-                  comments.filter((r) => r.task_id === id),
-                  taskEvents,
-                  taskRuns,
+                  taskComments.raw,
+                  taskEvents.raw,
+                  taskRuns.raw,
                   dependencies.filter(
                     (r) =>
                       r.task_id === id ||
@@ -320,9 +336,9 @@ export function kanbanRepositorySeed(
             body: json({
               board: slug,
               task,
-              comments: comments.filter((r) => r.task_id === id),
-              events: taskEvents,
-              runs: taskRuns.map(portableKanbanRun),
+              comments: taskComments.portable,
+              events: taskEvents.portable,
+              runs: taskRuns.portable,
               dependencies: dependencies.filter(
                 (r) =>
                   r.task_id === id || r.parent_id === id || r.child_id === id,
@@ -333,7 +349,7 @@ export function kanbanRepositorySeed(
               children: dependencies
                 .filter((r) => r.parent_id === id)
                 .map((r) => String(r.child_id)),
-              latest_summary: taskRuns.at(-1)?.summary ?? null,
+              latest_summary: taskRuns.portable.at(-1)?.summary ?? null,
               ...(rawAttachments.length || markedAttachments.has(id)
                 ? { attachments: portableAttachments }
                 : {}),
@@ -687,7 +703,12 @@ export function applyKanbanReplica(
             ? a === b
             : repositoryFingerprint({ body: a, deleted: false }) ===
               repositoryFingerprint({ body: b, deleted: false });
-        const runsChanged = !same(body.runs, incoming.runs);
+        const runsChanged = [
+          "comments",
+          "events",
+          "runs",
+          "latest_summary",
+        ].some((key) => !same(body[key], incoming[key]));
         const historyPlan = runsChanged
           ? planKanbanHistoryRestore(db, body.task.id, incoming, body)
           : undefined;
@@ -722,68 +743,6 @@ export function applyKanbanReplica(
             })
           : undefined;
         if (graphChanged && !graphPlan) return result("deferred", current);
-        const additions: { table: string; values: Record<string, unknown> }[] =
-          [];
-        for (const [key, table] of [
-          ["comments", "task_comments"],
-          ["events", "task_events"],
-        ]) {
-          if (historyPlan || same(body[key], incoming[key])) continue;
-          if (!Array.isArray(body[key]) || !Array.isArray(incoming[key]))
-            throw Error("Invalid task history");
-          const oldRows = body[key] as Record<string, JsonValue>[],
-            newRows = incoming[key] as Record<string, JsonValue>[];
-          if (
-            newRows.length > 20000 ||
-            !oldRows.every((row) => newRows.some((next) => same(row, next)))
-          )
-            return result("deferred", current);
-          const schema = (
-            db.prepare(`PRAGMA table_info(${table})`).all() as {
-              name: string;
-            }[]
-          ).map((row) => row.name);
-          if (
-            !schema.includes("id") ||
-            !schema.includes("task_id") ||
-            schema.some((name) => !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name))
-          )
-            return result("deferred", current);
-          const ids = new Set<string>();
-          for (const row of newRows) {
-            if (
-              !row ||
-              typeof row !== "object" ||
-              !Number.isSafeInteger(row.id) ||
-              row.task_id !== body.task.id ||
-              ids.has(String(row.id))
-            )
-              throw Error("Invalid task history identity");
-            ids.add(String(row.id));
-            if (oldRows.some((old) => same(old, row))) continue;
-            if (
-              Object.keys(row).some(
-                (field) => !schema.includes(field) && row[field] !== null,
-              )
-            )
-              return result("deferred", current);
-            const values: Record<string, unknown> = {};
-            for (const field of schema)
-              if (field in row) {
-                const value = row[field];
-                values[field] =
-                  field === "payload" ? JSON.stringify(value) : value;
-                if (
-                  values[field] !== null &&
-                  !["string", "number"].includes(typeof values[field])
-                )
-                  throw Error("Unsupported history field");
-              }
-            if (db.prepare(`SELECT id FROM ${table} WHERE id=?`).get(row.id))
-              return result("deferred", current);
-            additions.push({ table, values });
-          }
-        }
         const task = incoming.task as Record<string, JsonValue>;
         if (
           typeof task.title !== "string" ||
@@ -857,12 +816,6 @@ export function applyKanbanReplica(
         db.prepare(
           `UPDATE tasks SET ${fields.map((key) => `"${key}"=?`).join(",")} WHERE id=?`,
         ).run(...fields.map((key) => values[key]), body.task.id);
-        for (const addition of additions) {
-          const keys = Object.keys(addition.values);
-          db.prepare(
-            `INSERT INTO ${addition.table} (${keys.map((key) => `"${key}"`).join(",")}) VALUES(${keys.map(() => "?").join(",")})`,
-          ).run(...keys.map((key) => addition.values[key]));
-        }
         historyPlan?.();
         const appliedGraph = graphPlan?.apply();
         if (
@@ -886,24 +839,33 @@ export function applyKanbanReplica(
             )
             .get(table);
           if (!exists) return [];
-          return (
-            db
-              .prepare(`SELECT * FROM ${table} WHERE task_id=?`)
-              .all(body.task.id) as Record<string, JsonValue>[]
-          ).map((row) =>
-            table === "task_events" && typeof row.payload === "string"
-              ? { ...row, payload: JSON.parse(row.payload) }
-              : row,
-          );
+          return db
+            .prepare(`SELECT * FROM ${table} WHERE task_id=?`)
+            .all(body.task.id) as Record<string, JsonValue>[];
         };
-        const comments = readRelated("task_comments"),
-          events = readRelated("task_events");
-        // Read our uncommitted update from this connection, then construct the exact sanitized projection.
+        const comments = projectKanbanHistory(
+            db,
+            body.task.id,
+            "task_comments",
+            readRelated("task_comments"),
+          ),
+          events = projectKanbanHistory(
+            db,
+            body.task.id,
+            "task_events",
+            readRelated("task_events"),
+          );
         const updated = db
           .prepare("SELECT * FROM tasks WHERE id=?")
           .get(body.task.id) as Record<string, unknown>;
         const projected = portableKanbanTask(updated);
-        const rawRuns = readRelated("task_runs");
+        const runHistory = projectKanbanHistory(
+          db,
+          body.task.id,
+          "task_runs",
+          readRelated("task_runs"),
+        );
+        const rawRuns = runHistory.raw;
         const rawAttachments = orderedKanbanAttachments(
           db,
           body.task.id,
@@ -946,22 +908,22 @@ export function applyKanbanReplica(
             task: projected,
             ...(historyPlan
               ? {
-                  runs: rawRuns.map(portableKanbanRun),
+                  runs: runHistory.portable,
                   latest_summary: rawRuns.at(-1)?.summary ?? null,
                 }
               : {}),
             ...(incoming.attachments !== undefined
               ? { attachments: json(portableAttachments) }
               : {}),
-            comments,
-            events,
+            comments: comments.portable,
+            events: events.portable,
           }),
           version: createHash("sha256")
             .update(
               JSON.stringify([
                 updated,
-                comments,
-                events,
+                comments.raw,
+                events.raw,
                 rawRuns,
                 appliedGraph ?? body.dependencies,
                 ...(rawAttachments.length

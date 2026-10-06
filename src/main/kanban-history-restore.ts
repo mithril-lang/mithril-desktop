@@ -3,14 +3,20 @@ import {
   repositoryFingerprint,
   type JsonValue,
 } from "@mithril/workspace/repository";
+import { kanbanDeviceFields } from "./kanban-portable-record";
 import {
-  kanbanDeviceFields,
-  portableKanbanRun,
-} from "./kanban-portable-record";
+  historyIdentities,
+  projectKanbanHistory,
+  retainHistoryIdentities,
+  type HistoryIdentity,
+  type HistoryTable,
+} from "./kanban-history-identity";
 
 export interface RestoredKanbanHistory {
   comments: Record<string, JsonValue>[];
   events: Record<string, JsonValue>[];
+  rawComments: Record<string, JsonValue>[];
+  rawEvents: Record<string, JsonValue>[];
   rawRuns: Record<string, JsonValue>[];
   runs: Record<string, JsonValue>[];
 }
@@ -24,21 +30,47 @@ export function planKanbanHistoryRestore(
 ): (() => RestoredKanbanHistory) | null {
   if (!db.inTransaction)
     throw Error("History restoration requires a writer transaction");
-  const plans: { table: string; values: Record<string, unknown>[] }[] = [];
-  const same = (a: JsonValue, b: JsonValue): boolean =>
-    repositoryFingerprint({ body: a, deleted: false }) ===
-    repositoryFingerprint({ body: b, deleted: false });
+  const plans: {
+    table: HistoryTable;
+    values: Record<string, unknown>[];
+    authored: JsonValue[];
+  }[] = [];
+  const mappings: HistoryIdentity[] = [],
+    prior = historyIdentities(db, taskId);
+  const mappedCloudIds = new Set(
+    prior.map((r) => `${r.table_name}:${r.cloud_id}`),
+  );
+  const mappedNativeIds = new Map(
+    prior.map((r) => [`${r.table_name}:${r.native_id}`, r.cloud_id]),
+  );
+  const runIds = new Map(
+    prior
+      .filter((r) => r.table_name === "task_runs")
+      .map((r) => [r.cloud_id, r.native_id]),
+  );
+  if (Array.isArray(existing?.runs))
+    for (const row of existing.runs) {
+      if (
+        row &&
+        typeof row === "object" &&
+        !Array.isArray(row) &&
+        typeof row.id === "number" &&
+        !runIds.has(row.id)
+      )
+        runIds.set(row.id, row.id);
+    }
+  const hash = (row: JsonValue): string =>
+    repositoryFingerprint({ body: row, deleted: false });
+  const same = (a: JsonValue, b: JsonValue): boolean => hash(a) === hash(b);
   for (const [key, table] of [
+    ["runs", "task_runs"],
     ["comments", "task_comments"],
     ["events", "task_events"],
-    ["runs", "task_runs"],
-  ]) {
-    const rows = incoming[key] ?? [];
-    if (!Array.isArray(rows) || rows.length > 20000) return null;
-    const retained = existing?.[key] ?? [];
-    if (!Array.isArray(retained)) return null;
-    const hash = (row: JsonValue): string =>
-      repositoryFingerprint({ body: row, deleted: false });
+  ] as const) {
+    const rows = incoming[key] ?? [],
+      retained = existing?.[key] ?? [];
+    if (!Array.isArray(rows) || rows.length > 20000 || !Array.isArray(retained))
+      return null;
     const retainedHashes = new Set(retained.map(hash)),
       incomingHashes = new Set(rows.map(hash));
     if ([...retainedHashes].some((old) => !incomingHashes.has(old)))
@@ -56,23 +88,46 @@ export function planKanbanHistoryRestore(
       columns.some((c) => !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c))
     )
       return null;
+    const largest = db.prepare(`SELECT MAX(id) AS id FROM ${table}`).get() as {
+      id: number | null;
+    };
+    if (largest.id !== null && !Number.isSafeInteger(largest.id)) return null;
+    let next =
+      Math.max(
+        largest.id ?? 0,
+        ...rows.map((row) =>
+          row &&
+          typeof row === "object" &&
+          !Array.isArray(row) &&
+          typeof row.id === "number"
+            ? row.id
+            : 0,
+        ),
+      ) + 1;
     const ids = new Set<number>(),
-      values: Record<string, unknown>[] = [];
+      values: Record<string, unknown>[] = [],
+      authored: JsonValue[] = [];
     for (const value of rows) {
       if (!value || typeof value !== "object" || Array.isArray(value))
         return null;
-      const row = value as Record<string, JsonValue>;
+      const row = value as Record<string, JsonValue>,
+        cloudId = Number(row.id);
       if (
         !Number.isSafeInteger(row.id) ||
-        Number(row.id) < 1 ||
-        ids.has(Number(row.id)) ||
+        cloudId < 1 ||
+        ids.has(cloudId) ||
         row.task_id !== taskId
       )
         return null;
-      ids.add(Number(row.id));
-      if (retainedHashes.has(hash(row))) continue;
-      if (Object.keys(row).some((field) => !columns.includes(field)))
+      ids.add(cloudId);
+      if (Object.keys(row).some((f) => !columns.includes(f) && row[f] !== null))
         return null;
+      authored.push(
+        Object.fromEntries(
+          Object.entries(row).filter(([f]) => columns.includes(f)),
+        ) as JsonValue,
+      );
+      if (retainedHashes.has(hash(row))) continue;
       if (
         key === "runs" &&
         (typeof row.status !== "string" ||
@@ -84,7 +139,7 @@ export function planKanbanHistoryRestore(
             "failed",
             "released",
           ].includes(row.status) ||
-          kanbanDeviceFields.some((field) => field in row))
+          kanbanDeviceFields.some((f) => f in row))
       )
         return null;
       if (
@@ -96,41 +151,62 @@ export function planKanbanHistoryRestore(
         )
       )
         return null;
-      if (db.prepare(`SELECT id FROM ${table} WHERE id=?`).get(row.id))
+      if (mappedCloudIds.has(`${table}:${cloudId}`)) return null;
+      const collision = db
+        .prepare(`SELECT task_id FROM ${table} WHERE id=?`)
+        .get(cloudId) as { task_id: string } | undefined;
+      if (
+        collision?.task_id === taskId &&
+        (!mappedNativeIds.has(`${table}:${cloudId}`) ||
+          mappedNativeIds.get(`${table}:${cloudId}`) === cloudId)
+      )
         return null;
+      const nativeId = collision ? next++ : cloudId;
+      if (!Number.isSafeInteger(nativeId)) return null;
+      mappings.push({
+        table_name: table,
+        task_id: taskId,
+        cloud_id: cloudId,
+        native_id: nativeId,
+      });
+      if (key === "runs") runIds.set(cloudId, nativeId);
       const fields: Record<string, unknown> = {};
-      for (const field of columns)
-        if (field in row) {
-          const value = row[field];
-          fields[field] =
-            key === "events" && field === "payload"
-              ? JSON.stringify(value)
-              : value;
+      for (const f of columns)
+        if (f in row) {
+          const v = row[f];
+          fields[f] =
+            key === "events" && f === "payload" ? JSON.stringify(v) : v;
           if (
-            fields[field] !== null &&
-            !["string", "number"].includes(typeof fields[field])
+            fields[f] !== null &&
+            !["string", "number"].includes(typeof fields[f])
           )
             return null;
         }
+      fields.id = nativeId;
+      if (key === "events" && typeof row.run_id === "number") {
+        if (!runIds.has(row.run_id)) return null;
+        fields.run_id = runIds.get(row.run_id)!;
+      }
       values.push(fields);
     }
-    plans.push({ table, values });
+    plans.push({ table, values, authored });
   }
-  const read = (table: string): Record<string, JsonValue>[] => {
+  const read = (
+    table: HistoryTable,
+  ): ReturnType<typeof projectKanbanHistory> => {
     if (
       !db
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?")
         .get(table)
     )
-      return [];
-    return (
+      return { raw: [], portable: [] };
+    return projectKanbanHistory(
+      db,
+      taskId,
+      table,
       db
-        .prepare(`SELECT * FROM ${table} WHERE task_id=? ORDER BY id`)
-        .all(taskId) as Record<string, JsonValue>[]
-    ).map((row) =>
-      table === "task_events" && typeof row.payload === "string"
-        ? { ...row, payload: JSON.parse(row.payload) }
-        : row,
+        .prepare(`SELECT * FROM ${table} WHERE task_id=?`)
+        .all(taskId) as Record<string, unknown>[],
     );
   };
   return () => {
@@ -150,21 +226,32 @@ export function planKanbanHistoryRestore(
         )
           throw Error("History schema changed data; source retained");
       }
+    retainHistoryIdentities(db, mappings);
     const comments = read("task_comments"),
       events = read("task_events"),
-      rawRuns = read("task_runs"),
-      runs = rawRuns.map(portableKanbanRun);
-    for (const [key, rows] of [
-      ["comments", comments],
-      ["events", events],
-      ["runs", runs],
+      runs = read("task_runs");
+    for (const [table, rows] of [
+      ["task_comments", comments.portable],
+      ["task_events", events.portable],
+      ["task_runs", runs.portable],
     ] as const) {
-      const authored = incoming[key] ?? [];
-      if (!same(rows, authored))
+      if (!same(rows, plans.find((p) => p.table === table)?.authored ?? []))
         throw Error("History projection changed; source retained");
     }
-    if (!same(incoming.latest_summary ?? null, rawRuns.at(-1)?.summary ?? null))
+    if (
+      !same(
+        incoming.latest_summary ?? null,
+        runs.portable.at(-1)?.summary ?? null,
+      )
+    )
       throw Error("Historical summary does not match retained runs");
-    return { comments, events, rawRuns, runs };
+    return {
+      comments: comments.portable,
+      events: events.portable,
+      rawComments: comments.raw,
+      rawEvents: events.raw,
+      rawRuns: runs.raw,
+      runs: runs.portable,
+    };
   };
 }

@@ -240,7 +240,7 @@ Default and named boards must match fresh source fingerprints. Corrupt bytes, ac
 
 Inactive cloud tasks retain original comments, event payloads, terminal runs, IDs and derived summaries in the original SQLite working copy without executing historical work.
 
-The actual-schema source projection must equal the restored projection and a fresh snapshot. Missing/duplicate identities, global row-ID collisions, unknown fields, summary mismatches, SQL coercion and active run authority retain the whole task. Terminal run additions preserve existing history and native process metadata; receipts prevent duplicated reconstruction.
+The actual-schema source projection must equal the restored projection and a fresh snapshot. Missing/duplicate identities, unknown fields, summary mismatches, SQL coercion and active run authority retain the whole task. Terminal run additions preserve existing history and native process metadata; receipts prevent duplicated reconstruction.
 
 
 ## Kanban attachment publication barrier
@@ -252,3 +252,9 @@ The native snapshot exposes task records only after every private byte upload is
 Verify bounded chunk reads, metadata checks and staging writes require a mandatory owner and trusted renderer sender.
 
 Invalid owners, identifiers, digests, sizes and byte payloads must be rejected before storage access. No deletion or filesystem path channel is exposed.
+
+## Historical row identity collisions
+
+Original cloud history IDs survive collisions with another task's SQLite keys through private per-table identity mappings.
+
+Actual-schema tests preserve existing rows, remap event/run joins, append original Agent records, and converge both directions. Later cloud IDs may overlap a previously allocated native alias without overwriting it. Receipt replay preserves mappings; scalar JSON payloads decode exactly once. Missing mapped rows or tasks refuse publication rather than falsely acknowledge deleted history.

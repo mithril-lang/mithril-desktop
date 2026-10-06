@@ -802,6 +802,11 @@ it("restores a cloud-created inactive task with files into the existing original
   const f = fixture(),
     capture = f.capture();
   try {
+    const historyDb = new Database(f.dbFile);
+    historyDb.exec(
+      "INSERT INTO task_comments(id,task_id,author,body,created_at) VALUES(1,'native-original','alice','Retained comment with file',1);INSERT INTO task_runs(id,task_id,status,started_at,ended_at,summary) VALUES(2,'native-original','done',1,2,'Retained summary with file');INSERT INTO task_events(id,task_id,run_id,kind,payload,created_at) VALUES(3,'native-original',2,'completed','{\"receipt\":391}',2)",
+    );
+    historyDb.close();
     const source = kanbanReplicaSnapshot(
       f.root,
       "default",
@@ -813,6 +818,16 @@ it("restores a cloud-created inactive task with files into the existing original
     (body.task as Record<string, JsonValue>).id = "new-cloud-task";
     (body.task as Record<string, JsonValue>).title =
       "Cloud task with original files";
+    const comment = (body.comments as Record<string, JsonValue>[])[0];
+    comment.id = 40;
+    comment.task_id = "new-cloud-task";
+    const run = (body.runs as Record<string, JsonValue>[])[0];
+    run.id = 42;
+    run.task_id = "new-cloud-task";
+    const event = (body.events as Record<string, JsonValue>[])[0];
+    event.id = 41;
+    event.task_id = "new-cloud-task";
+    event.run_id = 42;
     const row = (body.attachments as Record<string, JsonValue>[])[0]!;
     row.id = 20;
     row.task_id = "new-cloud-task";
@@ -869,7 +884,7 @@ it("restores a cloud-created inactive task with files into the existing original
       n: 2,
     });
     expect(db.prepare("SELECT count(*) AS n FROM task_runs").get()).toEqual({
-      n: 0,
+      n: 2,
     });
     db.close();
     rmSync(restored.stored_path);

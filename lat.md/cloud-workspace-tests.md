@@ -236,6 +236,12 @@ Cloud attachment additions, replacements and removals reconcile with the origina
 
 Default and named boards must match fresh source fingerprints. Corrupt bytes, account changes, source conflicts, symlinks and SQL coercion retain the old rows/files. New inactive tasks restore attached bytes without a dispatcher call; retained receipts recover after later file loss.
 
+## Historical task reconstruction
+
+Inactive cloud tasks retain original comments, event payloads, terminal runs, IDs and derived summaries in the original SQLite working copy without executing historical work.
+
+The actual-schema source projection must equal the restored projection and a fresh snapshot. Missing/duplicate identities, global row-ID collisions, unknown fields, summary mismatches, SQL coercion and active run authority retain the whole task. Terminal run additions preserve existing history and native process metadata; receipts prevent duplicated reconstruction.
+
 
 ## Kanban attachment publication barrier
 

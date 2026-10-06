@@ -3,6 +3,7 @@ import type Database from "better-sqlite3";
 import { createHash } from "crypto";
 import { validBody, type JsonValue } from "@mithril/workspace/repository";
 import type { TaskAttachment } from "@mithril/workspace/task-attachments";
+import { planKanbanHistoryRestore } from "./kanban-history-restore";
 /** Restore a cloud-created inactive task into an existing board, without CLI/hooks. */
 export function restoreKanbanTask(
   db: Database.Database,
@@ -37,15 +38,7 @@ export function restoreKanbanTask(
     )
   )
     return null;
-  for (const field of [
-    "comments",
-    "events",
-    "runs",
-    "dependencies",
-    "parents",
-    "children",
-    "attachments",
-  ]) {
+  for (const field of ["dependencies", "parents", "children", "attachments"]) {
     if (field === "attachments" && restoreAttachments) continue;
     if (
       incoming[field] !== undefined &&
@@ -54,8 +47,6 @@ export function restoreKanbanTask(
     )
       return null;
   }
-  if (incoming.latest_summary !== undefined && incoming.latest_summary !== null)
-    return null;
   if (
     Object.keys(incoming).some(
       (key) =>
@@ -135,6 +126,8 @@ export function restoreKanbanTask(
         return null;
     }
   const fields = Object.keys(values);
+  const restoreHistory = planKanbanHistoryRestore(db, task.id, incoming);
+  if (!restoreHistory) return null;
   db.prepare(
     "INSERT INTO tasks (" +
       fields.map((key) => '"' + key + '"').join(",") +
@@ -157,17 +150,18 @@ export function restoreKanbanTask(
     documentId,
   );
   const projected = portableKanbanTask(raw);
+  const history = restoreHistory();
   const attachments = restoreAttachments?.();
   const body = {
     board: incoming.board,
     task: projected,
-    comments: [],
-    events: [],
-    runs: [],
+    comments: history.comments,
+    events: history.events,
+    runs: history.runs,
     dependencies: [],
     parents: [],
     children: [],
-    latest_summary: null,
+    latest_summary: history.rawRuns.at(-1)?.summary ?? null,
     ...(attachments ? { attachments: attachments.resources } : {}),
   };
   // Match the source snapshot's raw-row/relationship fingerprint.
@@ -175,9 +169,9 @@ export function restoreKanbanTask(
     .update(
       JSON.stringify([
         raw,
-        [],
-        [],
-        [],
+        history.comments,
+        history.events,
+        history.rawRuns,
         [],
         ...(attachments?.rows.length
           ? [{ rows: attachments.rows, resources: attachments.resources }]

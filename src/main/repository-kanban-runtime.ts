@@ -7,6 +7,7 @@ import {
   portableKanbanRun,
   kanbanDeviceFields,
 } from "./kanban-portable-record";
+import { planKanbanHistoryRestore } from "./kanban-history-restore";
 import { restoreKanbanTask } from "./kanban-task-restore";
 import {
   prepareKanbanAttachmentWriteback,
@@ -686,6 +687,11 @@ export function applyKanbanReplica(
             ? a === b
             : repositoryFingerprint({ body: a, deleted: false }) ===
               repositoryFingerprint({ body: b, deleted: false });
+        const runsChanged = !same(body.runs, incoming.runs);
+        const historyPlan = runsChanged
+          ? planKanbanHistoryRestore(db, body.task.id, incoming, body)
+          : undefined;
+        if (runsChanged && !historyPlan) return result("deferred", current);
         for (const key of new Set([
           ...Object.keys(body),
           ...Object.keys(incoming),
@@ -698,6 +704,7 @@ export function applyKanbanReplica(
               "dependencies",
               "parents",
               "children",
+              ...(historyPlan ? ["runs", "latest_summary"] : []),
               ...(attachmentWriteback ? ["attachments"] : []),
             ].includes(key) &&
             !same(body[key], incoming[key])
@@ -721,7 +728,7 @@ export function applyKanbanReplica(
           ["comments", "task_comments"],
           ["events", "task_events"],
         ]) {
-          if (same(body[key], incoming[key])) continue;
+          if (historyPlan || same(body[key], incoming[key])) continue;
           if (!Array.isArray(body[key]) || !Array.isArray(incoming[key]))
             throw Error("Invalid task history");
           const oldRows = body[key] as Record<string, JsonValue>[],
@@ -856,6 +863,7 @@ export function applyKanbanReplica(
             `INSERT INTO ${addition.table} (${keys.map((key) => `"${key}"`).join(",")}) VALUES(${keys.map(() => "?").join(",")})`,
           ).run(...keys.map((key) => addition.values[key]));
         }
+        historyPlan?.();
         const appliedGraph = graphPlan?.apply();
         if (
           attachmentWriteback &&
@@ -936,6 +944,12 @@ export function applyKanbanReplica(
                 }
               : {}),
             task: projected,
+            ...(historyPlan
+              ? {
+                  runs: rawRuns.map(portableKanbanRun),
+                  latest_summary: rawRuns.at(-1)?.summary ?? null,
+                }
+              : {}),
             ...(incoming.attachments !== undefined
               ? { attachments: json(portableAttachments) }
               : {}),

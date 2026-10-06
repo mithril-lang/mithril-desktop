@@ -827,3 +827,317 @@ it("keeps device claims and process identities outside cloud task/run projection
     db.close();
   }
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Historical task reconstruction]]
+it("restores actual-schema comments, events and terminal runs with original IDs, exact source snapshots and retained receipts", async () => {
+  const { kanbanReplicaSnapshot, applyKanbanReplica } =
+    await import("./repository-kanban-runtime");
+  const sourceRoot = realpathSync(
+      mkdtempSync(join(tmpdir(), "mithril-history-source-")),
+    ),
+    targetRoot = realpathSync(
+      mkdtempSync(join(tmpdir(), "mithril-history-target-")),
+    );
+  roots.push(sourceRoot, targetRoot);
+  const source = new Database(join(sourceRoot, "kanban.db")),
+    target = new Database(join(targetRoot, "kanban.db"));
+  try {
+    const schema = readFileSync(
+      join(process.cwd(), "tests/fixtures/agent-kanban-schema.sql"),
+      "utf8",
+    );
+    source.exec(schema);
+    target.exec(schema);
+    source.exec(
+      "INSERT INTO tasks(id,title,status,created_at,completed_at,result) VALUES('original','Original history','done',1,9,'Retained result');INSERT INTO task_comments(id,task_id,author,body,created_at) VALUES(17,'original','alice','Full original comment',3);INSERT INTO task_runs(id,task_id,profile,status,started_at,ended_at,outcome,summary,metadata,error,worker_pid,claim_lock) VALUES(23,'original','default','failed',2,4,'spawn_failed','Prior failure','{\"source\":\"original\"}','Retained error',555,'old-device');INSERT INTO task_runs(id,task_id,profile,status,started_at,ended_at,outcome,summary,metadata) VALUES(29,'original','default','done',5,9,'completed','Final original summary','{\"receipt\":391}');INSERT INTO task_events(id,task_id,run_id,kind,payload,created_at) VALUES(31,'original',23,'failed','{\"detail\":[1,2,3]}',4);INSERT INTO task_events(id,task_id,run_id,kind,payload,created_at) VALUES(37,'original',29,'completed','{\"receipt\":391}',9)",
+    );
+    const original = kanbanReplicaSnapshot(
+      sourceRoot,
+      "default",
+      "alice",
+      "source-device",
+    ).documents.find((r) => r.collection === "task")!;
+    const operation = {
+      operationId: "restore-full-history",
+      expectedVersion: null,
+      expectedRecord: null,
+      document: {
+        collection: "task" as const,
+        id: original.id,
+        body: original.body,
+        revision: 1,
+        deleted: false,
+        updatedAt: 10,
+      },
+    };
+    const accepted = applyKanbanReplica(
+      targetRoot,
+      "default",
+      "alice",
+      "target-device",
+      operation,
+    );
+    expect(accepted.status).toBe("applied");
+    expect(accepted.record?.body).toEqual(original.body);
+    expect(accepted.record).toEqual(
+      kanbanReplicaSnapshot(
+        targetRoot,
+        "default",
+        "alice",
+        "target-device",
+      ).documents.find((r) => r.id === original.id),
+    );
+    expect(
+      applyKanbanReplica(
+        targetRoot,
+        "default",
+        "alice",
+        "target-device",
+        operation,
+      ),
+    ).toEqual(accepted);
+    expect(
+      target.prepare("SELECT id,task_id FROM task_comments").all(),
+    ).toEqual([{ id: 17, task_id: "original" }]);
+    expect(
+      target
+        .prepare(
+          "SELECT id,status,worker_pid,claim_lock,last_heartbeat_at FROM task_runs ORDER BY id",
+        )
+        .all(),
+    ).toEqual([
+      {
+        id: 23,
+        status: "failed",
+        worker_pid: null,
+        claim_lock: null,
+        last_heartbeat_at: null,
+      },
+      {
+        id: 29,
+        status: "done",
+        worker_pid: null,
+        claim_lock: null,
+        last_heartbeat_at: null,
+      },
+    ]);
+    expect(
+      target.prepare("SELECT id,run_id FROM task_events ORDER BY id").all(),
+    ).toEqual([
+      { id: 31, run_id: 23 },
+      { id: 37, run_id: 29 },
+    ]);
+    expect(
+      target.prepare("SELECT count(*) AS n FROM kanban_notify_subs").get(),
+    ).toEqual({ n: 0 });
+    expect(
+      target
+        .prepare(
+          "SELECT count(*) AS n FROM tasks WHERE status IN ('ready','scheduled','running')",
+        )
+        .get(),
+    ).toEqual({ n: 0 });
+  } finally {
+    source.close();
+    target.close();
+  }
+});
+
+it("retains the entire task restoration on invalid history, conflicting IDs, SQL coercion or active run authority", async () => {
+  const { kanbanReplicaSnapshot, applyKanbanReplica } =
+    await import("./repository-kanban-runtime");
+  for (const mode of [
+    "collision",
+    "running",
+    "lease",
+    "duplicate",
+    "unknown",
+    "summary",
+    "coercion",
+  ]) {
+    const sourceRoot = realpathSync(
+        mkdtempSync(join(tmpdir(), "mithril-history-admission-source-")),
+      ),
+      targetRoot = realpathSync(
+        mkdtempSync(join(tmpdir(), "mithril-history-admission-target-")),
+      );
+    roots.push(sourceRoot, targetRoot);
+    const source = new Database(join(sourceRoot, "kanban.db")),
+      target = new Database(join(targetRoot, "kanban.db"));
+    try {
+      const schema = readFileSync(
+        join(process.cwd(), "tests/fixtures/agent-kanban-schema.sql"),
+        "utf8",
+      );
+      source.exec(schema);
+      target.exec(schema);
+      source.exec(
+        "INSERT INTO tasks(id,title,status,created_at) VALUES('original','History','done',1);INSERT INTO task_comments(id,task_id,author,body,created_at) VALUES(17,'original','alice','Retain me',1);INSERT INTO task_runs(id,task_id,status,started_at,ended_at,summary) VALUES(23,'original','done',1,2,'Original summary')",
+      );
+      const original = kanbanReplicaSnapshot(
+        sourceRoot,
+        "default",
+        "alice",
+        "source-device",
+      ).documents.find((r) => r.collection === "task")!;
+      const body = structuredClone(original.body) as Record<
+        string,
+        import("@mithril/workspace/repository").JsonValue
+      >;
+      const runs = body.runs as Record<
+        string,
+        import("@mithril/workspace/repository").JsonValue
+      >[];
+      if (mode === "running") runs[0].status = "running";
+      if (mode === "lease") runs[0].claim_lock = "other-device";
+      if (mode === "duplicate")
+        (body.comments as unknown[]).push(
+          structuredClone((body.comments as unknown[])[0]),
+        );
+      if (mode === "unknown") runs[0].unsupported = "Retain unknown field";
+      if (mode === "summary") body.latest_summary = "Invented summary";
+      if (mode === "collision")
+        target.exec(
+          "INSERT INTO tasks(id,title,status,created_at) VALUES('existing','Existing','done',1);INSERT INTO task_comments(id,task_id,author,body,created_at) VALUES(17,'existing','owner','Existing original row',1)",
+        );
+      if (mode === "coercion")
+        target.exec(
+          "CREATE TRIGGER coerce_history AFTER INSERT ON task_comments BEGIN UPDATE task_comments SET body='Changed' WHERE id=NEW.id; END",
+        );
+      const apply = (): ReturnType<typeof applyKanbanReplica> =>
+        applyKanbanReplica(targetRoot, "default", "alice", "target-device", {
+          operationId: mode,
+          expectedRecord: null,
+          expectedVersion: null,
+          document: {
+            collection: "task",
+            id: original.id,
+            body,
+            revision: 1,
+            deleted: false,
+            updatedAt: 10,
+          },
+        });
+      if (mode === "summary" || mode === "coercion") expect(apply).toThrow();
+      else expect(apply().status).toBe("deferred");
+      expect(
+        target.prepare("SELECT id FROM tasks WHERE id='original'").get(),
+      ).toBeUndefined();
+      expect(
+        target.prepare("SELECT count(*) AS n FROM task_runs").get(),
+      ).toEqual({ n: 0 });
+      expect(
+        target.prepare("SELECT count(*) AS n FROM task_comments").get(),
+      ).toEqual({ n: mode === "collision" ? 1 : 0 });
+      expect(
+        target.prepare("SELECT count(*) AS n FROM kanban_notify_subs").get(),
+      ).toEqual({ n: 0 });
+    } finally {
+      source.close();
+      target.close();
+    }
+  }
+});
+
+it("appends terminal run receipts to an existing task without replacing prior history or native process authority", async () => {
+  const { kanbanReplicaSnapshot, applyKanbanReplica } =
+    await import("./repository-kanban-runtime");
+  const root = realpathSync(
+    mkdtempSync(join(tmpdir(), "mithril-history-append-")),
+  );
+  roots.push(root);
+  const db = new Database(join(root, "kanban.db"));
+  try {
+    db.exec(
+      readFileSync(
+        join(process.cwd(), "tests/fixtures/agent-kanban-schema.sql"),
+        "utf8",
+      ),
+    );
+    db.exec(
+      "INSERT INTO tasks(id,title,status,created_at) VALUES('original','History','done',1);INSERT INTO task_runs(id,task_id,status,started_at,ended_at,summary,worker_pid,claim_lock) VALUES(1,'original','failed',1,2,'Earlier failure',555,'old-source-lock')",
+    );
+    const original = kanbanReplicaSnapshot(
+      root,
+      "default",
+      "alice",
+      "device",
+    ).documents.find((r) => r.collection === "task")!;
+    db.exec(
+      "INSERT INTO task_runs(id,task_id,status,started_at,ended_at,outcome,summary,metadata) VALUES(2,'original','done',3,4,'completed','Remote completion','{\"receipt\":391}');INSERT INTO task_events(id,task_id,run_id,kind,payload,created_at) VALUES(3,'original',2,'completed','{\"receipt\":391}',4)",
+    );
+    const incoming = kanbanReplicaSnapshot(
+      root,
+      "default",
+      "alice",
+      "device",
+    ).documents.find((r) => r.id === original.id)!;
+    db.exec(
+      "DELETE FROM task_events WHERE id=3;DELETE FROM task_runs WHERE id=2",
+    );
+    const operation = {
+      operationId: "append-terminal-run",
+      expectedRecord: original,
+      expectedVersion: original.version,
+      document: {
+        collection: "task" as const,
+        id: original.id,
+        body: incoming.body,
+        revision: 2,
+        deleted: false,
+        updatedAt: 4,
+      },
+    };
+    const accepted = applyKanbanReplica(
+      root,
+      "default",
+      "alice",
+      "device",
+      operation,
+    );
+    expect(accepted.status).toBe("applied");
+    expect(accepted.record?.body).toEqual(incoming.body);
+    expect(accepted.record).toEqual(
+      kanbanReplicaSnapshot(root, "default", "alice", "device").documents.find(
+        (r) => r.id === original.id,
+      ),
+    );
+    expect(
+      db
+        .prepare("SELECT worker_pid,claim_lock FROM task_runs WHERE id=1")
+        .get(),
+    ).toEqual({ worker_pid: 555, claim_lock: "old-source-lock" });
+    expect(
+      db
+        .prepare("SELECT worker_pid,claim_lock FROM task_runs WHERE id=2")
+        .get(),
+    ).toEqual({ worker_pid: null, claim_lock: null });
+    expect(
+      applyKanbanReplica(root, "default", "alice", "device", operation),
+    ).toEqual(accepted);
+    const changed = structuredClone(accepted.record!.body) as Record<
+      string,
+      import("@mithril/workspace/repository").JsonValue
+    >;
+    (
+      changed.runs as Record<
+        string,
+        import("@mithril/workspace/repository").JsonValue
+      >[]
+    )[0].summary = "Rewritten older history";
+    expect(
+      applyKanbanReplica(root, "default", "alice", "device", {
+        ...operation,
+        operationId: "history-overwrite",
+        expectedRecord: accepted.record!,
+        expectedVersion: accepted.record!.version,
+        document: { ...operation.document, body: changed },
+      }).status,
+    ).toBe("deferred");
+    expect(
+      db.prepare("SELECT summary FROM task_runs WHERE id=1").get(),
+    ).toEqual({ summary: "Earlier failure" });
+  } finally {
+    db.close();
+  }
+});

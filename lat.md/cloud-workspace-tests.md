@@ -130,3 +130,9 @@ Descriptor-based capture rejects symlinks, invalid Markdown, colliding paths and
 Download tests verify private staging, immutable chunk deduplication, canonical manifests and complete file integrity before native application.
 
 Corrupt chunks, inconsistent file fingerprints and account changes remove staging without altering original files or executing scripts.
+
+## Skill resource file transactions
+
+Native transaction tests verify original relative paths, binary bytes, executable flags, credential retention and private backups.
+
+They cover source conflicts, moved-parent descriptor refusal, symlink refusal, interrupted before/after recovery (including a real interpreter exit after the first replacement), snapshot blocking, changed operation reuse and file/directory replacements.

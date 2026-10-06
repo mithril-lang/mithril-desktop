@@ -634,6 +634,13 @@ async function nativeCapabilitySource(): Promise<
   );
   const home = profileHome(before.profile);
   checked(home);
+  const { assertSkillResourcesReady } =
+    await import("./skill-resource-replica");
+  const skillStateRoot = join(
+    app.getPath("userData"),
+    "repository-skill-transactions",
+  );
+  assertSkillResourcesReady(join(home, "skills"), skillStateRoot);
   const configFile = join(home, "config.yaml");
   checked(configFile);
   const readConfig = (): Buffer => {
@@ -669,6 +676,7 @@ async function nativeCapabilitySource(): Promise<
     description: skill.description,
     content: getSkillContent(skill.path, true),
   }));
+  assertSkillResourcesReady(join(home, "skills"), skillStateRoot);
   const afterConfig = readConfig();
   if (!config.equals(afterConfig))
     throw Error("Capability changed during snapshot; original source retained");
@@ -743,6 +751,12 @@ export async function nativeSkillResourceSnapshot(): Promise<
       throw Error("Workspace identity changed; Skill resources retained");
   };
   await guard();
+  const { assertSkillResourcesReady } =
+    await import("./skill-resource-replica");
+  assertSkillResourcesReady(
+    join(profileHome(before.profile), "skills"),
+    join(app.getPath("userData"), "repository-skill-transactions"),
+  );
   const capture = captureSkillResources(
     join(profileHome(before.profile), "skills"),
     HERMES_PYTHON,
@@ -750,11 +764,20 @@ export async function nativeSkillResourceSnapshot(): Promise<
     capabilityId(before.profile),
   );
   try {
+    assertSkillResourcesReady(
+      join(profileHome(before.profile), "skills"),
+      join(app.getPath("userData"), "repository-skill-transactions"),
+    );
     const manifest = await publishSkillResources(
       capture,
       cloudWorkspace.capabilityResources.forOwner(before.userId),
       guard,
     );
+    assertSkillResourcesReady(
+      join(profileHome(before.profile), "skills"),
+      join(app.getPath("userData"), "repository-skill-transactions"),
+    );
+    await guard();
     const body = {
       format: "mithril-skill-resources-v1",
       profile: before.profile,
@@ -858,6 +881,33 @@ export async function nativeReplicaSnapshot(): Promise<
     scope.ids.push(resources.id);
     snapshot.documents.push(resources);
   } catch {
+    const [
+      { hasPendingSkillResources },
+      { capabilityId },
+      { skillResourceId },
+    ] = await Promise.all([
+      import("./skill-resource-replica"),
+      import("@mithril/workspace/capability-data"),
+      import("@mithril/workspace/capability-resources"),
+    ]);
+    if (
+      hasPendingSkillResources(
+        join(profileHome(before.profile), "skills"),
+        join(app.getPath("userData"), "repository-skill-transactions"),
+        capabilityId(before.profile),
+      )
+    ) {
+      snapshot.recoveryRecords = [
+        { collection: "capability", id: skillResourceId(before.profile) },
+      ];
+      if (!snapshot.collections.includes("capability")) {
+        snapshot.collections.push("capability");
+        (snapshot.recordScopes ??= []).push({
+          collection: "capability",
+          ids: [],
+        });
+      }
+    }
     snapshot.warnings!.push(
       "Skill resource synchronization requires review or reconnect; original directories are retained",
     );
@@ -906,14 +956,136 @@ export async function nativeReplicaApply(
     write.document.collection === "capability" &&
     write.document.id.startsWith("skill-resources-")
   ) {
-    // Resource downloads need their own receipt-backed directory transaction, not the YAML writer.
-    result = {
+    const [
+      { validSkillResourcePointer, skillResourceId },
+      { HERMES_PYTHON },
+      { captureSkillResources, downloadSkillResources },
+      { recoverSkillResources, applySkillResources, assertSkillResourcesReady },
+    ] = await Promise.all([
+      import("@mithril/workspace/capability-resources"),
+      import("./installer"),
+      import("./skill-resource-snapshot"),
+      import("./skill-resource-replica"),
+    ]);
+    const body = write.document.body;
+    const root = join(profileHome(before.profile), "skills");
+    const stateRoot = join(
+      app.getPath("userData"),
+      "repository-skill-transactions",
+    );
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify([before.userId, before.replicaId, write]))
+      .digest("hex");
+    const guard = async (): Promise<void> => {
+      if (
+        JSON.stringify(before.context) !==
+        JSON.stringify(await cloudWorkspace.nativeContext(true))
+      )
+        throw Error("Workspace identity changed");
+    };
+    const observedResult = (
+      status: import("@mithril/workspace/replica-sync").ReplicaResult["status"],
+      record:
+        | import("@mithril/workspace/replica-sync").ReplicaRecord
+        | null = null,
+    ): import("@mithril/workspace/replica-sync").ReplicaResult => ({
       schemaVersion: 1,
       userId: before.userId,
       replicaId: before.replicaId,
-      status: "deferred",
-      record: null,
-    };
+      status,
+      record,
+    });
+    if (
+      write.document.deleted ||
+      !validSkillResourcePointer(body) ||
+      body.profile !== before.profile ||
+      write.document.id !== skillResourceId(before.profile)
+    ) {
+      result = observedResult("deferred");
+    } else {
+      await guard();
+      const replay = recoverSkillResources(
+        root,
+        HERMES_PYTHON,
+        stateRoot,
+        write.operationId,
+        fingerprint,
+      );
+      const target = {
+        collection: write.document.collection,
+        id: write.document.id,
+        body,
+        deleted: false,
+        version: createHash("sha256")
+          .update(repositoryFingerprint(write.document))
+          .digest("hex"),
+      };
+      if (replay !== "missing") {
+        result = observedResult(replay, replay === "applied" ? target : null);
+      } else {
+        assertSkillResourcesReady(root, stateRoot);
+        const source = captureSkillResources(
+          root,
+          HERMES_PYTHON,
+          join(app.getPath("userData"), "repository-skill-captures"),
+          body.capabilityId,
+        );
+        try {
+          const sourceBody = {
+            format: "mithril-skill-resources-v1",
+            profile: before.profile,
+            capabilityId: body.capabilityId,
+            manifest: source.digest,
+          };
+          const observed = {
+            ...target,
+            body: sourceBody,
+            version: createHash("sha256")
+              .update(
+                repositoryFingerprint({ body: sourceBody, deleted: false }),
+              )
+              .digest("hex"),
+          };
+          if (
+            (write.expectedRecord === null &&
+              source.manifest.files.length > 0) ||
+            (write.expectedRecord !== null &&
+              (repositoryFingerprint(write.expectedRecord) !==
+                repositoryFingerprint(observed) ||
+                write.expectedVersion !== observed.version))
+          ) {
+            result = observedResult("conflict", observed);
+          } else {
+            const downloaded = await downloadSkillResources(
+              body,
+              cloudWorkspace.capabilityResources.forOwner(before.userId),
+              join(app.getPath("userData"), "repository-skill-captures"),
+              guard,
+            );
+            try {
+              await guard();
+              const applied = applySkillResources(
+                root,
+                HERMES_PYTHON,
+                stateRoot,
+                write.operationId,
+                fingerprint,
+                source,
+                downloaded,
+              );
+              result = observedResult(
+                applied === "missing" ? "deferred" : applied,
+                applied === "applied" ? target : null,
+              );
+            } finally {
+              downloaded.dispose();
+            }
+          }
+        } finally {
+          source.dispose();
+        }
+      }
+    }
   } else if (write.document.collection === "capability") {
     const source = await nativeCapabilitySource();
     const [{ HERMES_PYTHON }, { applyCapabilityConfigReplica }] =

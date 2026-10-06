@@ -248,7 +248,7 @@ A separate owner-scoped Capability resource namespace in the Mithril API uses th
 
 The shared manifest retains original relative directories and executable attributes, rejects credential paths and file/directory collisions, and verifies byte digests and limits. The main-process [[src/main/cloud-workspace.ts#CloudWorkspace]] exposes the typed resource transport; bearer credentials remain in main, owner changes fail closed, and observing bytes never installs or runs them. Deleted Capability documents retain recovery reads but refuse new uploads.
 
-The POSIX native replica now captures original directories and uploads immutable resources before publishing a pointer through repository CAS. Bidirectional safe file application, Windows capture and original Skills editor integration remain unfinished. This namespace remains unpublished.
+The POSIX native replica now captures original directories and uploads immutable resources before publishing a pointer through repository CAS. POSIX file application now uses recoverable transactions. Windows capture and original Skills editor integration remain unfinished. This namespace remains unpublished.
 
 ### Original Skill directory capture (draft)
 
@@ -258,10 +258,18 @@ The main process uses a fixed isolated interpreter only to capture file data thr
 
 Immutable chunks and their manifest are uploaded through the fixed account-checked Mithril API before the resource pointer enters the durable repository outbox. Verified existing manifests avoid repeated uploads; identity checks surround each network step. API pointer edits require an existing owned manifest and use the existing repository CAS and receipts. This path stores data and never installs or executes a Skill.
 
-Native resource download/application and original Skills editor integration remain unfinished. Descriptor capture currently supports POSIX; Windows capture fails closed until an equivalent safe directory-handle implementation exists. Resource publication also requires the canonical Capability anchor to exist. Large legacy inline Capability bodies and this bootstrap need a versioned resource-backed adapter before full synchronization and release.
+Verified native downloads and POSIX file transactions are implemented; original Skills editor integration remains unfinished. Descriptor capture currently supports POSIX; Windows capture fails closed until an equivalent safe directory-handle implementation exists. Resource publication also requires the canonical Capability anchor to exist. Large legacy inline Capability bodies and this bootstrap need a versioned resource-backed adapter before full synchronization and release.
 
 ### Verified Skill resource download (draft)
 
 Cloud Skill bytes are verified in private staging before any future native file application.
 
 The main-only downloader validates the owned pointer and canonical manifest digest, downloads each immutable chunk once, and checks both chunk sizes/digests and full-file sizes and canonical chunk-list fingerprints. Identity guards surround requests and finish verification. Failures remove private staging and never touch original Skill files. The returned staging reader rechecks disk bytes. Native file application and original Skills editor wiring remain unfinished; this helper grants no install or execution authority.
+
+### Skill resource file transactions (draft)
+
+Native Skill resource pointers now apply to original directories through recoverable data-only file transactions.
+
+A main-only fixed POSIX transaction locks private per-profile state, compares the original tree with the captured source, checks that parent directory descriptors remain attached to their original paths, and verifies cached chunks before source mutations. Atomic per-file replacements retain original paths, binary bytes and executable flags; deletions and replacements keep private backups. Credentials and other excluded files stay untouched. Durable pending/completed receipts support stable operation replay and interrupted before/after recovery. Intervening edits produce conflicts; incomplete transactions block both resource and inline Capability source reads so partial trees cannot be published. Recovery-only snapshot keys let the common engine replay the exact retained journal operation without claiming source completeness.
+
+A completed receipt returns its original result without overwriting later native edits. Account checks surround download/application and source binding remains unchanged. Directory replacement refuses removal of untracked contents. Older native writers do not yet participate in this private advisory lock; cross-writer interruption and conflict UX still need integration. Windows file application and aggregate pointer tombstones remain deferred; original Skills editor wiring and resource-backed bootstrap remain unfinished.

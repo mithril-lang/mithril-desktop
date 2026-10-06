@@ -316,6 +316,10 @@ export async function downloadSkillResources(
   try {
     const downloaded = new Set<string>();
     for (const file of manifest.files) {
+      const markdown = file.path.split("/").at(-1) === "SKILL.md";
+      if (markdown && file.size > 1048576)
+        throw Error("Skill Markdown exceeds native limits");
+      const markdownChunks: Uint8Array[] = [];
       let size = 0;
       for (let index = 0; index < file.chunks.length; index++) {
         const digest = file.chunks[index];
@@ -342,7 +346,12 @@ export async function downloadSkillResources(
         )
           throw new Error("Skill resource chunk size mismatch");
         size += bytes.length;
+        if (markdown) markdownChunks.push(bytes);
       }
+      if (markdown)
+        new TextDecoder("utf-8", { fatal: true }).decode(
+          Buffer.concat(markdownChunks),
+        );
       if (
         size !== file.size ||
         createHash("sha256")

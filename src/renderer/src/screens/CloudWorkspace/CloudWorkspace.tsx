@@ -2,6 +2,10 @@ import { useFont } from "../../components/FontProvider";
 import { useChatPreferences } from "../../components/ChatPreferencesProvider";
 import { THEMES, FONT_OPTIONS } from "../../constants";
 import { setAnalyticsConsent } from "../../utils/analytics";
+import {
+  NativeSettingsPane,
+  NativeSettingsProvider,
+} from "../../components/settings/SettingsModal";
 import { useTheme } from "../../components/ThemeProvider";
 import { useI18n } from "../../components/useI18n";
 import { APP_LOCALES, type AppLocale } from "../../../../shared/i18n";
@@ -116,7 +120,16 @@ export default function CloudWorkspace({
       fileTransport={window.hermesAPI.cloudWorkspace.files}
       folderAdapter={window.hermesAPI.projectFolderSync}
       runtimeAdapter={window.hermesAPI.nativeWorkspace}
-      settingsRuntime={{ gpu: window.hermesAPI, spellcheck: chat }}
+      settingsRuntime={{
+        gpu: window.hermesAPI,
+        spellcheck: chat,
+        wrapSettings: (children) => (
+          <NativeSettingsProvider key={profile} profile={profile}>
+            {children}
+          </NativeSettingsProvider>
+        ),
+        renderPane: (section) => <NativeSettingsPane section={section} />,
+      }}
       onOpenNativeSection={onOpenNativeSection}
       onOpenChat={onOpenChat}
       beforeConnect={beforeConnect}

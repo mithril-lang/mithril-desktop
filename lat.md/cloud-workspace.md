@@ -219,3 +219,12 @@ An account-scoped rich `preferences/presentation` document stores original theme
 Observed revisions and durable operation receipts preserve offline edits and concurrent versions. Providers apply only acknowledged values. Preference refresh retries storage operations without executing agents, installations or schedules; identity cleanup stops the old synchronizer. [[src/renderer/src/screens/CloudWorkspace/CloudWorkspace.tsx#CloudWorkspace]] supplies original Theme, Font, ChatPreferences, I18n and analytics consumers, plus native GPU/dictionary availability.
 
 The five remaining default cloud Settings section adapters, automatic upload from the separate original native global Settings modal and full native cache reconciliation remain required. Browser notification/spellcheck effects also remain unfinished. Unit, route and build checks are draft source evidence; API/Web publication and installed-client verification remain separate release gates.
+
+
+### Default Desktop Settings runtime panes (draft)
+
+All nine original Settings panes now mount in the normal Desktop cloud Settings modal with state retained across tabs.
+
+[[src/renderer/src/components/settings/SettingsModal.tsx#NativeSettingsProvider]] supplies the original SettingsDataContext once for the whole modal; [[src/renderer/src/components/settings/SettingsModal.tsx#NativeSettingsPane]] dispatches the same original bodies used by the global modal. [[src/renderer/src/screens/CloudWorkspace/CloudWorkspace.tsx#CloudWorkspace]] supplies those ports to the shared shell for Connection, Data, About/Updates, Community and Logs, while general preference controls use canonical cloud settings. The provider is keyed by the selected profile and mounts only when Settings opens.
+
+Backups/imports, updates, connection tests and links retain existing explicit native handlers. Opening or switching panes does not replay those actions. Runtime credentials stay outside presentation documents. Tests cover native backup result retention and explicit profile ownership; browser default-route fixtures cover consumer state retention across general/runtime tabs. Web’s five runtime pane adapters and native provider-to-cloud uploads remain unfinished. Source checks are not installed-client or publication evidence.

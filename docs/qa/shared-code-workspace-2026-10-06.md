@@ -7,3 +7,5 @@ Profile-scoped Hermes execution remains a fixed child CLI. GitHub publication us
 Local typechecks, focused UI/IPC tests, production build, lint, packaging checks and lat check were run. UI fixtures are explicitly synthetic; they do not qualify actual native paid inference. The companion Fund UI tests exercise generation, editing, captured-head save, Pages request and editing-after-save rejection; actual Chromium exercises generated starter files.
 
 Release and production evidence will be recorded after current-main CI and installers finish.
+
+The installed Desktop lacked a configured local device runtime. The Code screen therefore also offers an explicit fixed Code service destination. Selecting it performs no request; only Assemble and verify uses the user's GitHub/provider authorization under the existing Code operator policy. It never silently falls back from Hermes or borrows the browser free pilot. The UI routing and fixed service request/credential boundaries have focused tests.

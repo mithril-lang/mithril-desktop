@@ -132,7 +132,7 @@ import { mithrilFirstRunState } from "../first-run";
 import { MITHRIL_TOKEN_PLACEHOLDER } from "../secure-env";
 import { mithrilChat } from "../mithril-chat";
 import { codeHarness } from "../code-harness";
-import { codeApi } from "../code-api";
+import { codeApi, codeServiceRun, codeServiceStatus } from "../code-api";
 import {
   cancelMithrilDeviceLogin,
   startMithrilDeviceLogin,
@@ -1197,6 +1197,12 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("mithril-first-run-state", (_event, profile?: string) =>
     mithrilFirstRunState(profile?.trim() || getActiveProfileNameSync()),
   );
+  ipcMain.handle(
+    "mithril-code-service-run",
+    (_event, goal: unknown, credentials: unknown) =>
+      codeServiceRun(goal, credentials),
+  );
+  ipcMain.handle("mithril-code-service-status", () => codeServiceStatus());
   ipcMain.handle(
     "mithril-code-api",
     (_event, path: unknown, body: unknown, credentials: unknown) =>

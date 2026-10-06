@@ -338,6 +338,13 @@ interface HermesAPI {
   ) => () => void;
   disconnectMithrilAccount: (profile?: string) => Promise<{ success: boolean }>;
   getMithrilFirstRunState: (profile?: string) => Promise<MithrilFirstRunState>;
+  codeServiceRun: (
+    goal: string,
+    credentials: import("@mithril/workspace/code").CodeCredentials,
+  ) => Promise<{ ok: true; value: unknown } | { ok: false; error: string }>;
+  codeServiceStatus: () => Promise<
+    { ok: true; value: unknown } | { ok: false; error: string }
+  >;
   codeApi: (
     path: string,
     body?: Record<string, unknown>,

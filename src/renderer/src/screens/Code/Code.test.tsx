@@ -78,3 +78,30 @@ it("keeps an unknown outcome visible without automatically running again", async
   );
   expect(call).toHaveBeenCalledTimes(1);
 });
+it("selects Code service explicitly without starting a run or falling back to Hermes", async () => {
+  const harness = vi.fn(),
+    service = vi.fn(async () => ({
+      ok: false,
+      error: "github_connection_required",
+    }));
+  vi.stubGlobal("crypto", {
+    randomUUID: () => "00000000-0000-4000-8000-000000000000",
+  });
+  Object.defineProperty(window, "hermesAPI", {
+    configurable: true,
+    value: { codeHarness: harness, codeServiceRun: service },
+  });
+  render(<Code profile="owner" locale="en" />);
+  fireEvent.change(screen.getByLabelText("Execution destination"), {
+    target: { value: "service" },
+  });
+  expect(harness).not.toHaveBeenCalled();
+  expect(service).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Assemble and verify" }));
+  await screen.findByText("Connect GitHub first.");
+  expect(service).toHaveBeenCalledWith(
+    "Toggle completion and count unfinished tasks",
+    { github: "", provider: "" },
+  );
+  expect(harness).not.toHaveBeenCalled();
+});

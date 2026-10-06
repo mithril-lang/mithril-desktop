@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { codeApi } from "./code-api";
+import { codeApi, codeServiceRun } from "./code-api";
 afterEach(() => vi.unstubAllGlobals());
 it("permits only fixed GitHub routes, forwards transient credentials and returns an uncertain write without retry", async () => {
   // @lat: [[mithril-code#Mithril Code#GitHub publication]]
@@ -37,10 +37,32 @@ it("permits only fixed GitHub routes, forwards transient credentials and returns
       },
     },
   ]);
+  // Explicit service choice is a separate, bounded operation; publication remains GitHub-only.
+  expect(await codeServiceRun("", { github: "token" })).toEqual({
+    ok: false,
+    error: "invalid_goal",
+  });
+  expect(
+    await codeServiceRun("todo", {
+      github: "run-token",
+      provider: "provider-key",
+    }),
+  ).toEqual({ ok: true, value: { sha: "a".repeat(40) } });
+  expect(fetcher.mock.calls[1]).toMatchObject([
+    "https://code.mithril.fund/api/runs",
+    {
+      method: "POST",
+      headers: {
+        authorization: "Bearer run-token",
+        "x-openrouter-key": "provider-key",
+      },
+      body: JSON.stringify({ template: "todo", goal: "todo" }),
+    },
+  ]);
   fetcher.mockRejectedValueOnce(Error("network"));
   expect(await codeApi("/api/github/commit", {}, { github: "token" })).toEqual({
     ok: false,
     error: "outcome_unknown",
   });
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(fetcher).toHaveBeenCalledTimes(3);
 });

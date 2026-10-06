@@ -21,3 +21,9 @@ The prior Code case qualifies toggle/count against fixed checks and 511 vectors.
 [[src/main/code-api.ts#codeApi]] accepts only fixed Code GitHub routes through trusted IPC. The user's GitHub credential stays in the owning screen's memory and is cleared when the profile changes or the user disconnects.
 
 Desktop, App `/code` and Code use the compiled workspace `CodeWorkspace`, including Desktop's composer, file navigation, tabs and receipt disclosure. The shared editor builds the immutable starter plus actual verified source and typed logic. CLJK edits do not recompile the runtime artifacts. Source edits invalidate the saved version; saving retains the verification distinction. GitHub uses a captured head and non-force update. Pages publishes only the saved public branch and refuses conflicting settings. Unknown write outcomes are not retried.
+
+## Execution destination
+
+Desktop explicitly offers a configured Hermes profile runner or the fixed Code service. Selecting a destination never starts execution or silently falls back after a failure.
+
+[[src/main/code-api.ts#codeServiceRun]] validates a bounded brief and sends only the fixed To-do task to Code with the screen's GitHub/provider credentials. The service retains its existing authorization and model-cost policy. This choice needs no local device runtime and does not borrow the browser's session-only free allowance. [[src/main/code-api.ts#codeServiceStatus]] reads readiness without credentials or inference.

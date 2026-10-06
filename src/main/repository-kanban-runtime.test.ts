@@ -1328,3 +1328,123 @@ it("reconciles colliding history IDs without overwriting existing rows, preserve
     target.close();
   }
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#New task dependency reconstruction]]
+it("restores new inactive task dependencies with exact source receipts and rolls deferred endpoints back", async () => {
+  const { kanbanReplicaSnapshot, applyKanbanReplica } =
+    await import("./repository-kanban-runtime");
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "mithril-task-graph-")));
+  roots.push(root);
+  const db = new Database(join(root, "kanban.db"));
+  try {
+    db.exec(
+      readFileSync(
+        join(process.cwd(), "tests/fixtures/agent-kanban-schema.sql"),
+        "utf8",
+      ),
+    );
+    db.prepare(
+      "INSERT INTO tasks(id,title,status,created_at,workspace_path) VALUES(?,?,?,?,?)",
+    ).run("parent", "Parent", "todo", 10, "/private/parent");
+    const source = kanbanReplicaSnapshot(
+      root,
+      "default",
+      "alice",
+      "device",
+    ).documents.find((row) => row.collection === "task")!;
+    const body = source.body as Record<
+      string,
+      import("@mithril/workspace/repository").JsonValue
+    >;
+    const task = body.task as Record<
+      string,
+      import("@mithril/workspace/repository").JsonValue
+    >;
+    const write = {
+      operationId: "new-task-graph",
+      expectedRecord: null,
+      expectedVersion: null,
+      document: {
+        collection: "task" as const,
+        id: "cloud-child",
+        revision: 1,
+        updatedAt: 1,
+        deleted: false,
+        body: {
+          ...body,
+          task: { ...task, id: "child", title: "Child" },
+          dependencies: [{ parent_id: "parent", child_id: "child" }],
+          parents: ["parent"],
+          children: [],
+        },
+      },
+    };
+    const missing = {
+      ...write,
+      document: {
+        ...write.document,
+        body: {
+          ...write.document.body,
+          dependencies: [{ parent_id: "missing", child_id: "child" }],
+          parents: ["missing"],
+        },
+      },
+    };
+    expect(
+      applyKanbanReplica(root, "default", "alice", "device", missing).status,
+    ).toBe("deferred");
+    expect(db.prepare("SELECT id FROM tasks ORDER BY id").all()).toEqual([
+      { id: "parent" },
+    ]);
+    expect(db.prepare("SELECT * FROM task_links").all()).toEqual([]);
+    expect(db.prepare("SELECT * FROM mithril_replica_receipts").all()).toEqual(
+      [],
+    );
+    expect(
+      db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE name='mithril_repository_task_ids'",
+        )
+        .all(),
+    ).toEqual([]);
+    db.prepare("UPDATE tasks SET status='ready' WHERE id='parent'").run();
+    expect(
+      applyKanbanReplica(root, "default", "alice", "device", write).status,
+    ).toBe("deferred");
+    expect(db.prepare("SELECT id FROM tasks ORDER BY id").all()).toEqual([
+      { id: "parent" },
+    ]);
+    expect(
+      db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE name='mithril_repository_task_ids'",
+        )
+        .all(),
+    ).toEqual([]);
+    db.prepare("UPDATE tasks SET status='todo' WHERE id='parent'").run();
+    const result = applyKanbanReplica(
+      root,
+      "default",
+      "alice",
+      "device",
+      write,
+    );
+    expect(result.status).toBe("applied");
+    expect(result.record).toEqual(
+      kanbanReplicaSnapshot(root, "default", "alice", "device").documents.find(
+        (row) => row.id === "cloud-child",
+      ),
+    );
+    expect(
+      applyKanbanReplica(root, "default", "alice", "device", write),
+    ).toEqual(result);
+    expect(db.prepare("SELECT * FROM task_links").all()).toEqual(
+      write.document.body.dependencies,
+    );
+    expect(
+      db.prepare("SELECT workspace_path FROM tasks WHERE id='parent'").get(),
+    ).toEqual({ workspace_path: "/private/parent" });
+  } finally {
+    db.close();
+  }
+});

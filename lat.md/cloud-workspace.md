@@ -454,3 +454,11 @@ Agent PR 11 merged as 806c0a473b9eaba74a97a8c0d5f8e5fe0bc9c30b after 21 tests / 
 The original workspace renderer resolves its stable attachment transport when mounted, after the consumer preload exists, rather than accessing Electron ports during module evaluation.
 
 Shared rendering still uses the same download/upload adapter and owner-scoped main handlers. Existing renderer account/marketplace tests exercise the mounting path; the IPC inventory includes the dedicated attachment registration module. The exact two CI failures reproduced and the repaired suites passed 59 tests / 2 files.
+
+## New inactive tasks with existing graph endpoints (draft)
+
+New tasks can restore complete dependency rows when their original board already contains the connected inactive tasks.
+
+[[src/main/kanban-task-restore.ts#restoreKanbanTask]] uses a nested writer savepoint so any deferred restoration rolls back inserted task, identity, history and graph rows. The existing schema-complete graph planner validates endpoints, cycle and execution ownership, then graph rows join the ordinary source fingerprint and receipt. Missing endpoints still require a connected-component restoration protocol; an empty new device with only mutually dependent cloud records is not yet qualified. No dispatcher or task promotion occurs.
+
+New task graph local qualification: 2,622 tests / 281 files passed with the missing-credential fixture isolated from OPENROUTER_API_KEY. Node/web types, full lint and lat check passed. The targeted 34-test storage/graph/attachment suite also passed; original user storage and production APIs were untouched.

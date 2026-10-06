@@ -3,9 +3,10 @@ import type Database from "better-sqlite3";
 import { createHash } from "crypto";
 import { validBody, type JsonValue } from "@mithril/workspace/repository";
 import type { TaskAttachment } from "@mithril/workspace/task-attachments";
+import { planKanbanDependencies } from "./kanban-dependency-replica";
 import { planKanbanHistoryRestore } from "./kanban-history-restore";
 /** Restore a cloud-created inactive task into an existing board, without CLI/hooks. */
-export function restoreKanbanTask(
+function restoreTask(
   db: Database.Database,
   documentId: string,
   value: JsonValue,
@@ -38,7 +39,7 @@ export function restoreKanbanTask(
     )
   )
     return null;
-  for (const field of ["dependencies", "parents", "children", "attachments"]) {
+  for (const field of ["attachments"]) {
     if (field === "attachments" && restoreAttachments) continue;
     if (
       incoming[field] !== undefined &&
@@ -149,6 +150,13 @@ export function restoreKanbanTask(
     task.id,
     documentId,
   );
+  const graph = planKanbanDependencies(db, task.id, {
+    dependencies: incoming.dependencies ?? [],
+    parents: incoming.parents ?? [],
+    children: incoming.children ?? [],
+  });
+  if (!graph) return null;
+  const dependencies = graph.apply();
   const projected = portableKanbanTask(raw);
   const history = restoreHistory();
   const attachments = restoreAttachments?.();
@@ -158,9 +166,13 @@ export function restoreKanbanTask(
     comments: history.comments,
     events: history.events,
     runs: history.runs,
-    dependencies: [],
-    parents: [],
-    children: [],
+    dependencies,
+    parents: dependencies
+      .filter((edge) => edge.child_id === task.id)
+      .map((edge) => edge.parent_id),
+    children: dependencies
+      .filter((edge) => edge.parent_id === task.id)
+      .map((edge) => edge.child_id),
     latest_summary: history.rawRuns.at(-1)?.summary ?? null,
     ...(attachments ? { attachments: attachments.resources } : {}),
   };
@@ -172,7 +184,7 @@ export function restoreKanbanTask(
         history.rawComments,
         history.rawEvents,
         history.rawRuns,
-        [],
+        dependencies,
         ...(attachments?.rows.length
           ? [{ rows: attachments.rows, resources: attachments.resources }]
           : []),
@@ -181,4 +193,24 @@ export function restoreKanbanTask(
     .digest("hex");
   if (!validBody(body)) throw Error("Restored task cannot be represented");
   return { body, version };
+}
+
+/** A deferred restore must not commit a partial task, mapping, history or graph. */
+export function restoreKanbanTask(
+  ...args: Parameters<typeof restoreTask>
+): ReturnType<typeof restoreTask> {
+  const [db] = args;
+  if (!db.inTransaction)
+    throw Error("Task restoration requires a writer transaction");
+  const deferred = new Error("Task restoration deferred");
+  try {
+    return db.transaction(() => {
+      const result = restoreTask(...args);
+      if (!result) throw deferred;
+      return result;
+    })();
+  } catch (error) {
+    if (error === deferred) return null;
+    throw error;
+  }
 }

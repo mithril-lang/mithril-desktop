@@ -312,3 +312,7 @@ Reviewed Agent writers allow source-CAS replacement while preserving private wor
 ## Original metadata replacement recovery
 
 Interrupted publication recovers the exact prepared operation before source reconciliation. Concurrent original edits win without replacement, and completed receipts remain independent of later native edits.
+
+## New task dependency reconstruction
+
+New inactive tasks restore graph edges with exact source receipts. Missing or runnable endpoints defer without partial task, graph, mapping or receipt writes; private endpoint state stays unchanged.

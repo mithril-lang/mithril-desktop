@@ -562,3 +562,9 @@ Fund PR542/main 165f654 adds the original per-key English translation fallback f
 Agent PR12 stages Desktop-compatible owner/profile delete intents inside original single/bulk SQLite deletion transactions, including delegate cascades. This closes a writer gap without changing account permissions or review guards.
 
 Agent head c1c7e7ab73 has 18 passing SQLite tests, including guard/refused-review admission, atomic rollback and A-B-A profile stores. Its broad state suite has the same 64 persistent failures as unmodified main 806c0a473b on this macOS environment; an existing quarantine race also passed on retry and remains recorded. CI run 37534472453 is pending. This writer is not merged or installer-pinned; automatic retention/repair writers, deletion conflict controls, continuation and remaining adapters stay outstanding. No user database or cloud deletion was performed for this qualification.
+
+## Original account reconnection (draft)
+
+The shared renderer distinguishes automatic connection from an explicit reconnect. Desktop handles permission recovery through its original account card; browser authentication and device permissions remain in consumer adapters.
+
+`beforeReconnect` defaults to `beforeConnect` for existing Web consumers. Desktop opens the original Mithril account dialog only when an explicit reconnect fails for missing Workspace scopes, absent identity or expired/refused sign-in. Automatic startup never opens the dialog or invokes device authorization. Network failures retain ordinary retry behavior. Profile/account changes close the dialog before reconnecting; no credential enters the shared package. [[cloud-workspace-tests#Cloud workspace tests#Explicit native reconnection recovery]] and [[cloud-workspace-tests#Cloud workspace tests#Transient reconnect never requests authorization]] cover the actual shared-renderer path.

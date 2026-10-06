@@ -487,7 +487,6 @@ export function initializeKanbanBoardMetadata(
   checked(dbFile);
   checked(file);
   if (!existsSync(dbFile)) return result("deferred");
-  const db = new Database(dbFile, { fileMustExist: true });
   const fingerprint = createHash("sha256")
     .update(JSON.stringify(write))
     .digest("hex");
@@ -500,6 +499,7 @@ export function initializeKanbanBoardMetadata(
       ),
     ) + "\n";
   if (Buffer.byteLength(desiredBytes) > 65536) return result("deferred");
+  const db = new Database(dbFile, { fileMustExist: true });
   type Pending = { fingerprint: string; bytes: string; receipt: string };
   try {
     db.exec(

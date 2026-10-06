@@ -428,3 +428,5 @@ Boards whose original display settings file is absent can adopt cloud names, des
 Existing nonempty board.json updates still require recoverable replacement with retained external edits. Missing-default custom metadata adoption, dependent task graphs, Windows and installed/offline/multi-device qualification remain outstanding.
 
 Local qualification: 44 Native tests / 5 files passed, including source barriers, exact prepared-operation recovery, stale source refusal, publication collision, different-owner refusal, operation reuse, later original task/display edits and oversized UTF-8 metadata. Node/web types, full lint, production build and lat check passed. Existing nonempty metadata replacement and installed/authenticated publication remain unqualified.
+
+Oversized metadata admission now returns before opening the writable SQLite handle, so a deferred operation cannot retain a database descriptor. The original Agent writer-lock prerequisite is being prepared separately; installed replacement remains unqualified.

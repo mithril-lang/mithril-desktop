@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, realpathSync } from "fs";
+import { mkdtempSync, mkdirSync, rmSync, realpathSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import Database from "better-sqlite3";
@@ -12,6 +12,7 @@ vi.mock("./config", () => ({ getConnectionConfig: () => ({ mode: "local" }) }));
 import {
   kanbanRepositorySeed,
   bindRepositorySource,
+  repositorySourceOwned,
 } from "./repository-kanban-runtime";
 const roots: string[] = [];
 afterEach(() =>
@@ -342,4 +343,19 @@ it("appends synchronized comments and status events atomically without launching
     { count: 1 },
   );
   db.close();
+});
+
+it("reads an existing profile binding without adopting another account", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "mithril-owner-read-")));
+  roots.push(root);
+  expect(repositorySourceOwned(join(root, "absent"), "default", "alice")).toBe(
+    false,
+  );
+  expect(existsSync(join(root, "absent"))).toBe(false);
+  bindRepositorySource(root, "default", "alice");
+  expect(repositorySourceOwned(root, "default", "alice")).toBe(true);
+  expect(() => repositorySourceOwned(root, "default", "bob")).toThrow(
+    "another account",
+  );
+  expect(repositorySourceOwned(root, "other", "bob")).toBe(false);
 });

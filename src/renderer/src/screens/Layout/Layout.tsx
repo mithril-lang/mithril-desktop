@@ -1018,6 +1018,7 @@ function Layout({
                 sidebarNavigation={cloudSidebarNavigation}
                 onSidebarSelect={() => goTo("mithril-chat")}
                 onSidebarProjects={() => goTo("projects")}
+                onSourceHistorySelect={handleResumeSession}
                 onConnectAccount={() => goTo("providers")}
                 visible={view === "mithril-chat"}
               />

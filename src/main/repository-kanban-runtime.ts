@@ -72,6 +72,30 @@ export function bindRepositorySource(
       "This device profile belongs to another account; automatic migration refused",
     );
 }
+/** Read an existing source binding without adopting or writing a device profile. */
+export function repositorySourceOwned(
+  directory: string,
+  profile: string,
+  userId: string,
+): boolean {
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(userId))
+    throw Error("Invalid repository owner");
+  checked(directory);
+  const path = join(
+    directory,
+    createHash("sha256").update(profile).digest("hex") + ".json",
+  );
+  checked(path);
+  if (!existsSync(path)) return false;
+  if (!lstatSync(path).isFile() || lstatSync(path).size > 2048)
+    throw Error("Invalid repository source binding");
+  const value = JSON.parse(readFileSync(path, "utf8"));
+  if (value.profile !== profile || value.userId !== userId)
+    throw Error(
+      "This device profile belongs to another account; source inventory refused",
+    );
+  return true;
+}
 /** Read rich board data in one SQLite snapshot. Never switches boards or invokes an agent. */
 export function kanbanRepositorySeed(
   root: string,

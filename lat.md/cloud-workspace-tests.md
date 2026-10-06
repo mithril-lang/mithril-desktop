@@ -172,3 +172,13 @@ Desktop's original context-menu interaction test must still pass through its sha
 Shared UI tests verify the original menu's project and pin actions, receipt retries after reload, owner changes, newer revisions, and rename acknowledgement recovery without inference or tool replay.
 
 Storage tests verify account isolation, concurrent writes, original IDs across reopen, atomic replacement and rejection of execution requests or mutation of an existing ID. Desktop's wrapper must still pass its original menu interaction and compile with the matching shared tar.
+
+## Owner-bound source sidebar selection
+
+The original shared sidebar opens a checked source ID while it awaits archival. Reading/selecting never invokes cloud inference or an import preview.
+
+Cloud records supersede matching source IDs, including tombstones; account changes remove the source inventory.
+
+## Read-only source inventory
+
+Only an existing owner-bound local profile produces stable source and cloud IDs. Tests reject account changes, another owner, and oversized inventories; reading never binds a source, captures messages, enables sync or starts execution.

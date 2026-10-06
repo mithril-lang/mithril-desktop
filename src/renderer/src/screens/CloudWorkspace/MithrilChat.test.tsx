@@ -25,6 +25,17 @@ beforeEach(() => {
     configurable: true,
     value: {
       cloudChat: {
+        nativeHistoryInventory: vi.fn(async () => ({
+          userId: "owner",
+          profile: "default",
+          rows: [
+            {
+              id: "native_pending",
+              sourceId: "original-pending",
+              title: "Original source conversation",
+            },
+          ],
+        })),
         enable,
         status: vi.fn(async () => ({ userId: "owner", enabled: false })),
         legacySnapshot: vi.fn(async () => ({
@@ -169,4 +180,43 @@ it("renders the original shared history row and context menu through canonical c
   } finally {
     list.mockResolvedValue({ schemaVersion: 1, userId: "owner", sessions: [] });
   }
+});
+
+// @lat: [[cloud-workspace-tests#Owner-bound source sidebar selection]]
+it("opens an unarchived source from the same shared sidebar without starting cloud inference", async () => {
+  const select = vi.fn();
+  render(
+    <>
+      <div id="cloud-session-sidebar" />
+      <MithrilChat profile="default" onSourceHistorySelect={select} />
+    </>,
+  );
+  fireEvent.click(await screen.findByText("Original source conversation"));
+  expect(select).toHaveBeenCalledWith("original-pending");
+  expect(apply).not.toHaveBeenCalled();
+  expect(preview).not.toHaveBeenCalled();
+});
+
+it("keeps source history readable when the model provider is unavailable", async () => {
+  models.mockRejectedValueOnce(Error("Provider overloaded"));
+  const select = vi.fn();
+  render(
+    <>
+      <div id="cloud-session-sidebar" />
+      <MithrilChat profile="default" onSourceHistorySelect={select} />
+    </>,
+  );
+  await screen.findByText("Models unavailable: Provider overloaded");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Retry model inventory" }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole("combobox", { name: /Mithril model/ }),
+    ).toHaveTextContent("mithril-model"),
+  );
+
+  fireEvent.click(await screen.findByText("Original source conversation"));
+  expect(select).toHaveBeenCalledWith("original-pending");
+  expect(apply).not.toHaveBeenCalled();
 });

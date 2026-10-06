@@ -23,9 +23,13 @@ import { getConnectionConfig } from "./config";
 import { getDbConnection } from "./db";
 import { activeStateDbPath } from "./utils";
 import { getSessionMessages, listSessions, type HistoryItem } from "./sessions";
-import { bindRepositorySource } from "./repository-kanban-runtime";
+import {
+  bindRepositorySource,
+  repositorySourceOwned,
+} from "./repository-kanban-runtime";
 import {
   NativeHistorySync,
+  nativeCloudSessionId,
   type NativeHistoryJournal,
 } from "./native-history-sync";
 import { digestBytes, syncablePath } from "@mithril/workspace/files";
@@ -433,4 +437,48 @@ export async function synchronizeNativeHistory(): Promise<
 > {
   await cloudChat.auth.enable();
   return nativeHistorySync.run();
+}
+
+/** Read-only inventory for the original sidebar; no migration, file capture or execution. */
+export async function nativeHistoryInventory(): Promise<{
+  userId: string;
+  profile: string;
+  rows: Array<{ id: string; sourceId: string; title: string }>;
+}> {
+  const context = await cloudChat.auth.nativeContext();
+  const result = {
+    userId: context.userId,
+    profile: context.profile,
+    rows: [] as Array<{ id: string; sourceId: string; title: string }>,
+  };
+  if (getConnectionConfig().mode !== "local") return result;
+  if (
+    !repositorySourceOwned(
+      join(app.getPath("userData"), "repository-source-owners"),
+      context.profile,
+      context.userId,
+    )
+  )
+    return result;
+  checked(activeStateDbPath(context.profile));
+  const db = getDbConnection(true, context.profile);
+  if (!db) return result;
+  const sessions = db.transaction(() =>
+    listSessions(1001, 0, context.profile),
+  )();
+  if (sessions.length > 1000)
+    throw Error(
+      "Source history inventory exceeds supported bound; source retained",
+    );
+  if (
+    JSON.stringify(context) !==
+    JSON.stringify(await cloudChat.auth.nativeContext())
+  )
+    throw Error("History account changed");
+  result.rows = sessions.map((session) => ({
+    id: nativeCloudSessionId(context.profile, session.id),
+    sourceId: session.id,
+    title: session.title || "Chat",
+  }));
+  return result;
 }

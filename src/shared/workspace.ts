@@ -45,6 +45,11 @@ import type {
   SessionNativeImportAdapter,
 } from "@mithril/workspace/sessions";
 export interface CloudChatAPI extends SessionTransport {
+  nativeHistoryInventory(): Promise<{
+    userId: string;
+    profile: string;
+    rows: Array<{ id: string; sourceId: string; title: string }>;
+  }>;
   syncNativeHistory(): Promise<{
     userId: string;
     synced: number;

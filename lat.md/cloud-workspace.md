@@ -62,7 +62,7 @@ Stopping synchronization invalidates active work before publishing downloaded by
 
 ## Shared sidebar history
 
-The API-backed Chat shares Web’s expanded sidebar for cloud sessions and projects. Pins and project membership use owner-scoped API records; legacy device history stays separate. Reading the sidebar never creates sessions or executes tools.
+API Chat uses the original shared sidebar for cloud sessions, projects and checked unarchived source rows. Pins and project membership use owner-scoped API records. Reading the sidebar never creates sessions or executes tools.
 
 ### Read-only cloud sidebar
 
@@ -323,3 +323,11 @@ The owner-scoped browser journal retains placement and rename/delete/restore ope
 Shared repository screens keep an explicit connection state until the account is verified, rather than substituting a portable-record editor. Table restoration pairs actual inline code delimiters before validating compact row seams.
 
 Settings, Memory, Capability, Kanban and Discover retain their canonical Desktop route through slow or failed authentication. Reconnect is explicit; connection rendering does not mutate records or invoke tools. Multiple code spans in table values no longer misclassify a row seam as code. Source transcript text remains unchanged.
+
+## Unified source inventory in the original sidebar
+
+An owner-bound read-only IPC inventory adds unarchived source conversations to the canonical sidebar. Cloud records supersede matching IDs, including deleted records, while original source selection uses its original history handler.
+
+Inventory reads do not bind a previously unowned profile, capture attachments, import records, or start inference. Unknown/different-owner sources remain reachable through the existing source-access dialog until migration and metadata action routing are complete. Source-row metadata/pin/project actions are disabled during that transition; cloud rows retain their API CAS actions. A closing shared context menu relinquishes key capture immediately, so inline rename can process Escape while the exit animation finishes.
+
+Cloud storage readiness is independent of model inventory. A provider failure keeps verified history readable; sending/creating execution still requires an available model. This prevents a model outage from hiding synchronized or original source conversations.

@@ -448,3 +448,9 @@ Final local qualification for existing-file replacement: 46 Native tests / 5 fil
 The verified Desktop installer now selects the merged Agent metadata writer revision for both Unix and Windows bootstrap paths.
 
 Agent PR 11 merged as 806c0a473b9eaba74a97a8c0d5f8e5fe0bc9c30b after 21 tests / 2 files passed through its canonical runner. The merged sources exactly match the Native admission digests. Both downloaded commit-pinned bootstrap files retain the checked SHA-256 values; their bootstrap bodies did not change. Existing runtime drain and restart remain owned by the normal install lifecycle. This source pin does not upgrade a running installation or release Desktop preview.28.
+
+## Renderer attachment adapter initialization
+
+The original workspace renderer resolves its stable attachment transport when mounted, after the consumer preload exists, rather than accessing Electron ports during module evaluation.
+
+Shared rendering still uses the same download/upload adapter and owner-scoped main handlers. Existing renderer account/marketplace tests exercise the mounting path; the IPC inventory includes the dedicated attachment registration module. The exact two CI failures reproduced and the repaired suites passed 59 tests / 2 files.

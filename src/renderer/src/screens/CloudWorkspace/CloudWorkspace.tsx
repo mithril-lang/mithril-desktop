@@ -12,16 +12,10 @@ import { useI18n } from "../../components/useI18n";
 import { APP_LOCALES, type AppLocale } from "../../../../shared/i18n";
 import { portableRepositorySeeds } from "@mithril/workspace/repository-migration";
 import type { RuntimeSection } from "@mithril/workspace/runtime";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { WorkspaceApp, type WorkspaceView } from "@mithril/workspace/react";
 import "@mithril/workspace/styles.css";
 import "@mithril/workspace/desktop-styles.css";
-
-const taskAttachmentDownloads = {
-  reader: window.hermesAPI.cloudWorkspace.taskAttachments,
-  writer: window.hermesAPI.cloudWorkspace.taskAttachments,
-  save: saveTaskAttachmentDownload,
-};
 
 // @lat: [[cloud-workspace#Cloud workspace#Shared screens]]
 export default function CloudWorkspace({
@@ -43,6 +37,14 @@ export default function CloudWorkspace({
   onOpenNativeSection?: (section: RuntimeSection) => void;
   onOpenChat?: () => void;
 }): React.JSX.Element {
+  const taskAttachmentDownloads = useMemo(
+    () => ({
+      reader: window.hermesAPI.cloudWorkspace.taskAttachments,
+      writer: window.hermesAPI.cloudWorkspace.taskAttachments,
+      save: saveTaskAttachmentDownload,
+    }),
+    [],
+  );
   const { setTheme, setRounded } = useTheme();
   const { setFont } = useFont();
   const chat = useChatPreferences();

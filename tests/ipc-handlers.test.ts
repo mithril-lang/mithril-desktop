@@ -9,6 +9,7 @@ const indexSrc = [
   "src/main/ipc/register.ts",
   "src/main/app/updater.ts",
   "src/main/capability-resource-ipc.ts",
+  "src/main/task-attachment-ipc.ts",
 ]
   .map((p) => readFileSync(join(ROOT, p), "utf-8"))
   .join("\n");

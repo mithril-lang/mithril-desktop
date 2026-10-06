@@ -44,11 +44,18 @@ export async function codeServiceRun(
 ): ReturnType<typeof codeApi> {
   if (typeof goal !== "string" || !goal.trim() || goal.length > 2000)
     return { ok: false, error: "invalid_goal" };
-  const credentials = validCredentials(keys);
-  if (!credentials) return { ok: false, error: "github_connection_required" };
+  const c = keys as CodeCredentials | undefined;
+  if (
+    !c ||
+    typeof c.provider !== "string" ||
+    !c.provider.trim() ||
+    c.provider.length > 1024
+  )
+    return { ok: false, error: "mithril_connection_required" };
+  const credentials = { github: "", provider: c.provider };
   return sendCode(
     "/api/runs",
-    JSON.stringify({ template: "todo", goal }),
+    JSON.stringify({ template: "todo", goal, request_id: crypto.randomUUID() }),
     credentials,
     true,
   );
@@ -77,11 +84,11 @@ async function sendCode(
       method: raw ? "POST" : "GET",
       redirect: "error",
       headers: {
-        authorization: "Bearer " + credentials.github,
+        ...(run ? {} : { authorization: "Bearer " + credentials.github }),
         origin: "https://code.mithril.fund",
         ...(raw ? { "content-type": "application/json" } : {}),
         ...(run && credentials.provider
-          ? { "x-openrouter-key": credentials.provider }
+          ? { "x-mithril-token": credentials.provider }
           : {}),
       },
       ...(raw ? { body: raw } : {}),

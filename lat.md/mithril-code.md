@@ -4,9 +4,9 @@ Desktop calls Hermes's owned Mithril Code plugin to assemble two bounded To-do f
 
 ## Native execution
 
-[[src/main/code-harness.ts#codeHarness]] invokes the profile-scoped `hermes mithril-code` CLI through fixed subprocess arguments. The brief travels over stdin; only the selected profile supplies the runner credential. No automatic execution, retries or publication occurs.
+[[src/main/code-harness.ts#codeHarness]] invokes the profile-scoped `hermes mithril-code` CLI through fixed subprocess arguments. The brief travels over stdin; only the selected profile supplies its encrypted Mithril API credential. No automatic execution, retries or publication occurs.
 
-The Agent plugin requires explicit enablement, a configured trusted runner and the profile's CODE_RUNNER_TOKEN. HTTP is loopback-only; remote URLs require HTTPS. Unknown POST outcomes remain uncertain. Existing registered free-trial quota/replay contracts in Fund PR492 are independent and must not be inferred from this operator runner adapter.
+The Agent plugin requires explicit enablement and the selected profile's MITHRIL_API_KEY. It calls the owned Code verification service, whose only inference route is api.mithril.fund/v1/chat/completions (qwen/qwen3.8-27b). Legacy runner settings are retained but never used as fallback. Unknown POST outcomes remain uncertain. The shared registered Code quota and API inference allowance apply.
 
 ## Review and measurements
 
@@ -26,12 +26,12 @@ Desktop, App `/code` and Code use the compiled workspace `CodeWorkspace`, includ
 
 Desktop explicitly offers a configured Hermes profile runner or the fixed Code service. Selecting a destination never starts execution or silently falls back after a failure.
 
-[[src/main/code-api.ts#codeServiceRun]] validates a bounded brief and sends only the fixed To-do task to Code with the screen's GitHub/provider credentials. The service retains its existing authorization and model-cost policy. This choice needs no local device runtime and does not borrow the browser's session-only free allowance. [[src/main/code-api.ts#codeServiceStatus]] reads readiness without credentials or inference.
+[[src/main/code-api.ts#codeServiceRun]] validates a bounded brief and sends only the fixed To-do task to Code with a transient Mithril API token and fresh request ID; GitHub credentials are excluded. The service admits typed ASTs and checks 511 vectors before source emission. Receipts state actual model and usage, not Jev identity or fabricated API cost. This choice needs no local device runtime and does not borrow the browser's session-only free allowance. [[src/main/code-api.ts#codeServiceStatus]] reads readiness without credentials or inference.
 
 ## Kuro source execution
 
 Code shares Kuro JS/Python source execution across App, Code and Desktop.
 
-The public App Kuro assets run in an opaque sandbox frame through a MessageChannel. No account, provider or GitHub credentials or Desktop IPC authority cross that boundary. Each explicit run gets a fresh bounded runtime; edits clear the displayed execution result. This is independent of the separate Node/NBB Jev generation runner. Python is not a Pages backend and CLJK is not compiled by this action.
+The public App Kuro assets run in an opaque sandbox frame through a MessageChannel. No account, provider or GitHub credentials or Desktop IPC authority cross that boundary. Each explicit run gets a fresh bounded runtime; edits clear the displayed execution result. This is independent of the separate Mithril API typed-AST generation. Python is not a Pages backend and CLJK is not compiled by this action.
 
 Desktop preserves the pinned public Kuro asset CSP through [[src/main/app/response-headers.ts#applyResponseHeaders]]. Its sandbox, restricted asset-only connections and blob worker policy remain authoritative; the local renderer keeps its own policy. Header tests verify this boundary and unchanged registry icon caching.

@@ -139,7 +139,7 @@ Compatible Fund API/App publication from `c1dfaa70e8da0fb8b955881bccdcae90369d8e
 
 ## Mithril Code (2026-10-06)
 
-The Code sidebar screen invokes the owned Hermes `mithril-code` plugin CLI through a bounded native IPC adapter. It needs a current Agent installation and explicitly configured runner authority for the selected profile; it does not relay Desktop's Mithril bearer or another profile's API keys. Only the user's Assemble and verify action starts paid inference. Source/logic/receipt stay reviewable; unknown outcomes are not automatically retried. Fund PR492's registered free pilot and source publication remain independently gated. See `lat.md/mithril-code.md`.
+The Code sidebar screen invokes the owned Hermes mithril-code plugin through bounded native IPC. The selected profile's encrypted MITHRIL_API_KEY supplies its Mithril identity. Code generation calls api.mithril.fund through the owned typed-AST verifier; GitHub credentials stay separate. Model output must pass type/operation admission and 511 vectors. Unknown outcomes never retry. See lat.md/mithril-code.md.
 
 # Shared Code workspace publication
 

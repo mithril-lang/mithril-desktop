@@ -107,6 +107,7 @@ export default function MithrilChat({
         }}
         identityEpoch={`${profile}:${epoch}`}
         nativeImport={window.hermesAPI.nativeSessionImport}
+        historyFiles={window.hermesAPI.cloudChat.historyFiles}
         loadModels={() => window.hermesAPI.cloudChat.models()}
         loadRuntime={() => window.hermesAPI.cloudChat.runtime()}
         beforeConnect={async () => {

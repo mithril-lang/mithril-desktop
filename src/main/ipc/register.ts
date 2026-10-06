@@ -1,3 +1,4 @@
+import { synchronizeNativeHistory } from "../native-history-runtime";
 import {
   nativeRepositorySeed,
   nativeReplicaSnapshot,
@@ -1259,6 +1260,18 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("cloud-chat-models", (event) => {
     trustedWorkspaceSender(event);
     return cloudChat.models();
+  });
+  ipcMain.handle("cloud-chat-file-put", (event, owner, id, bytes) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.historyFiles.forOwner(owner).put(id, bytes);
+  });
+  ipcMain.handle("cloud-chat-file-get", (event, owner, id, digest) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.historyFiles.forOwner(owner).get(id, digest);
+  });
+  ipcMain.handle("cloud-chat-native-history-sync", (event) => {
+    trustedWorkspaceSender(event);
+    return synchronizeNativeHistory();
   });
   ipcMain.handle("cloud-chat-list", (event) => {
     trustedWorkspaceSender(event);

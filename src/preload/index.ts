@@ -156,6 +156,16 @@ const electronAPI = {
   },
 };
 
+function historyFilesForOwner(owner: string): CloudChatAPI["historyFiles"] {
+  return {
+    forOwner: historyFilesForOwner,
+    put: (id, bytes) =>
+      ipcRenderer.invoke("cloud-chat-file-put", owner, id, bytes),
+    get: (id, digest) =>
+      ipcRenderer.invoke("cloud-chat-file-get", owner, id, digest),
+  };
+}
+
 const hermesAPI = {
   // Installation
   checkInstall: (): Promise<{
@@ -321,6 +331,13 @@ const hermesAPI = {
       ipcRenderer.invoke("cloud-chat-native-import", id, choices),
   } satisfies NativeSessionImportAPI,
   cloudChat: {
+    syncNativeHistory: () =>
+      ipcRenderer.invoke("cloud-chat-native-history-sync"),
+    historyFiles: {
+      forOwner: historyFilesForOwner,
+      put: () => Promise.reject(Error("Chat attachment owner required")),
+      get: () => Promise.reject(Error("Chat attachment owner required")),
+    },
     runtime: () => ipcRenderer.invoke("cloud-chat-runtime"),
     legacySnapshot: () => ipcRenderer.invoke("cloud-chat-legacy-snapshot"),
     status: () => ipcRenderer.invoke("cloud-chat-status"),

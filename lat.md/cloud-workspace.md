@@ -115,10 +115,16 @@ The work-in-progress repository preserves nested data and reuses original Kanban
 
 [[src/main/cloud-workspace.ts#CloudWorkspace#repositoryPage]] and [[src/main/cloud-workspace.ts#CloudWorkspace#repositoryApply]] expose fixed, owner-checked rich-document routes. [[src/main/repository-kanban-runtime.ts#kanbanRepositorySeed]] reads supported profile boards without dispatching an agent, switching the selected board or writing SQLite. Paths and live execution locks remain device-only. Each device profile is durably bound to its first authorized migration owner; a different signed-in account cannot silently adopt that source. Shared Kanban seeding retains existing cloud records and tombstones. Native reads reject more than 1000 tasks per board or 20000 rows per relationship table instead of truncating or performing an unbounded scan.
 
-Continuous native reconciliation and cloud-to-native writes are not implemented. Full chat/attachments, project bytes, cron delivery/executor ownership and remaining original surfaces still gate removal of the existing native dialogs. Keep this distinction from released preview.21 behavior and from the full target above.
+Continuous reconciliation now supports existing Kanban metadata/comments/events. Rich chat archival is data-only and cloud-to-native history reconstruction is still outstanding. Project bytes, cron delivery/executor ownership and remaining original surfaces still gate removal of the existing native dialogs. Keep this distinction from released preview.21 behavior and from the full target above.
 
 ### Continuous replica reconciliation (draft)
 
 A three-way journal compares the last synchronized pair with the device and cloud versions.
 
 Workspace views share the same background loop; account/profile changes stop the old loop. Disjoint object fields merge, concurrent array/history changes require an explicit choice, and busy records defer without blocking other records. Native Kanban metadata, appended comments and status events use SQLite CAS and durable receipts. Paths, claims and agent execution authority remain device-owned. This slice does not yet synchronize new native board/task creation or dependency graphs/run history back to SQLite; those writes are deferred. Full chat/file/schedule migration and removal of remaining legacy dialogs are still outstanding.
+
+### Rich history archival (draft)
+
+Desktop now continuously archives native user/assistant messages, reasoning and tool arguments/results into canonical Chat sessions.
+
+The source profile is owner-bound. Fixed trusted IPC starts a background data-only pass; pending operations are atomically journaled before POST and recovered by receipt. Attached bytes use private owner/session R2 chunks, preserving MIME/name/size and content digests. The same Chat component renders these records and attachments on Web/Desktop. Busy sessions defer and conflicts keep native and cloud versions. This slice is not full bidirectional history sync: cloud-to-native cache reconstruction, deleted native session/item reconciliation, conflict resolution and removal of the remaining history/schedule dialogs are still required. No release has been published.

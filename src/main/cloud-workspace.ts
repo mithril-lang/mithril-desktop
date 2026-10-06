@@ -81,37 +81,51 @@ export class CloudWorkspace {
   private generation = 0;
   readonly files: ProjectFileTransport;
   constructor(private deps: Dependencies) {
-    this.files = createProjectFileTransport(async (path, init) => {
-      const session = await this.session(),
-        generation = this.generation;
-      if (
-        init?.method === "POST" &&
-        !session.scopes.includes(this.deps.writeScope ?? "workspace:write")
-      )
-        throw new Error("Workspace write scope required");
-      const response = await this.deps.fetch(`${this.deps.origin()}${path}`, {
-        ...init,
-        credentials: "omit",
-        redirect: "error",
-        signal: AbortSignal.timeout(60000),
-        headers: {
-          "x-mithril-workspace-owner": session.userId,
-          ...init?.headers,
-          authorization: `Bearer ${session.token}`,
-        },
-      });
-      const bytes = await response.arrayBuffer();
-      if (
-        generation !== this.generation ||
-        session.token !== this.deps.token() ||
-        session.profile !== this.deps.profile()
-      )
-        throw new Error("Account changed; file response discarded");
-      if (response.status === 401 || response.status === 403) this.reset(false);
-      return new Response(bytes, {
-        status: response.status,
-        headers: response.headers,
-      });
+    this.files = createProjectFileTransport((path, init) =>
+      this.authorizedBinaryRequest(path, init),
+    );
+  }
+  /** Owner/generation-checked bytes for fixed file routes; credentials stay in main. */
+  async authorizedBinaryRequest(
+    path: string,
+    init?: RequestInit,
+  ): Promise<Response> {
+    if (
+      !/^\/v1\/(?:workspace\/files(?:\/|$)|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
+        path,
+      ) ||
+      !["GET", "POST"].includes(init?.method ?? "GET")
+    )
+      throw Error("Unsupported binary route");
+    const session = await this.session(),
+      generation = this.generation;
+    if (
+      init?.method === "POST" &&
+      !session.scopes.includes(this.deps.writeScope ?? "workspace:write")
+    )
+      throw new Error("Workspace write scope required");
+    const response = await this.deps.fetch(`${this.deps.origin()}${path}`, {
+      ...init,
+      credentials: "omit",
+      redirect: "error",
+      signal: AbortSignal.timeout(60000),
+      headers: {
+        "x-mithril-workspace-owner": session.userId,
+        ...init?.headers,
+        authorization: `Bearer ${session.token}`,
+      },
+    });
+    const bytes = await response.arrayBuffer();
+    if (
+      generation !== this.generation ||
+      session.token !== this.deps.token() ||
+      session.profile !== this.deps.profile()
+    )
+      throw new Error("Account changed; file response discarded");
+    if (response.status === 401 || response.status === 403) this.reset(false);
+    return new Response(bytes, {
+      status: response.status,
+      headers: response.headers,
     });
   }
 

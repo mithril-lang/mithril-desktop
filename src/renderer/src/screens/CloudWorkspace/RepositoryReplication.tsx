@@ -14,6 +14,7 @@ export default function RepositoryReplication({
   const [owner, setOwner] = useState<string | null>(null);
   const [epoch, setEpoch] = useState(0);
   const [connectionNotice, setConnectionNotice] = useState("");
+  const [historyNotice, setHistoryNotice] = useState("");
   useEffect(
     () =>
       window.hermesAPI.onCloudWorkspaceAccountChanged(() => {
@@ -25,6 +26,7 @@ export default function RepositoryReplication({
   useEffect(() => {
     let active = true;
     setOwner(null);
+    setHistoryNotice("");
     if (enabled)
       void window.hermesAPI.cloudWorkspace
         .status()
@@ -47,6 +49,42 @@ export default function RepositoryReplication({
       active = false;
     };
   }, [profile, epoch, enabled]);
+  useEffect(() => {
+    if (!enabled || !owner) return;
+    let active = true,
+      busy = false;
+    const run = async (): Promise<void> => {
+      if (busy) return;
+      busy = true;
+      try {
+        const result = await window.hermesAPI.cloudChat.syncNativeHistory();
+        if (result.userId !== owner) throw Error("History owner changed");
+        if (active)
+          setHistoryNotice(
+            result.conflicts.length || result.deferred.length
+              ? locale.startsWith("ja")
+                ? `${result.conflicts.length + result.deferred.length} 件のチャットが同期の確認待ちです。元の履歴は保持されています。`
+                : `${result.conflicts.length + result.deferred.length} chats need synchronization review. Original history is retained.`
+              : "",
+          );
+      } catch (error) {
+        if (active)
+          setHistoryNotice(
+            error instanceof Error
+              ? error.message
+              : "History synchronization unavailable",
+          );
+      } finally {
+        busy = false;
+      }
+    };
+    void run();
+    const timer = setInterval(() => void run(), 20000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [enabled, owner, profile, epoch, locale]);
   const replication = useRepositoryReplication(
     owner,
     window.hermesAPI.cloudWorkspace.repository,
@@ -54,7 +92,7 @@ export default function RepositoryReplication({
     `${profile}:${epoch}`,
   );
   const ja = locale.startsWith("ja");
-  const notice = connectionNotice || replication.notice;
+  const notice = connectionNotice || replication.notice || historyNotice;
   if (
     !enabled ||
     (!notice && !replication.conflicts.length && !replication.deferred)

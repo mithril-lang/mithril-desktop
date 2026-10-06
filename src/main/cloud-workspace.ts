@@ -101,10 +101,16 @@ export class CloudWorkspace {
     init?: RequestInit,
   ): Promise<Response> {
     if (
-      !/^\/v1\/(?:workspace\/files(?:\/|$)|workspace\/resources\/capability\/[a-zA-Z0-9_-]{1,64}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
+      !/^\/v1\/(?:workspace\/files(?:\/|$)|workspace\/resources\/capability\/[a-zA-Z0-9_-]{1,128}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
         path,
       ) ||
-      !["GET", "POST"].includes(init?.method ?? "GET")
+      (!["GET", "POST"].includes(init?.method ?? "GET") &&
+        !(
+          init?.method === "HEAD" &&
+          /^\/v1\/workspace\/resources\/capability\/[a-zA-Z0-9_-]{1,128}\/chunks\/[a-f0-9]{64}$/.test(
+            path,
+          )
+        ))
     )
       throw Error("Unsupported binary route");
     const session = await this.session(),

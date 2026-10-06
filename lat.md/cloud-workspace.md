@@ -248,4 +248,14 @@ A separate owner-scoped Capability resource namespace in the Mithril API uses th
 
 The shared manifest retains original relative directories and executable attributes, rejects credential paths and file/directory collisions, and verifies byte digests and limits. The main-process [[src/main/cloud-workspace.ts#CloudWorkspace]] exposes the typed resource transport; bearer credentials remain in main, owner changes fail closed, and observing bytes never installs or runs them. Deleted Capability documents retain recovery reads but refuse new uploads.
 
-This is a storage foundation. Automatic native resource scanning, durable manifest-pointer CAS, bidirectional safe file application and original Skills adapter integration remain unfinished. No new namespace is published or automatically uploaded by this draft.
+The POSIX native replica now captures original directories and uploads immutable resources before publishing a pointer through repository CAS. Bidirectional safe file application, Windows capture and original Skills editor integration remain unfinished. This namespace remains unpublished.
+
+### Original Skill directory capture (draft)
+
+Skills now contribute a separate resource pointer to the existing native replication journal while preserving original Capability v1 descriptors.
+
+The main process uses a fixed isolated interpreter only to capture file data through no-follow directory descriptors. Original relative names, binary assets, scripts, references and executable flags survive capture; credential and dependency paths are excluded. Source metadata is checked before and after reads and a second directory traversal rejects changes. Unsafe or unsupported sources are retained rather than publishing partial manifests. Private temporary chunks are removed after each attempt.
+
+Immutable chunks and their manifest are uploaded through the fixed account-checked Mithril API before the resource pointer enters the durable repository outbox. Verified existing manifests avoid repeated uploads; identity checks surround each network step. API pointer edits require an existing owned manifest and use the existing repository CAS and receipts. This path stores data and never installs or executes a Skill.
+
+Native resource download/application and original Skills editor integration remain unfinished. Descriptor capture currently supports POSIX; Windows capture fails closed until an equivalent safe directory-handle implementation exists. Resource publication also requires the canonical Capability anchor to exist. Large legacy inline Capability bodies and this bootstrap need a versioned resource-backed adapter before full synchronization and release.

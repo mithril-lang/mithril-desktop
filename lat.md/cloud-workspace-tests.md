@@ -118,3 +118,9 @@ The fixed Capability snapshot retains full skill bodies and excludes explicit cr
 Capability resource uploads and downloads use the fixed Mithril API through the main process.
 
 Tests preserve binary content, owner and content-type headers, reject owner switches and unsupported namespaces, discard late account responses, and refuse uploads without workspace write scope. Storage reads never invoke installation or execution.
+
+## Original Skill resource capture
+
+Original Skill resources retain their actual category/directory tree, binary bytes, references and executable attributes without executing any script.
+
+Descriptor-based capture rejects symlinks, invalid Markdown, colliding paths and unavailable interpreters while retaining the source. Tests verify credential exclusions, stable manifests, staging cleanup, upload ordering, repeat-upload avoidance and account-change cancellation.

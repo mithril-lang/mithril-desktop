@@ -719,6 +719,61 @@ export async function nativeMemorySnapshot(): Promise<{
     throw Error("Workspace identity changed");
   return { userId: before.userId, profile: before.profile, documents };
 }
+/** Captures original Skill paths privately, uploads bytes, then leaves pointer CAS to the replica journal. */
+export async function nativeSkillResourceSnapshot(): Promise<
+  import("@mithril/workspace/replica-sync").ReplicaRecord
+> {
+  const before = await replicaContext();
+  const [
+    { HERMES_PYTHON },
+    { captureSkillResources, publishSkillResources },
+    { capabilityId },
+    { skillResourceId },
+  ] = await Promise.all([
+    import("./installer"),
+    import("./skill-resource-snapshot"),
+    import("@mithril/workspace/capability-data"),
+    import("@mithril/workspace/capability-resources"),
+  ]);
+  const guard = async (): Promise<void> => {
+    if (
+      JSON.stringify(before.context) !==
+      JSON.stringify(await cloudWorkspace.nativeContext(true))
+    )
+      throw Error("Workspace identity changed; Skill resources retained");
+  };
+  await guard();
+  const capture = captureSkillResources(
+    join(profileHome(before.profile), "skills"),
+    HERMES_PYTHON,
+    join(app.getPath("userData"), "repository-skill-captures"),
+    capabilityId(before.profile),
+  );
+  try {
+    const manifest = await publishSkillResources(
+      capture,
+      cloudWorkspace.capabilityResources.forOwner(before.userId),
+      guard,
+    );
+    const body = {
+      format: "mithril-skill-resources-v1",
+      profile: before.profile,
+      capabilityId: capture.manifest.capabilityId,
+      manifest,
+    };
+    return {
+      collection: "capability",
+      id: skillResourceId(before.profile),
+      body,
+      deleted: false,
+      version: createHash("sha256")
+        .update(repositoryFingerprint({ body, deleted: false }))
+        .digest("hex"),
+    };
+  } finally {
+    capture.dispose();
+  }
+}
 export async function nativeReplicaSnapshot(): Promise<
   import("@mithril/workspace/replica-sync").ReplicaSnapshot
 > {
@@ -790,6 +845,23 @@ export async function nativeReplicaSnapshot(): Promise<
       "Capability source requires synchronization review; original configuration is retained",
     );
   }
+  try {
+    const resources = await nativeSkillResourceSnapshot();
+    if (!snapshot.collections.includes("capability"))
+      snapshot.collections.push("capability");
+    const scopes = (snapshot.recordScopes ??= []);
+    let scope = scopes.find((row) => row.collection === "capability");
+    if (!scope) {
+      scope = { collection: "capability", ids: [] };
+      scopes.push(scope);
+    }
+    scope.ids.push(resources.id);
+    snapshot.documents.push(resources);
+  } catch {
+    snapshot.warnings!.push(
+      "Skill resource synchronization requires review or reconnect; original directories are retained",
+    );
+  }
   if (!snapshot.collections.length)
     throw Error("Native sources require synchronization review");
   if (
@@ -830,7 +902,19 @@ export async function nativeReplicaApply(
   )
     throw Error("Workspace identity changed");
   let result: import("@mithril/workspace/replica-sync").ReplicaResult;
-  if (write.document.collection === "capability") {
+  if (
+    write.document.collection === "capability" &&
+    write.document.id.startsWith("skill-resources-")
+  ) {
+    // Resource downloads need their own receipt-backed directory transaction, not the YAML writer.
+    result = {
+      schemaVersion: 1,
+      userId: before.userId,
+      replicaId: before.replicaId,
+      status: "deferred",
+      record: null,
+    };
+  } else if (write.document.collection === "capability") {
     const source = await nativeCapabilitySource();
     const [{ HERMES_PYTHON }, { applyCapabilityConfigReplica }] =
       await Promise.all([

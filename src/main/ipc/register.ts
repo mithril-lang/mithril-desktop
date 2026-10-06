@@ -131,6 +131,7 @@ import {
 import { mithrilFirstRunState } from "../first-run";
 import { MITHRIL_TOKEN_PLACEHOLDER } from "../secure-env";
 import { mithrilChat } from "../mithril-chat";
+import { codeHarness } from "../code-harness";
 import {
   cancelMithrilDeviceLogin,
   startMithrilDeviceLogin,
@@ -1194,6 +1195,11 @@ export function registerIpcHandlers(context: IpcContext): void {
   // First-run gate: local-only (no network) so an offline launch never blocks.
   ipcMain.handle("mithril-first-run-state", (_event, profile?: string) =>
     mithrilFirstRunState(profile?.trim() || getActiveProfileNameSync()),
+  );
+  ipcMain.handle(
+    "mithril-code",
+    (_event, action: unknown, goal: unknown, profile?: string) =>
+      codeHarness(action, goal, profile?.trim() || getActiveProfileNameSync()),
   );
   ipcMain.handle(
     "mithril-chat",

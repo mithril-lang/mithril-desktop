@@ -48,3 +48,5 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[cloud-workspace-tests]] — consent, scope, owner, offline and account-switch safety tests for the cloud workspace adapter.
 
 - [[canonical-chat]] — default Mithril API-only D1 sessions, explicit native import and native runtime boundaries.
+
+- [[mithril-code]] — profile-scoped System One coding through the Hermes plugin CLI, source review and real execution receipts.

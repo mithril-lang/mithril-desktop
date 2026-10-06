@@ -338,6 +338,11 @@ interface HermesAPI {
   ) => () => void;
   disconnectMithrilAccount: (profile?: string) => Promise<{ success: boolean }>;
   getMithrilFirstRunState: (profile?: string) => Promise<MithrilFirstRunState>;
+  codeHarness: (
+    action: "status" | "run",
+    goal: string,
+    profile?: string,
+  ) => Promise<import("../shared/code-harness").CodeHarnessResponse>;
   mithrilChat: (
     messages: { role: "user" | "assistant"; content: string }[],
     profile?: string,

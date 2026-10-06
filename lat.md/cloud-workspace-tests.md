@@ -333,3 +333,12 @@ Main-owned group restoration verifies selected files before SQL writes, rolls ba
 ## Attachment identity collision reconciliation
 
 Cloud attachment IDs map to private SQLite keys without overwriting another task. Updates, alias overlaps and removals preserve exact projections; missing mapped rows refuse publication.
+
+
+## Custom default board initialization
+
+A missing default database adopts custom cloud display metadata through a durable preparation, retaining private workdirs, file permissions, original schema and board selection.
+
+## Custom default board recovery
+
+Interrupted default publication resumes with owner-bound exact receipts. Concurrent original metadata or tasks are retained instead of overwritten, and complete snapshots wait for recovery.

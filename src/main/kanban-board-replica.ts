@@ -181,17 +181,42 @@ function initializeDefaultBoard(
   replicaId: string,
   write: ReplicaWrite,
   python: string,
+  replacementSupported: boolean,
 ): ReplicaResult {
   const result = (
     status: ReplicaResult["status"],
     record: ReplicaResult["record"] = null,
   ): ReplicaResult => ({ schemaVersion: 1, userId, replicaId, status, record });
   const observed = kanbanBoardRecord(root, "default", []);
-  if (
+  const custom =
     repositoryFingerprint({ body: observed.body, deleted: false }) !==
-    repositoryFingerprint(write.document)
-  )
+    repositoryFingerprint(write.document);
+  const metadata = join(root, "kanban", "boards", "default", "board.json");
+  if (custom && existsSync(metadata) && !replacementSupported)
     return result("deferred");
+  const before = existsSync(metadata) ? readFileSync(metadata, "utf8") : null;
+  if (
+    createHash("sha256")
+      .update(
+        JSON.stringify(
+          before === null ? ["default", []] : ["default", [], before],
+        ),
+      )
+      .digest("hex") !== observed.version
+  )
+    return result("conflict");
+  const desired = Object.fromEntries(
+    Object.entries(write.document.body as Record<string, JsonValue>).filter(
+      ([key]) => !["is_current", "total", "counts"].includes(key),
+    ),
+  );
+  if (before !== null) {
+    const original = JSON.parse(before.replace(/^\uFEFF/, ""));
+    if (Object.prototype.hasOwnProperty.call(original, "default_workdir"))
+      desired.default_workdir = original.default_workdir;
+  }
+  const bytes = JSON.stringify(desired) + "\n";
+  if (Buffer.byteLength(bytes) > 65536) return result("deferred");
   checked(root);
   const target = join(root, "kanban.db");
   checked(target);
@@ -203,21 +228,42 @@ function initializeDefaultBoard(
     const accepted = result("applied", {
       collection: "board",
       id: "default",
-      body: observed.body,
+      body: custom ? write.document.body : observed.body,
       deleted: false,
-      version: observed.version,
+      version: custom
+        ? createHash("sha256")
+            .update(JSON.stringify(["default", [], bytes]))
+            .digest("hex")
+        : observed.version,
     });
     const db = new Database(join(stage, "kanban.db"));
     try {
       db.exec(schema);
-      db.exec(
-        "CREATE TABLE mithril_replica_receipts(operation_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,receipt TEXT NOT NULL)",
-      );
-      db.prepare("INSERT INTO mithril_replica_receipts VALUES(?,?,?)").run(
-        write.operationId,
-        createHash("sha256").update(JSON.stringify(write)).digest("hex"),
-        JSON.stringify(accepted),
-      );
+      const fingerprint = createHash("sha256")
+        .update(JSON.stringify(write))
+        .digest("hex");
+      if (custom) {
+        db.exec(
+          "CREATE TABLE mithril_board_pending(operation_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,bytes TEXT NOT NULL,receipt TEXT NOT NULL,before_bytes TEXT,initial_version TEXT)",
+        );
+        db.prepare("INSERT INTO mithril_board_pending VALUES(?,?,?,?,?,?)").run(
+          write.operationId,
+          fingerprint,
+          bytes,
+          JSON.stringify(accepted),
+          before,
+          observed.version,
+        );
+      } else {
+        db.exec(
+          "CREATE TABLE mithril_replica_receipts(operation_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,receipt TEXT NOT NULL)",
+        );
+        db.prepare("INSERT INTO mithril_replica_receipts VALUES(?,?,?)").run(
+          write.operationId,
+          fingerprint,
+          JSON.stringify(accepted),
+        );
+      }
     } finally {
       db.close();
     }
@@ -231,6 +277,15 @@ function initializeDefaultBoard(
     if (status === "conflict") return result("conflict");
     if (status !== "applied")
       throw Error("Default board publication not confirmed");
+    if (custom)
+      return initializeKanbanBoardMetadata(
+        root,
+        userId,
+        replicaId,
+        write,
+        python,
+        replacementSupported,
+      );
     if (kanbanBoardRecord(root, "default", []).version !== observed.version)
       throw Error("Default board metadata changed; receipt retained");
     return accepted;
@@ -245,6 +300,7 @@ export function restoreKanbanBoard(
   replicaId: string,
   write: ReplicaWrite,
   python: string,
+  replacementSupported = false,
 ): ReplicaResult {
   const result = (
     status: ReplicaResult["status"],
@@ -287,7 +343,14 @@ export function restoreKanbanBoard(
   )
     return result("deferred");
   if (slug === "default")
-    return initializeDefaultBoard(root, userId, replicaId, write, python);
+    return initializeDefaultBoard(
+      root,
+      userId,
+      replicaId,
+      write,
+      python,
+      replacementSupported,
+    );
   const parent = join(root, "kanban", "boards"),
     target = join(parent, slug);
   checked(parent);
@@ -554,6 +617,7 @@ export function initializeKanbanBoardMetadata(
     bytes: string;
     receipt: string;
     before_bytes: string | null;
+    initial_version: string | null;
   };
   try {
     db.exec(
@@ -567,9 +631,19 @@ export function initializeKanbanBoardMetadata(
       ).some((row) => row.name === "before_bytes")
     )
       db.exec("ALTER TABLE mithril_board_pending ADD COLUMN before_bytes TEXT");
+    if (
+      !(
+        db.prepare("PRAGMA table_info(mithril_board_pending)").all() as {
+          name: string;
+        }[]
+      ).some((row) => row.name === "initial_version")
+    )
+      db.exec(
+        "ALTER TABLE mithril_board_pending ADD COLUMN initial_version TEXT",
+      );
     const pending = db
       .prepare(
-        "SELECT fingerprint,bytes,receipt,before_bytes FROM mithril_board_pending WHERE operation_id=?",
+        "SELECT fingerprint,bytes,receipt,before_bytes,initial_version FROM mithril_board_pending WHERE operation_id=?",
       )
       .get(write.operationId) as Pending | undefined;
     const desired = (before: string | null): string => {
@@ -600,7 +674,25 @@ export function initializeKanbanBoardMetadata(
         saved.userId !== userId ||
         saved.replicaId !== replicaId ||
         saved.record?.id !== slug ||
-        saved.status !== "applied"
+        saved.status !== "applied" ||
+        (journal.initial_version !== null &&
+          (slug !== "default" ||
+            write.expectedRecord !== null ||
+            write.expectedVersion !== null ||
+            journal.initial_version !==
+              createHash("sha256")
+                .update(
+                  JSON.stringify(
+                    journal.before_bytes === null
+                      ? [slug, []]
+                      : [slug, [], journal.before_bytes],
+                  ),
+                )
+                .digest("hex") ||
+            saved.record.version !==
+              createHash("sha256")
+                .update(JSON.stringify([slug, [], journal.bytes]))
+                .digest("hex")))
       )
         throw Error("Invalid board transaction owner");
     } else {
@@ -651,6 +743,7 @@ export function initializeKanbanBoardMetadata(
             bytes,
             receipt: JSON.stringify(accepted),
             before_bytes,
+            initial_version: null,
           };
           db.prepare(
             "INSERT INTO mithril_board_pending(operation_id,fingerprint,bytes,receipt,before_bytes) VALUES(?,?,?,?,?)",
@@ -691,7 +784,8 @@ export function initializeKanbanBoardMetadata(
         if (currentBytes !== retained.bytes) {
           if (
             currentBytes !== retained.before_bytes ||
-            observed.version !== write.expectedVersion
+            observed.version !==
+              (retained.initial_version ?? write.expectedVersion)
           )
             return abandon();
           if (retained.before_bytes !== null && !replacementSupported)

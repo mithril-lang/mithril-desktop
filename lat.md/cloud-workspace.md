@@ -492,3 +492,14 @@ Cloud attachment IDs now retain private SQLite aliases when another original tas
 The collision, later alias overlap, replacement and removal invariant is [[cloud-workspace-tests#Cloud workspace tests#Attachment identity collision reconciliation]]. Reads and synchronization do not execute files or tasks. Installed and multi-device qualification remain required.
 
 Local alias qualification: 2,626 Desktop tests / 281 files and 32 targeted storage/attachment tests passed. Node/web types, production build and lat check passed. Missing-credential fixture isolated from OPENROUTER_API_KEY. Previous head ac92654 passed GitHub CI run 37516920103. New-head CI, publication and installed qualification remain outstanding.
+
+
+## Custom default board initialization (draft)
+
+The original default Kanban database can now initialize with cloud display metadata through a durable recovery preparation.
+
+A privately staged full-schema database contains the owner/replica-bound preparation before exclusive DB publication. The original metadata transaction then publishes display settings under its existing lock and retains the receipt. A separate initial source version admits only this missing-default operation; subsequent task or metadata changes refuse unpublished adoption. Existing private default_workdir values, file permissions and current-board selection survive. Replacing existing metadata still requires the admitted original Agent writer.
+
+[[cloud-workspace-tests#Cloud workspace tests#Custom default board initialization]] and [[cloud-workspace-tests#Cloud workspace tests#Custom default board recovery]] cover original schema, exact projections, interruptions before and after metadata publication, lost acknowledgement and concurrent native edits. Source snapshots report pending recovery rather than partial completion. No Agent command, dispatch or board switch occurs.
+
+Custom default qualification: 2,628 Desktop tests / 281 files and 34 targeted board/storage tests passed. Node/web types, full lint and production build passed. The missing-credential fixture ran without OPENROUTER_API_KEY. Previous head 3aaf9c7 passed CI run 37517609935. New-head CI, publication and installed multi-device qualification remain outstanding.

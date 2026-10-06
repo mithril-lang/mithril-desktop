@@ -583,7 +583,12 @@ export function applyKanbanReplica(
         replicaId,
         attachmentProjection,
       );
-  if (write.document.collection === "board" && write.expectedRecord) {
+  if (
+    write.document.collection === "board" &&
+    (write.expectedRecord ||
+      (write.document.id === "default" &&
+        pendingKanbanBoards(root).includes("default")))
+  ) {
     return boardPython
       ? initializeKanbanBoardMetadata(
           root,
@@ -620,7 +625,14 @@ export function applyKanbanReplica(
   if (write.document.collection === "board") {
     if (observed) return result("conflict");
     return boardPython
-      ? restoreKanbanBoard(root, userId, replicaId, write, boardPython)
+      ? restoreKanbanBoard(
+          root,
+          userId,
+          replicaId,
+          write,
+          boardPython,
+          boardMetadataReplacement,
+        )
       : result("deferred");
   }
   if (write.document.collection !== "task") return result("deferred");

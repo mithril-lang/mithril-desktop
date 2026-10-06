@@ -790,3 +790,179 @@ it("recovers an interrupted replacement before source publication and does not o
   expect(pendingKanbanBoards(race.r)).toEqual([]);
   expect(original.length).toBeGreaterThan(0);
 });
+
+function customDefaultOperation(): ReplicaWrite {
+  const write = operation();
+  write.document.id = "default";
+  write.operationId = "custom-default-initialize";
+  write.document.body = {
+    ...(write.document.body as object),
+    slug: "default",
+    name: "Cloud default",
+  };
+  return write;
+}
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Custom default board initialization]]
+it("adopts custom default display metadata with the original schema, private settings and exact receipt", () => {
+  for (const original of [false, true]) {
+    const r = root(),
+      w = customDefaultOperation(),
+      file = join(r, "kanban", "boards", "default", "board.json");
+    mkdirSync(join(r, "kanban", "boards", "default"), { recursive: true });
+    if (original) {
+      writeFileSync(
+        file,
+        JSON.stringify({
+          slug: "default",
+          name: "Native title",
+          default_workdir: "/private/work",
+        }) + "\n",
+      );
+      chmodSync(file, 0o640);
+      expect(apply(r, w).status).toBe("deferred");
+      expect(existsSync(join(r, "kanban.db"))).toBe(false);
+    }
+    writeFileSync(join(r, "kanban", "current"), "another-board\n");
+    const accepted = applyKanbanReplica(
+      r,
+      "default",
+      "alice",
+      "replica",
+      w,
+      undefined,
+      undefined,
+      "/usr/bin/python3",
+      true,
+    );
+    expect(accepted.status).toBe("applied");
+    expect(pendingKanbanBoards(r)).toEqual([]);
+    expect(accepted.record).toEqual(
+      kanbanReplicaSnapshot(r, "default", "alice", "replica").documents.find(
+        (row) => row.id === "default",
+      ),
+    );
+    expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({
+      name: "Cloud default",
+      ...(original ? { default_workdir: "/private/work" } : {}),
+    });
+    if (original) expect(statSync(file).mode & 0o777).toBe(0o640);
+    expect(readFileSync(join(r, "kanban", "current"), "utf8")).toBe(
+      "another-board\n",
+    );
+    const db = new Database(join(r, "kanban.db"));
+    expect(db.prepare("SELECT count(*) AS n FROM tasks").get()).toEqual({
+      n: 0,
+    });
+    db.close();
+    expect(apply(r, w)).toEqual(accepted);
+  }
+});
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Custom default board recovery]]
+it("recovers default initialization after DB publication and preserves concurrent original metadata or task edits", () => {
+  for (const mutation of ["none", "published", "metadata", "task"]) {
+    const r = root(),
+      w = customDefaultOperation(),
+      wrapper = join(r, "interrupted-python"),
+      file = join(r, "kanban", "boards", "default", "board.json");
+    writeFileSync(
+      wrapper,
+      mutation === "published"
+        ? '#!/usr/bin/python3\nimport subprocess,sys\np=subprocess.run(["/usr/bin/python3",*sys.argv[1:]])\nsys.exit(71 if sys.argv[-1].endswith("board.json") else p.returncode)\n'
+        : '#!/usr/bin/python3\nimport subprocess,sys\np=subprocess.run(["/usr/bin/python3",*sys.argv[1:]])\nsys.exit(71)\n',
+    );
+    chmodSync(wrapper, 0o700);
+    expect(() =>
+      applyKanbanReplica(
+        r,
+        "default",
+        "alice",
+        "replica",
+        w,
+        undefined,
+        undefined,
+        wrapper,
+        true,
+      ),
+    ).toThrow();
+    expect(pendingKanbanBoards(r)).toEqual(["default"]);
+    expect(existsSync(file)).toBe(mutation === "published");
+    expect(() =>
+      kanbanReplicaSnapshot(r, "default", "alice", "replica"),
+    ).toThrow("requires recovery");
+    expect(() =>
+      applyKanbanReplica(
+        r,
+        "default",
+        "bob",
+        "replica",
+        w,
+        undefined,
+        undefined,
+        "/usr/bin/python3",
+        true,
+      ),
+    ).toThrow("owner");
+    expect(() =>
+      apply(r, {
+        ...w,
+        document: {
+          ...w.document,
+          body: { ...(w.document.body as object), name: "Other" },
+        },
+      }),
+    ).toThrow("reused");
+    if (mutation === "metadata") {
+      mkdirSync(join(r, "kanban", "boards", "default"), { recursive: true });
+      writeFileSync(
+        file,
+        JSON.stringify({
+          name: "Concurrent native",
+          default_workdir: "/private/new",
+        }),
+      );
+    }
+    if (mutation === "task") {
+      const db = new Database(join(r, "kanban.db"));
+      db.prepare(
+        "INSERT INTO tasks(id,title,status,created_at) VALUES('later','Retained task','todo',2)",
+      ).run();
+      db.close();
+    }
+    const accepted = applyKanbanReplica(
+      r,
+      "default",
+      "alice",
+      "replica",
+      w,
+      undefined,
+      undefined,
+      "/usr/bin/python3",
+      true,
+    );
+    expect(accepted.status).toBe(
+      ["none", "published"].includes(mutation) ? "applied" : "conflict",
+    );
+    expect(pendingKanbanBoards(r)).toEqual([]);
+    if (["none", "published"].includes(mutation)) {
+      expect(accepted.record).toEqual(
+        kanbanReplicaSnapshot(r, "default", "alice", "replica").documents.find(
+          (row) => row.id === "default",
+        ),
+      );
+      expect(apply(r, w)).toEqual(accepted);
+    }
+    if (mutation === "metadata")
+      expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({
+        name: "Concurrent native",
+        default_workdir: "/private/new",
+      });
+    if (mutation === "task") {
+      expect(existsSync(file)).toBe(false);
+      expect(
+        kanbanReplicaSnapshot(r, "default", "alice", "replica").documents.some(
+          (row) => row.collection === "task",
+        ),
+      ).toBe(true);
+    }
+  }
+});

@@ -308,6 +308,11 @@ const hermesAPI = {
     ipcRenderer.invoke("mithril-account-disconnect", profile),
   getMithrilFirstRunState: (profile?: string): Promise<MithrilFirstRunState> =>
     ipcRenderer.invoke("mithril-first-run-state", profile),
+  codeApi: (
+    path: string,
+    body?: Record<string, unknown>,
+    credentials?: import("@mithril/workspace/code").CodeCredentials,
+  ) => ipcRenderer.invoke("mithril-code-api", path, body, credentials),
   codeHarness: (action: "status" | "run", goal: string, profile?: string) =>
     ipcRenderer.invoke("mithril-code", action, goal, profile),
   mithrilChat: (

@@ -1,10 +1,13 @@
+import { applyResponseHeaders } from "../src/main/app/response-headers";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 
 const ROOT = join(__dirname, "..");
-// The production CSP header is injected from the main-process startup module.
-const mainSrc = readFileSync(join(ROOT, "src/main/app/start.ts"), "utf-8");
+// Exercise the production response policy used by the startup module.
+const mainSrc = applyResponseHeaders(
+  "file:///Applications/Mithril.app/index.html",
+)["Content-Security-Policy"][0];
 const rendererIndexHtml = readFileSync(
   join(ROOT, "src/renderer/index.html"),
   "utf-8",

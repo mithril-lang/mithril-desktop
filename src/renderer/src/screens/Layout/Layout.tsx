@@ -1,4 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import Code from "../Code/Code";
+import { Code2 } from "lucide-react";
 import CloudSecurity from "../CloudWorkspace/CloudSecurity";
 import Agents from "../Agents/Agents";
 import Tools from "../Tools/Tools";
@@ -55,6 +57,7 @@ import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 
 type View =
+  | "code"
   | "mithril-chat"
   | "workspace"
   | "projects"
@@ -885,6 +888,14 @@ function Layout({
                 </button>
               ))}
               <button
+                className={`sidebar-footer-action ${view === "code" ? "active" : ""}`}
+                onClick={() => goTo("code")}
+                aria-label="Code"
+                data-tooltip="Code"
+              >
+                <Code2 size={16} />
+              </button>
+              <button
                 className="sidebar-footer-action"
                 onClick={() => goTo("cloud-settings")}
                 aria-label={t("navigation.settings")}
@@ -983,6 +994,15 @@ function Layout({
             </div>
           )}
 
+          {visitedViews.has("code") && (
+            <div style={paneStyle("code")}>
+              <Code
+                key={activeProfile}
+                profile={activeProfile}
+                locale={locale}
+              />
+            </div>
+          )}
           {visitedViews.has("mithril-chat") && (
             <div style={paneStyle("mithril-chat")}>
               <MithrilChat

@@ -208,3 +208,14 @@ Confirmed account preferences apply through original presentation providers on i
 The shared workspace observes one live preferences record and delivers its acknowledged revision once per identity. Pending preferences edits suppress automatic application, and multiple legacy preference records remain visible for review instead of being selected by timestamps. Desktop [[src/renderer/src/screens/CloudWorkspace/CloudWorkspace.tsx#CloudWorkspace]] supplies the original Theme/I18n providers; Web uses its locale/theme providers. Observation does not queue writes or execute agents.
 
 This closes the existing read-side appearance/language gap. Full original preference fields, automatic provider-to-cloud writes, canonical record selection and default shared Settings routing remain required.
+
+
+### Canonical presentation settings and default modal (draft)
+
+The default repository Settings route mounts the original modal and four general panes with acknowledged cloud preference effects.
+
+An account-scoped rich `preferences/presentation` document stores original theme/font IDs, locale, rounded corners, completion sound, spellcheck choices and analytics consent. Portable preference records retain their existing IDs and schema. One legacy record contributes values on the first explicit edit; multiple records require review. Opening Settings never seeds data or restores tombstones.
+
+Observed revisions and durable operation receipts preserve offline edits and concurrent versions. Providers apply only acknowledged values. Preference refresh retries storage operations without executing agents, installations or schedules; identity cleanup stops the old synchronizer. [[src/renderer/src/screens/CloudWorkspace/CloudWorkspace.tsx#CloudWorkspace]] supplies original Theme, Font, ChatPreferences, I18n and analytics consumers, plus native GPU/dictionary availability.
+
+The five remaining default cloud Settings section adapters, automatic upload from the separate original native global Settings modal and full native cache reconciliation remain required. Browser notification/spellcheck effects also remain unfinished. Unit, route and build checks are draft source evidence; API/Web publication and installed-client verification remain separate release gates.

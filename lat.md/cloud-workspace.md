@@ -172,3 +172,12 @@ The original Tools, MCP editor and Skills browser now share one component body a
 Failed toolset changes do not falsely change the displayed enabled state. Skill storage failures exit loading and allow retry; load/detail epochs discard stale profile/API responses. Shared CSS and English/Japanese dictionaries support browser consumers. The default cloud route now mounts these original tabs against canonical per-profile descriptors and existing portable preferences. Native source snapshots preserve full skill bodies; env/auth values and skill filesystem paths are excluded. Reads never test or install tools. Editors hold captured revisions, offline saves retain durable operations, and tombstones require explicit restoration. Settings modal extraction is still unfinished.
 
 [[src/main/repository-kanban-runtime.ts#nativeCapabilitySnapshot]] binds the selected local profile to the signed-in owner, checks config size/encoding/consistency and reads installed skills in strict mode. Known credential-bearing descriptors and device command paths are retained locally with a visible warning. [[src/main/repository-kanban-runtime.ts#nativeReplicaSnapshot]] includes Capability source versions in three-way reconciliation. Cloud-to-native configuration application remains deferred unless the source already matches; safe writeback and secret references are required before claiming full bidirectional Capability synchronization. No production or installed-release proof is implied.
+
+
+### Original Settings modal and general panes (draft)
+
+Original modal navigation and general preference components now share one renderer body while platform ports own effects.
+
+[[src/renderer/src/components/settings/SettingsModal.tsx#SettingsModal]] wraps the shared nine-section modal while retaining the existing native SettingsDataContext and remaining panes. Appearance, Language, Notifications and Privacy wrappers inject providers, GPU and analytics APIs into shared components. Native theme/font registries re-export shared choices. The existing AppModal and Toggle paths also re-export the shared original bodies for every native consumer. Original CSS remains compatible; the shared package also exports the modal/preference styles and all theme palettes for browser consumers.
+
+The default cloud Settings route remains unfinished pending the other pane adapters and canonical preference synchronization. No native setting has been silently imported or cloud value falsely applied by this extraction.

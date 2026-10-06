@@ -615,36 +615,11 @@ export function providerRouteForEnvKey(envKey: string): {
 
 // ── Theme ───────────────────────────────────────────────
 
-export type ThemeAppearance = "dark" | "light";
-
-export interface ThemeDef {
-  /** Value written to localStorage and the `data-theme` attribute. */
-  id: string;
-  /** Display name shown in the picker (proper names are not translated). */
-  name: string;
-  /** Whether the palette is dark or light (drives the "System" fallback). */
-  appearance: ThemeAppearance;
-}
-
-/**
- * Registry of selectable themes. Each entry must have a matching
- * `[data-theme="<id>"]` block in `assets/main.css`. To add a theme, append an
- * entry here and define its CSS variables there — nothing else is required.
- */
-export const THEMES: ThemeDef[] = [
-  { id: "dark", name: "Dark", appearance: "dark" },
-  { id: "light", name: "Light", appearance: "light" },
-  { id: "dracula", name: "Dracula", appearance: "dark" },
-  { id: "nord", name: "Nord", appearance: "dark" },
-  { id: "one-dark", name: "One Dark", appearance: "dark" },
-  { id: "github-dark", name: "GitHub Dark", appearance: "dark" },
-  { id: "monokai", name: "Monokai", appearance: "dark" },
-  { id: "solarized-dark", name: "Solarized Dark", appearance: "dark" },
-  { id: "gruvbox-dark", name: "Gruvbox Dark", appearance: "dark" },
-  { id: "tokyo-night", name: "Tokyo Night", appearance: "dark" },
-  { id: "github-light", name: "GitHub Light", appearance: "light" },
-  { id: "solarized-light", name: "Solarized Light", appearance: "light" },
-];
+export {
+  THEMES,
+  type ThemeDef,
+  type ThemeAppearance,
+} from "@mithril/workspace/desktop-settings";
 
 /**
  * Legacy options retained for older callers/tests that only distinguish between
@@ -667,26 +642,10 @@ export const THEME_STORAGE_KEY = "hermes-theme";
 // Each option maps to a full font-family stack assigned to `--font-sans`.
 // "manrope" is the bundled default; the rest fall back to OS-installed
 // families with a sane sans-serif chain so something always renders.
-export interface FontOption {
-  value: string;
-  label: string;
-  stack: string;
-}
-
-export const FONT_OPTIONS: FontOption[] = [
-  {
-    value: "manrope",
-    label: "settings.font.manrope",
-    stack:
-      '"Cairo", "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-  {
-    value: "gsans",
-    label: "settings.font.gsans",
-    stack:
-      '"Google Sans", "Google Sans Text", "Product Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, "Helvetica Neue", sans-serif',
-  },
-];
+export {
+  FONT_OPTIONS,
+  type FontOption,
+} from "@mithril/workspace/desktop-settings";
 
 export const DEFAULT_FONT = "manrope";
 

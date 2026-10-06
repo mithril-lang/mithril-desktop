@@ -134,3 +134,9 @@ The source profile is owner-bound. Fixed trusted IPC starts a background data-on
 The original Desktop timeline now reads a cloud projection layered over the unchanged agent message data.
 
 [[src/main/native-history-cache.ts#replaceNativeHistoryCache]] checks the native snapshot under an immediate SQLite transaction before updating the cache. [[src/main/native-history-cache.ts#mergeNativeHistoryCache]] applies cloud text, reasoning, tool evidence, attachment bytes and tombstones only while the source item matches its saved native baseline. New device edits bypass stale overlays. Cache rows are owner-bound and become invisible on account invalidation; verified attachment bytes are stored in private owner-specific files. Separate native/cloud fingerprints in the durable replication journal prevent pulling a cloud edit and then echoing the old device text back. Data restoration never writes messages/executions or runs an agent. Native item removals become cloud tombstones. Full remote-only session reconstruction, title/deletion migration, conflict resolution and UI separation removal remain unfinished.
+
+### Original Markdown rendering
+
+The original Desktop Markdown component is shared with Web; a display-only normalization restores structurally unambiguous tables whose source lost newlines.
+
+Stored replies remain unchanged. The shared workspace normalizer leaves ordinary GFM, fenced examples, inline code and inconsistent column counts untouched. This repairs historical one-line tables without replacing the original renderer or changing their contents.

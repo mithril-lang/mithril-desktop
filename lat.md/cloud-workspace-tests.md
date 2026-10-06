@@ -96,3 +96,7 @@ Tests cover repeated snapshots, native edits, lost acknowledgements, retained cl
 ## Cloud history working cache
 
 Cloud edits and tombstones update the original Desktop timeline through a checked cache without changing agent messages or executions. Native changes invalidate stale overlays; separate baselines prevent stale echo after restart.
+
+## Original Markdown table rendering
+
+Flattened archived tables with a consistent GFM separator render as a table through the same Desktop/Web Markdown component. Fenced examples and ambiguous pipes remain literal; stored transcript text is unchanged.

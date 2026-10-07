@@ -67,14 +67,23 @@ export default function RepositoryReplication({
         .catch((error) => {
           if (active)
             setConnectionNotice(
-              error instanceof Error ? error.message : String(error),
+              error instanceof Error &&
+                /Cloud connection requires explicit|sign.in expired|Sign in to your Mithril account first/i.test(
+                  error.message,
+                )
+                ? locale.startsWith("ja")
+                  ? "Mithril にサインインして同期を続けてください。"
+                  : "Sign in to Mithril to resume synchronization."
+                : locale.startsWith("ja")
+                  ? "同期に接続できません。接続を確認してください。"
+                  : "Synchronization unavailable. Check your connection.",
             );
         });
     return () => {
       active = false;
       generation.current++;
     };
-  }, [profile, epoch, enabled]);
+  }, [profile, epoch, enabled, locale]);
   useEffect(() => {
     if (!enabled || !owner) return;
     let active = true,

@@ -651,3 +651,11 @@ The pinned workspace 0.6.21-schedules.4 archive was produced from Fund source `b
 The private replica journal retains an operation's exact bound Native source before restoration, so restarting never recomputes a different target for a retained Agent receipt.
 
 [[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#retain]] stores the exact portable request, Native target and SHA under the coordinator lock. Reused IDs with changed source, CAS or scope refuse; identical retries skip binding. [[src/main/original-schedule-native-port.ts#BoundOriginalScheduleNativePort]] requires this target store. Concrete resource resolution and lifecycle mounting remain incomplete.
+
+### New Chat without connection gating
+
+The shared sidebar opens an empty Chat without waiting for cloud identity or model discovery; the first submitted message creates the session through the existing canonical outbox.
+
+Normal workspace screens and the Desktop sidebar no longer expose Device data/history migration sections. [[src/renderer/src/screens/CloudWorkspace/RepositoryReplication.tsx#RepositoryReplication]] continues background owner-scoped synchronization. [[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx]] shows a readable sign-in action instead of raw scope errors. Authentication and permissions remain enforced; no tokens gain scopes automatically.
+
+The New Chat candidate pins workspace 0.6.23-schedules.2 from Fund b8f68349, SHA256 `8e17de27e7930368fbaed553c6143a0a3395e5c6f4c461fa5e35280d79f8b699`. The immutable archive contains 411 files and was packed only after the completed build; it remains a draft dependency pending production publication.

@@ -466,3 +466,7 @@ An account change while binding is awaited prevents the old source from reaching
 ## Durable original schedule binding targets
 
 A real private SQLite journal preserves the exact bound target after restart, never calls the binder on receipt replay, and refuses changed operation CAS or writes outside the coordinator lock.
+
+## New Chat before sign-in
+
+The shared New Chat action navigates before cloud authentication or model discovery and creates no empty cloud session. A failed Native identity check displays readable sign-in guidance without sending a turn.

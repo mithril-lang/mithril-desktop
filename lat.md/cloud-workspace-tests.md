@@ -688,3 +688,12 @@ The real child-process transport accepts only the exact request's finite status 
 The Native port executes harmless scripts through the actual Agent in isolated A→B→A homes. Replays retain the original result without changing files or repeating effects; stale full-source versions refuse execution.
 
 This explicit local qualification requires `MITHRIL_AGENT_SOURCE_RUN_CHECKOUT` and `MITHRIL_AGENT_SOURCE_RUN_PYTHON` test inputs. CI without that checkout skips this qualification rather than substituting a fake CLI. It does not prove installed-client or production operation.
+
+
+## Original manual main transport receipts
+
+Real HTTP A/B/A take/report requests retain exact source and operation identity; malformed, foreign, oversized, redirected and lost replies refuse confirmation without retry. Replayed, empty and source-refused takes cannot grant fresh permission.
+
+## Original manual main transport identity fence
+
+Missing execution grants never upgrade the credential or send manual commands. Spoofed owner fields refuse before transmission; account/profile changes during streamed responses discard stale receipts.

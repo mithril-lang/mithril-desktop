@@ -53,7 +53,7 @@ async function peer(): Promise<Peer> {
     for await (const bytes of req) text += bytes.toString();
     const command = JSON.parse(text);
     calls.push({ path: req.url!, token: auth, command });
-    const receipt: Record<string, unknown> = {
+    let receipt: Record<string, unknown> = {
       userId,
       profile: command.profile,
     };
@@ -74,6 +74,39 @@ async function peer(): Promise<Peer> {
         operationId: command.operationId,
         changed: mode !== "replay",
       });
+    if (req.url === "/v1/schedules/original/manual") {
+      const { action: _action, ...input } = command;
+      const manual = {
+        userId,
+        profile,
+        jobId: "original-job",
+        operationId: "original-operation",
+        sourceRevision: 2,
+        sourceDigest: "a".repeat(64),
+        status: "unknown",
+      };
+      receipt =
+        command.action === "complete"
+          ? { userId, ...input }
+          : mode === "empty"
+            ? { fresh: false, request: null }
+            : mode === "source-refused"
+              ? { fresh: false, request: { ...manual, status: "rejected" } }
+              : {
+                  fresh: mode !== "replay",
+                  request: manual,
+                  authorityRevision: 1,
+                };
+      if (mode === "foreign") {
+        if (command.action === "take")
+          (receipt.request as Record<string, unknown>).userId = "foreign-owner";
+        else receipt.userId = "foreign-owner";
+      }
+      if (mode === "fresh-empty") receipt = { fresh: true, request: null };
+      if (mode === "fresh-completed")
+        (receipt.request as Record<string, unknown>).status = "completed";
+      if (mode === "operation") receipt.operationId = "other-operation";
+    }
     if (mode === "foreign") receipt.userId = "foreign-owner";
     if (mode === "profile") receipt.profile = "other-profile";
     if (mode === "extra") receipt.private = "private-response";
@@ -285,6 +318,139 @@ it("requires existing scopes and rejects supplied identities or changed accounts
       const waiting = p.paused();
       const result = p.cloud.originalScheduleCustody({
         action: "status",
+        profile: "default",
+      });
+      const rejected = expect(result).rejects.toThrow("account changed");
+      await waiting;
+      change();
+      p.release();
+      await rejected;
+    }
+    expect(p.calls).toHaveLength(2);
+  } finally {
+    await p.close();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Original manual main transport receipts]]
+it("takes and reports exact account-bound manual identities over real HTTP without redelivering a replay", async () => {
+  const p = await peer();
+  const complete = {
+    action: "complete" as const,
+    profile: "default",
+    jobId: occurrence.jobId,
+    operationId: occurrence.operationId,
+    sourceRevision: 2,
+    sourceDigest: occurrence.sourceDigest,
+    status: "completed" as const,
+  };
+  try {
+    for (const owner of ["a", "b", "a"] as const) {
+      p.identity(owner);
+      await p.cloud.enable();
+      p.mode("normal");
+      expect(
+        await p.cloud.originalScheduleManual({
+          action: "take",
+          profile: "default",
+        }),
+      ).toMatchObject({
+        fresh: true,
+        authorityRevision: 1,
+        request: { userId: owner, status: "unknown" },
+      });
+      expect(await p.cloud.originalScheduleManual(complete)).toEqual({
+        userId: owner,
+        profile: "default",
+        jobId: complete.jobId,
+        operationId: complete.operationId,
+        sourceRevision: 2,
+        sourceDigest: complete.sourceDigest,
+        status: "completed",
+      });
+      expect(p.calls.at(-1)).toEqual({
+        path: "/v1/schedules/original/manual",
+        token: `Bearer mf_${owner.repeat(43)}`,
+        command: complete,
+      });
+    }
+    for (const mode of [
+      "foreign",
+      "extra",
+      "oversize",
+      "lost",
+      "redirect",
+      "fresh-empty",
+      "fresh-completed",
+    ]) {
+      p.mode(mode);
+      const count = p.calls.length;
+      await expect(
+        p.cloud.originalScheduleManual({ action: "take", profile: "default" }),
+      ).rejects.toThrow();
+      expect(p.calls).toHaveLength(count + 1);
+    }
+    p.mode("operation");
+    await expect(p.cloud.originalScheduleManual(complete)).rejects.toThrow(
+      "receipt unconfirmed",
+    );
+    p.mode("replay");
+    expect(
+      await p.cloud.originalScheduleManual({
+        action: "take",
+        profile: "default",
+      }),
+    ).toMatchObject({ fresh: false });
+    p.mode("source-refused");
+    expect(
+      await p.cloud.originalScheduleManual({
+        action: "take",
+        profile: "default",
+      }),
+    ).toMatchObject({
+      fresh: false,
+      request: { status: "rejected" },
+    });
+    p.mode("empty");
+    expect(
+      await p.cloud.originalScheduleManual({
+        action: "take",
+        profile: "default",
+      }),
+    ).toEqual({ fresh: false, request: null });
+  } finally {
+    await p.close();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Original manual main transport identity fence]]
+it("refuses manual scope expansion and drops results after account/profile changes", async () => {
+  const p = await peer();
+  try {
+    p.allowed(["workspace:read", "workspace:write"]);
+    await p.cloud.enable();
+    await expect(
+      p.cloud.originalScheduleManual({ action: "take", profile: "default" }),
+    ).rejects.toThrow("authorization required");
+    expect(p.calls).toHaveLength(0);
+    await expect(
+      p.cloud.originalScheduleManual({
+        action: "take",
+        profile: "default",
+        owner: "spoof",
+      } as never),
+    ).rejects.toThrow("Invalid original");
+    p.allowed(scopes);
+    for (const change of [
+      () => p.identity("b"),
+      () => p.identity("a", "other"),
+    ]) {
+      p.identity("a");
+      p.mode("pause");
+      await p.cloud.enable();
+      const waiting = p.paused();
+      const result = p.cloud.originalScheduleManual({
+        action: "take",
         profile: "default",
       });
       const rejected = expect(result).rejects.toThrow("account changed");

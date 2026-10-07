@@ -67,6 +67,14 @@ import {
   type OriginalScheduleCustodyReceipt,
 } from "./original-schedule-custody";
 
+import {
+  ORIGINAL_MANUAL_BYTES,
+  validOriginalManualCommand,
+  validOriginalManualResult,
+  type OriginalManualCommand,
+  type OriginalManualResult,
+} from "./original-schedule-manual";
+
 interface Dependencies {
   token(): string | null;
   profile(): string;
@@ -665,6 +673,38 @@ export class CloudWorkspace {
       ORIGINAL_SCHEDULE_CUSTODY_BYTES,
     );
     if (!validOriginalScheduleCustodyReceipt(value, session.userId, request))
+      throw Error("Schedule execution receipt unconfirmed");
+    return value;
+  }
+  /** Main-only manual consumer; never retries a lost take or invents an executor. */
+  // @lat: [[cloud-workspace#Original manual main consumer transport (draft)]]
+  async originalScheduleManual(
+    command: OriginalManualCommand,
+  ): Promise<OriginalManualResult> {
+    if (
+      !validOriginalManualCommand(command) ||
+      command.profile !== this.deps.profile()
+    )
+      throw Error("Invalid original manual execution command");
+    const input = structuredClone(command);
+    const session = await this.session();
+    if (session.profile !== input.profile)
+      throw Error("Workspace account changed; schedule request discarded");
+    if (
+      !["workspace:write", "chat:write", "inference"].every((scope) =>
+        session.scopes.includes(scope),
+      )
+    )
+      throw Error("Original schedule execution authorization required");
+    const value = await this.request(
+      "/v1/schedules/original/manual",
+      session.token,
+      session.profile,
+      input,
+      15000,
+      ORIGINAL_MANUAL_BYTES,
+    );
+    if (!validOriginalManualResult(value, session.userId, input))
       throw Error("Schedule execution receipt unconfirmed");
     return value;
   }

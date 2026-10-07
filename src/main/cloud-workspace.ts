@@ -59,6 +59,13 @@ import {
 } from "@mithril/workspace/protocol";
 import type { CloudWorkspaceStatus } from "../shared/workspace";
 import { createHash } from "crypto";
+import {
+  ORIGINAL_SCHEDULE_CUSTODY_BYTES,
+  validOriginalScheduleCustodyCommand,
+  validOriginalScheduleCustodyReceipt,
+  type OriginalScheduleCustodyCommand,
+  type OriginalScheduleCustodyReceipt,
+} from "./original-schedule-custody";
 
 interface Dependencies {
   token(): string | null;
@@ -305,6 +312,7 @@ export class CloudWorkspace {
     profile: string,
     body?: unknown,
     timeoutMs = 15000,
+    responseLimit?: number,
   ): Promise<unknown> {
     const generation = this.generation;
     if (token !== this.deps.token() || profile !== this.deps.profile()) {
@@ -344,7 +352,40 @@ export class CloudWorkspace {
     }
     if (!response.ok)
       throw new Error(`Workspace request failed (${response.status})`);
-    const value: unknown = await response.json().catch(() => null);
+    let value: unknown;
+    if (responseLimit !== undefined) {
+      if (Number(response.headers.get("content-length") ?? 0) > responseLimit) {
+        await response.body?.cancel().catch(() => {});
+        throw Error("Schedule execution receipt unconfirmed");
+      }
+      const reader = response.body?.getReader();
+      const parts: Uint8Array[] = [];
+      let size = 0;
+      try {
+        if (reader)
+          for (;;) {
+            const { done, value: part } = await reader.read();
+            if (done) break;
+            size += part.length;
+            if (size > responseLimit)
+              throw Error("Schedule execution receipt unconfirmed");
+            parts.push(part);
+          }
+        const bytes = new Uint8Array(size);
+        let offset = 0;
+        for (const part of parts) {
+          bytes.set(part, offset);
+          offset += part.length;
+        }
+        value = JSON.parse(
+          new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+        );
+      } catch {
+        throw Error("Schedule execution receipt unconfirmed");
+      } finally {
+        await reader?.cancel().catch(() => {});
+      }
+    } else value = await response.json().catch(() => null);
     if (generation !== this.generation) {
       throw new Error("Workspace account changed; stale response discarded");
     }
@@ -567,6 +608,43 @@ export class CloudWorkspace {
     )
       throw Error("Schedule snapshot rejected");
     return snapshot;
+  }
+  /** Main-only original schedule custody. No renderer IPC, scope upgrade or mutation retry. */
+  // @lat: [[cloud-workspace#Original schedule main execution transport (draft)]]
+  async originalScheduleCustody(
+    command: OriginalScheduleCustodyCommand,
+  ): Promise<OriginalScheduleCustodyReceipt> {
+    if (
+      !validOriginalScheduleCustodyCommand(command) ||
+      command.profile !== this.deps.profile()
+    )
+      throw Error("Invalid original schedule execution command");
+    const request = structuredClone(command);
+    if (
+      new TextEncoder().encode(JSON.stringify(request)).length >
+      ORIGINAL_SCHEDULE_CUSTODY_BYTES
+    )
+      throw Error("Invalid original schedule execution command");
+    const session = await this.session();
+    if (session.profile !== request.profile)
+      throw Error("Workspace account changed; schedule request discarded");
+    if (
+      !["workspace:write", "chat:write", "inference"].every((scope) =>
+        session.scopes.includes(scope),
+      )
+    )
+      throw Error("Original schedule execution authorization required");
+    const value = await this.request(
+      "/v1/schedules/original/execution",
+      session.token,
+      session.profile,
+      request,
+      15000,
+      ORIGINAL_SCHEDULE_CUSTODY_BYTES,
+    );
+    if (!validOriginalScheduleCustodyReceipt(value, session.userId, request))
+      throw Error("Schedule execution receipt unconfirmed");
+    return value;
   }
   async applySchedule(operation: ScheduleEdit): Promise<ScheduleResult> {
     if (!validScheduleEdit(operation)) throw Error("Invalid schedule edit");

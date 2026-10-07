@@ -439,6 +439,14 @@ The original source transport uses only schedule-source resource IDs and the fix
 
 Credentials and owner headers stay in main; wrong-owner responses, account changes and missing write scopes refuse access before storing bytes. It does not register a Capability, grant execution or automatically publish Native data.
 
+## Original schedule main execution receipts
+
+Real HTTP A/B/A requests preserve the original occurrence identity and accept only exact current-owner receipts. Foreign, extra, oversized, redirected and lost receipts cannot confirm an execution; mutations never retry.
+
+## Original schedule main execution identity fence
+
+Existing execution grants are required before custody requests. Caller-supplied identities, invalid instants and transitions are refused, and account/profile changes during response streaming discard stale receipts.
+
 ## Durable original schedule replica journal
 
 A committed pending operation retains exact source bytes and identity after external failure and store reopening. Files remain private.

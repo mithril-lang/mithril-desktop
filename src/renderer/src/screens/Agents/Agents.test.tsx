@@ -1,6 +1,13 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../components/useI18n", () => ({
   useI18n: () => ({
@@ -59,12 +66,24 @@ function installHermesAPI(): {
   createProfile: ReturnType<typeof vi.fn>;
   deleteProfile: ReturnType<typeof vi.fn>;
   setActiveProfile: ReturnType<typeof vi.fn>;
+  cloudWorkspace: {
+    status: ReturnType<typeof vi.fn>;
+    enable: ReturnType<typeof vi.fn>;
+  };
+  getAgentSyncStatus: ReturnType<typeof vi.fn>;
+  syncAgents: ReturnType<typeof vi.fn>;
 } {
   const api = {
     listProfiles: vi.fn(),
     createProfile: vi.fn(),
     deleteProfile: vi.fn(),
     setActiveProfile: vi.fn(),
+    cloudWorkspace: {
+      status: vi.fn().mockResolvedValue({ userId: "alice", enabled: true }),
+      enable: vi.fn(),
+    },
+    getAgentSyncStatus: vi.fn(),
+    syncAgents: vi.fn(),
   };
   Object.defineProperty(window, "hermesAPI", {
     configurable: true,
@@ -72,6 +91,11 @@ function installHermesAPI(): {
   });
   return api;
 }
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("Agents profile creation", () => {
   it("refreshes profiles after a failed create so ambiguous successes appear", async () => {
@@ -118,4 +142,106 @@ describe("Agents profile creation", () => {
   // Profile deletion (optimistic hide + rollback on failure) moved out of the
   // Agents screen into the ProfileModal danger zone, so its rendering tests no
   // longer belong here. The Agents screen only opens that modal now.
+});
+
+describe("Agents canonical workspace identity", () => {
+  // @lat: [[cloud-workspace-tests#Cloud workspace tests#Agents failed initial list]]
+  it("leaves loading after a listing failure and recovers through refresh", async () => {
+    const api = installHermesAPI();
+    api.listProfiles
+      .mockRejectedValueOnce(Error("Profile list unavailable"))
+      .mockResolvedValue([profile("default", true)]);
+    render(
+      <Agents
+        activeProfile="default"
+        onSelectProfile={() => {}}
+        onChatWith={() => {}}
+      />,
+    );
+    await screen.findByText("Profile list unavailable");
+    fireEvent.click(screen.getByText("common.refresh"));
+    await screen.findByText("default");
+    expect(screen.queryByText("Profile list unavailable")).toBeNull();
+    expect(api.listProfiles).toHaveBeenCalledTimes(2);
+  });
+
+  // @lat: [[cloud-workspace-tests#Cloud workspace tests#Agents canonical identity]]
+  it("keeps the original list without retired sync or a separate workspace button", async () => {
+    const api = installHermesAPI();
+    api.listProfiles.mockResolvedValue([profile("default", true)]);
+    render(
+      <Agents
+        activeProfile="default"
+        onSelectProfile={() => {}}
+        onChatWith={() => {}}
+      />,
+    );
+    await waitFor(() =>
+      expect(api.cloudWorkspace.status).toHaveBeenCalledOnce(),
+    );
+    await screen.findByText("default");
+    expect(api.getAgentSyncStatus).not.toHaveBeenCalled();
+    expect(api.syncAgents).not.toHaveBeenCalled();
+    expect(screen.queryByText("agents.syncSignedOut")).toBeNull();
+    expect(screen.queryByText("Open Cloud Workspace")).toBeNull();
+  });
+
+  // @lat: [[cloud-workspace-tests#Cloud workspace tests#Agents identity retry]]
+  it("retries an identity transport failure without claiming the user signed out", async () => {
+    const api = installHermesAPI();
+    api.listProfiles.mockResolvedValue([profile("default", true)]);
+    api.cloudWorkspace.status.mockRejectedValueOnce(
+      Error("Connection temporarily unavailable"),
+    );
+    render(
+      <Agents
+        activeProfile="default"
+        onSelectProfile={() => {}}
+        onChatWith={() => {}}
+      />,
+    );
+    await screen.findByText("Connection temporarily unavailable");
+    expect(screen.queryByText("agents.syncSignedOut")).toBeNull();
+    fireEvent.click(screen.getByText("common.retry"));
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Connection temporarily unavailable"),
+      ).toBeNull(),
+    );
+    expect(api.cloudWorkspace.status).toHaveBeenCalledTimes(2);
+    expect(api.syncAgents).not.toHaveBeenCalled();
+  });
+
+  // @lat: [[cloud-workspace-tests#Cloud workspace tests#Agents background list refresh]]
+  it("refreshes working copies without overlapping polls and stops on unmount", async () => {
+    vi.useFakeTimers();
+    const api = installHermesAPI();
+    api.listProfiles.mockResolvedValueOnce([profile("default", true)]);
+    const view = render(
+      <Agents
+        activeProfile="default"
+        onSelectProfile={() => {}}
+        onChatWith={() => {}}
+      />,
+    );
+    await act(async () => {});
+    let resolveList!: (value: ProfileInfo[]) => void;
+    api.listProfiles.mockImplementationOnce(
+      () =>
+        new Promise<ProfileInfo[]>((resolve) => {
+          resolveList = resolve;
+        }),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(api.listProfiles).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      resolveList([profile("default", true), profile("remote-edit")]);
+    });
+    expect(screen.getByText("remote-edit")).toBeTruthy();
+    view.unmount();
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(api.listProfiles).toHaveBeenCalledTimes(2);
+  });
 });

@@ -944,3 +944,19 @@ An identity transport error remains retryable in the original shared pane withou
 ## Canonical profile Sync stale identity
 
 An old account identity resolving after an account-change refresh cannot mount or request another repository synchronization pass.
+
+## Agents canonical identity
+
+The original Agents list uses validated workspace identity, never retired agent-sync handlers or a separate Cloud Workspace entry.
+
+## Agents identity retry
+
+Transport failures retain the original list and allow identity retry without reporting the account as signed out.
+
+## Agents background list refresh
+
+Authenticated list refresh observes background working-copy changes without overlapping reads; unmount stops polling and rejects late results.
+
+## Agents failed initial list
+
+A failed initial profile read leaves loading and exposes refresh so the original list can recover without revisiting the screen.

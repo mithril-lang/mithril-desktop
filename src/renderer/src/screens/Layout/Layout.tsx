@@ -896,7 +896,6 @@ function Layout({
                 activeProfile={activeProfile}
                 onSelectProfile={handleSelectProfile}
                 onChatWith={handleChatWithProfile}
-                onCloudWorkspace={() => goTo("workspace")}
               />
             </div>
           )}

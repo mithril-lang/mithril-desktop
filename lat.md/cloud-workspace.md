@@ -1045,3 +1045,9 @@ The original Sync pane now uses the same account-bound repository lifecycle as W
 Workspace `0.6.29-schedules.19` exposes RepositoryProfileSync with owner-fenced background refresh, real repository metadata verification and explicit retry. Native obtains the current cloudWorkspace identity, enables only existing authorized workspace access, and invalidates late authentication on account/profile changes. Transient failures do not display the sign-in hint. Native tests exercise the actual shared repository component and verify that no retired agent-sync bridge is called. Full synchronization, public API/Web and installed behavior remain unfinished.
 
 The canonical Sync candidate archive has 447 files with SHA256 `c66061dd0712f5f3d00010dce62c6577fdfedf346103a44e1e81497febfa2d5c`; producer, package and installed bytes are compared independently.
+
+## Original Agents canonical connection (draft)
+
+The original Agents list and profile Sync pane share one canonical workspace identity hook, retaining native profile operations while removing the separate workspace button.
+
+The hook fences old account/profile responses and enables only already authorized workspace access. The list no longer invokes retired agent-sync handlers that always report signed out. Authenticated working copies refresh every 20 seconds without overlapping background reads; transport failures preserve the list and expose retry. This does not yet materialize cloud-only profiles or prove full Web list parity, production publication or installed synchronization.

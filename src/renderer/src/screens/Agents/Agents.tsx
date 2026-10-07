@@ -5,10 +5,7 @@ import { AppModal, AppModalTitle } from "../../components/modal/AppModal";
 import { useI18n } from "../../components/useI18n";
 import { OrbLoader } from "../../components/OrbLoader";
 import { useProfileModal } from "../../components/profile/ProfileModalContext";
-import type {
-  AgentSyncResult,
-  AgentSyncStatus,
-} from "../../../../shared/agent-sync";
+import { useWorkspaceIdentity } from "../../components/useWorkspaceIdentity";
 
 interface ProfileInfo {
   id: string;
@@ -31,19 +28,19 @@ interface AgentsProps {
   activeProfile: string;
   onSelectProfile: (name: string) => void;
   onChatWith: (name: string) => void;
-  onCloudWorkspace?: () => void;
 }
 
 function Agents({
   activeProfile,
   onSelectProfile,
   onChatWith,
-  onCloudWorkspace,
 }: AgentsProps): React.JSX.Element {
   const { t } = useI18n();
+  const identity = useWorkspaceIdentity(activeProfile);
   const { openProfile } = useProfileModal();
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [cloneConfig, setCloneConfig] = useState(true);
@@ -56,9 +53,15 @@ function Agents({
   const [startingProfile, setStartingProfile] = useState<string | null>(null);
 
   const loadProfiles = useCallback(async (): Promise<void> => {
-    const list = await window.hermesAPI.listProfiles();
-    setProfiles(list);
-    setLoading(false);
+    try {
+      const list = await window.hermesAPI.listProfiles();
+      setProfiles(list);
+      setListError("");
+    } catch (error) {
+      setListError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   // A switched profile starts its gateway asynchronously, so the pid file the
@@ -112,81 +115,32 @@ function Agents({
   // Cancel any in-flight gateway poll when the page unmounts.
   useEffect(() => stopGatewayPoll, [stopGatewayPoll]);
 
-  // Cloud sync: null while the signed-in state is still loading.
-  const [syncStatus, setSyncStatus] = useState<AgentSyncStatus | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const autoSyncedRef = useRef(false);
-
-  const refreshSyncStatus = useCallback(async (): Promise<void> => {
-    try {
-      setSyncStatus(await window.hermesAPI.getAgentSyncStatus());
-    } catch {
-      // Bridge unavailable (tests/old preload): leave the affordance hidden.
-    }
-  }, []);
-
-  const runSync = useCallback(async (): Promise<void> => {
-    setSyncing(true);
-    try {
-      const result = await window.hermesAPI.syncAgents();
-      setSyncStatus((s) => (s ? { ...s, lastResult: result } : s));
-      if (result.outcomes.some((o) => o.action === "created-local")) {
-        await loadProfiles();
-      }
-    } catch {
-      // Surfaced through lastResult on the next status refresh.
-    } finally {
-      setSyncing(false);
-      void refreshSyncStatus();
-    }
-  }, [loadProfiles, refreshSyncStatus]);
-
-  // Load the signed-in state once, then run one automatic pass per visit so
-  // console-side edits appear without a manual click.
+  // Original working copies are refreshed after background repository replication.
+  // This is list refresh, not an assertion that every profile has synchronized.
   useEffect(() => {
-    void (async () => {
+    if (!identity.owner) return undefined;
+    let active = true;
+    let busy = false;
+    const timer = setInterval(async () => {
+      if (busy) return;
+      busy = true;
       try {
-        const status = await window.hermesAPI.getAgentSyncStatus();
-        setSyncStatus(status);
-        if (status.signedIn && !status.running && !autoSyncedRef.current) {
-          autoSyncedRef.current = true;
-          void runSync();
+        const list = await window.hermesAPI.listProfiles();
+        if (active) {
+          setProfiles(list);
+          setListError("");
         }
       } catch {
-        // Bridge unavailable: leave the affordance hidden.
+        // Preserve the last list; a later refresh can recover a transient failure.
+      } finally {
+        busy = false;
       }
-    })();
-  }, [runSync]);
-
-  // Syncs triggered elsewhere (e.g. right after sign-in) refresh the list too.
-  useEffect(() => {
-    if (!window.hermesAPI.onAgentSyncUpdated) return undefined;
-    return window.hermesAPI.onAgentSyncUpdated((result: AgentSyncResult) => {
-      setSyncStatus((s) => (s ? { ...s, lastResult: result } : s));
-      if (result.outcomes.some((o) => o.action === "created-local")) {
-        void loadProfiles();
-      }
-    });
-  }, [loadProfiles]);
-
-  function syncSummary(result: AgentSyncResult): string {
-    if (result.status === "unauthorized") return t("agents.syncUnauthorized");
-    if (result.status === "error")
-      return result.error || t("agents.syncFailed");
-    const counts = { pushed: 0, pulled: 0, created: 0, errors: 0 };
-    for (const o of result.outcomes) {
-      if (o.action === "pushed" || o.action === "created-remote")
-        counts.pushed++;
-      else if (o.action === "pulled") counts.pulled++;
-      if (o.action === "created-local") counts.created++;
-      if (o.action === "error") counts.errors++;
-    }
-    if (counts.errors > 0)
-      return t("agents.syncErrors", { count: counts.errors });
-    if (counts.pushed + counts.pulled + counts.created === 0)
-      return t("agents.syncUpToDate");
-    return t("agents.syncSummary", counts);
-  }
+    }, 20_000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [identity.owner, activeProfile]);
 
   // Open the create modal, defaulting the clone source to the active profile.
   function openCreate(): void {
@@ -264,47 +218,34 @@ function Agents({
           <p className="agents-subtitle">{t("agents.subtitle")}</p>
         </div>
         <div className="agents-header-actions">
-          {onCloudWorkspace && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onCloudWorkspace}
-              title="Local profiles stay on this device. Cloud Workspace syncs data you explicitly enter there."
-            >
-              Open Cloud Workspace
-            </button>
+          {listError && (
+            <>
+              <span className="agents-sync-hint" role="status">
+                {listError}
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => void loadProfiles()}
+              >
+                {t("common.refresh")}
+              </button>
+            </>
           )}
-          {syncStatus && !syncStatus.signedIn && (
-            <span
-              className="agents-sync-hint"
-              title={t("agents.syncSignedOutHint")}
-            >
-              {t("agents.syncSignedOut")}
-            </span>
-          )}
-          {syncStatus?.signedIn && (
-            <span
-              className="agents-sync-hint"
-              title={
-                syncStatus.lastResult?.outcomes
-                  .flatMap((o) => o.warnings.map((w) => `${o.profile}: ${w}`))
-                  .join("\n") ||
-                (syncStatus.accountLabel ?? "")
-              }
-            >
-              {syncStatus.lastResult
-                ? syncSummary(syncStatus.lastResult)
-                : (syncStatus.accountLabel ?? "")}
-            </span>
-          )}
-          {syncStatus?.signedIn && (
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => void runSync()}
-              disabled={syncing}
-            >
-              {syncing ? t("agents.syncing") : t("agents.sync")}
-            </button>
+          {identity.error && (
+            <>
+              <span className="agents-sync-hint" role="status">
+                {identity.error}
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => void identity.refresh()}
+                disabled={identity.checking}
+              >
+                {t("common.retry")}
+              </button>
+            </>
           )}
           <button className="btn btn-primary btn-sm" onClick={openCreate}>
             <Plus size={14} />

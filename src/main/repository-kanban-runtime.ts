@@ -1248,26 +1248,57 @@ export async function nativeSkillResourceSnapshot(): Promise<
     capture.dispose();
   }
 }
+async function metadataSources(
+  before: Awaited<ReturnType<typeof replicaContext>>,
+): Promise<
+  ReturnType<
+    typeof import("./profile-metadata-inventory").profileMetadataInventory
+  >
+> {
+  const [{ profileMetadataInventory }, { HERMES_HOME }] = await Promise.all([
+    import("./profile-metadata-inventory"),
+    import("./installer"),
+  ]);
+  if (
+    JSON.stringify(before.context) !==
+    JSON.stringify(await cloudWorkspace.nativeContext(true))
+  )
+    throw Error("Workspace identity changed");
+  const directory = join(app.getPath("userData"), "repository-source-owners");
+  return profileMetadataInventory(
+    HERMES_HOME,
+    directory,
+    before.userId,
+    (profile) => bindRepositorySource(directory, profile, before.userId),
+  );
+}
 function profileMetadataPort(
   before: Awaited<ReturnType<typeof replicaContext>>,
+  source: import("./profile-metadata-inventory").ProfileMetadataSource,
 ): Promise<import("./profile-metadata-port").ProfileMetadataPort> {
   return import("./profile-metadata-port").then(
     ({ ProfileMetadataPort }) =>
       new ProfileMetadataPort(
         {
           owner: before.userId,
-          profile: before.profile,
-          root: profileHome(before.profile),
+          profile: source.profile,
+          root: source.root,
           replicaId: before.replicaId,
         },
         join(app.getPath("userData"), "repository-profile-transactions"),
         cloudWorkspace.profileResources,
         async () => {
+          // Reauthentication happens once in metadataSources at the operation boundary.
+          // Between I/O stages, fence against token/account changes without per-profile auth requests.
+          cloudWorkspace.assertNativeContext(before.context);
           if (
-            JSON.stringify(before.context) !==
-            JSON.stringify(await cloudWorkspace.nativeContext(true))
+            !repositorySourceOwned(
+              join(app.getPath("userData"), "repository-source-owners"),
+              source.profile,
+              before.userId,
+            )
           )
-            throw Error("Workspace identity changed");
+            throw Error("Profile source identity changed");
         },
       ),
   );
@@ -1430,18 +1461,39 @@ export async function nativeReplicaSnapshot(): Promise<
   const metadataScope = { collection: "profile" as const, ids: [] as string[] };
   (snapshot.recordScopes ??= []).push(metadataScope);
   try {
-    const port = await profileMetadataPort(before);
-    const metadata = await port.snapshot();
-    metadataScope.ids.push(port.id);
-    if (metadata) snapshot.documents.push(metadata);
+    const inventory = await metadataSources(before);
+    snapshot.warnings!.push(...inventory.warnings);
+    for (const source of inventory.sources) {
+      const id = `profile-metadata-${source.profile}`;
+      try {
+        const port = await profileMetadataPort(before, source);
+        const metadata = await port.snapshot();
+        metadataScope.ids.push(id);
+        if (metadata) snapshot.documents.push(metadata);
+      } catch {
+        (snapshot.recoveryRecords ??= []).push({ collection: "profile", id });
+        snapshot.warnings!.push(
+          `Profile ${source.profile} metadata synchronization requires reconnect or conflict resolution; original data is retained`,
+        );
+      }
+    }
   } catch {
-    (snapshot.recoveryRecords ??= []).push({
-      collection: "profile",
-      id: `profile-metadata-${before.profile}`,
-    });
     snapshot.warnings!.push(
-      "Profile metadata synchronization requires reconnect or conflict resolution; original data is retained",
+      "Profile metadata inventory is unavailable; original data is retained",
     );
+  }
+  // Keep the existing bounded IPC schema usable when multiple profiles need review.
+  if (snapshot.warnings!.length > 20)
+    snapshot.warnings = [
+      ...snapshot.warnings!.slice(0, 19),
+      `${snapshot.warnings!.length - 19} additional synchronization sources require review`,
+    ];
+  if ((snapshot.recoveryRecords?.length ?? 0) > 100) {
+    snapshot.recoveryRecords = snapshot.recoveryRecords!.slice(0, 100);
+    snapshot.warnings = [
+      ...snapshot.warnings!.slice(0, 19),
+      "Additional unavailable sources are retained and will be reconsidered on the next snapshot",
+    ];
   }
   if (!snapshot.collections.length)
     throw Error("Native sources require synchronization review");
@@ -1484,7 +1536,13 @@ export async function nativeReplicaApply(
     throw Error("Workspace identity changed");
   let result: import("@mithril/workspace/replica-sync").ReplicaResult;
   if (write.document.collection === "profile") {
-    result = await (await profileMetadataPort(before)).apply(write);
+    const inventory = await metadataSources(before);
+    const source = inventory.sources.find(
+      (row) => write.document.id === `profile-metadata-${row.profile}`,
+    );
+    if (!source)
+      throw Error("Profile metadata source is unavailable for this account");
+    result = await (await profileMetadataPort(before, source)).apply(write);
   } else if (
     write.document.collection === "capability" &&
     write.document.id.startsWith("skill-resources-")

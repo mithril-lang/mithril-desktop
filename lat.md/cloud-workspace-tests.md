@@ -860,3 +860,19 @@ Edits or authorization changes during resource download prevent native restorati
 ## Profile metadata replica tombstone baseline
 
 Physical deletion produces a stable native tombstone, and documents for another profile never enter the metadata file adapter.
+
+## All-profile metadata inventory preserves selection
+
+The inventory includes empty and populated original profiles without changing the active selection or accessing runtime credential contents. Foreign source bindings remain excluded.
+
+## All-profile metadata inventory retains absent owned sources
+
+Missing current-owner profile identities remain in the metadata inventory so deletion can reconcile; missing foreign identities cannot become this account's sources.
+
+## All-profile metadata inventory rejects linked sources
+
+Linked roots and invalid names are not adopted, and mismatched private binding filenames fail inventory validation.
+
+## Deleted original profile is never recreated by metadata download
+
+When an original profile directory disappears, metadata download is deferred and neither a directory nor a metadata file is recreated.

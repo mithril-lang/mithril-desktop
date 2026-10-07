@@ -171,3 +171,26 @@ it("keeps the physical deletion as a stable native tombstone and rejects foreign
     }),
   ).rejects.toThrow("Foreign");
 });
+
+// @lat: [[cloud-workspace-tests#Deleted original profile is never recreated by metadata download]]
+it("defers metadata restoration when the original directory is deleted before or during download", async () => {
+  for (const duringDownload of [false, true]) {
+    const f = fixture();
+    const pointer = await uploadProfileMetadata(
+      f.resources,
+      "alice",
+      "research",
+      Buffer.from('{"name":"cloud"}'),
+    );
+    const remove = (): void => rmSync(f.root, { recursive: true, force: true });
+    if (duringDownload) f.downloading.hook = remove;
+    else {
+      remove();
+      expect(await f.port.snapshot()).toBeNull();
+    }
+    expect(
+      (await f.port.apply(write(pointer as unknown as JsonValue, null))).status,
+    ).toBe("deferred");
+    expect(() => readFileSync(join(f.root, "profile-meta.json"))).toThrow();
+  }
+});

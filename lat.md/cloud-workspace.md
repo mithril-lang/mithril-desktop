@@ -957,3 +957,11 @@ The prior jsdom suite treated native Node buffers as foreign Uint8Arrays, and ma
 The existing rich replica now captures and restores the selected original profile metadata file through owner-bound resources, exact version checks and the durable native journal.
 
 [[src/main/profile-metadata-port.ts#ProfileMetadataPort]] guards authorization before recovery and after each resource await. Concurrent original edits return a conflict. Completed receipts are replayed before recapture; physical deletion remains a stable tombstone. [[src/main/repository-kanban-runtime.ts#nativeReplicaSnapshot]] restricts profile completeness to the selected metadata ID and retains recovery records on unavailable source. [[src/main/repository-kanban-runtime.ts#nativeReplicaApply]] routes metadata restoration before Kanban fallback. All-profile inventory and Web original profile UI remain pending; this candidate is not production qualification.
+
+## All-profile metadata source inventory (draft)
+
+Original metadata replication inventories every valid native profile directory and retained current-owner source binding without changing the active profile or reading credentials.
+
+[[src/main/profile-metadata-inventory.ts#profileMetadataInventory]] includes fresh empty directories and absent owned identities for deletion reconciliation. Different-owner sources are refused by the original source binding before bytes are captured. Symlinks, invalid names and forged binding identities are not adopted. The existing rich replica now claims each successfully captured metadata ID independently. Missing native profile directories defer nondeleted metadata download, including directory deletion during a resource await. This extends original metadata to all existing profiles; all-profile remaining file categories and creation of new cloud-only native profiles are not yet qualified.
+
+All-profile metadata inventory reauthenticates workspace:write once at the operation boundary. Each resource I/O stage then uses the original captured-context main-process guard and source-owner binding; enumerating profiles does not add a /v1/me request for each identity guard. Resource transports retain their own authorization checks.

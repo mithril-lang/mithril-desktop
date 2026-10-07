@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { lstatSync } from "node:fs";
 import {
   repositoryFingerprint,
   type JsonValue,
@@ -41,11 +42,23 @@ export class ProfileMetadataPort {
     this.id = `profile-metadata-${scope.profile}`;
     this.journal = new ProfileMetadataReplica(directory, scope);
   }
+  private profilePresent(): boolean {
+    try {
+      const info = lstatSync(this.scope.root);
+      if (!info.isDirectory() || info.isSymbolicLink())
+        throw Error("Unsafe original profile directory");
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
+  }
   private async capture(): Promise<{
     bytes: Buffer | null;
     record: ReplicaRecord | null;
   }> {
     await this.guard();
+    if (!this.profilePresent()) return { bytes: null, record: null };
     this.journal.recover();
     const bytes = readProfileMetadataFile(this.scope.root);
     if (bytes === null) {
@@ -96,7 +109,9 @@ export class ProfileMetadataPort {
       JSON.stringify([this.scope.owner, this.scope.replicaId, write]),
     );
     await this.guard();
-    this.journal.recover();
+    if (!write.document.deleted && !this.profilePresent())
+      return result("deferred", null);
+    if (this.profilePresent()) this.journal.recover();
     const receipt = this.journal.receipt(write.operationId, fingerprint);
     if (receipt) return result("applied", receipt);
     const local = await this.capture();
@@ -123,6 +138,8 @@ export class ProfileMetadataPort {
       );
     }
     await this.guard();
+    if (!write.document.deleted && !this.profilePresent())
+      return result("deferred", null);
     if (!same(local.bytes, readProfileMetadataFile(this.scope.root)))
       return result("conflict", await this.snapshot());
     const record: ReplicaRecord = {

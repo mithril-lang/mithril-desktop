@@ -1,0 +1,42 @@
+default_platform(:mac)
+
+platform :mac do
+  desc "Validate the credential-free Mac App Store release structure"
+  lane :verify do
+    sh("node", File.expand_path("../../check-readiness.mjs", __dir__))
+  end
+
+  desc "Upload an already sandbox-tested MAS pkg without submitting it for review"
+  lane :upload_pkg do
+    sh(
+      "node",
+      File.expand_path("../../check-readiness.mjs", __dir__),
+      "--release",
+      "--macos",
+    )
+    upload_to_app_store(
+      api_key_path: ENV.fetch("MITHRIL_MAS_API_KEY_PATH"),
+      app_identifier: ENV.fetch("MITHRIL_MAS_APP_IDENTIFIER"),
+      pkg: ENV.fetch("MITHRIL_MAS_PKG"),
+      skip_metadata: true,
+      skip_screenshots: true,
+      submit_for_review: false,
+      automatic_release: false,
+    )
+  end
+
+  desc "Submit a processed build for review; this never enables automatic release"
+  lane :submit_review do
+    UI.user_error!("MITHRIL_MAS_BUILD_NUMBER is required") if ENV["MITHRIL_MAS_BUILD_NUMBER"].to_s.empty?
+    upload_to_app_store(
+      api_key_path: ENV.fetch("MITHRIL_MAS_API_KEY_PATH"),
+      app_identifier: ENV.fetch("MITHRIL_MAS_APP_IDENTIFIER"),
+      build_number: ENV.fetch("MITHRIL_MAS_BUILD_NUMBER"),
+      skip_binary_upload: true,
+      skip_metadata: true,
+      skip_screenshots: true,
+      submit_for_review: true,
+      automatic_release: false,
+    )
+  end
+end

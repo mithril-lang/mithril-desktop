@@ -1,3 +1,4 @@
+import { startAllProfileHistoryReplication } from "../native-history-all-profiles-runtime";
 import { startWalletReplication } from "../wallet-replication-runtime";
 import { startOriginalScheduleReplication } from "../original-schedule-replication-runtime";
 import { applyResponseHeaders } from "./response-headers";
@@ -86,6 +87,8 @@ export function startMainProcess(): void {
     }
 
     stopOriginalSchedules = startOriginalScheduleReplication();
+    const stopHistory = startAllProfileHistoryReplication();
+    app.once("before-quit", stopHistory);
     const stopWallets = startWalletReplication();
     app.once("before-quit", stopWallets);
 

@@ -25,6 +25,7 @@ import {
 } from "fs";
 import { dirname, join, resolve, basename } from "path";
 import { cloudChat, onCloudChatAccountChanged } from "./cloud-chat-runtime";
+import type { CloudChat } from "./cloud-chat";
 import { sessionHistoryItems } from "@mithril/workspace/session-history";
 import {
   remoteHistoryStore,
@@ -155,18 +156,21 @@ async function portableItems(
   context: Awaited<ReturnType<typeof cloudChat.auth.nativeContext>>,
   sessionId: string,
   items: HistoryItem[],
+  client: CloudChat = cloudChat,
+  guard: () => Promise<void> = async () => {},
 ): Promise<ArchivedHistoryItem[]> {
   const output: ArchivedHistoryItem[] = [];
   const owner = context.userId,
-    transport = cloudChat.historyFiles.forOwner(owner);
+    transport = client.historyFiles.forOwner(owner);
   const files = {
     ...transport,
     put: async (id: string, bytes: Uint8Array): Promise<string> => {
       if (
         JSON.stringify(context) !==
-        JSON.stringify(await cloudChat.auth.nativeContext(true))
+        JSON.stringify(await client.auth.nativeContext(true))
       )
         throw Error("History account changed");
+      await guard();
       return transport.put(id, bytes);
     },
   };
@@ -210,6 +214,7 @@ async function portableItems(
     if ("attachments" in item && item.attachments?.length) {
       value.attachments = [];
       for (const [index, attachment] of item.attachments.entries()) {
+        await guard();
         const bytes = attachmentBytes(attachment),
           digest = await digestBytes(bytes),
           attachmentId =
@@ -258,6 +263,8 @@ export async function materializeCloudHistory(
   sessionId: string,
   cloudItems: ArchivedHistoryItem[],
   items: HistoryItem[] = [],
+  client: CloudChat = cloudChat,
+  guard: () => Promise<void> = async () => {},
 ): Promise<{ source: ArchivedHistoryItem; item: HistoryItem | null }[]> {
   const materialized = [] as {
     source: ArchivedHistoryItem;
@@ -273,6 +280,7 @@ export async function materializeCloudHistory(
       attachmentBytes += file.size;
       if (attachmentBytes > 50 * 1024 * 1024)
         throw Error("History attachments exceed supported cache bound");
+      await guard();
       const directory = join(
         root(),
         "attachments",
@@ -290,12 +298,13 @@ export async function materializeCloudHistory(
       const bytes = existsSync(path)
         ? readFileSync(path)
         : await readHistoryAttachment(
-            cloudChat.historyFiles.forOwner(context.userId),
+            client.historyFiles.forOwner(context.userId),
             sessionId,
             file,
           );
       if ((await digestBytes(bytes)) !== file.digest)
         throw Error("Cached attachment digest mismatch");
+      await guard();
       if (!existsSync(path))
         writeFileSync(path, bytes, { flag: "wx", mode: 0o600 });
       localAttachments.push({
@@ -333,284 +342,307 @@ export async function materializeCloudHistory(
   return materialized;
 }
 
-const nativeHistorySync = new NativeHistorySync({
-  hasRemote: async (session, expected) => {
-    if (
-      JSON.stringify(expected) !==
-      JSON.stringify(await cloudChat.auth.nativeContext(true))
-    )
-      throw Error("History account changed");
-    return (
-      remoteSessionCacheRevision(
-        remoteHistoryStore(expected.userId, expected.profile),
-        session.id,
-      ) === session.revision
-    );
-  },
-  cacheRemote: async (session, events, expected) => {
-    if (
-      JSON.stringify(expected) !==
-      JSON.stringify(await cloudChat.auth.nativeContext(true))
-    )
-      throw Error("History account changed");
-    const materialized = session.deleted
-      ? []
-      : await materializeCloudHistory(
-          expected,
-          session.id,
-          sessionHistoryItems(events),
-        );
-    if (
-      JSON.stringify(expected) !==
-      JSON.stringify(await cloudChat.auth.nativeContext(true))
-    )
-      throw Error("History account changed");
-    const db = remoteHistoryStore(expected.userId, expected.profile);
-    replaceRemoteSessionCache(
-      db,
-      expected.userId,
-      session,
-      events,
-      materialized.flatMap((row) => (row.item ? [row.item] : [])),
-    );
-    setNativeHistoryCacheOwner(db.name, expected.userId);
-  },
-  context: () => cloudChat.auth.nativeContext(true),
-  transport: cloudChat,
-  read,
-  write,
-  deletions: {
-    list: async (identity) => {
-      if (
-        JSON.stringify(identity) !==
-        JSON.stringify(await cloudChat.auth.nativeContext(true))
-      )
-        throw Error("History account changed");
-      if (getConnectionConfig().mode !== "local") return [];
-      checked(activeStateDbPath(identity.profile));
-      if (
-        !repositorySourceOwned(
-          join(app.getPath("userData"), "repository-source-owners"),
-          identity.profile,
-          identity.userId,
-        )
-      )
-        return [];
-      const db = getDbConnection(true, identity.profile);
-      return db
-        ? nativeHistoryDeletions(db, identity.userId, identity.profile)
-        : [];
-    },
-    prepare: async (identity, intent, revision) => {
-      if (
-        JSON.stringify(identity) !==
-        JSON.stringify(await cloudChat.auth.nativeContext(true))
-      )
-        throw Error("History account changed");
-      if (
-        getConnectionConfig().mode !== "local" ||
-        !repositorySourceOwned(
-          join(app.getPath("userData"), "repository-source-owners"),
-          identity.profile,
-          identity.userId,
-        )
-      )
-        throw Error("Native deletion owner unavailable");
-      checked(activeStateDbPath(identity.profile));
-      const db = getDbConnection(false, identity.profile);
-      if (!db) throw Error("Native deletion outbox unavailable");
-      return prepareNativeHistoryDeletion(
-        db,
-        identity.userId,
-        identity.profile,
-        intent,
-        revision,
-      );
-    },
-    acknowledge: async (identity, intent, receipt) => {
-      if (
-        JSON.stringify(identity) !==
-        JSON.stringify(await cloudChat.auth.nativeContext(true))
-      )
-        throw Error("History account changed");
-      if (
-        getConnectionConfig().mode !== "local" ||
-        !repositorySourceOwned(
-          join(app.getPath("userData"), "repository-source-owners"),
-          identity.profile,
-          identity.userId,
-        )
-      )
-        throw Error("Native deletion owner unavailable");
-      checked(activeStateDbPath(identity.profile));
-      const db = getDbConnection(false, identity.profile);
-      if (!db) throw Error("Native deletion outbox unavailable");
-      acknowledgeNativeHistoryDeletion(
-        db,
-        identity.userId,
-        identity.profile,
-        intent,
-        receipt,
-      );
-    },
-  },
-  source: async () => {
+/** Reuses original history effects with a scoped transport; never selects a profile. */
+export function createNativeHistoryRuntime(
+  cloudChat: CloudChat,
+  guard: () => Promise<void> = async () => {},
+  cacheUnmappedRemote = true,
+): NativeHistorySync {
+  const historyContext = async (): Promise<
+    Awaited<ReturnType<typeof cloudChat.auth.nativeContext>>
+  > => {
+    await guard();
     const context = await cloudChat.auth.nativeContext(true);
-    if (getConnectionConfig().mode !== "local") return [];
-    checked(activeStateDbPath(context.profile));
-    const db = getDbConnection(true, context.profile);
-    if (!db) return [];
-    bindRepositorySource(
-      join(app.getPath("userData"), "repository-source-owners"),
-      context.profile,
-      context.userId,
-    );
-    const sessions = db.transaction(() =>
-      listSessions(1001, 0, context.profile, true).map((session) => {
-        try {
-          return {
-            session,
-            items: getSessionMessages(session.id, context.profile, true),
-            error: null,
-          };
-        } catch {
-          return {
-            session,
-            items: [] as HistoryItem[],
-            error: "Native history unavailable; source retained",
-          };
+    await guard();
+    return context;
+  };
+  return new NativeHistorySync({
+    hasRemote: cacheUnmappedRemote
+      ? async (session, expected) => {
+          if (
+            JSON.stringify(expected) !== JSON.stringify(await historyContext())
+          )
+            throw Error("History account changed");
+          return (
+            remoteSessionCacheRevision(
+              remoteHistoryStore(expected.userId, expected.profile),
+              session.id,
+            ) === session.revision
+          );
         }
-      }),
-    )();
-    if (
-      JSON.stringify(context) !==
-      JSON.stringify(await cloudChat.auth.nativeContext(true))
-    )
-      throw Error("History account changed");
-    if (getConnectionConfig().mode !== "local")
-      throw Error("Native history source changed");
-    const writable = getDbConnection(false, context.profile);
-    if (!writable) throw Error("Native history mapping unavailable");
-    bindNativeHistorySources(
-      writable,
-      context.userId,
-      context.profile,
-      sessions.map(({ session }) => ({
-        sourceId: session.id,
-        sessionId: nativeCloudSessionId(context.profile, session.id),
-      })),
-    );
-    return sessions.map(({ session, items, error }) => ({
-      id: session.id,
-      title: session.title || "Chat",
-      model: session.model || "native-history",
-      archived: session.archived,
-      cacheArchived:
-        session.archived === undefined
-          ? undefined
-          : async (archived) => {
-              if (
-                JSON.stringify(context) !==
-                JSON.stringify(await cloudChat.auth.nativeContext(true))
-              )
-                throw Error("History account changed");
-              const writable = getDbConnection(false, context.profile);
-              if (!writable) throw Error("Native archive cache unavailable");
-              return applyCloudSessionArchive(
-                writable,
+      : undefined,
+    cacheRemote: cacheUnmappedRemote
+      ? async (session, events, expected) => {
+          if (
+            JSON.stringify(expected) !== JSON.stringify(await historyContext())
+          )
+            throw Error("History account changed");
+          const materialized = session.deleted
+            ? []
+            : await materializeCloudHistory(
+                expected,
                 session.id,
-                session.archived!,
-                archived,
+                sessionHistoryItems(events),
+                [],
+                cloudChat,
+                guard,
               );
-            },
-      items: (sessionId) => {
-        if (error) return Promise.reject(Error(error));
-        return portableItems(context, sessionId, items);
-      },
-      cacheModel: async (model) => {
-        if (
-          JSON.stringify(context) !==
-          JSON.stringify(await cloudChat.auth.nativeContext(true))
-        )
+          if (
+            JSON.stringify(expected) !== JSON.stringify(await historyContext())
+          )
+            throw Error("History account changed");
+          const db = remoteHistoryStore(expected.userId, expected.profile);
+          replaceRemoteSessionCache(
+            db,
+            expected.userId,
+            session,
+            events,
+            materialized.flatMap((row) => (row.item ? [row.item] : [])),
+          );
+          setNativeHistoryCacheOwner(db.name, expected.userId);
+        }
+      : undefined,
+    context: historyContext,
+    transport: cloudChat,
+    read,
+    write,
+    deletions: {
+      list: async (identity) => {
+        if (JSON.stringify(identity) !== JSON.stringify(await historyContext()))
           throw Error("History account changed");
-        const writable = getDbConnection(false, context.profile);
-        if (!writable) throw Error("Native model cache unavailable");
-        return applyCloudSessionModel(
-          writable,
-          session.id,
-          session.model,
-          model,
-        );
-      },
-      cacheTitle: async (title) => {
+        if (getConnectionConfig().mode !== "local") return [];
+        checked(activeStateDbPath(identity.profile));
         if (
-          JSON.stringify(context) !==
-          JSON.stringify(await cloudChat.auth.nativeContext(true))
+          !repositorySourceOwned(
+            join(app.getPath("userData"), "repository-source-owners"),
+            identity.profile,
+            identity.userId,
+          )
         )
-          throw Error("History account changed");
-        const writable = getDbConnection(false, context.profile);
-        if (!writable) throw Error("Native history cache unavailable");
-        return applyCloudSessionTitle(
-          writable,
-          session.id,
-          session.title,
-          title,
-        );
+          return [];
+        const db = getDbConnection(true, identity.profile);
+        return db
+          ? nativeHistoryDeletions(db, identity.userId, identity.profile)
+          : [];
       },
-      cache: async (sessionId, cloudItems) => {
-        if (error) throw Error(error);
-        const materialized = await materializeCloudHistory(
-          context,
-          sessionId,
-          cloudItems,
-          items,
-        );
+      prepare: async (identity, intent, revision) => {
+        if (JSON.stringify(identity) !== JSON.stringify(await historyContext()))
+          throw Error("History account changed");
         if (
-          JSON.stringify(context) !==
-          JSON.stringify(await cloudChat.auth.nativeContext(true))
+          getConnectionConfig().mode !== "local" ||
+          !repositorySourceOwned(
+            join(app.getPath("userData"), "repository-source-owners"),
+            identity.profile,
+            identity.userId,
+          )
         )
-          throw Error("History account changed");
-        const writable = getDbConnection(false, context.profile);
-        if (!writable) throw Error("Native history cache unavailable");
-        setNativeHistoryCacheOwner(writable.name, context.userId);
-        replaceNativeHistoryCache(
-          writable,
-          session.id,
-          context.userId,
-          items,
-          () => getSessionMessages(session.id, context.profile, true, writable),
-          materialized,
+          throw Error("Native deletion owner unavailable");
+        checked(activeStateDbPath(identity.profile));
+        const db = getDbConnection(false, identity.profile);
+        if (!db) throw Error("Native deletion outbox unavailable");
+        return prepareNativeHistoryDeletion(
+          db,
+          identity.userId,
+          identity.profile,
+          intent,
+          revision,
         );
       },
-    }));
-  },
-});
+      acknowledge: async (identity, intent, receipt) => {
+        if (JSON.stringify(identity) !== JSON.stringify(await historyContext()))
+          throw Error("History account changed");
+        if (
+          getConnectionConfig().mode !== "local" ||
+          !repositorySourceOwned(
+            join(app.getPath("userData"), "repository-source-owners"),
+            identity.profile,
+            identity.userId,
+          )
+        )
+          throw Error("Native deletion owner unavailable");
+        checked(activeStateDbPath(identity.profile));
+        const db = getDbConnection(false, identity.profile);
+        if (!db) throw Error("Native deletion outbox unavailable");
+        acknowledgeNativeHistoryDeletion(
+          db,
+          identity.userId,
+          identity.profile,
+          intent,
+          receipt,
+        );
+      },
+    },
+    source: async () => {
+      const context = await historyContext();
+      if (getConnectionConfig().mode !== "local") return [];
+      checked(activeStateDbPath(context.profile));
+      const db = getDbConnection(true, context.profile);
+      if (!db) return [];
+      bindRepositorySource(
+        join(app.getPath("userData"), "repository-source-owners"),
+        context.profile,
+        context.userId,
+      );
+      const sessions = db.transaction(() =>
+        listSessions(1001, 0, context.profile, true).map((session) => {
+          try {
+            return {
+              session,
+              items: getSessionMessages(session.id, context.profile, true),
+              error: null,
+            };
+          } catch {
+            return {
+              session,
+              items: [] as HistoryItem[],
+              error: "Native history unavailable; source retained",
+            };
+          }
+        }),
+      )();
+      if (JSON.stringify(context) !== JSON.stringify(await historyContext()))
+        throw Error("History account changed");
+      if (getConnectionConfig().mode !== "local")
+        throw Error("Native history source changed");
+      const writable = getDbConnection(false, context.profile);
+      if (!writable) throw Error("Native history mapping unavailable");
+      bindNativeHistorySources(
+        writable,
+        context.userId,
+        context.profile,
+        sessions.map(({ session }) => ({
+          sourceId: session.id,
+          sessionId: nativeCloudSessionId(context.profile, session.id),
+        })),
+      );
+      return sessions.map(({ session, items, error }) => ({
+        id: session.id,
+        title: session.title || "Chat",
+        model: session.model || "native-history",
+        archived: session.archived,
+        cacheArchived:
+          session.archived === undefined
+            ? undefined
+            : async (archived) => {
+                if (
+                  JSON.stringify(context) !==
+                  JSON.stringify(await historyContext())
+                )
+                  throw Error("History account changed");
+                const writable = getDbConnection(false, context.profile);
+                if (!writable) throw Error("Native archive cache unavailable");
+                return applyCloudSessionArchive(
+                  writable,
+                  session.id,
+                  session.archived!,
+                  archived,
+                );
+              },
+        items: (sessionId) => {
+          if (error) return Promise.reject(Error(error));
+          return portableItems(context, sessionId, items, cloudChat, guard);
+        },
+        cacheModel: async (model) => {
+          if (
+            JSON.stringify(context) !== JSON.stringify(await historyContext())
+          )
+            throw Error("History account changed");
+          const writable = getDbConnection(false, context.profile);
+          if (!writable) throw Error("Native model cache unavailable");
+          return applyCloudSessionModel(
+            writable,
+            session.id,
+            session.model,
+            model,
+          );
+        },
+        cacheTitle: async (title) => {
+          if (
+            JSON.stringify(context) !== JSON.stringify(await historyContext())
+          )
+            throw Error("History account changed");
+          const writable = getDbConnection(false, context.profile);
+          if (!writable) throw Error("Native history cache unavailable");
+          return applyCloudSessionTitle(
+            writable,
+            session.id,
+            session.title,
+            title,
+          );
+        },
+        cache: async (sessionId, cloudItems) => {
+          if (error) throw Error(error);
+          const materialized = await materializeCloudHistory(
+            context,
+            sessionId,
+            cloudItems,
+            items,
+            cloudChat,
+            guard,
+          );
+          if (
+            JSON.stringify(context) !== JSON.stringify(await historyContext())
+          )
+            throw Error("History account changed");
+          const writable = getDbConnection(false, context.profile);
+          if (!writable) throw Error("Native history cache unavailable");
+          setNativeHistoryCacheOwner(writable.name, context.userId);
+          replaceNativeHistoryCache(
+            writable,
+            session.id,
+            context.userId,
+            items,
+            () =>
+              getSessionMessages(session.id, context.profile, true, writable),
+            materialized,
+          );
+        },
+      }));
+    },
+  });
+}
+const nativeHistorySync = createNativeHistoryRuntime(cloudChat);
+let historyLane: Promise<void> = Promise.resolve();
+/** Foreground conflict recovery and background archival share the same durable journal lane. */
+export function serializeNativeHistory<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  const next = historyLane.then(operation);
+  historyLane = next.then(
+    () => {},
+    () => {},
+  );
+  return next;
+}
+
 export async function synchronizeNativeHistory(): Promise<
   Awaited<ReturnType<typeof nativeHistorySync.run>>
 > {
   await cloudChat.auth.enable();
-  return nativeHistorySync.run();
+  return serializeNativeHistory(() => nativeHistorySync.run());
 }
 
 export async function resolveNativeHistoryTitle(
   request: import("./native-history-sync").NativeTitleResolution,
 ): Promise<Awaited<ReturnType<typeof nativeHistorySync.run>>> {
   await cloudChat.auth.enable();
-  return nativeHistorySync.resolveTitle(request);
+  return serializeNativeHistory(() => nativeHistorySync.resolveTitle(request));
 }
 
 export async function resolveNativeHistoryModel(
   request: import("./native-history-sync").NativeTitleResolution,
 ): Promise<Awaited<ReturnType<typeof nativeHistorySync.run>>> {
   await cloudChat.auth.enable();
-  return nativeHistorySync.resolveModel(request);
+  return serializeNativeHistory(() => nativeHistorySync.resolveModel(request));
 }
 
 export async function resolveNativeHistoryVisibility(
   request: import("./native-history-sync").NativeTitleResolution,
 ): Promise<Awaited<ReturnType<typeof nativeHistorySync.run>>> {
   await cloudChat.auth.enable();
-  return nativeHistorySync.resolveVisibility(request);
+  return serializeNativeHistory(() =>
+    nativeHistorySync.resolveVisibility(request),
+  );
 }
 
 /** Read-only inventory for the original sidebar; no migration, file capture or execution. */

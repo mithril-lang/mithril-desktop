@@ -1077,3 +1077,33 @@ A remote tombstone removes the public record from repeated Native synchronizatio
 ## Original wallet canonical deletion display
 
 The actual Native adapter consumes the compiled shared pane and hides a removed canonical card without issuing a native key deletion.
+
+
+## All-profile history background source coverage
+
+The startup lifecycle visits default, research and empty owned profiles using actual fixed-profile CloudWorkspace clients and the original source capture adapter, excludes another owner's profile and preserves selected profile state.
+
+## All-profile history account retirement
+
+A changed captured account generation aborts the pass before another profile is visited or the pending source result is accepted.
+
+## All-profile history source replacement
+
+Replacing an original profile directory after capture is refused by inode/device guards; prior owned profiles remain accepted without changing the replacement.
+
+## All-profile history native connection isolation
+
+A remote connection does not read local original profiles or initiate scoped API clients through the automatic local-history lifecycle.
+
+
+## All-profile history source failure isolation
+
+A temporary failure in one owned profile does not prevent other profiles from archiving; source bindings and the selected profile remain intact.
+
+## All-profile history lifecycle retirement
+
+Stopping the lifecycle fences in-flight source results, prevents later profile visits and unsubscribes account changes.
+
+## Shared history journal serialization
+
+Foreground and background consumers share one serial lane. A waiting operation cannot overlap the prior source journal mutation, and a failed operation releases the lane for retained-intent recovery.

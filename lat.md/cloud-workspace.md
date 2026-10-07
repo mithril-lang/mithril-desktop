@@ -1116,3 +1116,14 @@ The immutable archive contains 461 matching producer/archive/vendor/installed fi
 The ordinary MithrilChat consumer no longer supplies the manual Native history import adapter to the shared chat settings menu.
 
 [[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx#MithrilChat]] retains the same original source rows and canonical conversations in one shared sidebar. [[src/renderer/src/screens/CloudWorkspace/RepositoryReplication.tsx#RepositoryReplication]] continues existing background archival and conflict handling. The manual import service is retained for existing explicit operators, but it is not a second user migration flow. Tests open the real shared Chat settings and verify no local-history migration controls are rendered or invoked, alongside source selection and automatic synchronization tests. Installed upgrade and cross-device qualification remain pending.
+
+
+## All-profile automatic original history archival (draft)
+
+A main-process lifecycle now archives every present original profile owned by the captured account, independently of the selected screen and profile.
+
+[[src/main/native-history-all-profiles-runtime.ts#startAllProfileHistoryReplication]] reuses the owner-bound source inventory and [[src/main/native-history-runtime.ts#createNativeHistoryRuntime]] with a fixed-profile canonical CloudChat transport. It never changes profile selection, starts inference or provisions a runtime. Account/generation, source ownership, root identity and symlink guards fence asynchronous capture and restoration; source failures retain their journals and retry. Background runs restore associated original sessions only, rather than reconstructing all account-wide remote conversations into every profile.
+
+[[src/main/native-history-runtime.ts#serializeNativeHistory]] serializes foreground archival and metadata conflict recovery with background passes so the original durable journals cannot be overwritten by concurrent consumers. Startup installs the lifecycle and before-quit retires it. Existing current-profile conflict controls remain available; full cross-profile conflict presentation, production publication and installed upgrade/cross-device evidence remain unfinished.
+
+Local verification: seven lifecycle/serialization tests use actual scoped CloudWorkspace clients and original capture ports with a controlled sync engine, alongside fifty existing history-engine/cache/deletion/sidebar tests (57 passing). This proves source wiring and local boundaries, not authenticated production synchronization or installer upgrade behavior.

@@ -48,7 +48,7 @@ A revoked token is refused, and a ledger mismatch never appears as a trustworthy
 
 ## Secure Mithril token storage
 
-[[src/main/mithril-token-store.ts]] keeps each profile's Mithril bearer in a separate Electron `safeStorage` encrypted file. Without a system keyring it falls back to a weaker, disclosed AES-256-GCM file. It never writes plaintext or reads the old Kotoba token file.
+[[src/main/mithril-token-store.ts]] encrypts installation account identity and profile-specific native provider credentials separately. Without a system keyring it falls back to a weaker, disclosed AES-256-GCM file. It never writes plaintext or reads the old Kotoba token file.
 
 ### Profile isolation
 
@@ -106,7 +106,7 @@ Each account read verifies the stored token again, and a revoked token is shown 
 
 Browser approval, device-code approval, manual provider entry, and disconnect all await one profile-scoped refresh through [[src/main/mithril-runtime-lifecycle.ts#createMithrilRuntimeLifecycle]].
 
-Refused or cancelled flows leave running processes alone. Each profile serializes the credential mutation and refresh together, preserving the user's order across slow Connect, repeated Connect, and Disconnect operations.
+Refused or cancelled flows leave running processes alone. Account mutations serialize across profiles, including the selected native provider refresh, preserving the user's order across slow Connect, repeated Connect, and Disconnect operations.
 
 The refresh waits for active Desktop turns, dashboard turn leases, and profile cron work without a forced timeout, then recreates the profile's gateway and any managed dashboard so their child environment is rebuilt from the secure token store. An unreadable lease or cron database is treated as busy to preserve unknown work. A named profile served by the default gateway multiplexer refreshes its managed dashboard without disrupting the shared gateway, whose process environment cannot represent multiple profile-specific values for the same secret name.
 

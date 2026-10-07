@@ -65,10 +65,10 @@ export function createMithrilRuntimeLifecycle(
 } {
   const mutationQueues = new Map<string, Promise<void>>();
   const runSerialized = async <T>(
-    profile: string | undefined,
+    _profile: string | undefined,
     mutateAndRefresh: () => Promise<T>,
   ): Promise<T> => {
-    const key = profile?.trim() || "default";
+    const key = "mithril-account";
     const previous = mutationQueues.get(key) ?? Promise.resolve();
     const task = previous.then(mutateAndRefresh);
     const tail = task.then(

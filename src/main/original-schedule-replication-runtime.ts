@@ -1,4 +1,4 @@
-import { readMithrilToken } from "./mithril-token-store";
+import { readCloudAccountToken } from "./mithril-token-store";
 import { app } from "electron";
 import { dirname, join } from "node:path";
 import { lstatSync } from "node:fs";
@@ -183,11 +183,11 @@ export function runOriginalScheduleScreen<T>(
   kind: "read" | "edit" | "execute",
 ): Promise<T> {
   const requestedProfile = getActiveProfileNameSync() || "default";
-  const requestedToken = readMithrilToken(requestedProfile);
+  const requestedToken = readCloudAccountToken(requestedProfile);
   const checkRequest = (): void => {
     if (
       (getActiveProfileNameSync() || "default") !== requestedProfile ||
-      readMithrilToken(requestedProfile) !== requestedToken
+      readCloudAccountToken(requestedProfile) !== requestedToken
     )
       throw Error(
         "Workspace account changed; queued schedule action discarded",

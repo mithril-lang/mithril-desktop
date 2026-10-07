@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mithrilChat, parseChatReply } from "./mithril-chat";
-import { readMithrilToken } from "./mithril-token-store";
+import { readCloudAccountToken } from "./mithril-token-store";
 
-vi.mock("./mithril-token-store", () => ({ readMithrilToken: vi.fn() }));
+vi.mock("./mithril-token-store", () => ({ readCloudAccountToken: vi.fn() }));
 const token = `mf_${"a".repeat(43)}`;
 const reply = (status: number, body: unknown): Response =>
   ({ status, json: async () => body }) as Response;
@@ -11,7 +11,7 @@ beforeEach(() => vi.clearAllMocks());
 describe("Mithril in-app chat", () => {
   // @lat: [[mithril-migration#Mithril desktop migration#First-run connect#In-app chat]]
   it("posts to api.mithril.fund with the stored mf_ bearer and max_tokens >= 4096", async () => {
-    vi.mocked(readMithrilToken).mockReturnValue(token);
+    vi.mocked(readCloudAccountToken).mockReturnValue(token);
     const fetcher = vi.fn().mockResolvedValue(
       reply(200, {
         model: "qwen/qwen3.8-27b",
@@ -36,7 +36,7 @@ describe("Mithril in-app chat", () => {
   });
 
   it("retries once with a larger budget when reasoning_budget_exhausted leaves content empty", async () => {
-    vi.mocked(readMithrilToken).mockReturnValue(token);
+    vi.mocked(readCloudAccountToken).mockReturnValue(token);
     const empty = {
       status: 200,
       headers: new Headers({
@@ -74,7 +74,7 @@ describe("Mithril in-app chat", () => {
   });
 
   it("surfaces reasoning_budget_exhausted instead of a silent empty reply after a failed recovery", async () => {
-    vi.mocked(readMithrilToken).mockReturnValue(token);
+    vi.mocked(readCloudAccountToken).mockReturnValue(token);
     const empty = {
       status: 200,
       headers: new Headers({
@@ -96,7 +96,7 @@ describe("Mithril in-app chat", () => {
   });
 
   it("refuses to call the API without a stored token", async () => {
-    vi.mocked(readMithrilToken).mockReturnValue(null);
+    vi.mocked(readCloudAccountToken).mockReturnValue(null);
     const fetcher = vi.fn();
     expect(
       await mithrilChat([{ role: "user", content: "hi" }], "p", fetcher),
@@ -120,7 +120,7 @@ describe("Mithril in-app chat", () => {
   });
 
   it("surfaces the API error code without leaking exception text", async () => {
-    vi.mocked(readMithrilToken).mockReturnValue(token);
+    vi.mocked(readCloudAccountToken).mockReturnValue(token);
     const f401 = vi
       .fn()
       .mockResolvedValue(reply(401, { error: { code: "unauthenticated" } }));

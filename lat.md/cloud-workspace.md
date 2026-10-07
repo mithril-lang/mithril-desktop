@@ -1073,3 +1073,12 @@ Native and Web use the original shared profile creation modal and its styles fro
 Native cloning remains behind its original adapter. Browser creation uploads public original metadata under the authenticated owner, requires a revision-zero receipt and selects only accepted profiles. Existing/tombstoned IDs cannot be reused; conflicts and offline operations stay durable without replacement requests. Account changes fence completion. Credentials and execution grants are not cloned. Real shared-form tests cover cloud creation and Native's existing ambiguous-create recovery; publication and installed cross-device proof remain unfinished.
 
 The immutable creation archive contains 451 files with SHA256 `2e39b59ec70e8bc2723bbbe9f2eabee45b469bdf8b3bce169433bc334c4e63f0`; producer, archive, Native vendor and installed package bytes were compared independently.
+
+
+## Installation account identity (draft)
+
+Cloud workspace and chat use one encrypted installation account credential across profile selection; original native provider settings remain profile-scoped.
+
+[[src/main/mithril-token-store.ts#readCloudAccountToken]] promotes only the selected legacy credential when the account record is absent. It never enumerates profiles. Sign-out persists a marker that blocks legacy fallback after restart; unreadable ciphertext also cannot select another account. API owner and existing scope validation, profile context fences and source custody remain mandatory. Explicit sign-in updates account and selected native provider records with ciphertext rollback on failure. Credential mutations serialize across profiles. Tests exercise both real CloudWorkspace instances, profile switches, stale contexts, sign-out and failed storage. Production, installer and installed upgrade qualification remain pending.
+
+Local validation: all 308 test files passed (2815 tests, one existing skip), full Desktop typecheck/build and changed-file lint passed. On this Node 26 host, tests ran with `NODE_OPTIONS=--no-experimental-webstorage` and ambient `OPENROUTER_API_KEY` unset to preserve browser/test isolation; CI remains pinned to Node 22.

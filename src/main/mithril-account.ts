@@ -1,10 +1,11 @@
 // @lat: [[mithril-migration#Mithril desktop migration#Native Mithril account]]
 import { MITHRIL_ACCOUNT_URL, inspectMithrilToken } from "./mithril-token";
 import {
+  clearCloudAccountToken,
   clearMithrilToken,
-  mithrilStorageProtection,
-  readMithrilToken,
-  writeMithrilToken,
+  cloudAccountStorageProtection,
+  readCloudAccountToken,
+  writeMithrilAccountCredentials,
 } from "./mithril-token-store";
 import { onMithrilConnected, onMithrilDisconnected } from "./mithril-sync";
 import type {
@@ -20,7 +21,7 @@ export async function connectMithrilAccount(
   const inspection = await inspectMithrilToken(rawToken, fetchImpl);
   if (!inspection.ok) return { status: "refused", error: inspection.error };
   try {
-    writeMithrilToken(profile, rawToken.trim());
+    writeMithrilAccountCredentials(profile, rawToken.trim());
   } catch {
     return { status: "refused", error: "secure_storage_unavailable" };
   }
@@ -31,7 +32,7 @@ export async function connectMithrilAccount(
   }
   return {
     status: "connected",
-    protection: mithrilStorageProtection(profile),
+    protection: cloudAccountStorageProtection(),
     account: {
       userId: inspection.userId,
       accountUrl: MITHRIL_ACCOUNT_URL,
@@ -47,7 +48,7 @@ export async function mithrilAccount(
   profile?: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<MithrilAccount | null> {
-  const token = readMithrilToken(profile);
+  const token = readCloudAccountToken(profile);
   if (!token) return null;
   const inspection = await inspectMithrilToken(token, fetchImpl);
   if (!inspection.ok) {
@@ -73,6 +74,7 @@ export async function mithrilAccount(
 export function disconnectMithrilAccount(profile?: string): {
   success: boolean;
 } {
+  clearCloudAccountToken();
   clearMithrilToken(profile);
   try {
     onMithrilDisconnected();

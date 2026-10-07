@@ -1,5 +1,7 @@
 import type { OriginalScheduleReplicationPorts } from "./original-schedule-replication";
-vi.mock("./mithril-token-store", () => ({ readMithrilToken: () => f.token }));
+vi.mock("./mithril-token-store", () => ({
+  readCloudAccountToken: () => f.token,
+}));
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { mkdtempSync, mkdirSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";

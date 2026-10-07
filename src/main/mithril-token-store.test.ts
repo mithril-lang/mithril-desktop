@@ -1,4 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   existsSync,
   mkdtempSync,
@@ -15,13 +23,20 @@ const state = vi.hoisted(() => ({
   available: true,
   backend: "gnome_libsecret",
   failRead: false,
+  encryptionsUntilFailure: null as number | null,
 }));
 vi.mock("electron", () => ({
   app: { getPath: () => join(state.base, "userData") },
   safeStorage: {
     isEncryptionAvailable: () => state.available,
     getSelectedStorageBackend: () => state.backend,
-    encryptString: (value: string) => Buffer.from(`sealed:${value}`),
+    encryptString: (value: string) => {
+      if (state.encryptionsUntilFailure !== null) {
+        if (state.encryptionsUntilFailure-- === 0)
+          throw new Error("storage failed");
+      }
+      return Buffer.from(`sealed:${value}`);
+    },
     decryptString: (value: Buffer) => {
       if (state.failRead) throw new Error("keychain locked");
       return value.toString().replace(/^sealed:/, "");
@@ -43,6 +58,11 @@ vi.mock("./utils", async () => {
 
 import {
   clearMithrilToken,
+  clearCloudAccountToken,
+  readCloudAccountToken,
+  writeCloudAccountToken,
+  writeMithrilAccountCredentials,
+  MITHRIL_ACCOUNT_TOKEN_FILE,
   MITHRIL_INSTALL_SECRET_FILE,
   MITHRIL_TOKEN_FILE,
   mithrilStorageProtection,
@@ -186,5 +206,130 @@ describe("Mithril token at rest", () => {
     );
     state.failRead = false;
     expect(readMithrilToken("carol")).toBe(previous);
+  });
+});
+
+import { CloudWorkspace } from "./cloud-workspace";
+
+describe("installation cloud account identity", () => {
+  beforeEach(() => {
+    state.encryptionsUntilFailure = null;
+    rmSync(join(state.base, "userData", MITHRIL_ACCOUNT_TOKEN_FILE), {
+      force: true,
+    });
+    Object.assign(state, {
+      available: true,
+      backend: "gnome_libsecret",
+      failRead: false,
+    });
+  });
+
+  it("preserves the selected legacy account across new profiles without copying credentials into them", () => {
+    const token = `mf_${"j".repeat(43)}`;
+    writeMithrilToken("upgrade-source", token);
+    expect(readCloudAccountToken("upgrade-source")).toBe(token);
+    expect(readCloudAccountToken("cloud-only-profile")).toBe(token);
+    expect(readMithrilToken("cloud-only-profile")).toBeNull();
+    expect(existsSync(join(state.base, "cloud-only-profile"))).toBe(false);
+    // Switching to a profile with another legacy identity does not switch account.
+    writeMithrilToken("other-owner", `mf_${"k".repeat(43)}`);
+    expect(readCloudAccountToken("other-owner")).toBe(token);
+  });
+
+  it("persists sign-out across profile changes and fresh reads, then accepts explicit sign-in", () => {
+    writeMithrilToken("retained-owner", `mf_${"l".repeat(43)}`);
+    readCloudAccountToken("retained-owner");
+    clearCloudAccountToken();
+    expect(readCloudAccountToken("retained-owner")).toBeNull();
+    expect(readCloudAccountToken("other-owner")).toBeNull();
+    const next = `mf_${"m".repeat(43)}`;
+    writeCloudAccountToken(next);
+    expect(readCloudAccountToken("retained-owner")).toBe(next);
+  });
+
+  it("does not fall back to legacy credentials when account ciphertext is unreadable", () => {
+    const token = `mf_${"n".repeat(43)}`;
+    writeCloudAccountToken(token);
+    writeMithrilToken("legacy-readable", `mf_${"o".repeat(43)}`);
+    const path = join(state.base, "userData", MITHRIL_ACCOUNT_TOKEN_FILE);
+    writeFileSync(path, "broken record");
+    expect(readCloudAccountToken("legacy-readable")).toBeNull();
+  });
+
+  it("keeps account encryption and rollback when the system keyring is unavailable", () => {
+    state.available = false;
+    const token = `mf_${"p".repeat(43)}`;
+    writeCloudAccountToken(token);
+    const path = join(state.base, "userData", MITHRIL_ACCOUNT_TOKEN_FILE);
+    expect(readFileSync(path, "utf8")).not.toContain(token);
+    expect(readCloudAccountToken("new")).toBe(token);
+    const previous = readFileSync(path, "utf8");
+    state.available = true;
+    state.failRead = true;
+    expect(() => writeCloudAccountToken(`mf_${"q".repeat(43)}`)).toThrow();
+    state.failRead = false;
+    expect(readFileSync(path, "utf8")).toBe(previous);
+    expect(readCloudAccountToken("new")).toBe(token);
+  });
+  it("rolls back both account and native provider if the second encrypted write fails", () => {
+    const old = `mf_${"r".repeat(43)}`;
+    writeMithrilAccountCredentials("atomic", old);
+    const paths = [
+      join(state.base, "atomic", MITHRIL_TOKEN_FILE),
+      join(state.base, "userData", MITHRIL_ACCOUNT_TOKEN_FILE),
+    ];
+    const prior = paths.map((path) => readFileSync(path, "utf8"));
+    state.encryptionsUntilFailure = 1;
+    expect(() =>
+      writeMithrilAccountCredentials("atomic", `mf_${"s".repeat(43)}`),
+    ).toThrow();
+    expect(paths.map((path) => readFileSync(path, "utf8"))).toEqual(prior);
+    expect(readCloudAccountToken("atomic")).toBe(old);
+    expect(readMithrilToken("atomic")).toBe(old);
+  });
+
+  it("keeps workspace and chat identity across profile switches while fencing old native contexts", async () => {
+    writeMithrilAccountCredentials("existing", `mf_${"t".repeat(43)}`);
+    let profile = "existing";
+    const create = (readScope: string, writeScope: string): CloudWorkspace =>
+      new CloudWorkspace({
+        token: () => readCloudAccountToken(profile),
+        profile: () => profile,
+        origin: () => "https://api.mithril.fund",
+        changed: () => {},
+        readScope,
+        writeScope,
+        fetch: vi.fn(
+          async () =>
+            new Response(
+              JSON.stringify({
+                via: "api_token",
+                user: { id: "owner" },
+                scopes: [
+                  "workspace:read",
+                  "workspace:write",
+                  "chat:read",
+                  "chat:write",
+                ],
+              }),
+              { status: 200 },
+            ),
+        ) as typeof fetch,
+      });
+    const workspace = create("workspace:read", "workspace:write");
+    const chat = create("chat:read", "chat:write");
+    await workspace.enable();
+    await chat.enable();
+    const priorContext = await workspace.nativeContext();
+    profile = "new-cloud-profile";
+    expect(await workspace.status()).toMatchObject({ userId: "owner" });
+    expect(await chat.status()).toMatchObject({ userId: "owner" });
+    expect(() => workspace.assertNativeContext(priorContext)).toThrow();
+    expect(readMithrilToken(profile)).toBeNull();
+    await workspace.enable();
+    await chat.enable();
+    clearCloudAccountToken();
+    expect(await workspace.status()).toEqual({ userId: null, enabled: false });
+    expect(await chat.status()).toEqual({ userId: null, enabled: false });
   });
 });

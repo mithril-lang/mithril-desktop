@@ -128,7 +128,7 @@ describe("Mithril runtime credential lifecycle", () => {
     expect(refreshRuntime).toHaveBeenCalledTimes(2);
   });
 
-  it("does not let a slow connect overtake a later disconnect", async () => {
+  it("does not let a slow connect overtake a later disconnect from another profile", async () => {
     let finishConnect: (() => void) | undefined;
     connect.mockImplementationOnce(
       () =>
@@ -139,12 +139,12 @@ describe("Mithril runtime credential lifecycle", () => {
     const subject = lifecycle();
     const connecting = subject.connect("dummy", "profile-a");
     await vi.waitFor(() => expect(connect).toHaveBeenCalledTimes(1));
-    const disconnecting = subject.disconnect("profile-a");
+    const disconnecting = subject.disconnect("profile-b");
     await Promise.resolve();
     expect(disconnect).not.toHaveBeenCalled();
     finishConnect?.();
     await Promise.all([connecting, disconnecting]);
-    expect(disconnect).toHaveBeenCalledWith("profile-a");
+    expect(disconnect).toHaveBeenCalledWith("profile-b");
     expect(refreshRuntime).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,7 +1,7 @@
 // @lat: [[mithril-migration#Mithril desktop migration#First-run connect#In-app chat]]
 /** Chat with the Mithril API using only the stored mf_ bearer. */
 import { mithrilApiOrigin } from "./mithril-token";
-import { readMithrilToken } from "./mithril-token-store";
+import { readCloudAccountToken } from "./mithril-token-store";
 import type { MithrilChatResult } from "../shared/account";
 
 export const MITHRIL_CHAT_MODEL = "qwen/qwen3.8-27b";
@@ -101,7 +101,7 @@ export async function mithrilChat(
   profile?: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<MithrilChatResult> {
-  const token = readMithrilToken(profile);
+  const token = readCloudAccountToken(profile);
   if (!token) return { ok: false, error: "not_connected" };
   const clean = (Array.isArray(messages) ? messages : [])
     .filter(

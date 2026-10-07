@@ -775,7 +775,7 @@ The tests exercise the actual source/resource adapters, shared repository engine
 
 Desktop now mounts the original shared Schedules component directly over its automatically synchronized original inventory, with no separate device dialog.
 
-Workspace `0.6.29-schedules.4` resets the original renderer's rows, dialogs and action state when its API or profile changes. Out-of-order refresh replies cannot replace the newest inventory, and a successful refresh clears a prior load error. The new immutable vendor archive includes the shared browser original-file context export; the preceding archive is retained unchanged. Source package tests and consumer build checks remain distinct from a signed installer or installed behavior.
+Workspace `0.6.29-schedules.5` resets the original renderer's rows, dialogs and action state when its API or profile changes. Out-of-order refresh replies cannot replace the newest inventory, and a successful refresh clears a prior load error. The new immutable vendor archive includes the shared browser original-file context export; the preceding archive is retained unchanged. Source package tests and consumer build checks remain distinct from a signed installer or installed behavior.
 
 [[src/renderer/src/screens/CloudWorkspace/CloudSchedules.tsx]] retains the original cards, creation form and lifecycle controls, remounting on account changes. The existing narrow Cron IPC operations call [[src/main/original-schedule-replication-runtime.ts#runOriginalScheduleScreen]] through the same serialized lane as background replication. Profile/account identity is captured before queuing and checked before/after actions; switching users cannot apply an old queued action to a new account.
 
@@ -866,8 +866,15 @@ Actual Agent A/B/A tests verify read-only completed inspection after original so
 
 ## Current-main shared schedules package
 
-Desktop now pins workspace `0.6.29-schedules.4`, packed from Fund `db985e3f`, including current-main shared UI changes and the unified schedule adapter. Earlier archives remain immutable.
+Desktop now pins workspace `0.6.29-schedules.5`, packed from Fund `4f204465`, including current-main shared UI changes and the unified schedule adapter. Earlier archives remain immutable.
 
 The installer candidate is preview.37 because preview.36 already has published assets.
 
 Source, archive and installed files plus the lock integrity are checked together before consumer build verification. This package update does not change the Agent bootstrap pin, publish the original execution schema, or prove an installed-client release.
+
+
+## Live shared schedule inventory
+
+The original shared schedule renderer follows synchronized rows without reopening the screen.
+
+Workspace `0.6.29-schedules.5` refreshes idle rows every five seconds through the existing account-scoped API. Background reads are serial and stop when unmounted; dialogs and pending actions suspend new background reads. The screen retains the existing controls and generation checks. The producer passed 28 focused shared tests and 24 browser adapter tests. Consumer build and tests, CI, installers and live cross-device behavior are separate gates.

@@ -431,3 +431,7 @@ A network failure retries the original transport and never opens an account prom
 ## New Chat before sign-in
 
 Failed identity checks display readable sign-in guidance and no chat operation is sent. Shared tests cover opening without identity/models and retaining the new screen after an initial session link.
+
+## Signed-in scoped authorization recovery
+
+Chat distinguishes missing scoped permission from account expiry and transport errors. Its original shared welcome action offers permission approval or network retry; retries never start device sign-in or change stored credentials.

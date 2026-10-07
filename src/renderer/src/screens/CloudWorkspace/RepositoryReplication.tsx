@@ -1,3 +1,4 @@
+import { connectionNotice as describeConnectionFailure } from "./connection-notice";
 import { useEffect, useRef, useState } from "react";
 import { useRepositoryReplication } from "@mithril/workspace/repository-react";
 
@@ -67,16 +68,7 @@ export default function RepositoryReplication({
         .catch((error) => {
           if (active)
             setConnectionNotice(
-              error instanceof Error &&
-                /Cloud connection requires explicit|sign.in expired|Sign in to your Mithril account first/i.test(
-                  error.message,
-                )
-                ? locale.startsWith("ja")
-                  ? "Mithril にサインインして同期を続けてください。"
-                  : "Sign in to Mithril to resume synchronization."
-                : locale.startsWith("ja")
-                  ? "同期に接続できません。接続を確認してください。"
-                  : "Synchronization unavailable. Check your connection.",
+              describeConnectionFailure(error, locale).message,
             );
         });
     return () => {

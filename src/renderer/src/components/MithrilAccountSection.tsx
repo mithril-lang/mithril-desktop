@@ -219,7 +219,7 @@ export default function MithrilAccountSection({
                 className={`hermes-account-chip ${account.live ? "is-connected" : ""}`}
               >
                 {account.live
-                  ? label("Connected", "接続済み")
+                  ? label("Signed in", "サインイン済み")
                   : label("Connection expired", "接続が無効です")}
               </span>
             </span>
@@ -252,7 +252,12 @@ export default function MithrilAccountSection({
           disabled={busy}
           onClick={() => void deviceLogin()}
         >
-          {label("Sign in with browser", "ブラウザでサインイン")}
+          {account?.live
+            ? label(
+                "Approve Chat and Workspace access",
+                "Chat・Workspace のアクセスを承認",
+              )
+            : label("Sign in with browser", "ブラウザでサインイン")}
         </button>
         {deviceCode && (
           <>

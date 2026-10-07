@@ -1025,3 +1025,9 @@ Workspace `0.6.29-schedules.15` removes the duplicate Native loader and connects
 The shared original identity editor retains active name drafts while Web observes remote metadata revisions automatically.
 
 Workspace `0.6.29-schedules.16` refreshes clean Web identity panes from the existing owner-bound metadata/resource adapter. During name editing, its original snapshot remains the save baseline; a remote change produces a conflict instead of replacing the draft or silently overwriting it. Native uses the same identity component. Its archive contains 443 files with SHA256 `824e9da90e59336d08c4c6f2a185077a2b7fa619433310348ea88f4644e9d1f7`. Source tests and local builds do not prove public or installed cross-device operation.
+
+## Background original Agent Memory pane (draft)
+
+Native and Web share periodic profile Memory refresh, with frozen entry drafts and observed save baselines retained across remote changes.
+
+Workspace `0.6.29-schedules.17` updates an already loaded pane every 20 seconds without overlapping reads or retrying an initial failed load automatically. Scope invalidation refuses late results. Removing the last remote entry cannot hide an active original entry editor or delete confirmation; adapter-provided portable-note baselines are preserved. The immutable archive contains 443 files, SHA256 `88aec801017fbc9508ebf8497b544a9c8f0c2997891ffbe089c873d97e2d3acd`. Timer/adapter regression tests and local builds remain distinct from publication and installed cross-device proof.

@@ -1100,3 +1100,12 @@ The original Native profile adapter recovers failed or missing reads inside the 
 Read responses are fenced to the open profile and request generation. Changing or closing the dialog retires prior responses; loaded data from another profile is never rendered. Failed refresh keeps the current profile with retry, and a missing profile exposes close/retry instead of an infinite loader. A late deletion retains its authorized backend outcome but cannot close another selected profile or invoke stale view callbacks. Native read recovery does not yet qualify public cross-device synchronization or installed upgrade behavior.
 
 Local validation passes all 18 original ProfileModal, ProfileSyncPane and Agents tests, Desktop build/types, changed-file lint and lat links. Release and installed operation remain separate gates.
+
+
+## Original Advanced profile pane shared consumption (draft)
+
+The original Advanced deletion pane now renders through DesktopProfileAdvanced from workspace 0.6.29-schedules.28, preserving the Native profile-scoped operation.
+
+[[src/renderer/src/components/profile/ProfileModal.tsx#ProfileModal]] supplies the existing confirmation state, pending state, error, original icon and deletion handler. Default-profile protection and original confirmation markup are shared; Native retains account/profile effects and fences late responses. Existing adapter tests exercise failure/retry and dialog replacement against the actual compiled shared package. Browser all-data deletion remains unfinished because a metadata-only tombstone cannot represent removal of history, files, schedules and runtime state. Publication and installed upgrade/cross-device proof remain separate gates.
+
+The immutable archive contains 461 matching producer/archive/vendor/installed files with SHA256 `d8a8e9a90107aae96df2cbf991f2d8f99cb98b1b23b8195927654d20c44c8fc4`.

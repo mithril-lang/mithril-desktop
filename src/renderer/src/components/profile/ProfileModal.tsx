@@ -24,6 +24,7 @@ import ProfileAvatar from "../common/ProfileAvatar";
 import {
   DesktopProfileIdentity,
   DesktopProfileModal,
+  DesktopProfileAdvanced,
 } from "@mithril/workspace/desktop-profile";
 import { fileToAvatarDataUrl } from "../../utils/imageResize";
 import { useI18n } from "../useI18n";
@@ -367,53 +368,17 @@ export default function ProfileModal({
           {section === "sync" && <ProfileSyncPane profile={profile.id} />}
 
           {section === "advanced" && (
-            <div className="profile-modal-pane">
-              {profile.isDefault ? (
-                <p className="profile-modal-danger-info">
-                  {t("agents.defaultNotDeletable")}
-                </p>
-              ) : (
-                <div className="profile-modal-danger">
-                  <span className="profile-modal-label profile-modal-danger-label">
-                    {t("agents.dangerZone")}
-                  </span>
-                  <p className="profile-modal-danger-info">
-                    {t("agents.deleteProfileInfo")}
-                  </p>
-                  {confirmDelete ? (
-                    <div className="profile-modal-danger-confirm">
-                      <span>{t("agents.deleteProfileConfirm")}</span>
-                      <div className="profile-modal-image-actions">
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={handleDelete}
-                          disabled={deleting}
-                        >
-                          {t("agents.deleteProfile")}
-                        </button>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => setConfirmDelete(false)}
-                        >
-                          {t("common.cancel")}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      className="btn btn-danger-ghost btn-sm"
-                      onClick={() => setConfirmDelete(true)}
-                      disabled={deleting}
-                    >
-                      <Trash size={13} />
-                      {t("agents.deleteProfile")}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {error && <div className="agents-create-error">{error}</div>}
-            </div>
+            <DesktopProfileAdvanced
+              isDefault={profile.isDefault}
+              confirmDelete={confirmDelete}
+              deleting={deleting}
+              error={error}
+              t={t}
+              onConfirm={() => setConfirmDelete(true)}
+              onCancel={() => setConfirmDelete(false)}
+              onDelete={handleDelete}
+              Trash={Trash}
+            />
           )}
         </>
       )}

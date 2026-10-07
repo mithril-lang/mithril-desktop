@@ -977,3 +977,9 @@ The original Desktop profile identity pane, avatar, palette, image resizer and C
 Memory replication now captures all existing owner-bound profile working copies without switching the active profile.
 
 [[src/main/profile-memory-inventory.ts#profileMemoryInventory]] reads the original three Memory files and configured limits through the existing reader. Only successfully captured profile IDs are claimed; absent, linked or invalid sources cannot erase other cloud records. [[src/main/repository-kanban-runtime.ts#nativeReplicaApply]] selects the exact owned profile from the validated Memory body and stable ID before invoking the original lock/CAS/receipt transaction. Capability configuration, Skills and schedules still require their all-profile paths; this is not published or installed-client qualification.
+
+## All-profile Capability configuration capture (draft)
+
+Capability configuration records now come from every present owner-bound original profile without switching the active selection.
+
+[[src/main/repository-kanban-runtime.ts#nativeReplicaSnapshot]] reuses the validated profile inventory and original descriptor readers for each public configuration anchor. Exact configuration bytes and the original directory identity are checked across async descriptor reads; unavailable sources cannot claim deletion authority. [[src/main/repository-kanban-runtime.ts#nativeReplicaApply]] routes a validated Capability body and stable ID to the matching owned original profile before the existing lock/CAS transaction. Skill resources and schedule sources still need all-profile transport paths. Source tests and builds are separate from publication and installed-client verification.

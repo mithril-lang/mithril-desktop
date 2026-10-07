@@ -884,3 +884,13 @@ Tests capture default, research and empty owned profiles with original contents 
 ## All-profile Memory inventory preserves unavailable sources
 
 Tests retain missing, linked and malformed source data without claiming their Memory IDs as complete or deleting cloud records.
+
+## All-profile Capability configuration capture
+
+Tests capture default, research and empty profiles while excluding a differently owned profile.
+
+Original selection is preserved, public descriptors are keyed to the correct profile, and credential values and install/test execution remain excluded.
+
+## All-profile Capability restore targets its original profile
+
+Tests restore a cloud configuration change into the owned research working copy while the selected default configuration remains byte-identical. No installation is performed.

@@ -23,26 +23,40 @@ const state = vi.hoisted(() => ({
     putManifest: vi.fn(),
   },
   owner: vi.fn(),
+  guard: vi.fn(),
+  toolProfiles: [] as string[],
 }));
 vi.mock("electron", () => ({ app: { getPath: () => state.userData } }));
-vi.mock("./utils", () => ({ profileHome: () => state.home }));
+vi.mock("./utils", () => ({
+  profileHome: (profile: string) =>
+    profile === "default" ? state.home : join(state.home, "profiles", profile),
+}));
 vi.mock("./config", () => ({ getConnectionConfig: () => ({ mode: "local" }) }));
 vi.mock("./cloud-workspace-runtime", () => ({
   cloudWorkspace: {
     nativeContext: state.context,
+    assertNativeContext: state.guard,
     capabilityResources: { forOwner: state.owner },
   },
 }));
-vi.mock("./installer", () => ({ HERMES_PYTHON: "/usr/bin/python3" }));
+vi.mock("./installer", () => ({
+  HERMES_PYTHON: "/usr/bin/python3",
+  get HERMES_HOME() {
+    return state.home;
+  },
+}));
 vi.mock("./tools", () => ({
-  getToolsets: () => [
-    {
-      key: "execution",
-      label: "Original execution",
-      description: "Retained",
-      enabled: true,
-    },
-  ],
+  getToolsets: (profile: string) => {
+    state.toolProfiles.push(profile);
+    return [
+      {
+        key: "execution",
+        label: "Original execution",
+        description: "Retained",
+        enabled: true,
+      },
+    ];
+  },
 }));
 vi.mock("./mcp-servers", () => ({
   listMcpServers: async () => [
@@ -90,6 +104,7 @@ afterEach(() => {
   state.resources.putChunk.mockReset();
   state.resources.putManifest.mockReset();
   state.owner.mockReset();
+  state.toolProfiles.splice(0);
 });
 function setup(): void {
   const root = realpathSync(
@@ -103,6 +118,74 @@ function setup(): void {
   writeFileSync(join(state.home, "config.yaml"), "# Original source\n");
   state.context.mockResolvedValue({ userId: "alice", profile: "default" });
 }
+// @lat: [[cloud-workspace-tests#All-profile Capability configuration capture]]
+it("captures each owned original Capability profile while retaining foreign source isolation and active selection", async () => {
+  setup();
+  for (const profile of ["research", "empty", "foreign"]) {
+    const home = join(state.home, "profiles", profile);
+    mkdirSync(home, { recursive: true });
+    writeFileSync(join(home, "config.yaml"), "# Original " + profile + "\n");
+  }
+  const { bindRepositorySource } = await import("./repository-kanban-runtime");
+  bindRepositorySource(
+    join(state.userData, "repository-source-owners"),
+    "foreign",
+    "bob",
+  );
+  writeFileSync(join(state.home, "active_profile"), "default\n");
+  const snapshot = await nativeReplicaSnapshot();
+  const configurations = snapshot.documents.filter(
+    (row) =>
+      row.collection === "capability" && row.id.startsWith("capability-"),
+  );
+  expect(configurations.map((row) => row.id).sort()).toEqual([
+    "capability-default",
+    "capability-empty",
+    "capability-research",
+  ]);
+  expect(state.toolProfiles).toEqual(["default", "empty", "research"]);
+  expect(readFileSync(join(state.home, "active_profile"), "utf8")).toBe(
+    "default\n",
+  );
+  expect(JSON.stringify(configurations)).not.toContain("PRIVATE_VALUE");
+  expect(state.test).not.toHaveBeenCalled();
+  expect(state.install).not.toHaveBeenCalled();
+});
+// @lat: [[cloud-workspace-tests#All-profile Capability restore targets its original profile]]
+it("restores a cloud Capability change to its owned research profile without changing the active default configuration", async () => {
+  setup();
+  const home = join(state.home, "profiles", "research");
+  mkdirSync(home, { recursive: true });
+  writeFileSync(join(home, "config.yaml"), "# Research original\n");
+  const snapshot = await nativeReplicaSnapshot();
+  const original = snapshot.documents.find(
+    (row) => row.id === "capability-research",
+  )!;
+  type Configuration = { toolsets: { enabled: boolean }[] };
+  const target = structuredClone(original.body);
+  (target as unknown as Configuration).toolsets[0].enabled = false;
+  const result = await nativeReplicaApply({
+    operationId: "research-config-edit",
+    expectedRecord: original,
+    expectedVersion: original.version,
+    document: {
+      collection: "capability",
+      id: original.id,
+      body: target,
+      deleted: false,
+      revision: 2,
+      updatedAt: 1,
+    },
+  });
+  expect(result.status).toBe("applied");
+  expect(readFileSync(join(state.home, "config.yaml"), "utf8")).toBe(
+    "# Original source\n",
+  );
+  expect(readFileSync(join(home, "config.yaml"), "utf8")).not.toBe(
+    "# Research original\n",
+  );
+  expect(state.install).not.toHaveBeenCalled();
+});
 // @lat: [[cloud-workspace-tests#Cloud workspace tests#Capability snapshot identity]]
 it("reads owner-profile configuration without duplicating Skill bytes, credentials, paths or execution", async () => {
   setup();

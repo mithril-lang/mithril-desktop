@@ -1080,21 +1080,30 @@ async function replicaContext(write = false): Promise<{
   };
 }
 /** Fixed original configuration descriptors; Skill bytes live in separate resources. No tests or installs run here. */
-async function nativeCapabilitySource(): Promise<
+async function nativeCapabilitySource(
+  source?: import("./profile-metadata-inventory").ProfileMetadataSource,
+  captured?: Awaited<ReturnType<typeof cloudWorkspace.nativeContext>>,
+): Promise<
   Awaited<
     ReturnType<import("@mithril/workspace/capability-data").CapabilitySeed>
   > & { configDigest: string }
 > {
-  const before = await cloudWorkspace.nativeContext();
+  const before = captured ?? (await cloudWorkspace.nativeContext());
+  const profile = source?.profile ?? before.profile;
+  if (source && !source.present) throw Error("Capability profile unavailable");
+  if (captured) cloudWorkspace.assertNativeContext(captured);
   if (getConnectionConfig().mode !== "local")
     throw Error("Capability source unavailable for this runtime");
   bindRepositorySource(
     join(app.getPath("userData"), "repository-source-owners"),
-    before.profile,
+    profile,
     before.userId,
   );
-  const home = profileHome(before.profile);
+  const home = source?.root ?? profileHome(profile);
   checked(home);
+  const originalDirectory = source ? lstatSync(home) : null;
+  if (originalDirectory && !originalDirectory.isDirectory())
+    throw Error("Capability profile unavailable");
   const { assertSkillResourcesReady } =
     await import("./skill-resource-replica");
   const skillStateRoot = join(
@@ -1105,6 +1114,7 @@ async function nativeCapabilitySource(): Promise<
   const configFile = join(home, "config.yaml");
   checked(configFile);
   const readConfig = (): Buffer => {
+    if (captured) cloudWorkspace.assertNativeContext(captured);
     checked(configFile);
     if (!existsSync(configFile)) return Buffer.from("");
     const stat = lstatSync(configFile);
@@ -1124,21 +1134,34 @@ async function nativeCapabilitySource(): Promise<
       import("./mcp-servers"),
       import("@mithril/workspace/capability-data"),
     ]);
-  const toolsets = getToolsets(before.profile);
-  const mcps = await listMcpServers(before.profile);
+  if (captured) cloudWorkspace.assertNativeContext(captured);
+  const toolsets = getToolsets(profile);
+  const mcps = await listMcpServers(profile);
+  if (captured) cloudWorkspace.assertNativeContext(captured);
   assertSkillResourcesReady(join(home, "skills"), skillStateRoot);
   const afterConfig = readConfig();
   if (!config.equals(afterConfig))
     throw Error("Capability changed during snapshot; original source retained");
-  const body = resourceCapabilityData(before.profile, toolsets, mcps);
-  if (
+  if (originalDirectory) {
+    checked(home);
+    const after = lstatSync(home);
+    if (
+      !after.isDirectory() ||
+      after.ino !== originalDirectory.ino ||
+      after.dev !== originalDirectory.dev
+    )
+      throw Error("Capability profile changed during capture");
+  }
+  const body = resourceCapabilityData(profile, toolsets, mcps);
+  if (captured) cloudWorkspace.assertNativeContext(captured);
+  else if (
     JSON.stringify(before) !==
     JSON.stringify(await cloudWorkspace.nativeContext())
   )
     throw Error("Workspace identity changed");
   return {
     userId: before.userId,
-    profile: before.profile,
+    profile,
     body,
     configDigest: createHash("sha256").update(config).digest("hex"),
   };
@@ -1392,27 +1415,36 @@ export async function nativeReplicaSnapshot(): Promise<
     );
   }
   try {
-    const capability = await nativeCapabilitySnapshot();
+    const sources = await inventory();
     const { capabilityId } = await import("@mithril/workspace/capability-data");
-    const id = capabilityId(before.profile);
     snapshot.collections.push("capability");
-    (snapshot.recordScopes ??= []).push({
-      collection: "capability",
-      ids: [id],
-    });
-    const body = capability.body as unknown as JsonValue;
-    snapshot.documents.push({
-      collection: "capability",
-      id,
-      body,
-      deleted: false,
-      version: createHash("sha256")
-        .update(repositoryFingerprint({ body, deleted: false }))
-        .digest("hex"),
-    });
+    const scope = { collection: "capability" as const, ids: [] as string[] };
+    (snapshot.recordScopes ??= []).push(scope);
+    for (const source of sources.sources) {
+      if (!source.present) continue;
+      try {
+        const capability = await nativeCapabilitySource(source, before.context);
+        const id = capabilityId(source.profile);
+        const body = capability.body as unknown as JsonValue;
+        scope.ids.push(id);
+        snapshot.documents.push({
+          collection: "capability",
+          id,
+          body,
+          deleted: false,
+          version: createHash("sha256")
+            .update(repositoryFingerprint({ body, deleted: false }))
+            .digest("hex"),
+        });
+      } catch {
+        snapshot.warnings!.push(
+          `Profile ${source.profile} Capability source is unavailable; original configuration is retained`,
+        );
+      }
+    }
   } catch {
     snapshot.warnings!.push(
-      "Capability source requires synchronization review; original configuration is retained",
+      "Capability profile inventory is unavailable; original configuration is retained",
     );
   }
   try {
@@ -1681,7 +1713,27 @@ export async function nativeReplicaApply(
       }
     }
   } else if (write.document.collection === "capability") {
-    const source = await nativeCapabilitySource();
+    const { validCapabilityData, capabilityId } =
+      await import("@mithril/workspace/capability-data");
+    const sources = await metadataSources(before);
+    const body = write.document.body;
+    const original = validCapabilityData(body)
+      ? sources.sources.find(
+          (row) =>
+            row.present &&
+            row.profile === body.profile &&
+            write.document.id === capabilityId(row.profile),
+        )
+      : undefined;
+    if (!original)
+      return {
+        schemaVersion: 1,
+        userId: before.userId,
+        replicaId: before.replicaId,
+        status: "deferred",
+        record: null,
+      };
+    const source = await nativeCapabilitySource(original, before.context);
     const [{ HERMES_PYTHON }, { applyCapabilityConfigReplica }] =
       await Promise.all([
         import("./installer"),
@@ -1693,7 +1745,7 @@ export async function nativeReplicaApply(
     )
       throw Error("Workspace identity changed");
     result = applyCapabilityConfigReplica(
-      profileHome(before.profile),
+      original.root,
       before.userId,
       before.replicaId,
       HERMES_PYTHON,

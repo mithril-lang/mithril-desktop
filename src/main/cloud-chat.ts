@@ -158,7 +158,7 @@ export class CloudChat implements SessionTransport {
       throw Error("Invalid tool checkpoint");
     const { value } = await this.auth.authorizedRequest(
       `/v1/chat/sessions/${encodeURIComponent(id)}/browser`,
-      body,
+      { ...body, toolProtocol: "mithril-language-v1" },
       "inference",
     );
     const result = value as {

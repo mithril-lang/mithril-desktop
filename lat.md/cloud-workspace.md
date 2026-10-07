@@ -1019,3 +1019,9 @@ Workspace `0.6.29-schedules.14` keeps Native's original section labels, icons, t
 Native ProfileModal and Web profiles now render DesktopProfileMemory from one component, using their existing storage adapters.
 
 Workspace `0.6.29-schedules.15` removes the duplicate Native loader and connects Web Agent Memory to owner-bound original MEMORY resources. Failed loads require explicit retry instead of repeating forever, and late responses from replaced profiles are ignored. Entry saves retain the original MEMORY/USER baseline. Native preload Memory types now describe the actual main-process result. Publication and installed cross-device behavior remain unverified.
+
+## Background profile identity refresh (draft)
+
+The shared original identity editor retains active name drafts while Web observes remote metadata revisions automatically.
+
+Workspace `0.6.29-schedules.16` refreshes clean Web identity panes from the existing owner-bound metadata/resource adapter. During name editing, its original snapshot remains the save baseline; a remote change produces a conflict instead of replacing the draft or silently overwriting it. Native uses the same identity component. Its archive contains 443 files with SHA256 `824e9da90e59336d08c4c6f2a185077a2b7fa619433310348ea88f4644e9d1f7`. Source tests and local builds do not prove public or installed cross-device operation.

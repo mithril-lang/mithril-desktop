@@ -866,7 +866,7 @@ Actual Agent A/B/A tests verify read-only completed inspection after original so
 
 ## Current-main shared schedules package
 
-Desktop now pins workspace `0.6.29-schedules.5`, packed from Fund `4f204465`, including current-main shared UI changes and the unified schedule adapter. Earlier archives remain immutable.
+Desktop now pins workspace `0.6.29-schedules.6`, packed from Fund `1098d029`, including current-main shared UI changes and the unified schedule adapter. Earlier archives remain immutable.
 
 The installer candidate is preview.37 because preview.36 already has published assets.
 
@@ -878,3 +878,12 @@ Source, archive and installed files plus the lock integrity are checked together
 The original shared schedule renderer follows synchronized rows without reopening the screen.
 
 Workspace `0.6.29-schedules.5` refreshes idle rows every five seconds through the existing account-scoped API. Background reads are serial and stop when unmounted; dialogs and pending actions suspend new background reads. The screen retains the existing controls and generation checks. The producer passed 28 focused shared tests and 24 browser adapter tests. Consumer build and tests, CI, installers and live cross-device behavior are separate gates.
+
+
+## Memory drafts during cloud synchronization
+
+The original shared Memory editor keeps new input while a save or remote refresh is pending.
+
+Workspace `0.6.29-schedules.6` isolates Memory editors when the adapter/profile changes. Profile saves block duplicate submission, retain later typing and keep the acknowledged expected text. An older read cannot replace an acknowledged edit. Transport failures preserve drafts and do not report Saved. Producer renderer/file/note regressions passed 13 tests and browser screen tests passed four; App CI requires these regressions. Native credentials remain outside synchronized records. Production and installed-client checks remain separate.
+
+Consumer validation compared all 426 archive files with producer and installed bytes and checked the lock SHA512. Native build, 19 tests across Memory locking/reconciliation and shared cloud routes, and lat validation passed. The installer candidate remains preview.37; it has not been published or installed by this change.

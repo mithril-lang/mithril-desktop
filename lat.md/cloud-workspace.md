@@ -927,3 +927,9 @@ The background reconciler observes the same rich `preferences/presentation` reco
 Every Settings command in the mounted Desktop workspace uses the same original shared modal, including commands targeting another profile.
 
 [[src/renderer/src/screens/CloudWorkspace/useWorkspaceSettingsRoute.ts#useWorkspaceSettingsRoute]] preserves the explicit profile, section and request generation. Layout passes that profile to the original native Settings provider, while general preferences stay account-scoped. Opening settings never switches the current Chat agent or starts another conversation. Bootstrap setup remains available before Layout mounts.
+
+## Original profile metadata file preservation (draft)
+
+Original profile edits use the shared token-preserving metadata patcher and an atomic main-process file replacement before profile resource replication can be enabled.
+
+[[src/main/profile-meta-files.ts#readProfileMetadataFile]] captures exact bounded UTF-8 object bytes without following linked storage. [[src/main/profile-meta-files.ts#patchProfileMetadataFile]] synchronously reads, patches only the authored name/color/avatar token, checks the source again and fsyncs a private temporary file before rename. Unknown extension fields, opaque integer precision, whitespace and BOM survive. All original `profile-meta.ts` appearance handlers use this lane; malformed or ambiguous source is retained instead of being replaced with empty projected metadata. This prepares the original edit surface for bidirectional sync but does not itself enable profile replication or prove installed-client publication.

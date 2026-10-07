@@ -1041,3 +1041,59 @@ it("invalidates native background work on token, profile, actor or lifecycle cha
     "stale native context",
   );
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Original profile metadata resource transport]]
+it("binds original profile resources to main-process API identity without credential expansion", async () => {
+  const { profileResourceId } =
+    await import("@mithril/workspace/profile-resources");
+  const { digestBytes } = await import("@mithril/workspace/files");
+  const bytes = new Uint8Array(new TextEncoder().encode('{"name":"original"}')),
+    digest = await digestBytes(bytes),
+    id = await profileResourceId("default");
+  let release: ((response: Response) => void) | undefined;
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: token === tokenB ? "b" : "a" },
+        scopes: ["workspace:read", "workspace:write"],
+      });
+    calls.push({ url, init });
+    return new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+  });
+  await client.enable();
+  await expect(
+    client.authorizedBinaryRequest(
+      "/v1/workspace/resources/profile/other/chunks",
+    ),
+  ).rejects.toThrow("profile resource route");
+  await expect(
+    client.profileResources.forOwner("b").getChunk(id, digest),
+  ).rejects.toThrow("owner changed");
+  const pending = client.profileResources.forOwner("a").getChunk(id, digest);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  expect(calls[0].url).toBe(
+    `https://api.mithril.fund/v1/workspace/resources/profile/${id}/chunks/${digest}`,
+  );
+  expect(
+    new Headers(calls[0].init?.headers).get("x-mithril-workspace-owner"),
+  ).toBe("a");
+  expect(calls[0].init).toMatchObject({
+    credentials: "omit",
+    redirect: "error",
+  });
+  client.reset();
+  token = tokenB;
+  release!(new Response(bytes.slice()));
+  await expect(pending).rejects.toThrow("Account changed");
+  await client.enable();
+  fetcher.mockImplementation(async () =>
+    reply({ via: "api_token", user: { id: "b" }, scopes: ["workspace:read"] }),
+  );
+  await expect(
+    client.profileResources.forOwner("b").putChunk(id, bytes),
+  ).rejects.toThrow("write scope");
+});

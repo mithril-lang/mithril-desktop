@@ -1,3 +1,4 @@
+import { createProfileResourceTransport } from "@mithril/workspace/profile-resources";
 import { createOriginalScheduleResourceTransport } from "@mithril/workspace/original-schedule-resources";
 import {
   createTaskAttachmentTransport,
@@ -115,7 +116,11 @@ export class CloudWorkspace {
   readonly files: ProjectFileTransport;
   readonly capabilityResources: CapabilityResourceTransport;
   readonly scheduleResources: CapabilityResourceTransport;
+  readonly profileResources: CapabilityResourceTransport;
   constructor(private deps: Dependencies) {
+    this.profileResources = createProfileResourceTransport((path, init) =>
+      this.authorizedBinaryRequest(path, init),
+    );
     this.taskAttachments = createTaskAttachmentTransport((path, init) =>
       this.authorizedBinaryRequest(path, init),
     );
@@ -135,13 +140,13 @@ export class CloudWorkspace {
     init?: RequestInit,
   ): Promise<Response> {
     if (
-      !/^\/v1\/(?:workspace\/files(?:\/|$)|workspace\/resources\/(?:capability|task|schedule)\/[a-zA-Z0-9_-]{1,128}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
+      !/^\/v1\/(?:workspace\/files(?:\/|$)|workspace\/resources\/(?:capability|task|schedule|profile)\/[a-zA-Z0-9_-]{1,128}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
         path,
       ) ||
       (!["GET", "POST"].includes(init?.method ?? "GET") &&
         !(
           init?.method === "HEAD" &&
-          /^\/v1\/workspace\/resources\/(?:capability|task|schedule)\/[a-zA-Z0-9_-]{1,128}\/chunks\/[a-f0-9]{64}$/.test(
+          /^\/v1\/workspace\/resources\/(?:capability|task|schedule|profile)\/[a-zA-Z0-9_-]{1,128}\/chunks\/[a-f0-9]{64}$/.test(
             path,
           )
         ))
@@ -161,6 +166,13 @@ export class CloudWorkspace {
       )
     )
       throw Error("Unsupported schedule resource route");
+    if (
+      /^\/v1\/workspace\/resources\/profile\//.test(path) &&
+      !/^\/v1\/workspace\/resources\/profile\/profile-metadata-[a-f0-9]{64}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$/.test(
+        path,
+      )
+    )
+      throw Error("Unsupported profile resource route");
     const session = await this.session(),
       generation = this.generation;
     if (

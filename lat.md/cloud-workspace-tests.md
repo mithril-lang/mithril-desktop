@@ -792,3 +792,31 @@ The always-mounted reconciler applies the initial theme and language, refreshes 
 A Settings command for another profile uses the same canonical workspace without changing the agent selected in Chat.
 
 The selected profile and section remain fixed while the active Chat profile changes. A later command without an explicit profile uses the then-current Chat profile and remounts the settings provider. Neither path mounts the bootstrap preference editor.
+
+## Profile metadata retains original extension tokens
+
+Changing a profile name preserves exact unknown extension tokens, large opaque integers and unrelated source whitespace.
+
+## Invalid profile metadata is retained
+
+Malformed, duplicate-key or nonobject metadata cannot be overwritten by an appearance mutation, and no temporary file remains.
+
+## Profile metadata avatar capacity
+
+Clearing another appearance field retains the complete original native avatar allowance and extension metadata.
+
+## Profile metadata rejects linked storage
+
+Appearance edits refuse symbolic metadata links without changing their destination.
+
+## Profile metadata sequential appearance edits
+
+Main-process name and color mutations share a synchronous file lane so a later edit cannot discard the preceding field.
+
+## Original profile appearance handlers preserve data
+
+The original public name, color, avatar and removal handlers use the lossless lane, retain extension tokens and return failure while preserving malformed source.
+
+## Original profile metadata resource transport
+
+Profile resources use the fixed main-process API with captured owner and existing scopes. Invalid resource ids, another owner, stale account replies and read-only writes are rejected without expanding credentials.

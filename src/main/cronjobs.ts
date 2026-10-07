@@ -30,6 +30,12 @@ import {
   type OriginalCronTransitionRequest,
   type OriginalCronTransitionResult,
 } from "./cron-source-transition";
+import {
+  callOriginalCronRun,
+  validOriginalCronRunRequest,
+  type OriginalCronRunRequest,
+  type OriginalCronRunResult,
+} from "./cron-source-run";
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
@@ -563,6 +569,25 @@ export async function prepareOriginalCronTransition(
     JSON.stringify(captured),
   );
   return parseOriginalCronTransitionResult(result.output, captured);
+}
+
+/** Exact-source main-only execution after selected-device custody validation. */
+export async function runOriginalCronSource(
+  request: OriginalCronRunRequest,
+  assertActive: () => Promise<void>,
+): Promise<OriginalCronRunResult> {
+  if (isRemoteMode() || !validOriginalCronRunRequest(request))
+    return { success: false, error: "Original schedule execution unavailable" };
+  return callOriginalCronRun(
+    request,
+    {
+      executable: HERMES_PYTHON,
+      cliArgs: hermesCliArgs(),
+      cwd: join(HERMES_HOME, "hermes-agent"),
+      env: { ...process.env, ...secureSpawnEnv(request.profile) },
+    },
+    assertActive,
+  );
 }
 
 /** Local restore after resource/execution binding. No raw-source renderer IPC. */

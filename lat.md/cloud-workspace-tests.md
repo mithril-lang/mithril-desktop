@@ -678,3 +678,13 @@ An original scheduled resume receipt remains available even when the subsequent 
 ## Original parser mailbox runtime scope
 
 The runtime forwards exact preparation and transition requests to the original Cron ports. Foreign owner requests and a timezone change during parsing cannot return an accepted result.
+
+## Original manual execution receipt boundary
+
+The real child-process transport accepts only the exact request's finite status receipt. Foreign, oversize, extra-field, lost and malformed replies or an account change never report completion or leak child output.
+
+## Original manual execution actual Agent qualification
+
+The Native port executes harmless scripts through the actual Agent in isolated A→B→A homes. Replays retain the original result without changing files or repeating effects; stale full-source versions refuse execution.
+
+This explicit local qualification requires `MITHRIL_AGENT_SOURCE_RUN_CHECKOUT` and `MITHRIL_AGENT_SOURCE_RUN_PYTHON` test inputs. CI without that checkout skips this qualification rather than substituting a fake CLI. It does not prove installed-client or production operation.

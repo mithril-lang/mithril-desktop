@@ -175,7 +175,7 @@ The default Memory route now mounts these original components using per-profile 
 
 Fixed known Memory files synchronize through the shared three-way journal while original UI components remain the editor.
 
-[[src/main/memory-replica-files.ts#memoryReplicaSnapshot]] reads only the selected owner-bound profile files and configured capacities. Snapshots explicitly claim only that profile’s three record IDs; unavailable collections report warnings and cannot delete unrelated data. Credentials, configuration values, installation metadata and device paths are excluded from canonical bodies.
+[[src/main/memory-replica-files.ts#memoryReplicaSnapshot]] reads fixed owner-bound profile files and configured capacities. The all-profile inventory now invokes this reader for each validated original profile and claims only successful profile record IDs; unavailable collections report warnings and cannot delete unrelated data. Credentials, configuration values, installation metadata and device paths are excluded from canonical bodies.
 
 [[src/main/memory-replica-files.ts#applyMemoryReplica]] uses the original Memory lock inodes, no-follow reads, source CAS, atomic file writes and durable operation receipts. Repeating a completed receipt never rewrites newer native contents; interrupted writes recover from their recorded before/after state. Tombstones preserve recoverable cloud bodies and deletion markers. Differing configured capacities defer pending shared Settings integration. Original Persona writes now use the same locks and observed text checks rather than an unlocked write.
 
@@ -971,3 +971,9 @@ All-profile metadata inventory reauthenticates workspace:write once at the opera
 The original Desktop profile identity pane, avatar, palette, image resizer and CSS now have one shared workspace implementation for native and browser adapters.
 
 [[src/renderer/src/components/profile/ProfileModal.tsx#ProfileModal]] renders workspace DesktopProfileIdentity using original IPC, translation, chips and refresh callbacks. [[src/renderer/src/components/common/ProfileAvatar.tsx#ProfileAvatar]] supplies only the original logo to the shared avatar. Original Escape/blur cancellation and failed-save draft retention remain tested. Other modal panes remain original native components until their adapters are qualified. Browser metadata writes, live Web rendering and installer publication remain pending.
+
+## All-profile Memory source inventory (draft)
+
+Memory replication now captures all existing owner-bound profile working copies without switching the active profile.
+
+[[src/main/profile-memory-inventory.ts#profileMemoryInventory]] reads the original three Memory files and configured limits through the existing reader. Only successfully captured profile IDs are claimed; absent, linked or invalid sources cannot erase other cloud records. [[src/main/repository-kanban-runtime.ts#nativeReplicaApply]] selects the exact owned profile from the validated Memory body and stable ID before invoking the original lock/CAS/receipt transaction. Capability configuration, Skills and schedules still require their all-profile paths; this is not published or installed-client qualification.

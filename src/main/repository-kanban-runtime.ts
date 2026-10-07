@@ -31,7 +31,6 @@ import {
 import { taskAttachmentRecords } from "@mithril/workspace/task-attachments";
 import { validReplicaRecord as isReplicaRecord } from "@mithril/workspace/replica-sync";
 import { planKanbanDependencies } from "./kanban-dependency-replica";
-import { memoryFileId, memoryFileKinds } from "@mithril/workspace/memory-files";
 import {
   memoryReplicaSnapshot,
   applyMemoryReplica,
@@ -1307,6 +1306,9 @@ export async function nativeReplicaSnapshot(): Promise<
   import("@mithril/workspace/replica-sync").ReplicaSnapshot
 > {
   const before = await replicaContext();
+  let inventoryPromise: ReturnType<typeof metadataSources> | undefined;
+  const inventory = (): ReturnType<typeof metadataSources> =>
+    (inventoryPromise ??= metadataSources(before));
   const snapshot: import("@mithril/workspace/replica-sync").ReplicaSnapshot = {
     schemaVersion: 1,
     userId: before.userId,
@@ -1373,16 +1375,17 @@ export async function nativeReplicaSnapshot(): Promise<
     );
   }
   try {
-    const memory = memoryReplicaSnapshot(
-      profileHome(before.profile),
-      before.profile,
-    );
+    const { profileMemoryInventory } =
+      await import("./profile-memory-inventory");
+    const memory = profileMemoryInventory((await inventory()).sources);
+    cloudWorkspace.assertNativeContext(before.context);
     snapshot.collections.push("memory");
     (snapshot.recordScopes ??= []).push({
       collection: "memory",
-      ids: memoryFileKinds.map((kind) => memoryFileId(before.profile, kind)),
+      ids: memory.ids,
     });
-    snapshot.documents.push(...memory);
+    snapshot.documents.push(...memory.documents);
+    snapshot.warnings!.push(...memory.warnings);
   } catch {
     snapshot.warnings!.push(
       "Memory source requires synchronization review; original files are retained",
@@ -1461,9 +1464,9 @@ export async function nativeReplicaSnapshot(): Promise<
   const metadataScope = { collection: "profile" as const, ids: [] as string[] };
   (snapshot.recordScopes ??= []).push(metadataScope);
   try {
-    const inventory = await metadataSources(before);
-    snapshot.warnings!.push(...inventory.warnings);
-    for (const source of inventory.sources) {
+    const sources = await inventory();
+    snapshot.warnings!.push(...sources.warnings);
+    for (const source of sources.sources) {
       const id = `profile-metadata-${source.profile}`;
       try {
         const port = await profileMetadataPort(before, source);
@@ -1699,17 +1702,30 @@ export async function nativeReplicaApply(
       source.configDigest,
     );
   } else if (write.document.collection === "memory") {
-    const { HERMES_PYTHON } = await import("./installer");
-    // Account changes during module loading must be checked before touching source files.
+    const [{ HERMES_PYTHON }, { profileMemorySource }] = await Promise.all([
+      import("./installer"),
+      import("./profile-memory-inventory"),
+    ]);
+    const sources = await metadataSources(before);
+    // Revalidate account authority before selecting the owned original working copy.
     if (
       JSON.stringify(before.context) !==
       JSON.stringify(await cloudWorkspace.nativeContext(true))
     )
       throw Error("Workspace identity changed");
+    const source = profileMemorySource(sources.sources, write.document);
+    if (!source)
+      return {
+        schemaVersion: 1,
+        userId: before.userId,
+        replicaId: before.replicaId,
+        status: "deferred",
+        record: null,
+      };
     try {
       result = applyMemoryReplica(
-        profileHome(before.profile),
-        before.profile,
+        source.root,
+        source.profile,
         before.userId,
         before.replicaId,
         HERMES_PYTHON,

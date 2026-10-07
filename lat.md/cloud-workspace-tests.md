@@ -876,3 +876,11 @@ Linked roots and invalid names are not adopted, and mismatched private binding f
 ## Deleted original profile is never recreated by metadata download
 
 When an original profile directory disappears, metadata download is deferred and neither a directory nor a metadata file is recreated.
+
+## All-profile Memory inventory preserves original files
+
+Tests capture default, research and empty owned profiles with original contents and limits, while excluding configuration credentials and avoiding profile selection writes.
+
+## All-profile Memory inventory preserves unavailable sources
+
+Tests retain missing, linked and malformed source data without claiming their Memory IDs as complete or deleting cloud records.

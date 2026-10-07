@@ -983,3 +983,9 @@ Memory replication now captures all existing owner-bound profile working copies 
 Capability configuration records now come from every present owner-bound original profile without switching the active selection.
 
 [[src/main/repository-kanban-runtime.ts#nativeReplicaSnapshot]] reuses the validated profile inventory and original descriptor readers for each public configuration anchor. Exact configuration bytes and the original directory identity are checked across async descriptor reads; unavailable sources cannot claim deletion authority. [[src/main/repository-kanban-runtime.ts#nativeReplicaApply]] routes a validated Capability body and stable ID to the matching owned original profile before the existing lock/CAS transaction. Skill resources and schedule sources still need all-profile transport paths. Source tests and builds are separate from publication and installed-client verification.
+
+## All-profile Skill resource replication (draft)
+
+Original Skill directories now contribute separate cloud resource pointers for every present owner-bound profile.
+
+[[src/main/repository-kanban-runtime.ts#nativeReplicaSnapshot]] captures and uploads each source without switching profile selection. Directory identity, current account and owner binding are fenced across I/O; a fresh capture must match the uploaded snapshot before the pointer is returned. Pending native transactions retain per-profile recovery records. [[src/main/repository-kanban-runtime.ts#nativeReplicaApply]] routes validated pointers to the matching owned profile, keeping the original download verification, source CAS and receipt recovery. Absent or replaced profile directories cannot be recreated by this path. This remains an unpublished candidate; all-profile schedules, original UI completion and installed cross-device checks are still pending.

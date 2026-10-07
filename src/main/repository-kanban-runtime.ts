@@ -1201,10 +1201,17 @@ export async function nativeMemorySnapshot(): Promise<{
   return { userId: before.userId, profile: before.profile, documents };
 }
 /** Captures original Skill paths privately, uploads bytes, then leaves pointer CAS to the replica journal. */
-export async function nativeSkillResourceSnapshot(): Promise<
-  import("@mithril/workspace/replica-sync").ReplicaRecord
-> {
-  const before = await replicaContext();
+async function profileSkillResourceSnapshot(
+  original?: import("./profile-metadata-inventory").ProfileMetadataSource,
+  captured?: Awaited<ReturnType<typeof replicaContext>>,
+): Promise<import("@mithril/workspace/replica-sync").ReplicaRecord> {
+  const before = captured ?? (await replicaContext());
+  const profile = original?.profile ?? before.profile;
+  const home = original?.root ?? profileHome(profile);
+  checked(home);
+  const directory = lstatSync(home);
+  if (!directory.isDirectory() || (original && !original.present))
+    throw Error("Skill profile unavailable");
   const [
     { HERMES_PYTHON },
     { captureSkillResources, publishSkillResources },
@@ -1217,28 +1224,46 @@ export async function nativeSkillResourceSnapshot(): Promise<
     import("@mithril/workspace/capability-resources"),
   ]);
   const guard = async (): Promise<void> => {
-    if (
+    if (captured) cloudWorkspace.assertNativeContext(before.context);
+    else if (
       JSON.stringify(before.context) !==
       JSON.stringify(await cloudWorkspace.nativeContext(true))
     )
       throw Error("Workspace identity changed; Skill resources retained");
+    checked(home);
+    const current = lstatSync(home);
+    if (
+      !current.isDirectory() ||
+      current.ino !== directory.ino ||
+      current.dev !== directory.dev
+    )
+      throw Error("Skill profile changed; original files retained");
+    if (
+      !repositorySourceOwned(
+        join(app.getPath("userData"), "repository-source-owners"),
+        profile,
+        before.userId,
+      )
+    )
+      throw Error("Skill profile owner changed");
   };
   await guard();
   const { assertSkillResourcesReady } =
     await import("./skill-resource-replica");
+  await guard();
   assertSkillResourcesReady(
-    join(profileHome(before.profile), "skills"),
+    join(home, "skills"),
     join(app.getPath("userData"), "repository-skill-transactions"),
   );
   const capture = captureSkillResources(
-    join(profileHome(before.profile), "skills"),
+    join(home, "skills"),
     HERMES_PYTHON,
     join(app.getPath("userData"), "repository-skill-captures"),
-    capabilityId(before.profile),
+    capabilityId(profile),
   );
   try {
     assertSkillResourcesReady(
-      join(profileHome(before.profile), "skills"),
+      join(home, "skills"),
       join(app.getPath("userData"), "repository-skill-transactions"),
     );
     const manifest = await publishSkillResources(
@@ -1247,19 +1272,33 @@ export async function nativeSkillResourceSnapshot(): Promise<
       guard,
     );
     assertSkillResourcesReady(
-      join(profileHome(before.profile), "skills"),
+      join(home, "skills"),
       join(app.getPath("userData"), "repository-skill-transactions"),
     );
     await guard();
+    const fresh = captureSkillResources(
+      join(home, "skills"),
+      HERMES_PYTHON,
+      join(app.getPath("userData"), "repository-skill-captures"),
+      capabilityId(profile),
+    );
+    try {
+      if (fresh.digest !== capture.digest)
+        throw Error(
+          "Skill files changed during upload; original files retained",
+        );
+    } finally {
+      fresh.dispose();
+    }
     const body = {
       format: "mithril-skill-resources-v1",
-      profile: before.profile,
+      profile,
       capabilityId: capture.manifest.capabilityId,
       manifest,
     };
     return {
       collection: "capability",
-      id: skillResourceId(before.profile),
+      id: skillResourceId(profile),
       body,
       deleted: false,
       version: createHash("sha256")
@@ -1269,6 +1308,11 @@ export async function nativeSkillResourceSnapshot(): Promise<
   } finally {
     capture.dispose();
   }
+}
+export async function nativeSkillResourceSnapshot(): Promise<
+  import("@mithril/workspace/replica-sync").ReplicaRecord
+> {
+  return profileSkillResourceSnapshot();
 }
 async function metadataSources(
   before: Awaited<ReturnType<typeof replicaContext>>,
@@ -1448,18 +1492,7 @@ export async function nativeReplicaSnapshot(): Promise<
     );
   }
   try {
-    const resources = await nativeSkillResourceSnapshot();
-    if (!snapshot.collections.includes("capability"))
-      snapshot.collections.push("capability");
-    const scopes = (snapshot.recordScopes ??= []);
-    let scope = scopes.find((row) => row.collection === "capability");
-    if (!scope) {
-      scope = { collection: "capability", ids: [] };
-      scopes.push(scope);
-    }
-    scope.ids.push(resources.id);
-    snapshot.documents.push(resources);
-  } catch {
+    const sources = await inventory();
     const [
       { hasPendingSkillResources },
       { capabilityId },
@@ -1469,27 +1502,41 @@ export async function nativeReplicaSnapshot(): Promise<
       import("@mithril/workspace/capability-data"),
       import("@mithril/workspace/capability-resources"),
     ]);
-    if (
-      hasPendingSkillResources(
-        join(profileHome(before.profile), "skills"),
-        join(app.getPath("userData"), "repository-skill-transactions"),
-        capabilityId(before.profile),
-      )
-    ) {
-      (snapshot.recoveryRecords ??= []).push({
-        collection: "capability",
-        id: skillResourceId(before.profile),
-      });
-      if (!snapshot.collections.includes("capability")) {
-        snapshot.collections.push("capability");
-        (snapshot.recordScopes ??= []).push({
-          collection: "capability",
-          ids: [],
-        });
+    if (!snapshot.collections.includes("capability"))
+      snapshot.collections.push("capability");
+    const scopes = (snapshot.recordScopes ??= []);
+    let scope = scopes.find((row) => row.collection === "capability");
+    if (!scope) {
+      scope = { collection: "capability", ids: [] };
+      scopes.push(scope);
+    }
+    for (const source of sources.sources) {
+      if (!source.present) continue;
+      try {
+        const resources = await profileSkillResourceSnapshot(source, before);
+        scope.ids.push(resources.id);
+        snapshot.documents.push(resources);
+      } catch {
+        cloudWorkspace.assertNativeContext(before.context);
+        if (
+          hasPendingSkillResources(
+            join(source.root, "skills"),
+            join(app.getPath("userData"), "repository-skill-transactions"),
+            capabilityId(source.profile),
+          )
+        )
+          (snapshot.recoveryRecords ??= []).push({
+            collection: "capability",
+            id: skillResourceId(source.profile),
+          });
+        snapshot.warnings!.push(
+          `Profile ${source.profile} Skill synchronization requires review; original directories are retained`,
+        );
       }
     }
+  } catch {
     snapshot.warnings!.push(
-      "Skill resource synchronization requires review or reconnect; original directories are retained",
+      "Skill profile inventory is unavailable; original directories are retained",
     );
   }
   snapshot.collections.push("profile");
@@ -1594,7 +1641,26 @@ export async function nativeReplicaApply(
       import("./skill-resource-replica"),
     ]);
     const body = write.document.body;
-    const root = join(profileHome(before.profile), "skills");
+    const inventory = await metadataSources(before);
+    const original = validSkillResourcePointer(body)
+      ? inventory.sources.find(
+          (row) =>
+            row.present &&
+            row.profile === body.profile &&
+            write.document.id === skillResourceId(row.profile),
+        )
+      : undefined;
+    if (!original)
+      return {
+        schemaVersion: 1,
+        userId: before.userId,
+        replicaId: before.replicaId,
+        status: "deferred",
+        record: null,
+      };
+    checked(original.root);
+    const directory = lstatSync(original.root);
+    const root = join(original.root, "skills");
     const stateRoot = join(
       app.getPath("userData"),
       "repository-skill-transactions",
@@ -1608,6 +1674,22 @@ export async function nativeReplicaApply(
         JSON.stringify(await cloudWorkspace.nativeContext(true))
       )
         throw Error("Workspace identity changed");
+      checked(original.root);
+      const current = lstatSync(original.root);
+      if (
+        !current.isDirectory() ||
+        current.ino !== directory.ino ||
+        current.dev !== directory.dev
+      )
+        throw Error("Skill profile changed");
+      if (
+        !repositorySourceOwned(
+          join(app.getPath("userData"), "repository-source-owners"),
+          original.profile,
+          before.userId,
+        )
+      )
+        throw Error("Skill profile owner changed");
     };
     const observedResult = (
       status: import("@mithril/workspace/replica-sync").ReplicaResult["status"],
@@ -1624,8 +1706,8 @@ export async function nativeReplicaApply(
     if (
       write.document.deleted ||
       !validSkillResourcePointer(body) ||
-      body.profile !== before.profile ||
-      write.document.id !== skillResourceId(before.profile)
+      body.profile !== original.profile ||
+      write.document.id !== skillResourceId(original.profile)
     ) {
       result = observedResult("deferred");
     } else {
@@ -1659,7 +1741,7 @@ export async function nativeReplicaApply(
         try {
           const sourceBody = {
             format: "mithril-skill-resources-v1",
-            profile: before.profile,
+            profile: original.profile,
             capabilityId: body.capabilityId,
             manifest: source.digest,
           };

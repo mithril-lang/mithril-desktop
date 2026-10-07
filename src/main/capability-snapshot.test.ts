@@ -151,6 +151,54 @@ it("captures each owned original Capability profile while retaining foreign sour
   expect(state.test).not.toHaveBeenCalled();
   expect(state.install).not.toHaveBeenCalled();
 });
+// @lat: [[cloud-workspace-tests#All-profile Skill resource capture]]
+it("publishes distinct original Skill resources for every owned profile", async () => {
+  setup();
+  const { digestBytes } = await import("@mithril/workspace/files");
+  const { capabilityResourceManifestBytes } =
+    await import("@mithril/workspace/capability-resources");
+  state.owner.mockReturnValue(state.resources);
+  state.resources.getManifest.mockRejectedValue(
+    Error("Capability resource request failed (404)"),
+  );
+  state.resources.putChunk.mockImplementation(
+    (_id: string, bytes: Uint8Array) => digestBytes(bytes),
+  );
+  state.resources.putManifest.mockImplementation((manifest) =>
+    digestBytes(capabilityResourceManifestBytes(manifest)),
+  );
+  for (const profile of ["default", "research"]) {
+    const home =
+      profile === "default"
+        ? state.home
+        : join(state.home, "profiles", profile);
+    mkdirSync(join(home, "skills"), { recursive: true });
+    writeFileSync(join(home, "skills", "SKILL.md"), `# Original ${profile}\n`);
+  }
+  const snapshot = await nativeReplicaSnapshot();
+  const pointers = snapshot.documents.filter((row) =>
+    row.id.startsWith("skill-resources-"),
+  );
+  expect(pointers.map((row) => row.id).sort()).toEqual([
+    "skill-resources-default",
+    "skill-resources-research",
+  ]);
+  expect(
+    state.resources.putManifest.mock.calls
+      .map(([manifest]) => manifest.capabilityId)
+      .sort(),
+  ).toEqual(["capability-default", "capability-research"]);
+  expect(
+    state.resources.putChunk.mock.calls.map(([id, bytes]) => [
+      id,
+      new TextDecoder().decode(bytes),
+    ]),
+  ).toEqual([
+    ["capability-default", "# Original default\n"],
+    ["capability-research", "# Original research\n"],
+  ]);
+  expect(state.install).not.toHaveBeenCalled();
+});
 // @lat: [[cloud-workspace-tests#All-profile Capability restore targets its original profile]]
 it("restores a cloud Capability change to its owned research profile without changing the active default configuration", async () => {
   setup();
@@ -287,6 +335,37 @@ it("feeds original Skill resources into a separate repository pointer without ex
   expect(state.install).not.toHaveBeenCalled();
 });
 
+// @lat: [[cloud-workspace-tests#Skill resource upload preserves concurrent original edits]]
+it("refuses a stale pointer if original Skill bytes change while uploading", async () => {
+  setup();
+  const root = join(state.home, "skills");
+  mkdirSync(root);
+  const file = join(root, "SKILL.md");
+  writeFileSync(file, "# Before upload\n");
+  const { digestBytes } = await import("@mithril/workspace/files");
+  const { capabilityResourceManifestBytes } =
+    await import("@mithril/workspace/capability-resources");
+  state.owner.mockReturnValue(state.resources);
+  state.resources.getManifest.mockRejectedValue(
+    Error("Capability resource request failed (404)"),
+  );
+  state.resources.putChunk.mockImplementation(
+    (_id: string, bytes: Uint8Array) => {
+      writeFileSync(file, "# Edited during upload\n");
+      return digestBytes(bytes);
+    },
+  );
+  state.resources.putManifest.mockImplementation((manifest) =>
+    digestBytes(capabilityResourceManifestBytes(manifest)),
+  );
+  await expect(nativeSkillResourceSnapshot()).rejects.toThrow(
+    "files changed during upload",
+  );
+  expect(readFileSync(file, "utf8")).toBe("# Edited during upload\n");
+  expect(
+    readdirSync(join(state.userData, "repository-skill-captures")),
+  ).toEqual([]);
+});
 it("abandons pointer publication on identity changes during resource upload while retaining native files", async () => {
   setup();
   const root = join(state.home, "skills", "research", "actual-directory");
@@ -316,105 +395,122 @@ it("abandons pointer publication on identity changes during resource upload whil
   ).toEqual([]);
 });
 
-it("applies an owned cloud resource pointer to original native Skills and replays receipts before downloading", async () => {
-  setup();
-  const { captureSkillResources } = await import("./skill-resource-snapshot");
-  const { repositoryFingerprint } =
-    await import("@mithril/workspace/repository");
-  const { createHash } = await import("node:crypto");
-  const native = join(state.home, "skills"),
-    remote = join(state.userData, "remote-skills");
-  mkdirSync(native);
-  mkdirSync(remote);
-  writeFileSync(join(native, "SKILL.md"), "# Native original\n");
-  writeFileSync(join(remote, "SKILL.md"), "# Cloud edit\n");
-  const old = captureSkillResources(
-    native,
-    "/usr/bin/python3",
-    join(state.userData, "captures"),
-    "capability-default",
-  );
-  const target = captureSkillResources(
-    remote,
-    "/usr/bin/python3",
-    join(state.userData, "captures"),
-    "capability-default",
-  );
-  const body = {
-    format: "mithril-skill-resources-v1",
-    profile: "default",
-    capabilityId: "capability-default",
-    manifest: target.digest,
-  };
-  const oldBody = { ...body, manifest: old.digest };
-  const expectedRecord = {
-    collection: "capability" as const,
-    id: "skill-resources-default",
-    body: oldBody,
-    deleted: false,
-    version: createHash("sha256")
-      .update(repositoryFingerprint({ body: oldBody, deleted: false }))
-      .digest("hex"),
-  };
-  const write = {
-    operationId: "resource-replica-test",
-    document: {
+it.each(["default", "research"])(
+  "applies owned cloud Skills to %s and replays receipts before downloading",
+  async (profile) => {
+    setup();
+    const { captureSkillResources } = await import("./skill-resource-snapshot");
+    const { repositoryFingerprint } =
+      await import("@mithril/workspace/repository");
+    const { createHash } = await import("node:crypto");
+    const home =
+      profile === "default"
+        ? state.home
+        : join(state.home, "profiles", profile);
+    mkdirSync(home, { recursive: true });
+    const native = join(home, "skills"),
+      remote = join(state.userData, "remote-skills");
+    mkdirSync(native);
+    mkdirSync(remote);
+    writeFileSync(join(native, "SKILL.md"), "# Native original\n");
+    writeFileSync(join(remote, "SKILL.md"), "# Cloud edit\n");
+    const old = captureSkillResources(
+      native,
+      "/usr/bin/python3",
+      join(state.userData, "captures"),
+      `capability-${profile}`,
+    );
+    const target = captureSkillResources(
+      remote,
+      "/usr/bin/python3",
+      join(state.userData, "captures"),
+      `capability-${profile}`,
+    );
+    const body = {
+      format: "mithril-skill-resources-v1",
+      profile,
+      capabilityId: `capability-${profile}`,
+      manifest: target.digest,
+    };
+    const oldBody = { ...body, manifest: old.digest };
+    const expectedRecord = {
       collection: "capability" as const,
-      id: expectedRecord.id,
-      body,
+      id: `skill-resources-${profile}`,
+      body: oldBody,
       deleted: false,
-      revision: 2,
-      updatedAt: 1,
-    },
-    expectedRecord,
-    expectedVersion: expectedRecord.version,
-  };
-  state.owner.mockReturnValue(state.resources);
-  state.resources.getManifest.mockResolvedValue(target.manifest);
-  state.resources.getChunk.mockImplementation((_id: string, digest: string) =>
-    target.readChunk(digest),
-  );
-  const result = await nativeReplicaApply(write);
-  expect(result.status).toBe("applied");
-  expect(result.record?.body).toEqual(body);
-  expect(readFileSync(join(native, "SKILL.md"), "utf8")).toBe("# Cloud edit\n");
-  expect(state.owner).toHaveBeenCalledWith("alice");
-  const stateRoot = join(state.userData, "repository-skill-transactions");
-  const ledger = join(stateRoot, readdirSync(stateRoot)[0]);
-  const receiptPath = join(
-    ledger,
-    readdirSync(ledger).find((name) => name.endsWith(".json"))!,
-  );
-  const saved = JSON.parse(readFileSync(receiptPath, "utf8"));
-  writeFileSync(receiptPath, JSON.stringify({ ...saved, state: "pending" }));
-  await expect(nativeCapabilitySnapshot()).rejects.toThrow("recovery required");
-  const unavailable = await nativeReplicaSnapshot();
-  expect(unavailable.recoveryRecords).toEqual([
-    { collection: "capability", id: "skill-resources-default" },
-  ]);
-  expect(
-    unavailable.documents.some(
-      (record) =>
-        record.id === "skill-resources-default" ||
-        record.id === "capability-default",
-    ),
-  ).toBe(false);
-  writeFileSync(receiptPath, JSON.stringify(saved));
-  state.resources.getManifest.mockRejectedValue(Error("offline"));
-  writeFileSync(join(native, "SKILL.md"), "# Later original edit\n");
-  expect((await nativeReplicaApply(write)).status).toBe("applied");
-  expect(state.resources.getManifest).toHaveBeenCalledTimes(1);
-  expect(readFileSync(join(native, "SKILL.md"), "utf8")).toBe(
-    "# Later original edit\n",
-  );
-  await expect(
-    nativeReplicaApply({
-      ...write,
-      document: { ...write.document, body: oldBody },
-    }),
-  ).rejects.toThrow("reused");
-  expect(state.install).not.toHaveBeenCalled();
-  expect(state.test).not.toHaveBeenCalled();
-  old.dispose();
-  target.dispose();
-});
+      version: createHash("sha256")
+        .update(repositoryFingerprint({ body: oldBody, deleted: false }))
+        .digest("hex"),
+    };
+    const write = {
+      operationId: "resource-replica-test",
+      document: {
+        collection: "capability" as const,
+        id: expectedRecord.id,
+        body,
+        deleted: false,
+        revision: 2,
+        updatedAt: 1,
+      },
+      expectedRecord,
+      expectedVersion: expectedRecord.version,
+    };
+    state.owner.mockReturnValue(state.resources);
+    state.resources.getManifest.mockResolvedValue(target.manifest);
+    state.resources.getChunk.mockImplementation((_id: string, digest: string) =>
+      target.readChunk(digest),
+    );
+    const result = await nativeReplicaApply(write);
+    expect(result.status).toBe("applied");
+    expect(result.record?.body).toEqual(body);
+    expect(readFileSync(join(native, "SKILL.md"), "utf8")).toBe(
+      "# Cloud edit\n",
+    );
+    expect(state.owner).toHaveBeenCalledWith("alice");
+    const stateRoot = join(state.userData, "repository-skill-transactions");
+    const ledger = join(stateRoot, readdirSync(stateRoot)[0]);
+    const receiptPath = join(
+      ledger,
+      readdirSync(ledger).find((name) => name.endsWith(".json"))!,
+    );
+    const saved = JSON.parse(readFileSync(receiptPath, "utf8"));
+    writeFileSync(receiptPath, JSON.stringify({ ...saved, state: "pending" }));
+    if (profile === "default")
+      await expect(nativeCapabilitySnapshot()).rejects.toThrow(
+        "recovery required",
+      );
+    else expect((await nativeCapabilitySnapshot()).profile).toBe("default");
+    const unavailable = await nativeReplicaSnapshot();
+    expect(unavailable.recoveryRecords).toEqual([
+      { collection: "capability", id: `skill-resources-${profile}` },
+    ]);
+    expect(
+      unavailable.documents.some(
+        (record) =>
+          record.id === `skill-resources-${profile}` ||
+          record.id === `capability-${profile}`,
+      ),
+    ).toBe(false);
+    writeFileSync(receiptPath, JSON.stringify(saved));
+    const downloadsBeforeReplay = state.resources.getManifest.mock.calls.length;
+    state.resources.getManifest.mockRejectedValue(Error("offline"));
+    writeFileSync(join(native, "SKILL.md"), "# Later original edit\n");
+    expect((await nativeReplicaApply(write)).status).toBe("applied");
+    expect(state.resources.getManifest).toHaveBeenCalledTimes(
+      downloadsBeforeReplay,
+    );
+    expect(readFileSync(join(native, "SKILL.md"), "utf8")).toBe(
+      "# Later original edit\n",
+    );
+    await expect(
+      nativeReplicaApply({
+        ...write,
+        document: { ...write.document, body: oldBody },
+      }),
+    ).rejects.toThrow("reused");
+    expect(state.install).not.toHaveBeenCalled();
+    expect(state.test).not.toHaveBeenCalled();
+    old.dispose();
+    target.dispose();
+  },
+);

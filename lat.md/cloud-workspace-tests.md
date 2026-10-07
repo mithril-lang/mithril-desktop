@@ -894,3 +894,13 @@ Original selection is preserved, public descriptors are keyed to the correct pro
 ## All-profile Capability restore targets its original profile
 
 Tests restore a cloud configuration change into the owned research working copy while the selected default configuration remains byte-identical. No installation is performed.
+
+## All-profile Skill resource capture
+
+Tests publish separate original Skill bytes under default and research profile resource IDs without executing installation.
+
+The existing restoration test also runs for both default and research, checks interruption recovery and receipt replay after later original edits, and rejects altered operation reuse.
+
+## Skill resource upload preserves concurrent original edits
+
+Tests change the original Skill file during chunk upload, refuse the stale repository pointer, retain the newer original bytes, and remove private capture staging.

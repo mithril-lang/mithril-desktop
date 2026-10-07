@@ -1091,3 +1091,12 @@ DesktopProfileModal from workspace 0.6.29-schedules.22 now owns the original Des
 Both consumers use the same modal, title, navigation, close control and Done footer. Native retains original pane adapters, icons and loader. Web opens the profile editor from the shared list and preserves owner-bound edits, Memory, Persona, Sync and conflict recovery inside the dialog. Shared tests cover actual modal open/close/reopen; the compiled Native package retains original name-edit, deletion and memory tests. Wallet, Advanced, full runtime parity, publication and installed qualification remain unfinished.
 
 The immutable archive contains 451 files with SHA256 `6b209c54bed7c554db095b97001e178f4281cb5bfdc178416df098cb37d49b58`. Producer, archive, Native vendor and installed bytes match; shared 17 tests and Native 13 tests, Web typecheck, Native full build/typecheck and changed-file lint pass.
+
+
+## Original profile dialog recovery (draft)
+
+The original Native profile adapter recovers failed or missing reads inside the shared dialog and bounds each initial read to twelve seconds.
+
+Read responses are fenced to the open profile and request generation. Changing or closing the dialog retires prior responses; loaded data from another profile is never rendered. Failed refresh keeps the current profile with retry, and a missing profile exposes close/retry instead of an infinite loader. A late deletion retains its authorized backend outcome but cannot close another selected profile or invoke stale view callbacks. Native read recovery does not yet qualify public cross-device synchronization or installed upgrade behavior.
+
+Local validation passes all 18 original ProfileModal, ProfileSyncPane and Agents tests, Desktop build/types, changed-file lint and lat links. Release and installed operation remain separate gates.

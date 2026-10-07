@@ -988,3 +988,28 @@ Resource failure or changed account authority leaves the new original profile di
 ## Cloud profile replica scope
 
 The actual Native snapshot admits valid cloud-only profile IDs so background replication can restore them, while foreign original bindings remain outside its scope.
+
+
+## Profile dialog read recovery
+
+A failed original profile read exposes retry within the shared modal, then clears its error after successful recovery without a new sign-in.
+
+
+## Profile dialog missing source
+
+A missing original profile produces an actionable unavailable state with retry and close controls instead of an infinite loader.
+
+
+## Profile dialog scope fencing
+
+A late read from another profile cannot replace the currently selected agent or its original identity controls.
+
+
+## Profile dialog bounded read
+
+A pending original IPC read stops waiting after twelve seconds; a retry can recover and the old response cannot overwrite it.
+
+
+## Profile dialog late deletion
+
+A previously authorized deletion completing after selection changes cannot close another profile dialog or publish stale UI callbacks.

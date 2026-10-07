@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type React from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -233,4 +239,134 @@ it("uses the shared original Agent Memory pane with the exact Native source base
       user: "Original user",
     }),
   );
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Profile dialog read recovery]]
+it("recovers a failed profile read inside the original dialog without another sign-in", async () => {
+  installHermesAPI([profile()]);
+  const list = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("offline"))
+    .mockResolvedValue([profile()]);
+  window.hermesAPI.listProfiles = list;
+  renderModal();
+  await screen.findByText("agents.profileLoadFailed");
+  fireEvent.click(screen.getByRole("button", { name: "common.retry" }));
+  await screen.findByRole("button", { name: "agents.nameLabel" });
+  expect(screen.queryByText("agents.profileLoadFailed")).toBeNull();
+  expect(list).toHaveBeenCalledTimes(2);
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Profile dialog missing source]]
+it("shows an unavailable profile instead of keeping the loading animation indefinitely", async () => {
+  installHermesAPI([]);
+  renderModal();
+  await screen.findByText("agents.profileUnavailable");
+  expect(screen.getByRole("button", { name: "common.retry" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "common.done" })).toBeEnabled();
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Profile dialog scope fencing]]
+it("ignores late profile reads after the dialog changes to another agent", async () => {
+  installHermesAPI([]);
+  let resolve!: (value: ProfileInfo[]) => void;
+  const first = new Promise<ProfileInfo[]>((done) => {
+    resolve = done;
+  });
+  const beta = { ...profile("Beta"), id: "beta" };
+  window.hermesAPI.listProfiles = vi
+    .fn()
+    .mockReturnValueOnce(first)
+    .mockResolvedValue([beta]);
+  const view = render(<ProfileModal name="alpha" open onClose={() => {}} />);
+  await waitFor(() =>
+    expect(window.hermesAPI.listProfiles).toHaveBeenCalledTimes(1),
+  );
+  view.rerender(<ProfileModal name="beta" open onClose={() => {}} />);
+  await screen.findByRole("dialog", { name: "Beta" });
+  await act(async () => {
+    resolve([{ ...profile("Alpha"), id: "alpha" }]);
+  });
+  expect(screen.queryByText("Alpha")).toBeNull();
+  expect(screen.getByRole("dialog", { name: "Beta" })).toBeInTheDocument();
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Profile dialog bounded read]]
+it("bounds a stuck initial read and ignores its response after a successful retry", async () => {
+  installHermesAPI([]);
+  let resolve!: (value: ProfileInfo[]) => void;
+  const first = new Promise<ProfileInfo[]>((done) => {
+    resolve = done;
+  });
+  window.hermesAPI.listProfiles = vi
+    .fn()
+    .mockReturnValueOnce(first)
+    .mockResolvedValue([profile("Recovered")]);
+  vi.useFakeTimers();
+  const view = render(<ProfileModal name="default" open onClose={() => {}} />);
+  try {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(12001);
+    });
+    expect(screen.getByText("agents.profileLoadFailed")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "common.retry" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(
+      screen.getByRole("dialog", { name: "Recovered" }),
+    ).toBeInTheDocument();
+    await act(async () => {
+      resolve([profile("Late")]);
+    });
+    expect(screen.queryByText("Late")).toBeNull();
+  } finally {
+    view.unmount();
+    vi.useRealTimers();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Profile dialog late deletion]]
+it("does not close another agent dialog when an older deletion finishes", async () => {
+  installHermesAPI([{ ...profile("Alpha"), id: "alpha", isDefault: false }]);
+  let resolve!: (value: { success: boolean }) => void;
+  window.hermesAPI.deleteProfile = vi.fn().mockReturnValue(
+    new Promise((done) => {
+      resolve = done;
+    }),
+  );
+  const onClose = vi.fn(),
+    onDeleted = vi.fn();
+  const view = render(
+    <ProfileModal
+      name="alpha"
+      open
+      initialSection="advanced"
+      onClose={onClose}
+      onDeleted={onDeleted}
+    />,
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "agents.deleteProfile" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "agents.deleteProfile" }));
+  window.hermesAPI.listProfiles = vi
+    .fn()
+    .mockResolvedValue([{ ...profile("Beta"), id: "beta" }]);
+  view.rerender(
+    <ProfileModal
+      name="beta"
+      open
+      initialSection="profile"
+      onClose={onClose}
+      onDeleted={onDeleted}
+    />,
+  );
+  await screen.findByRole("dialog", { name: "Beta" });
+  await act(async () => {
+    resolve({ success: true });
+  });
+  expect(onClose).not.toHaveBeenCalled();
+  expect(onDeleted).not.toHaveBeenCalled();
+  expect(screen.getByRole("dialog", { name: "Beta" })).toBeInTheDocument();
 });

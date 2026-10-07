@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+} from "react";
 import {
   Brain,
   Database,
@@ -97,7 +103,22 @@ export default function ProfileModal({
 }: ProfileModalProps): React.JSX.Element {
   const id = name;
   const { t, locale } = useI18n();
-  const [profile, setProfile] = useState<ProfileInfo | null>(null);
+  const [loadedProfile, setProfile] = useState<ProfileInfo | null>(null);
+  const profile = loadedProfile?.id === id ? loadedProfile : null;
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const scope = useRef({ id, open });
+  const reads = useRef(0);
+  useLayoutEffect(() => {
+    scope.current = { id, open };
+    setLoadError("");
+    setError("");
+    setConfirmDelete(false);
+    setDeleting(false);
+    return () => {
+      scope.current = { id, open: false };
+    };
+  }, [id, open]);
   const [section, setSection] = useState<ProfileSection>(
     initialSection ?? "profile",
   );
@@ -111,30 +132,57 @@ export default function ProfileModal({
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async (): Promise<void> => {
+    const captured = scope.current;
+    if (!captured.open || captured.id !== id) return;
+    const generation = ++reads.current;
+    const current = (): boolean =>
+      scope.current === captured && reads.current === generation;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    setLoading(true);
+    setLoadError("");
     try {
-      const list = await window.hermesAPI.listProfiles();
-      setProfile(list.find((p) => p.id === id) ?? null);
+      const list = await Promise.race([
+        window.hermesAPI.listProfiles(),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("Profile read timed out")),
+            12000,
+          );
+        }),
+      ]);
+      if (!current()) return;
+      const found = list.find((p) => p.id === id) ?? null;
+      setProfile(found);
+      if (!found) setLoadError("unavailable");
     } catch {
-      /* keep last-known profile */
+      if (current()) setLoadError("failed");
+    } finally {
+      if (timer) clearTimeout(timer);
+      if (current()) setLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (open) void load();
+  }, [load, open]);
 
   const afterMutation = useCallback(async (): Promise<void> => {
+    const captured = scope.current;
+    if (!captured.open || captured.id !== id) return;
     await load();
-    onChanged?.();
-  }, [load, onChanged]);
+    if (scope.current === captured) onChanged?.();
+  }, [id, load, onChanged]);
 
   async function handleDelete(): Promise<void> {
     if (deleting) return;
+    const captured = scope.current;
+    if (!captured.open || captured.id !== id) return;
     setDeleting(true);
     setConfirmDelete(false);
     setError("");
     try {
       const result = await window.hermesAPI.deleteProfile(id);
+      if (scope.current !== captured) return;
       if (result.success) {
         onDeleted?.(id);
         onChanged?.();
@@ -143,9 +191,9 @@ export default function ProfileModal({
         setError(result.error || t("agents.deleteFailed"));
       }
     } catch {
-      setError(t("agents.deleteFailed"));
+      if (scope.current === captured) setError(t("agents.deleteFailed"));
     } finally {
-      setDeleting(false);
+      if (scope.current === captured) setDeleting(false);
     }
   }
 
@@ -222,11 +270,50 @@ export default function ProfileModal({
       closeLabel={t("common.cancel")}
       doneLabel={t("common.done")}
       ready={Boolean(profile)}
-      loading={<OrbLoader state="searching" size={64} />}
+      loading={
+        loadError ? (
+          <div role="alert">
+            <p>
+              {t(
+                loadError === "unavailable"
+                  ? "agents.profileUnavailable"
+                  : "agents.profileLoadFailed",
+              )}
+            </p>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => void load()}
+              disabled={loading}
+            >
+              {t("common.retry")}
+            </button>
+          </div>
+        ) : (
+          <OrbLoader state="searching" size={64} />
+        )
+      }
       X={X}
     >
       {profile && (
         <>
+          {loadError && (
+            <div role="alert">
+              <p>
+                {t(
+                  loadError === "unavailable"
+                    ? "agents.profileUnavailable"
+                    : "agents.profileLoadFailed",
+                )}
+              </p>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => void load()}
+                disabled={loading}
+              >
+                {t("common.retry")}
+              </button>
+            </div>
+          )}
           {section === "profile" && (
             <DesktopProfileIdentity
               key={profile.id}

@@ -1015,3 +1015,29 @@ it("does not upgrade inference or read-only credentials to write original schedu
     true,
   );
 });
+
+// @lat: [[cloud-workspace-tests#Automatic schedule native context guard]]
+it("invalidates native background work on token, profile, actor or lifecycle changes without a new network request", async () => {
+  await client.enable();
+  const context = await client.nativeContext(true);
+  const requests = fetcher.mock.calls.length;
+  client.assertNativeContext(context);
+  expect(fetcher.mock.calls).toHaveLength(requests);
+  token = tokenB;
+  expect(() => client.assertNativeContext(context)).toThrow(
+    "stale native context",
+  );
+  token = tokenA;
+  profile = "other";
+  expect(() => client.assertNativeContext(context)).toThrow(
+    "stale native context",
+  );
+  profile = "default";
+  expect(() =>
+    client.assertNativeContext({ ...context, actor: "foreign" }),
+  ).toThrow("stale native context");
+  client.reset();
+  expect(() => client.assertNativeContext(context)).toThrow(
+    "stale native context",
+  );
+});

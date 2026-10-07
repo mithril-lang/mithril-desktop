@@ -1,3 +1,8 @@
+import {
+  emptyRepository,
+  validRepositoryState,
+  type RepositoryState,
+} from "@mithril/workspace/repository-sync";
 import Database from "better-sqlite3";
 import { createHash } from "crypto";
 import { closeSync, lstatSync, mkdirSync, openSync, type Stats } from "fs";
@@ -126,6 +131,9 @@ export class NativeOriginalScheduleReplicaStore
       );
       db.exec(
         "CREATE TABLE IF NOT EXISTS schedule_directory_targets (operation_id TEXT NOT NULL, slot TEXT NOT NULL, request TEXT NOT NULL, payload TEXT NOT NULL, digest TEXT NOT NULL, PRIMARY KEY(operation_id,slot))",
+      );
+      db.exec(
+        "CREATE TABLE IF NOT EXISTS schedule_repository_state (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL)",
       );
       return db;
     } catch (error) {
@@ -288,6 +296,46 @@ export class NativeOriginalScheduleReplicaStore
         "INSERT INTO schedule_directory_targets VALUES(?,?,?,?,?)",
       ).run(write.operationId, key, request, payload, digest);
       return JSON.parse(payload) as OriginalSchedulePrivateDirectoryTarget;
+    } finally {
+      db.close();
+    }
+  }
+  /** The source manifest outbox shares this profile's durable cross-process lock. */
+  async readRepository(
+    scope: OriginalScheduleReplicaScope,
+  ): Promise<RepositoryState> {
+    this.assertScope(scope);
+    const db = this.journal();
+    try {
+      const row = db
+        .prepare("SELECT payload FROM schedule_repository_state WHERE id=1")
+        .get() as { payload: string } | undefined;
+      const state: unknown = row ? JSON.parse(row.payload) : emptyRepository();
+      if (!validRepositoryState(state))
+        throw Error("Invalid schedule repository state");
+      return structuredClone(state);
+    } finally {
+      db.close();
+    }
+  }
+  async updateRepository(
+    scope: OriginalScheduleReplicaScope,
+    change: (state: RepositoryState) => RepositoryState,
+  ): Promise<RepositoryState> {
+    this.assertScope(scope);
+    const before = await this.readRepository(scope);
+    const next = change(before);
+    if (!validRepositoryState(next))
+      throw Error("Invalid schedule repository state");
+    const payload = JSON.stringify(next);
+    if (Buffer.byteLength(payload) > 128 * 1024 * 1024)
+      throw Error("Schedule repository state too large");
+    const db = this.journal();
+    try {
+      db.prepare(
+        "INSERT INTO schedule_repository_state VALUES(1,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
+      ).run(payload);
+      return structuredClone(next);
     } finally {
       db.close();
     }

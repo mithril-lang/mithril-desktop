@@ -554,3 +554,35 @@ Foreign identities, extra fields, oversized output, lost acknowledgements and ma
 ## Original schedule Agent preparation
 
 Absent and existing original sources can enter the required policy lane through bounded stdin. Foreign, damaged or lost receipts cannot confirm preparation; preparation does not select an executor.
+
+## Automatic schedule exact source admission
+
+Both passive restoration and local capture require a fresh authority revision and an exact source digest, including BOM and line-ending bytes; changed or missing source refuses.
+
+## Automatic schedule authority refusal
+
+Absent or changed authority, foreign owner/profile, timezone mismatch and stale identity refuse before source admission.
+
+## Automatic schedule account race
+
+Account changes during custody or source I/O invalidate the result before runtime/resource binding can continue.
+
+## Automatic schedule lifecycle polling
+
+A single lifecycle poller starts without a screen, ignores duplicate starts and stops polling and subscriptions during shutdown.
+
+## Automatic schedule stale lifecycle cancellation
+
+An engine created during an identity switch is discarded before synchronization and the current identity resumes immediately.
+
+## Automatic schedule interrupted lifecycle recovery
+
+Identity changes stop in-flight work without concurrent runs; temporary failures retry on the next poll while retained state remains available.
+
+## Automatic schedule repository outbox durability
+
+A real private SQLite journal preserves pending source-manifest operations across failure and reopening, retains acknowledged documents and refuses unlocked or foreign access.
+
+## Automatic schedule native context guard
+
+Background work validates the retained account/token/profile/generation without network calls and refuses stale or forged context after identity changes.

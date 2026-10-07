@@ -1,3 +1,4 @@
+import { startOriginalScheduleReplication } from "../original-schedule-replication-runtime";
 import { applyResponseHeaders } from "./response-headers";
 import {
   migrateAllMithrilEnvKeys,
@@ -58,6 +59,7 @@ export function startMainProcess(): void {
 
   setupUpdater({ getMainWindow: () => mainWindow });
 
+  let stopOriginalSchedules: (() => void) | null = null;
   app.whenReady().then(() => {
     electronApp.setAppUserModelId("fund.mithril.desktop");
 
@@ -81,6 +83,8 @@ export function startMainProcess(): void {
     } catch (e) {
       console.error("[mithril] secure env setup failed:", e);
     }
+
+    stopOriginalSchedules = startOriginalScheduleReplication();
 
     app.on("browser-window-created", (_, window) => {
       optimizer.watchWindowShortcuts(window);
@@ -121,6 +125,7 @@ export function startMainProcess(): void {
   });
 
   app.on("before-quit", () => {
+    stopOriginalSchedules?.();
     stopHealthPolling();
     // Only the watch loop stops: supervised services are detached and keep
     // running; the next Desktop adopts them from their pid files.

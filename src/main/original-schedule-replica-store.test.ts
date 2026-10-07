@@ -277,3 +277,56 @@ it("persists private directory baselines before writes and rejects changed opera
     reopened.retainDirectoryTarget(write, slot, "b".repeat(64), bind),
   ).rejects.toThrow("lock required");
 });
+
+// @lat: [[cloud-workspace-tests#Automatic schedule repository outbox durability]]
+it("retains the repository operation after failure and refuses unlocked or foreign access", async () => {
+  const directory = root();
+  const first = new NativeOriginalScheduleReplicaStore(directory, scope);
+  const edit = {
+    operationId: "retained_source",
+    collection: "schedule" as const,
+    id: "schedule-file-default",
+    baseRevision: 0,
+    deleted: false,
+    body: { source: pending.pending!.sourceText },
+  };
+  await expect(
+    first.exclusive(scope, async () => {
+      await first.updateRepository(scope, (state) => ({
+        ...state,
+        pending: [edit],
+      }));
+      throw Error("lost acknowledgement");
+    }),
+  ).rejects.toThrow("lost acknowledgement");
+  const restart = new NativeOriginalScheduleReplicaStore(directory, scope);
+  await restart.exclusive(scope, async () => {
+    const retained = await restart.readRepository(scope);
+    expect(retained.pending).toEqual([edit]);
+    await restart.updateRepository(scope, (state) => ({
+      ...state,
+      documents: [
+        {
+          collection: "schedule",
+          id: edit.id,
+          revision: 1,
+          deleted: false,
+          updatedAt: 1,
+          body: edit.body,
+        },
+      ],
+      pending: [],
+    }));
+    await expect(
+      restart.readRepository({ ...scope, owner: "bob" }),
+    ).rejects.toThrow("identity changed");
+  });
+  await expect(restart.readRepository(scope)).rejects.toThrow("lock required");
+  const final = new NativeOriginalScheduleReplicaStore(directory, scope);
+  await final.exclusive(scope, async () => {
+    expect((await final.readRepository(scope)).pending).toEqual([]);
+    expect((await final.readRepository(scope)).documents[0].body).toEqual(
+      edit.body,
+    );
+  });
+});

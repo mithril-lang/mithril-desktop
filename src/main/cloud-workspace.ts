@@ -306,6 +306,28 @@ export class CloudWorkspace {
     };
   }
 
+  /** Cheap main-only guard between I/O stages; reauthentication stays at operation boundaries. */
+  assertNativeContext(context: {
+    userId: string;
+    profile: string;
+    epoch: number;
+    actor: string;
+  }): void {
+    const identity = this.identity;
+    if (
+      !this.enabled ||
+      !identity ||
+      context.epoch !== this.generation ||
+      context.userId !== identity.userId ||
+      context.profile !== identity.profile ||
+      identity.token !== this.deps.token() ||
+      identity.profile !== this.deps.profile() ||
+      context.actor !==
+        createHash("sha256").update(identity.token).digest("hex")
+    )
+      throw Error("Workspace account changed; stale native context discarded");
+  }
+
   private async request(
     path: string,
     token: string,

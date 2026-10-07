@@ -731,3 +731,16 @@ Fresh take receipts must match account, profile, timezone, source and custody bi
 ## Original manual consumer account change fence
 
 Stopping or switching accounts during execution retains uncertainty and refuses stale reporting; reopening never invokes that request again.
+
+
+## Original manual lifecycle wiring
+
+The manual lifecycle starts independently of the source poller. A long running peer does not block original screen operations, and stop invalidates the consumer and its captured engine.
+
+## Original manual concrete source resource binding
+
+The real coordinator, private SQLite and actual script files bind dispatch to synchronized native/source versions. Output returns through ordinary replication; a reopened report obligation never invokes the effect again.
+
+## Original manual concrete stale resource refusal
+
+Changed script bytes, custody revisions, passive devices and stopped contexts refuse the concrete dispatch binding before reaching the Agent port.

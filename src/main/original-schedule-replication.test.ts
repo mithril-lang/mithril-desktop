@@ -31,6 +31,12 @@ import {
 } from "@mithril/workspace/repository-sync";
 import { OriginalSchedulePreparationMailbox } from "@mithril/workspace/original-schedule-preparation";
 import { captureOriginalCronFile } from "./cron-source-files";
+import type {
+  OriginalManualCommand,
+  OriginalManualReceipt,
+  OriginalManualResult,
+} from "./original-schedule-manual";
+
 const roots: string[] = [];
 afterEach(() =>
   roots
@@ -621,3 +627,127 @@ it("processes confirmed parser requests on a passive device while retaining orig
   );
   expect(captureOriginalCronFile(passive.home, "default")).toBeNull();
 });
+
+function manualRequest(peer: ReturnType<typeof cloud>): OriginalManualReceipt {
+  const document = peer.documents.get("schedule:schedule-file-default")!;
+  return {
+    userId: "alice",
+    profile: "default",
+    jobId: "one",
+    operationId: "manual-one",
+    sourceRevision: document.revision,
+    sourceDigest: (document.body as { digest: string }).digest,
+    status: "unknown",
+  };
+}
+function authoredManualDevice(
+  peer: ReturnType<typeof cloud>,
+): ReturnType<typeof device> {
+  const a = device(peer, true);
+  mkdirSync(join(a.home, "cron"));
+  mkdirSync(join(a.home, "scripts"));
+  writeFileSync(join(a.home, "scripts", "task.py"), "print('original')\n");
+  writeFileSync(
+    join(a.home, "cron", "jobs.json"),
+    '{"opaque":9223372036854775807,"jobs":[{"id":"one","name":"one","prompt":"test","enabled":true,"state":"scheduled","schedule":{"kind":"cron","expr":"17 9 * * 1-5"},"script":"task.py"}]}',
+  );
+  return a;
+}
+// @lat: [[cloud-workspace-tests#Original manual concrete source resource binding]]
+it("dispatches through the concrete synchronized source/resource binding and retains output on the ordinary replication path", async () => {
+  const peer = cloud(),
+    a = authoredManualDevice(peer);
+  const engine = new OriginalScheduleReplication(a.ports);
+  expect(await engine.sync()).toEqual({ status: "synced" });
+  const request = manualRequest(peer);
+  let effects = 0,
+    lost = true;
+  const command = async (
+    c: OriginalManualCommand,
+  ): Promise<OriginalManualResult> => {
+    if (c.action === "take")
+      return effects === 0
+        ? { fresh: true, request, authorityRevision: 1 }
+        : { fresh: false, request: null };
+    if (lost) throw Error("lost report acknowledgement");
+    const { action: _action, ...receipt } = c;
+    return { userId: "alice", ...receipt };
+  };
+  const consumer = engine.manualConsumer({
+    command,
+    serialize: async <T>(action: () => Promise<T>): Promise<T> => action(),
+    run: async (input) => {
+      expect(input.expectedVersion).toBe(
+        captureOriginalCronFile(a.home, "default")!.version,
+      );
+      expect(input.operationId).toBe(request.operationId);
+      effects++;
+      writeFileSync(
+        join(a.home, "scripts", "output.txt"),
+        "actual output bytes",
+      );
+      return { success: true, receipt: { ...input, status: "completed" } };
+    },
+  });
+  await expect(consumer.poll()).rejects.toThrow("lost report acknowledgement");
+  expect(effects).toBe(1);
+  expect(await engine.sync()).toEqual({ status: "synced" });
+  expect(manualRequest(peer).sourceDigest).not.toBe(request.sourceDigest);
+  engine.stop();
+  lost = false;
+  const reopened = new OriginalScheduleReplication(a.ports);
+  const replay = reopened.manualConsumer({
+    command,
+    serialize: async <T>(action: () => Promise<T>): Promise<T> => action(),
+    run: async () => {
+      throw Error("replay must not execute");
+    },
+  });
+  await replay.poll();
+  expect(effects).toBe(1);
+  expect(readFileSync(join(a.home, "scripts", "output.txt"), "utf8")).toBe(
+    "actual output bytes",
+  );
+  reopened.stop();
+}, 30000);
+
+// @lat: [[cloud-workspace-tests#Original manual concrete stale resource refusal]]
+it("refuses changed script resources, selected custody and stopped contexts before binding dispatch", async () => {
+  const peer = cloud(),
+    a = authoredManualDevice(peer);
+  const engine = new OriginalScheduleReplication(a.ports);
+  await engine.sync();
+  const request = manualRequest(peer);
+  expect(await engine.manualBinding(request, 1)).toMatchObject({
+    owner: "alice",
+    jobId: "one",
+    sourceDigest: request.sourceDigest,
+  });
+  writeFileSync(join(a.home, "scripts", "task.py"), "print('changed')\n");
+  await expect(engine.manualBinding(request, 1)).rejects.toThrow(
+    "resources changed",
+  );
+  writeFileSync(join(a.home, "scripts", "task.py"), "print('original')\n");
+  a.ports.custody = async () => ({
+    userId: "alice",
+    profile: "default",
+    selected: true,
+    revision: 2,
+  });
+  await expect(engine.manualBinding(request, 1)).rejects.toThrow(
+    "custody changed",
+  );
+  a.ports.custody = async () => ({
+    userId: "alice",
+    profile: "default",
+    selected: false,
+    revision: 1,
+  });
+  await expect(engine.manualBinding(request, 1)).rejects.toThrow(
+    "selected device",
+  );
+  engine.stop();
+  await expect(engine.manualBinding(request, 1)).rejects.toThrow(
+    "identity changed",
+  );
+}, 30000);

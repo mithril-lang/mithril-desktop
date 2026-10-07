@@ -842,4 +842,13 @@ The manual consumer combines main-only take/report transport with the private di
 
 [[src/main/original-schedule-manual-consumer.ts#OriginalScheduleManualConsumer#poll]] reports retained outcomes first, accepts only fresh validated API takes, and requires a matching synchronized native-source/custody binding. It commits the dispatch fence under the existing cross-process lock, invokes the original source-run port outside that lock, and retains only exact results. Failed reporting retries the result, never the effect. Account changes and stop invalidate later acknowledgements. Unknown recovery does not invoke the Agent; reserved recovery and unknown reconciliation remain separate unfinished work.
 
-Tests use real private SQLite and synthetic transport/Agent peers to verify reopening, replay refusal, identity fences and nonblocking execution. This coordinator is not yet mounted into the lifecycle or supplied with the concrete synchronized resource/custody binding. Production API, original route mount, installer and installed-client verification remain required.
+Tests use real private SQLite and synthetic transport/Agent peers to verify reopening, replay refusal, identity fences and nonblocking execution. The lifecycle and concrete synchronized resource/custody binding are now connected as described below. Production API, original route mount, installer and installed-client verification remain required.
+
+
+## Original manual lifecycle mounting (draft)
+
+A separate main-process lifecycle consumes original manual requests without occupying the source replication poller or the original screen's serialized action lane during execution.
+
+[[src/main/original-schedule-replication-runtime.ts#startOriginalScheduleReplication]] starts and stops both lifecycles under the existing account-change subscription. [[src/main/original-schedule-replication.ts#OriginalScheduleReplication#manualConsumer]] serializes source/resource synchronization and binding, then invokes the existing main source-run port outside that lane. [[src/main/original-schedule-replication.ts#OriginalScheduleReplication#manualBinding]] recaptures verified script/workdir/runtime references under their original private store lock and checks the exact native version, source digest and selected custody revision. The Agent's original source CAS and execution policy still admit the effect. Output/counter changes return through the existing durable replication path after completion or report failure.
+
+Runtime tests use synthetic Agent/transport peers. Concrete coordinator tests use real SQLite and files to verify binding and output replication. The updated Agent pin, unknown/reserved reconciliation, API schema publication, normal Web renderer, installer and installed-client execution remain unfinished; lifecycle wiring alone is not production proof.

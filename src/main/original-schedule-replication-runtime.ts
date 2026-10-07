@@ -16,8 +16,10 @@ import {
   restoreOriginalCronSource,
   prepareOriginalCronExecution,
   bindOriginalCronExecution,
+  runOriginalCronSource,
 } from "./cronjobs";
 import { OriginalScheduleReplication } from "./original-schedule-replication";
+import type { OriginalScheduleManualConsumer } from "./original-schedule-manual-consumer";
 import { OriginalScheduleReplicationLoop } from "./original-schedule-replication-loop";
 
 // One lane for the lifecycle poller and original screen operations.
@@ -199,6 +201,56 @@ export function startOriginalScheduleReplication(): () => void {
       };
     },
   });
+  // A separate lifecycle keeps long Agent work out of the replication poller.
+  const manual = new OriginalScheduleReplicationLoop({
+    changed: onCloudWorkspaceAccountChanged,
+    create: async () => {
+      let stopped = false;
+      let engine: OriginalScheduleReplication | null = null;
+      let consumer: OriginalScheduleManualConsumer | null = null;
+      return {
+        stop: () => {
+          stopped = true;
+          consumer?.stop();
+          engine?.stop();
+        },
+        sync: async () => {
+          engine = await serial(createEngine);
+          if (stopped) {
+            engine?.stop();
+            throw Error("Manual schedule lifecycle stopped");
+          }
+          if (!engine)
+            return {
+              status: "deferred" as const,
+              reason: "schedule-not-connected",
+            };
+          const active = engine;
+          consumer = active.manualConsumer({
+            command: (command) =>
+              cloudWorkspace.originalScheduleManual(command),
+            run: (request) =>
+              runOriginalCronSource(request, () =>
+                active.assertScreenScope(request.profile),
+              ),
+            serialize: serial,
+          });
+          try {
+            await consumer.poll();
+            return { status: "synced" as const };
+          } finally {
+            // Original output/counters are ordinary data on the existing outbox.
+            if (!stopped) await serial(() => active.sync()).catch(() => {});
+            active.stop();
+          }
+        },
+      };
+    },
+  });
   loop.start();
-  return () => loop.stop();
+  manual.start();
+  return () => {
+    manual.stop();
+    loop.stop();
+  };
 }

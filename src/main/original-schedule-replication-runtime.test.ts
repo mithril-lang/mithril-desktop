@@ -13,6 +13,15 @@ const f = vi.hoisted(() => ({
   ports: [] as OriginalScheduleReplicationPorts[],
   parseCreate: vi.fn(),
   parseTransition: vi.fn(),
+  manual: vi.fn(),
+  manualStop: vi.fn(),
+  manualPorts: [] as {
+    command: unknown;
+    run: (input: unknown) => Promise<unknown>;
+    serialize: unknown;
+  }[],
+  manualCommand: vi.fn(),
+  sourceRun: vi.fn(),
 }));
 vi.mock("electron", () => ({ app: { getPath: () => "/test/user-data" } }));
 vi.mock("./cloud-workspace-runtime", () => ({
@@ -31,6 +40,7 @@ vi.mock("./cloud-workspace-runtime", () => ({
     repositoryHistory: vi.fn(),
     scheduleResources: {},
     originalScheduleCustody: vi.fn(),
+    originalScheduleManual: f.manualCommand,
   },
   onCloudWorkspaceAccountChanged: () => () => {},
 }));
@@ -53,11 +63,19 @@ vi.mock("./cronjobs", () => ({
   restoreOriginalCronSource: vi.fn(),
   prepareOriginalCronExecution: vi.fn(),
   bindOriginalCronExecution: vi.fn(),
+  runOriginalCronSource: f.sourceRun,
 }));
 vi.mock("./original-schedule-replication", () => ({
   OriginalScheduleReplication: class {
     constructor(ports: OriginalScheduleReplicationPorts) {
       f.ports.push(ports);
+    }
+    manualConsumer(ports: (typeof f.manualPorts)[number]): {
+      poll: typeof f.manual;
+      stop: typeof f.manualStop;
+    } {
+      f.manualPorts.push(ports);
+      return { poll: f.manual, stop: f.manualStop };
     }
     sync = f.sync;
     assertScreenScope = f.check;
@@ -74,6 +92,8 @@ beforeEach(() => {
   f.token = "synthetic-account-a";
   f.timeZone = "UTC";
   f.ports = [];
+  f.manualPorts = [];
+  f.manual.mockResolvedValue(undefined);
   f.sync.mockResolvedValue({ status: "synced" });
   f.check.mockResolvedValue(undefined);
   f.selected.mockResolvedValue(undefined);
@@ -210,7 +230,7 @@ it("queues the background poll behind an in-flight screen action instead of ente
     release();
     await operation;
     await flush();
-    expect(f.sync).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(f.sync).toHaveBeenCalledTimes(3));
   } finally {
     stop();
   }
@@ -262,4 +282,38 @@ it("calls the original Cron preparation ports under the captured account profile
   await expect(ports.parser.prepareCreate(request)).rejects.toThrow(
     "profile changed",
   );
+});
+
+// @lat: [[cloud-workspace-tests#Original manual lifecycle wiring]]
+it("starts manual consumption independently and leaves original screen operations available during a long run", async () => {
+  let release!: () => void;
+  f.manual.mockImplementationOnce(
+    () =>
+      new Promise<void>((r) => {
+        release = r;
+      }),
+  );
+  const stop = startOriginalScheduleReplication();
+  try {
+    await vi.waitFor(() => expect(f.manual).toHaveBeenCalledTimes(1));
+    const ports = f.manualPorts[0]!;
+    const request = {
+      owner: "alice",
+      profile: "default",
+      operationId: "operation",
+      jobId: "one",
+      expectedVersion: "a".repeat(64),
+    };
+    await ports.run(request);
+    expect(f.sourceRun).toHaveBeenCalledWith(request, expect.any(Function));
+    const action = vi.fn(async () => []);
+    await runOriginalScheduleScreen("default", action, "read");
+    expect(action).toHaveBeenCalledTimes(1);
+    stop();
+    expect(f.manualStop).toHaveBeenCalled();
+    release();
+    await flush();
+  } finally {
+    stop();
+  }
 });

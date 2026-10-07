@@ -39,6 +39,18 @@ import {
   type OriginalScheduleCustodyReceipt,
 } from "./original-schedule-custody";
 
+import { OriginalScheduleManualConsumer } from "./original-schedule-manual-consumer";
+import type { OriginalManualBinding } from "./original-schedule-manual-journal";
+import type {
+  OriginalManualCommand,
+  OriginalManualResult,
+  OriginalManualReceipt,
+} from "./original-schedule-manual";
+import type {
+  OriginalCronRunRequest,
+  OriginalCronRunResult,
+} from "./cron-source-run";
+
 export interface OriginalScheduleReplicationPorts {
   scope: OriginalScheduleReplicaScope;
   home: string;
@@ -76,6 +88,10 @@ function managedDirectory(root: string): void {
 export class OriginalScheduleReplication {
   private stopped = false;
   private running = false;
+  private manualAnchor: OriginalScheduleAgentBinding | null = null;
+  private manualCapture:
+    | (() => Promise<{ version: string | null; sourceDigest: string | null }>)
+    | null = null;
   private replica: OriginalScheduleFileReplica | null = null;
   private repository: RepositorySync | null = null;
   constructor(private readonly ports: OriginalScheduleReplicationPorts) {}
@@ -115,10 +131,86 @@ export class OriginalScheduleReplication {
     )
       throw Error("Run this schedule on its selected device");
   }
+  /** Bind a fresh intent to the same verified resources and native version used by replication. */
+  async manualBinding(
+    request: OriginalManualReceipt,
+    authorityRevision: number,
+  ): Promise<OriginalManualBinding> {
+    await this.check();
+    const anchor = this.manualAnchor,
+      capture = this.manualCapture;
+    if (
+      !anchor ||
+      !capture ||
+      request.userId !== this.ports.scope.owner ||
+      request.profile !== anchor.profile ||
+      request.sourceRevision !== anchor.sourceRevision ||
+      request.sourceDigest !== anchor.sourceDigest ||
+      authorityRevision !== anchor.authorityRevision
+    )
+      throw Error("Manual schedule source changed");
+    await this.assertSelectedExecution();
+    const authority = await this.ports.custody({
+      action: "status",
+      profile: anchor.profile,
+    });
+    await this.check();
+    if (
+      !validOriginalScheduleCustodyReceipt(authority, this.ports.scope.owner, {
+        action: "status",
+        profile: anchor.profile,
+      }) ||
+      !("selected" in authority) ||
+      !authority.selected ||
+      authority.revision !== authorityRevision
+    )
+      throw Error("Manual schedule custody changed");
+    const current = await capture();
+    await this.check();
+    if (
+      current.version !== anchor.nativeVersion ||
+      current.sourceDigest !== anchor.sourceDigest
+    )
+      throw Error("Manual schedule resources changed");
+    return {
+      ...this.ports.scope,
+      jobId: request.jobId,
+      operationId: request.operationId,
+      sourceRevision: anchor.sourceRevision,
+      sourceDigest: anchor.sourceDigest,
+      authorityRevision,
+      nativeVersion: anchor.nativeVersion,
+    };
+  }
+  manualConsumer(ports: {
+    command(input: OriginalManualCommand): Promise<OriginalManualResult>;
+    run(input: OriginalCronRunRequest): Promise<OriginalCronRunResult>;
+    serialize<T>(action: () => Promise<T>): Promise<T>;
+  }): OriginalScheduleManualConsumer {
+    return new OriginalScheduleManualConsumer({
+      scope: this.ports.scope,
+      store: new NativeOriginalScheduleReplicaStore(
+        join(this.ports.stateRoot, "schedule-replicas"),
+        this.ports.scope,
+      ),
+      check: () => this.check(),
+      command: ports.command,
+      run: ports.run,
+      bind: (request, revision) =>
+        ports.serialize(async () => {
+          const result = await this.sync();
+          if (result.status !== "synced")
+            throw Error("Manual schedule synchronization unconfirmed");
+          return this.manualBinding(request, revision);
+        }),
+    });
+  }
   async sync(): Promise<OriginalScheduleReplicaResult> {
     if (this.running)
       return { status: "deferred", reason: "schedule-replica-busy" };
     this.running = true;
+    this.manualAnchor = null;
+    this.manualCapture = null;
     const p = this.ports;
     try {
       await this.check();
@@ -344,15 +436,20 @@ export class OriginalScheduleReplication {
           captured.sourceDigest !== sha(cloud.text)
         )
           throw Error("Schedule source changed after synchronization");
-        await p.bind({
+        const anchor: OriginalScheduleAgentBinding = {
           owner: p.scope.owner,
           profile: p.scope.profile,
           sourceRevision: cloud.document.revision,
           sourceDigest: captured.sourceDigest,
           nativeVersion: captured.version,
           authorityRevision,
-        });
+        };
+        await p.bind(anchor);
         await this.check();
+        this.manualAnchor = anchor;
+        // Native capture needs the very same store lock used by resource bindings.
+        this.manualCapture = () =>
+          store.exclusive(p.scope, () => native.capture());
       });
       return result;
     } finally {

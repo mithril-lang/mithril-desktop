@@ -1109,3 +1109,10 @@ The original Advanced deletion pane now renders through DesktopProfileAdvanced f
 [[src/renderer/src/components/profile/ProfileModal.tsx#ProfileModal]] supplies the existing confirmation state, pending state, error, original icon and deletion handler. Default-profile protection and original confirmation markup are shared; Native retains account/profile effects and fences late responses. Existing adapter tests exercise failure/retry and dialog replacement against the actual compiled shared package. Browser all-data deletion remains unfinished because a metadata-only tombstone cannot represent removal of history, files, schedules and runtime state. Publication and installed upgrade/cross-device proof remain separate gates.
 
 The immutable archive contains 461 matching producer/archive/vendor/installed files with SHA256 `d8a8e9a90107aae96df2cbf991f2d8f99cb98b1b23b8195927654d20c44c8fc4`.
+
+
+## Ordinary Chat uses automatic history synchronization (draft)
+
+The ordinary MithrilChat consumer no longer supplies the manual Native history import adapter to the shared chat settings menu.
+
+[[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx#MithrilChat]] retains the same original source rows and canonical conversations in one shared sidebar. [[src/renderer/src/screens/CloudWorkspace/RepositoryReplication.tsx#RepositoryReplication]] continues existing background archival and conflict handling. The manual import service is retained for existing explicit operators, but it is not a second user migration flow. Tests open the real shared Chat settings and verify no local-history migration controls are rendered or invoked, alongside source selection and automatic synchronization tests. Installed upgrade and cross-device qualification remain pending.

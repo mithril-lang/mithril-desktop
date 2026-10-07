@@ -1051,3 +1051,9 @@ The canonical Sync candidate archive has 447 files with SHA256 `c66061dd0712f5f3
 The original Agents list and profile Sync pane share one canonical workspace identity hook, retaining native profile operations while removing the separate workspace button.
 
 The hook fences old account/profile responses and enables only already authorized workspace access. The list no longer invokes retired agent-sync handlers that always report signed out. Authenticated working copies refresh every 20 seconds without overlapping background reads; transport failures preserve the list and expose retry. This does not yet materialize cloud-only profiles or prove full Web list parity, production publication or installed synchronization.
+
+## Cloud-only profile working copies (draft)
+
+New remote original metadata can materialize a named Desktop profile automatically, while retained missing original sources remain deleted.
+
+The replica transport verifies owner-scoped resource bytes before creation. A durable creation intent distinguishes first materialization from retained deletion, and canonical authority is rechecked before directory mutations. No credentials, runtime configuration or active selection are cloned. Existing original metadata CAS and receipts perform the actual content restoration. Public and installed cross-device qualification remain unfinished.

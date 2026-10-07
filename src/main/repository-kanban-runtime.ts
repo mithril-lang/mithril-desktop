@@ -44,6 +44,9 @@ import {
   mkdirSync,
   readFileSync,
   writeFileSync,
+  openSync,
+  fsyncSync,
+  closeSync,
 } from "fs";
 import { join, resolve, dirname } from "path";
 import { createHash, randomUUID } from "crypto";
@@ -88,10 +91,21 @@ export function bindRepositorySource(
   checked(path);
   if (!existsSync(path)) {
     try {
-      writeFileSync(path, JSON.stringify({ profile, userId }), {
-        flag: "wx",
-        mode: 0o600,
-      });
+      const fd = openSync(path, "wx", 0o600);
+      try {
+        writeFileSync(fd, JSON.stringify({ profile, userId }));
+        fsyncSync(fd);
+      } finally {
+        closeSync(fd);
+      }
+      if (process.platform !== "win32") {
+        const parent = openSync(directory, "r");
+        try {
+          fsyncSync(parent);
+        } finally {
+          closeSync(parent);
+        }
+      }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     }
@@ -1559,6 +1573,61 @@ export async function nativeReplicaSnapshot(): Promise<
         );
       }
     }
+    // Admit verified cloud-only profile IDs into the replica scope. Existing foreign
+    // directories/bindings remain excluded; only the creator can establish a new source.
+    const [
+      { validProfileMetadataPointer },
+      { validRepositoryPage },
+      { HERMES_HOME },
+    ] = await Promise.all([
+      import("@mithril/workspace/profile-resources"),
+      import("@mithril/workspace/repository"),
+      import("./installer"),
+    ]);
+    let after: string | undefined;
+    let count = 0;
+    for (let pageIndex = 0; pageIndex < 100; pageIndex++) {
+      const page = await cloudWorkspace.repositoryPage("profile", after);
+      cloudWorkspace.assertNativeContext(before.context);
+      if (
+        !validRepositoryPage(page, "profile", after) ||
+        page.userId !== before.userId
+      )
+        throw Error("Invalid cloud profile inventory");
+      count += page.documents.length;
+      if (count > 10000)
+        throw Error("Cloud profile inventory exceeds supported capacity");
+      for (const row of page.documents) {
+        if (
+          row.deleted ||
+          !validProfileMetadataPointer(row.body) ||
+          row.id !== `profile-metadata-${row.body.profile}` ||
+          row.body.profile === "default" ||
+          metadataScope.ids.includes(row.id)
+        )
+          continue;
+        const root = join(HERMES_HOME, "profiles", row.body.profile);
+        checked(root);
+        if (existsSync(root)) continue;
+        try {
+          if (
+            repositorySourceOwned(
+              join(app.getPath("userData"), "repository-source-owners"),
+              row.body.profile,
+              before.userId,
+            )
+          )
+            continue;
+          metadataScope.ids.push(row.id);
+        } catch {
+          /* A foreign or unsafe source is never admitted. */
+        }
+      }
+      if (page.nextAfter === null) break;
+      if (pageIndex === 99)
+        throw Error("Cloud profile inventory exceeds supported capacity");
+      after = page.nextAfter;
+    }
   } catch {
     snapshot.warnings!.push(
       "Profile metadata inventory is unavailable; original data is retained",
@@ -1619,11 +1688,68 @@ export async function nativeReplicaApply(
   let result: import("@mithril/workspace/replica-sync").ReplicaResult;
   if (write.document.collection === "profile") {
     const inventory = await metadataSources(before);
-    const source = inventory.sources.find(
+    let source = inventory.sources.find(
       (row) => write.document.id === `profile-metadata-${row.profile}`,
     );
+    if (
+      !write.document.deleted &&
+      write.expectedRecord === null &&
+      write.expectedVersion === null
+    ) {
+      const { validProfileMetadataPointer, downloadProfileMetadata } =
+        await import("@mithril/workspace/profile-resources");
+      const pointer = write.document.body;
+      if (
+        validProfileMetadataPointer(pointer) &&
+        write.document.id === `profile-metadata-${pointer.profile}` &&
+        pointer.profile !== "default"
+      ) {
+        // Verify owner-scoped manifest, digest and original JSON before creating anything.
+        if (!source?.present)
+          await downloadProfileMetadata(
+            cloudWorkspace.profileResources,
+            before.userId,
+            pointer,
+          );
+        cloudWorkspace.assertNativeContext(before.context);
+        const [{ HERMES_HOME }, { createCloudProfileWorkingCopy }] =
+          await Promise.all([
+            import("./installer"),
+            import("./cloud-profile-working-copy"),
+          ]);
+        const bindings = join(
+          app.getPath("userData"),
+          "repository-source-owners",
+        );
+        const root = createCloudProfileWorkingCopy(
+          {
+            home: HERMES_HOME,
+            directory: join(
+              app.getPath("userData"),
+              "repository-profile-creations",
+            ),
+            owner: before.userId,
+            profile: pointer.profile,
+          },
+          {
+            guard: () => cloudWorkspace.assertNativeContext(before.context),
+            hasBinding: () =>
+              repositorySourceOwned(bindings, pointer.profile, before.userId),
+            bind: () =>
+              bindRepositorySource(bindings, pointer.profile, before.userId),
+          },
+        );
+        if (root) source = { profile: pointer.profile, root, present: true };
+      }
+    }
     if (!source)
-      throw Error("Profile metadata source is unavailable for this account");
+      return {
+        schemaVersion: 1,
+        userId: before.userId,
+        replicaId: before.replicaId,
+        status: "deferred",
+        record: null,
+      };
     result = await (await profileMetadataPort(before, source)).apply(write);
   } else if (
     write.document.collection === "capability" &&

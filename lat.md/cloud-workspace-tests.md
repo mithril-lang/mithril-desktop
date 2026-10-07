@@ -960,3 +960,31 @@ Authenticated list refresh observes background working-copy changes without over
 ## Agents failed initial list
 
 A failed initial profile read leaves loading and exposes refresh so the original list can recover without revisiting the screen.
+
+## Cloud profile first materialization
+
+A new remote profile creates an empty original directory and records ownership; completed intents never recreate a later deletion or copy runtime credentials.
+
+## Cloud profile retained deletion
+
+An existing source binding without a pending creation intent cannot recreate its missing original directory.
+
+## Cloud profile interrupted creation
+
+A durable pre-directory intent survives interruption and resumes its first creation instead of treating it as a deleted prior source.
+
+## Cloud profile creation authority
+
+Foreign ownership, account invalidation and symlink ancestors prevent working-copy creation before any original profile mutation.
+
+## Cloud profile replica materialization
+
+The actual Native replica transport verifies remote resources, restores exact original metadata, replays its receipt and defers after a later directory deletion.
+
+## Cloud profile replica resource failure
+
+Resource failure or changed account authority leaves the new original profile directory absent through the actual Native replica path.
+
+## Cloud profile replica scope
+
+The actual Native snapshot admits valid cloud-only profile IDs so background replication can restore them, while foreign original bindings remain outside its scope.

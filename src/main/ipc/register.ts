@@ -1329,6 +1329,10 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudChat.apply(id, operation);
   });
+  ipcMain.handle("cloud-chat-browser-step", (event, id, body) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.browserStep(id, body);
+  });
   ipcMain.handle("cloud-chat-receipt", (event, id, operationId) => {
     trustedWorkspaceSender(event);
     return cloudChat.receipt(id, operationId);

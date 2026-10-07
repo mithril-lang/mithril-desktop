@@ -21,14 +21,22 @@ it("requires an explicit run and shows verified source and measurements", async 
   const call = vi.fn(async () => ({
     ok: true,
     result: {
-      format: "mithril.code-project/v1",
+      format: "mithril.language-project/v1",
       verified: true,
       files: {
-        "src/todo/interaction.cljk": "(defn toggle [old] (not old))",
-        "src/todo/summary.cljk":
-          "(defn remaining [xs] (count (filter false? xs)))",
+        "application.mith": "(mithril/app-agent)",
+        "artifact.json": "{}",
+        "index.html": "<main>Fixture</main>",
+        ".nojekyll": "",
+        "README.md": "Synthetic UI fixture",
       },
-      logic: {},
+      logic: { format: "https://mithril.fund/artifact/app-agent-v1" },
+      receipt: {
+        format: "mithril.language-inference-receipt/v1",
+        source: "(mithril/app-agent)",
+        status: "admitted",
+        compiler: "https://app.mithril.fund/api/compile",
+      },
       metrics: {
         "verification-passed": true,
         "receipt-id": "synthetic-ui-test",
@@ -52,12 +60,12 @@ it("requires an explicit run and shows verified source and measurements", async 
   await waitFor(() =>
     expect(
       (screen.getByLabelText("Source editor") as HTMLTextAreaElement).value,
-    ).toBe("(defn toggle [old] (not old))"),
+    ).toBe("(mithril/app-agent)"),
   );
   expect(call).toHaveBeenCalledTimes(1);
   expect(call).toHaveBeenCalledWith(
     "run",
-    "Toggle completion and count unfinished tasks",
+    "Create a static ontology report in Mithril",
     "owner",
   );
 });
@@ -100,7 +108,7 @@ it("selects Code service explicitly without starting a run or falling back to He
   fireEvent.click(screen.getByRole("button", { name: "Assemble and verify" }));
   await screen.findByText("Connect GitHub first.");
   expect(service).toHaveBeenCalledWith(
-    "Toggle completion and count unfinished tasks",
+    "Create a static ontology report in Mithril",
     { github: "", provider: "" },
   );
   expect(harness).not.toHaveBeenCalled();

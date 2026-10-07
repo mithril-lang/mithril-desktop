@@ -46,6 +46,14 @@ import type {
   SessionNativeImportAdapter,
 } from "@mithril/workspace/sessions";
 export interface CloudChatAPI extends SessionTransport {
+  browserStep(
+    id: string,
+    body: Record<string, unknown>,
+  ): Promise<{
+    phase: string;
+    round: number;
+    calls: import("@mithril/workspace/client-tool-turn").ClientToolCall[];
+  }>;
   nativeHistoryInventory(): Promise<{
     userId: string;
     profile: string;

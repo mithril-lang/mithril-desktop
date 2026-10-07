@@ -626,7 +626,7 @@ Older Agent receipts remain readable but do not supply the raw source required b
 
 ## Original schedule source resources
 
-The shared package 0.6.18 provides a main-only owner-scoped schedule resource transport through the fixed Mithril API.
+The shared package 0.6.21-schedules.2 provides a main-only owner-scoped schedule resource transport through the fixed Mithril API.
 
 Its private R2 namespace is separate from Capability registration, and D1 stores verified complete-file pointers. Original Schedules components are unchanged.
 

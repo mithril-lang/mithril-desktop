@@ -36,6 +36,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test installer API compatibility gate
+        run: node --test scripts/check-workspace-api.test.mjs
+
       - name: Test
         run: npm test
 

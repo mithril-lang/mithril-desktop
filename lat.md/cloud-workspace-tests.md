@@ -1151,3 +1151,13 @@ Owner changes, rejected nontransient HTTP requests and invalid schemas stop auto
 ## Canonical cloud connection settings
 
 The Native consumer mounts the actual shared account status component with main-owned reads, keeps original execution settings unmounted until expansion and opens account management only on an explicit click.
+
+
+## Paged canonical chat inventory
+
+The main-owned Chat adapter completes stable-boundary API pages before returning the owner-scoped inventory and retains recent activity ordering. The existing credential/profile fence applies to every page.
+
+
+## Large multi-profile cloud history inventory
+
+The original NativeHistorySync engine archives the selected native source against an owner-bound cloud inventory above one thousand sessions without dispatching inference or tools.

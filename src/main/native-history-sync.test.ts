@@ -1444,3 +1444,22 @@ it("retains another owner's deletion intent while reconstructing only the curren
     f.db.close();
   }
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Large multi-profile cloud history inventory]]
+it("archives the current native source when other cloud profiles exceed one thousand sessions", async () => {
+  const f = fixture();
+  for (let i = 0; i < 1205; i++)
+    f.sessions.set(`other-${i}`, {
+      id: `other-${i}`,
+      title: "Other retained chat",
+      model: "mock",
+      revision: 1,
+      eventSeq: 0,
+      deleted: false,
+      activeTurn: null,
+    });
+  const result = await new NativeHistorySync(f.ports).run();
+  expect(result.synced).toBe(f.items.length);
+  expect(f.sessions).toHaveProperty("size", 1206);
+  expect(f.executions()).toBe(0);
+});

@@ -486,7 +486,13 @@ it("archives all profiles through the real engine and canonical HTTP adapter, re
         return Response.json({
           schemaVersion: 1,
           userId: "owner",
-          sessions: [...sessions.values()],
+          sessions: [...sessions.values()].sort((a, b) =>
+            a.id < b.id ? -1 : 1,
+          ),
+          anchor: 1,
+          total: sessions.size,
+          updatedAt: [...sessions.values()].map(() => 1),
+          nextAfter: null,
         });
       const route =
         /^\/v1\/chat\/sessions\/([^/]+)\/(events|operations)(?:\/([^/]+))?$/.exec(

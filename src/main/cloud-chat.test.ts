@@ -69,7 +69,15 @@ function fixture(scopes = ["chat:read", "chat:write"]): {
         status: "accepted",
         session,
       });
-    return response({ schemaVersion: 1, userId: "a", sessions: [session] });
+    return response({
+      schemaVersion: 1,
+      userId: "a",
+      sessions: [session],
+      anchor: 1,
+      total: 1,
+      updatedAt: [1],
+      nextAfter: null,
+    });
   });
   const changed = vi.fn();
   const auth = new CloudWorkspace({
@@ -256,4 +264,41 @@ describe("Canonical Desktop chat transport", () => {
     await expect(pending).rejects.toThrow("stale");
     expect((await f.auth.status()).enabled).toBe(true);
   });
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Paged canonical chat inventory]]
+it("reads complete canonical pages through main-owned authority and preserves recent-first order", async () => {
+  const f = fixture();
+  await f.auth.enable();
+  const original = f.fetcher.getMockImplementation() as (
+    url: string,
+    init?: RequestInit,
+  ) => Promise<Response>;
+  f.fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.includes("/v1/chat/sessions?page=1")) {
+      const last = new URL(url).searchParams.has("after");
+      return f.response({
+        schemaVersion: 1,
+        userId: "a",
+        anchor: 3,
+        total: 2,
+        sessions: [{ ...session, id: last ? "s2" : "s1" }],
+        updatedAt: [last ? 2 : 1],
+        nextAfter: last ? null : "s1",
+      });
+    }
+    return original(url, init);
+  });
+  expect((await f.client.list()).sessions.map((s) => s.id)).toEqual([
+    "s2",
+    "s1",
+  ]);
+  expect(
+    f.fetcher.mock.calls
+      .filter(([url]) => url.includes("sessions?page=1"))
+      .map(([url]) => url),
+  ).toEqual([
+    "https://api.mithril.fund/v1/chat/sessions?page=1",
+    "https://api.mithril.fund/v1/chat/sessions?page=1&anchor=3&after=s1",
+  ]);
 });

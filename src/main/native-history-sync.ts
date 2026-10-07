@@ -247,7 +247,6 @@ export class NativeHistorySync {
     await check();
     if (list.userId !== identity.userId) throw Error("History owner mismatch");
     if (
-      list.sessions.length > 1000 ||
       list.sessions.some((session) => !validateChatSession(session)) ||
       new Set(list.sessions.map((session) => session.id)).size !==
         list.sessions.length

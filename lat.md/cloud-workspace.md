@@ -1183,3 +1183,21 @@ Workspace `.34` is a source candidate. Full Data archive adapters, authenticated
 
 
 The `.34` archive SHA256 is `6cab4b70ee2c4aebed56898018dd1cb46a8c2b74851bace6e818e165a911690b`; all 463 files match producer and installed bytes and the lock SHA512 matches. Shared qualification passed 378 tests, browser Settings/Logs passed 13 and Native connection/modal/routes passed 13. Both builds, type checking, changed-file lint and lat validation passed. These checks do not substitute for installed-client or production evidence.
+
+
+## Paged canonical session inventory
+
+The Web and Desktop Chat adapters now share bounded, owner-checked inventory pagination instead of the old whole-account one-thousand-session response.
+
+Workspace `.36` verifies every page, stable insertion boundary, total count, strict ID order and complete final count before exposing results; recent activity ordering is restored after all pages finish. [[src/main/cloud-chat.ts#CloudChat#list]] uses the existing main-owned authorized route per page. Native history synchronization no longer rejects a valid complete cloud inventory solely because other profiles bring its count above one thousand. Original per-profile source/journal and deletion limits remain to be migrated; this does not claim complete large-history synchronization.
+
+The additive API page mode requires API-before-consumer publication. Legacy list responses remain unchanged. The canonical create/history admission removes the old whole-account one-thousand-row ceiling, preserving operation receipts, revision CAS and execution fences. No production schema mutation or publication is part of this source change.
+
+
+## Installer API compatibility admission
+
+Stable and beta installer publication require the paged canonical API before creating a tag or uploading release assets.
+
+The release gate reads only the fixed `https://api.mithril.fund/health` route with a deadline, no credentials and no redirects, and requires `chat-inventory-keyset-v1`. CI tests reject absent/older protocol and failed health responses. This establishes compatibility admission, not authenticated behavior or complete synchronization qualification.
+
+Local qualification: 56 targeted Native history/Chat tests, one Node release-gate test, Desktop build/typechecks, changed-file lint and `lat check` pass. Workspace `.36` archive SHA256 is `b0ebaa11496c737ba0c3e69bf0faadf66229de1ac4566eee3204dad4425f76f1`; all 463 archive files match the producer and installed consumer, and lockfile integrity matches. No installer or installed-client success is implied.

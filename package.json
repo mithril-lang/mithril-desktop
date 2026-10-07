@@ -37,7 +37,7 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@mithril/design-system": "git+https://github.com/mithril-lang/design-system.git#b6980fa303e4d50eefb49bc585e466617a320286",
-    "@mithril/workspace": "file:vendor/mithril-workspace-0.6.29-schedules.34.tgz",
+    "@mithril/workspace": "file:vendor/mithril-workspace-0.6.29-schedules.36.tgz",
     "@radix-ui/react-dialog": "^1.1.17",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",

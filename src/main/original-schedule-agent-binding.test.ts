@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
@@ -26,20 +26,22 @@ function runtime(mode = "ok"): OriginalScheduleAgentRuntime {
   const cwd = mkdtempSync(join(tmpdir(), "mithril-agent-binding-"));
   roots.push(cwd);
   const script = join(cwd, "peer.cjs");
-  writeFileSync(
-    script,
-    `let text='';process.stdin.on('data',v=>text+=v);process.stdin.on('end',()=>{
+  const peer = `let text='';process.stdin.on('data',v=>text+=v);process.stdin.on('end',()=>{
     const envelope=JSON.parse(text);const {owner}=envelope;const binding=envelope.binding||envelope.prepare;
     const args=process.argv.slice(2);
-    if(args.join(',')!=='-p,'+binding.profile+',mithril-schedule-custody,--stdin')process.exit(2);
+    const expected=envelope.prepare ? '-p,'+binding.profile+',--stdin' : '-p,'+binding.profile+',mithril-schedule-custody,--stdin';
+    if(args.join(',')!==expected)process.exit(2);
     const receipt={owner,...binding,bindingDigest:'c'.repeat(64)};
     if(process.env.MODE==='foreign')receipt.profile='b';
     if(process.env.MODE==='extra')receipt.token='synthetic-secret';
     if(process.env.MODE==='lost'){process.stderr.write('synthetic-secret');process.exit(1);}
     if(process.env.MODE==='oversize'){process.stdout.write('x'.repeat(10000));return;}
     process.stdout.write(JSON.stringify({ok:true,receipt}));
-  });`,
-  );
+  });`;
+  writeFileSync(script, peer);
+  const bootstrapDir = join(cwd, "plugins", "mithril-schedules");
+  mkdirSync(bootstrapDir, { recursive: true });
+  writeFileSync(join(bootstrapDir, "bootstrap.py"), peer);
   return {
     executable: process.execPath,
     cliArgs: [script],

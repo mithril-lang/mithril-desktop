@@ -753,6 +753,8 @@ The main process can persist a published original source's execution policy thro
 
 The same main-only bridge prepares the required execution-policy lane before authored source restoration through [[src/main/cronjobs.ts#prepareOriginalCronExecution]]. Absent files retain a null CAS; existing source bytes remain unchanged. The owned Agent verifies account status and original fire fences before durable preparation. Passive replicas may retain source policies, but only the selected executor's fresh per-occurrence claim admits effects. Lifecycle mounting remains required.
 
+Preparation now invokes the Agent checkout's owned `plugins/mithril-schedules/bootstrap.py` directly with the existing interpreter, profile and bounded stdin. This works without manually enabling the plugin CLI. The draft Agent verifies fixed-origin identity before PM-owned admission, preserves unrelated configuration, and refuses explicit disabling or external overrides. Binding still uses the enabled existing CLI. Successful PM publication, the reviewed Agent installer pin and installed-client qualification remain required; a local child-peer test proves the Native command contract only.
+
 ## Automatic original schedule replication (draft)
 
 The main lifecycle now composes exact original source, resource binding, a private durable repository outbox and Agent policy preparation without a migration screen.

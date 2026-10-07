@@ -553,7 +553,7 @@ Foreign identities, extra fields, oversized output, lost acknowledgements and ma
 
 ## Original schedule Agent preparation
 
-Absent and existing original sources can enter the required policy lane through bounded stdin. Foreign, damaged or lost receipts cannot confirm preparation; preparation does not select an executor.
+Absent and existing sources use the owned Agent bootstrap through bounded stdin without manually enabling its CLI. Foreign, damaged or lost receipts cannot confirm preparation, and no executor is selected.
 
 ## Automatic schedule exact source admission
 

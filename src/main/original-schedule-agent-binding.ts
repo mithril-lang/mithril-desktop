@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { join } from "node:path";
 
 export interface OriginalScheduleAgentBinding {
   owner: string;
@@ -59,13 +60,20 @@ async function callOriginalScheduleAgent(
     try {
       const child = execFile(
         runtime.executable,
-        [
-          ...runtime.cliArgs,
-          "-p",
-          request.profile,
-          "mithril-schedule-custody",
-          "--stdin",
-        ],
+        action === "prepare"
+          ? [
+              join(runtime.cwd, "plugins", "mithril-schedules", "bootstrap.py"),
+              "-p",
+              request.profile,
+              "--stdin",
+            ]
+          : [
+              ...runtime.cliArgs,
+              "-p",
+              request.profile,
+              "mithril-schedule-custody",
+              "--stdin",
+            ],
         {
           cwd: runtime.cwd,
           env: runtime.env,

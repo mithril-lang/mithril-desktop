@@ -760,3 +760,9 @@ The main lifecycle now composes exact original source, resource binding, a priva
 [[src/main/original-schedule-replication.ts#OriginalScheduleReplication]] prepares the required original Agent policy lane before restoring authored inventories or selecting an absent authority. It never takes over an existing selected device. [[src/main/original-schedule-replication-admission.ts#originalScheduleReplicationAdmission]] requires fresh owner/profile custody at the retained revision and the exact local or owner-bound cloud source digest. Passive replicas may retain data; actual execution still requires a fresh per-occurrence claim. [[src/main/cloud-workspace.ts#CloudWorkspace#assertNativeContext]] guards account, token, profile and generation between asynchronous stages.
 
 The private SQLite journal also retains repository snapshots and pending source-manifest operations under the same cross-process lock. Restoration retains existing scripts/workdir CAS and receipts. This composition is a draft: whole-coordinator multi-device tests, shared directory alias identity, default owned-plugin setup, cloud timezone policy, original shared Schedules mounting, production migration/publication and installer qualification remain required. No real-cloud or installed-app completion is claimed by the local lifecycle tests.
+
+### Coordinator peer qualification
+
+The mounted coordinator now has real-file/SQLite roundtrip and lost-acknowledgement tests across two device roots, retaining authored inventories and concurrent script edits.
+
+The tests exercise the actual source/resource adapters, shared repository engine and durable journals against owner-scoped cloud and Native receipt peers. Preparation and binding are test ports, not a live Agent CLI, D1/R2 deployment or installed application. Full authority/Agent/cloud qualification, shared directory alias identity and the original Schedules consumer remain release requirements.

@@ -586,3 +586,19 @@ A real private SQLite journal preserves pending source-manifest operations acros
 ## Automatic schedule native context guard
 
 Background work validates the retained account/token/profile/generation without network calls and refuses stale or forged context after identity changes.
+
+## Automatic original schedule device roundtrip
+
+The actual coordinator and SQLite journals publish real script/workdir files and restore them on a fresh passive device, retaining original BOM, CRLF and opaque integers before reopening without a second source write.
+
+## Automatic original schedule lost cloud acknowledgement
+
+A cloud peer commits a source manifest then loses its reply; reopening the durable outbox reuses its exact operation and retains one cloud revision and the original Native bytes.
+
+## Automatic original schedule lost native acknowledgement
+
+A Native peer writes the original source but loses its reply; reopening replays the retained receipt and preserves subsequent real script edits before publishing their new snapshot.
+
+## Automatic original schedule concurrent device edits
+
+Independent edits on two devices produce a retained conflict, preserving the receiving device source and the accepted cloud revision rather than silently replacing authored data.

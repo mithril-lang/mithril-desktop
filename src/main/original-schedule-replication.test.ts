@@ -1,0 +1,354 @@
+// @vitest-environment node
+import { afterEach, expect, it } from "vitest";
+import { createHash } from "node:crypto";
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  capabilityResourceManifestBytes,
+  type CapabilityResourceManifest,
+  type CapabilityResourceTransport,
+} from "@mithril/workspace/capability-resources";
+import type {
+  RepositoryDocument,
+  RepositoryTransport,
+  RepositoryReceipt,
+} from "@mithril/workspace/repository";
+import {
+  OriginalScheduleReplication,
+  type OriginalScheduleReplicationPorts,
+} from "./original-schedule-replication";
+import { captureOriginalCronFile } from "./cron-source-files";
+const roots: string[] = [];
+afterEach(() =>
+  roots
+    .splice(0)
+    .forEach((root) => rmSync(root, { recursive: true, force: true })),
+);
+const sha = (v: string | Uint8Array): string =>
+  createHash("sha256").update(v).digest("hex");
+function cloud(): {
+  repository: RepositoryTransport;
+  resources: CapabilityResourceTransport;
+  documents: Map<string, RepositoryDocument>;
+  failures: { cloudAck: boolean };
+  operations: string[];
+} {
+  const failures = { cloudAck: false },
+    operations: string[] = [];
+  const documents = new Map<string, RepositoryDocument>(),
+    receipts = new Map<string, RepositoryReceipt>(),
+    manifests = new Map<string, CapabilityResourceManifest>(),
+    chunks = new Map<string, Uint8Array>();
+  const forOwner = (owner: string): CapabilityResourceTransport => ({
+    forOwner,
+    putChunk: async (id, bytes) => {
+      const digest = sha(bytes);
+      chunks.set(JSON.stringify([owner, id, digest]), new Uint8Array(bytes));
+      return digest;
+    },
+    getChunk: async (id, digest) => {
+      const bytes = chunks.get(JSON.stringify([owner, id, digest]));
+      if (!bytes) throw Error("Capability resource request failed (404)");
+      return new Uint8Array(bytes);
+    },
+    putManifest: async (m) => {
+      const digest = sha(capabilityResourceManifestBytes(m));
+      manifests.set(
+        JSON.stringify([owner, m.capabilityId, digest]),
+        structuredClone(m),
+      );
+      return digest;
+    },
+    getManifest: async (id, digest) => {
+      const m = manifests.get(JSON.stringify([owner, id, digest]));
+      if (!m) throw Error("Capability resource request failed (404)");
+      return structuredClone(m);
+    },
+  });
+  const repository: RepositoryTransport = {
+    page: async (collection) => ({
+      schemaVersion: 1,
+      userId: "alice",
+      documents: structuredClone(
+        [...documents.values()].filter((d) => d.collection === collection),
+      ),
+      nextAfter: null,
+    }),
+    apply: async (edit) => {
+      operations.push(edit.operationId);
+      const retained = receipts.get(edit.operationId);
+      if (retained) return structuredClone(retained);
+      const key = edit.collection + ":" + edit.id,
+        previous = documents.get(key);
+      const accepted = (previous?.revision ?? 0) === edit.baseRevision;
+      const document = accepted
+        ? {
+            collection: edit.collection,
+            id: edit.id,
+            revision: edit.baseRevision + 1,
+            deleted: edit.deleted,
+            updatedAt: 1,
+            body: structuredClone(edit.body),
+          }
+        : (previous ?? null);
+      if (accepted) documents.set(key, document!);
+      const receipt = {
+        schemaVersion: 1 as const,
+        userId: "alice",
+        operationId: edit.operationId,
+        status: accepted ? ("accepted" as const) : ("conflict" as const),
+        document,
+      };
+      receipts.set(edit.operationId, receipt);
+      if (failures.cloudAck) {
+        failures.cloudAck = false;
+        throw Error("lost cloud acknowledgement");
+      }
+      return structuredClone(receipt);
+    },
+  };
+  return {
+    repository,
+    resources: forOwner("unbound"),
+    documents,
+    failures,
+    operations,
+  };
+}
+function device(
+  peer: ReturnType<typeof cloud>,
+  selected: boolean,
+): {
+  home: string;
+  ports: OriginalScheduleReplicationPorts;
+  events: string[];
+  failures: { nativeAck: boolean };
+} {
+  const home = realpathSync(
+    mkdtempSync(join(tmpdir(), "mithril-schedule-device-")),
+  );
+  roots.push(home);
+  const events: string[] = [];
+  const failures = { nativeAck: false };
+  const restored = new Map<
+    string,
+    { source: string; expected: string | null; version: string }
+  >();
+  let prepared = false;
+  const ports: OriginalScheduleReplicationPorts = {
+    scope: { owner: "alice", profile: "default", timeZone: "UTC" },
+    home,
+    stateRoot: join(home, "private-state"),
+    python: "/usr/bin/python3",
+    repository: peer.repository,
+    resources: peer.resources,
+    assertActive: async () => {},
+    custody: async (command) => {
+      expect(command.action).toBe("status");
+      return { userId: "alice", profile: "default", selected, revision: 1 };
+    },
+    prepare: async () => {
+      prepared = true;
+      events.push("prepare");
+      return { bindingDigest: "a".repeat(64) };
+    },
+    bind: async (input) => {
+      expect(prepared).toBe(true);
+      expect(input.nativeVersion).toBe(
+        captureOriginalCronFile(home, "default")?.version,
+      );
+      events.push("bind");
+      return { bindingDigest: "b".repeat(64) };
+    },
+    native: {
+      capture: (profile) => captureOriginalCronFile(home, profile),
+      restore: async (request) => {
+        expect(prepared).toBe(true);
+        events.push("restore");
+        if (request.sourceText === undefined) throw Error("text required");
+        const retained = restored.get(request.operationId);
+        if (retained) {
+          if (
+            retained.source !== request.sourceText ||
+            retained.expected !== request.expectedVersion
+          )
+            throw Error("changed restore operation");
+          return {
+            success: true,
+            receipt: {
+              owner: request.owner,
+              profile: request.profile,
+              operationId: request.operationId,
+              version: retained.version,
+            },
+          };
+        }
+        const before = captureOriginalCronFile(home, request.profile);
+        if ((before?.version ?? null) !== request.expectedVersion)
+          throw Error("source CAS changed");
+        mkdirSync(join(home, "cron"), { recursive: true });
+        writeFileSync(join(home, "cron", "jobs.json"), request.sourceText);
+        restored.set(request.operationId, {
+          source: request.sourceText,
+          expected: request.expectedVersion,
+          version: sha(request.sourceText),
+        });
+        if (failures.nativeAck) {
+          failures.nativeAck = false;
+          throw Error("lost native acknowledgement");
+        }
+        return {
+          success: true,
+          receipt: {
+            owner: request.owner,
+            profile: request.profile,
+            operationId: request.operationId,
+            version: sha(request.sourceText),
+          },
+        };
+      },
+    },
+  };
+  return { home, ports, events, failures };
+}
+// @lat: [[cloud-workspace-tests#Automatic original schedule device roundtrip]]
+it("composes real source, script and working-directory restoration to a fresh passive device and resumes after reopening", async () => {
+  const peer = cloud(),
+    a = device(peer, true),
+    b = device(peer, false);
+  mkdirSync(join(a.home, "scripts"));
+  mkdirSync(join(a.home, "work"));
+  mkdirSync(join(a.home, "cron"));
+  writeFileSync(join(a.home, "scripts", "task.py"), "print('original')\n");
+  writeFileSync(join(a.home, "work", "input.bin"), Buffer.from([0, 255, 1, 9]));
+  const raw =
+    '\uFEFF{\r\n "metadata":9223372036854775807,"jobs":[{"id":"one","name":"Original","prompt":"日本語","enabled":true,"state":"scheduled","schedule":{"kind":"cron","expr":"17 9 * * 1-5"},"script":"task.py","workdir":' +
+    JSON.stringify(join(a.home, "work")) +
+    ',"run_claim":null,"opaque":9007199254740993}]\r\n}';
+  writeFileSync(join(a.home, "cron", "jobs.json"), raw);
+  await expect(
+    new OriginalScheduleReplication(a.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  await expect(
+    new OriginalScheduleReplication(b.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  const restored = readFileSync(join(b.home, "cron", "jobs.json"), "utf8"),
+    row = JSON.parse(restored.slice(1)).jobs[0];
+  expect(restored).toBe(
+    raw.replace(
+      JSON.stringify(join(a.home, "work")),
+      JSON.stringify(row.workdir),
+    ),
+  );
+  expect(readFileSync(join(b.home, "scripts", "task.py"), "utf8")).toBe(
+    "print('original')\n",
+  );
+  expect(readFileSync(join(row.workdir, "input.bin"))).toEqual(
+    Buffer.from([0, 255, 1, 9]),
+  );
+  expect(b.events).toEqual(["prepare", "restore", "bind"]);
+  await expect(
+    new OriginalScheduleReplication(b.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  expect(b.events.filter((event) => event === "restore")).toHaveLength(1);
+  expect(
+    [...peer.documents.values()].some((d) =>
+      JSON.stringify(d.body).includes(a.home),
+    ),
+  ).toBe(false);
+}, 30000);
+
+// @lat: [[cloud-workspace-tests#Automatic original schedule lost cloud acknowledgement]]
+it("reopens retained outboxes after a committed cloud write loses its acknowledgement without another operation", async () => {
+  const peer = cloud(),
+    a = device(peer, true);
+  mkdirSync(join(a.home, "cron"));
+  const source = '\uFEFF{"opaque":9223372036854775807,"jobs":[]}\r\n';
+  writeFileSync(join(a.home, "cron", "jobs.json"), source);
+  peer.failures.cloudAck = true;
+  await expect(
+    new OriginalScheduleReplication(a.ports).sync(),
+  ).resolves.toEqual({ status: "deferred", reason: "cloud-write-unconfirmed" });
+  await expect(
+    new OriginalScheduleReplication(a.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  expect(new Set(peer.operations).size).toBe(1);
+  expect([...peer.documents.values()].map((d) => d.revision)).toEqual([1]);
+  expect(readFileSync(join(a.home, "cron", "jobs.json"), "utf8")).toBe(source);
+}, 30000);
+// @lat: [[cloud-workspace-tests#Automatic original schedule lost native acknowledgement]]
+it("reopens a committed Native restoration without overwriting subsequent script edits", async () => {
+  const peer = cloud(),
+    a = device(peer, true),
+    b = device(peer, false);
+  mkdirSync(join(a.home, "cron"));
+  mkdirSync(join(a.home, "scripts"));
+  writeFileSync(join(a.home, "scripts", "task.py"), "print('before')\n");
+  const source =
+    '{"jobs":[{"id":"one","name":"one","prompt":"test","enabled":true,"state":"scheduled","schedule":{"kind":"cron","expr":"17 9 * * 1-5"},"script":"task.py"}]}';
+  writeFileSync(join(a.home, "cron", "jobs.json"), source);
+  await expect(
+    new OriginalScheduleReplication(a.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  b.failures.nativeAck = true;
+  await expect(
+    new OriginalScheduleReplication(b.ports).sync(),
+  ).resolves.toEqual({
+    status: "deferred",
+    reason: "native-write-unconfirmed",
+  });
+  writeFileSync(join(b.home, "scripts", "task.py"), "print('after')\n");
+  await expect(
+    new OriginalScheduleReplication(b.ports).sync(),
+  ).resolves.toEqual({
+    status: "deferred",
+    reason: "sources-changed-after-receipt",
+  });
+  expect(readFileSync(join(b.home, "scripts", "task.py"), "utf8")).toBe(
+    "print('after')\n",
+  );
+  await expect(
+    new OriginalScheduleReplication(b.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  expect(readFileSync(join(b.home, "scripts", "task.py"), "utf8")).toBe(
+    "print('after')\n",
+  );
+}, 30000);
+
+// @lat: [[cloud-workspace-tests#Automatic original schedule concurrent device edits]]
+it("retains both independently edited inventories as a conflict instead of silently overwriting either device", async () => {
+  const peer = cloud(),
+    a = device(peer, true),
+    b = device(peer, false);
+  mkdirSync(join(a.home, "cron"));
+  const source = '{"opaque":9223372036854775807,"name":"baseline","jobs":[]}';
+  writeFileSync(join(a.home, "cron", "jobs.json"), source);
+  await expect(
+    new OriginalScheduleReplication(a.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  await expect(
+    new OriginalScheduleReplication(b.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  const local = source.replace("baseline", "device_b");
+  writeFileSync(
+    join(a.home, "cron", "jobs.json"),
+    source.replace("baseline", "device_a"),
+  );
+  writeFileSync(join(b.home, "cron", "jobs.json"), local);
+  await expect(
+    new OriginalScheduleReplication(a.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  await expect(
+    new OriginalScheduleReplication(b.ports).sync(),
+  ).resolves.toEqual({ status: "conflict", reason: "both-sources-changed" });
+  expect(readFileSync(join(b.home, "cron", "jobs.json"), "utf8")).toBe(local);
+  expect([...peer.documents.values()].map((d) => d.revision)).toEqual([2]);
+}, 30000);

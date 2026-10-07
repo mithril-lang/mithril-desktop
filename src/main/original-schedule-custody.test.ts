@@ -464,3 +464,27 @@ it("refuses manual scope expansion and drops results after account/profile chang
     await p.close();
   }
 });
+
+// @lat: [[cloud-workspace-tests#All-profile schedule transport identity]]
+it("uses captured active account authority for another profile and refuses stale contexts without sending", async () => {
+  const p = await peer();
+  try {
+    await p.cloud.enable();
+    const context = await p.cloud.nativeContext(true);
+    const command = { action: "status" as const, profile: "research" };
+    await expect(p.cloud.originalScheduleCustody(command)).rejects.toThrow(
+      "Invalid original",
+    );
+    expect(
+      await p.cloud.originalScheduleCustody(command, context),
+    ).toMatchObject({ userId: "a", profile: "research" });
+    const calls = p.calls.length;
+    p.identity("b");
+    await expect(
+      p.cloud.originalScheduleCustody(command, context),
+    ).rejects.toThrow("stale native context");
+    expect(p.calls).toHaveLength(calls);
+  } finally {
+    await p.close();
+  }
+});

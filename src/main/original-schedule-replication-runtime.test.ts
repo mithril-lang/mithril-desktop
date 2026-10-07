@@ -1,7 +1,12 @@
 import type { OriginalScheduleReplicationPorts } from "./original-schedule-replication";
 vi.mock("./mithril-token-store", () => ({ readMithrilToken: () => f.token }));
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { mkdtempSync, mkdirSync, realpathSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 const f = vi.hoisted(() => ({
+  inventory: vi.fn(),
+  root: "",
   sync: vi.fn(),
   selected: vi.fn(),
   check: vi.fn(),
@@ -54,9 +59,16 @@ vi.mock("./utils", () => ({
   getActiveProfileNameSync: () => "default",
   profileHome: () => "/test/home",
 }));
-vi.mock("./installer", () => ({ HERMES_PYTHON: "/test/python" }));
+vi.mock("./installer", () => ({
+  HERMES_PYTHON: "/test/python",
+  HERMES_HOME: "/test/home",
+}));
+vi.mock("./profile-metadata-inventory", () => ({
+  profileMetadataInventory: f.inventory,
+}));
 vi.mock("./repository-kanban-runtime", () => ({
   bindRepositorySource: f.bind,
+  repositorySourceOwned: () => true,
 }));
 vi.mock("./cronjobs", () => ({
   readOriginalCronSource: vi.fn(),
@@ -92,6 +104,12 @@ import {
 } from "./original-schedule-replication-runtime";
 beforeEach(() => {
   vi.clearAllMocks();
+  f.tokenGuard.mockReset();
+  f.root = mkdtempSync(join(realpathSync(tmpdir()), "schedule-profiles-"));
+  f.inventory.mockReturnValue({
+    sources: [{ profile: "default", root: f.root, present: true }],
+    warnings: [],
+  });
   f.token = "synthetic-account-a";
   f.timeZone = "UTC";
   f.ports = [];
@@ -101,6 +119,7 @@ beforeEach(() => {
   f.check.mockResolvedValue(undefined);
   f.selected.mockResolvedValue(undefined);
 });
+afterEach(() => rmSync(f.root, { recursive: true, force: true }));
 const flush = async (): Promise<void> => {
   for (let i = 0; i < 15; i++) await Promise.resolve();
 };
@@ -318,6 +337,60 @@ it("starts manual consumption independently and leaves original screen operation
     expect(f.manualStop).toHaveBeenCalled();
     release();
     await flush();
+  } finally {
+    stop();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#All-profile original schedule lifecycle]]
+it("replicates each owned present profile without switching the active profile or creating extra execution consumers", async () => {
+  const research = join(f.root, "research");
+  mkdirSync(research);
+  f.inventory.mockReturnValue({
+    sources: [
+      { profile: "default", root: f.root, present: true },
+      { profile: "research", root: research, present: true },
+      { profile: "absent", root: join(f.root, "absent"), present: false },
+    ],
+    warnings: [],
+  });
+  const stop = startOriginalScheduleReplication();
+  try {
+    await vi.waitFor(() =>
+      expect(f.ports.some((p) => p.scope.profile === "research")).toBe(true),
+    );
+    const port = f.ports.find((p) => p.scope.profile === "research")!;
+    expect(port.home).toBe(research);
+    await port.assertActive();
+    expect(f.manualPorts).toHaveLength(1);
+    rmSync(research, { recursive: true });
+    await expect(port.assertActive()).rejects.toThrow();
+    expect(f.ports.some((p) => p.scope.profile === "absent")).toBe(false);
+  } finally {
+    stop();
+  }
+});
+// @lat: [[cloud-workspace-tests#All-profile schedule failure isolation]]
+it("continues later profiles after a source failure but aborts on an account change", async () => {
+  const research = join(f.root, "research");
+  mkdirSync(research);
+  f.inventory.mockReturnValue({
+    sources: [
+      { profile: "broken", root: join(f.root, "missing"), present: true },
+      { profile: "research", root: research, present: true },
+    ],
+    warnings: [],
+  });
+  const stop = startOriginalScheduleReplication();
+  try {
+    await vi.waitFor(() =>
+      expect(f.ports.some((p) => p.scope.profile === "research")).toBe(true),
+    );
+    const port = f.ports.find((p) => p.scope.profile === "research")!;
+    f.tokenGuard.mockImplementation(() => {
+      throw Error("Account changed");
+    });
+    await expect(port.assertActive()).rejects.toThrow("Account changed");
   } finally {
     stop();
   }

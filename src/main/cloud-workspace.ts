@@ -655,12 +655,14 @@ export class CloudWorkspace {
   // @lat: [[cloud-workspace#Original schedule main execution transport (draft)]]
   async originalScheduleCustody(
     command: OriginalScheduleCustodyCommand,
+    context?: Parameters<CloudWorkspace["assertNativeContext"]>[0],
   ): Promise<OriginalScheduleCustodyReceipt> {
     if (
       !validOriginalScheduleCustodyCommand(command) ||
-      command.profile !== this.deps.profile()
+      (!context && command.profile !== this.deps.profile())
     )
       throw Error("Invalid original schedule execution command");
+    if (context) this.assertNativeContext(context);
     const request = structuredClone(command);
     if (
       new TextEncoder().encode(JSON.stringify(request)).length >
@@ -668,7 +670,12 @@ export class CloudWorkspace {
     )
       throw Error("Invalid original schedule execution command");
     const session = await this.session();
-    if (session.profile !== request.profile)
+    if (context) this.assertNativeContext(context);
+    if (
+      context
+        ? session.userId !== context.userId
+        : session.profile !== request.profile
+    )
       throw Error("Workspace account changed; schedule request discarded");
     if (
       !["workspace:write", "chat:write", "inference"].every((scope) =>
@@ -684,6 +691,7 @@ export class CloudWorkspace {
       15000,
       ORIGINAL_SCHEDULE_CUSTODY_BYTES,
     );
+    if (context) this.assertNativeContext(context);
     if (!validOriginalScheduleCustodyReceipt(value, session.userId, request))
       throw Error("Schedule execution receipt unconfirmed");
     return value;

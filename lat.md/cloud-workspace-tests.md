@@ -904,3 +904,15 @@ The existing restoration test also runs for both default and research, checks in
 ## Skill resource upload preserves concurrent original edits
 
 Tests change the original Skill file during chunk upload, refuse the stale repository pointer, retain the newer original bytes, and remove private capture staging.
+
+## All-profile original schedule lifecycle
+
+Runtime tests verify owned present profiles use their original homes without switching selection, adding manual consumers or recreating absent directories. Removing a captured root invalidates later operations.
+
+## All-profile schedule failure isolation
+
+A failed original source does not suppress later owned profiles. Captured engine operations reject an account change before continuing native or cloud work.
+
+## All-profile schedule transport identity
+
+Real HTTP transport tests verify another profile requires an explicit valid captured account context, receipts bind the requested profile, and stale contexts send no custody request.

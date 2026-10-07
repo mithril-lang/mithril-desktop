@@ -1,14 +1,22 @@
 import { readMithrilToken } from "./mithril-token-store";
 import { app } from "electron";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { lstatSync } from "node:fs";
+import {
+  profileMetadataInventory,
+  type ProfileMetadataSource,
+} from "./profile-metadata-inventory";
 import {
   cloudWorkspace,
   onCloudWorkspaceAccountChanged,
 } from "./cloud-workspace-runtime";
 import { getConnectionConfig, getConfigValue } from "./config";
 import { getActiveProfileNameSync, profileHome } from "./utils";
-import { HERMES_PYTHON } from "./installer";
-import { bindRepositorySource } from "./repository-kanban-runtime";
+import { HERMES_PYTHON, HERMES_HOME } from "./installer";
+import {
+  bindRepositorySource,
+  repositorySourceOwned,
+} from "./repository-kanban-runtime";
 import {
   readOriginalCronSource,
   prepareOriginalCronSource,
@@ -33,23 +41,68 @@ function serial<T>(run: () => Promise<T>): Promise<T> {
   );
   return next;
 }
-async function createEngine(): Promise<OriginalScheduleReplication | null> {
+async function authenticatedContext(): Promise<Awaited<
+  ReturnType<typeof cloudWorkspace.nativeContext>
+> | null> {
   if (getConnectionConfig().mode !== "local") return null;
   const status = await cloudWorkspace.status();
   if (!status.userId) return null;
   await cloudWorkspace.enable();
   const context = await cloudWorkspace.nativeContext(true);
-  const profile = getActiveProfileNameSync() || "default";
-  if (context.profile !== profile) throw Error("Schedule profile changed");
+  if (context.profile !== (getActiveProfileNameSync() || "default"))
+    throw Error("Schedule profile changed");
+  return context;
+}
+async function createEngine(
+  original?: ProfileMetadataSource,
+  captured?: Awaited<ReturnType<typeof cloudWorkspace.nativeContext>>,
+): Promise<OriginalScheduleReplication | null> {
+  const context = captured ?? (await authenticatedContext());
+  if (!context) return null;
+  cloudWorkspace.assertNativeContext(context);
+  const selectedProfile = context.profile;
+  const profile = original?.profile ?? selectedProfile;
+  const home = original?.root ?? profileHome(profile);
+  const directory = original ? lstatSync(home) : null;
+  if (
+    original &&
+    (!original.present ||
+      !directory?.isDirectory() ||
+      directory.isSymbolicLink())
+  )
+    throw Error("Schedule profile unavailable");
   const assertActive = async (): Promise<void> => {
     cloudWorkspace.assertNativeContext(context);
     if (
       getConnectionConfig().mode !== "local" ||
-      (getActiveProfileNameSync() || "default") !== profile ||
+      (getActiveProfileNameSync() || "default") !== selectedProfile ||
       (getConfigValue("timezone", profile)?.trim() ||
         Intl.DateTimeFormat().resolvedOptions().timeZone) !== timeZone
     )
       throw Error("Schedule profile changed");
+    if (directory) {
+      for (let path = home; ; path = dirname(path)) {
+        if (lstatSync(path).isSymbolicLink())
+          throw Error("Unsafe schedule profile directory");
+        if (dirname(path) === path) break;
+      }
+      if (
+        !repositorySourceOwned(
+          join(app.getPath("userData"), "repository-source-owners"),
+          profile,
+          context.userId,
+        )
+      )
+        throw Error("Schedule profile owner changed");
+      const current = lstatSync(home);
+      if (
+        !current.isDirectory() ||
+        current.isSymbolicLink() ||
+        current.ino !== directory.ino ||
+        current.dev !== directory.dev
+      )
+        throw Error("Schedule profile directory changed");
+    }
   };
   const stateRoot = join(app.getPath("userData"), "mithril-original-schedules");
   bindRepositorySource(
@@ -62,7 +115,7 @@ async function createEngine(): Promise<OriginalScheduleReplication | null> {
     Intl.DateTimeFormat().resolvedOptions().timeZone;
   return new OriginalScheduleReplication({
     scope: { owner: context.userId, profile, timeZone },
-    home: profileHome(profile),
+    home,
     stateRoot,
     python: HERMES_PYTHON,
     repository: {
@@ -107,7 +160,17 @@ async function createEngine(): Promise<OriginalScheduleReplication | null> {
     },
     prepare: (input) => prepareOriginalCronExecution(input, assertActive),
     bind: (input) => bindOriginalCronExecution(input, assertActive),
-    custody: (command) => cloudWorkspace.originalScheduleCustody(command),
+    custody: async (command) => {
+      await assertActive();
+      if (command.profile !== profile)
+        throw Error("Schedule custody profile changed");
+      const result = await cloudWorkspace.originalScheduleCustody(
+        command,
+        original ? context : undefined,
+      );
+      await assertActive();
+      return result;
+    },
     assertActive,
   });
 }
@@ -183,21 +246,49 @@ export function startOriginalScheduleReplication(): () => void {
         sync: () =>
           serial(async () => {
             if (stopped) throw Error("Schedule lifecycle stopped");
-            engine = await createEngine();
-            if (stopped) {
-              engine?.stop();
-              throw Error("Schedule lifecycle stopped");
+            const context = await authenticatedContext();
+            if (!context)
+              return {
+                status: "deferred" as const,
+                reason: "schedule-not-connected",
+              };
+            const bindings = join(
+              app.getPath("userData"),
+              "repository-source-owners",
+            );
+            const inventory = profileMetadataInventory(
+              HERMES_HOME,
+              bindings,
+              context.userId,
+              (profile) =>
+                bindRepositorySource(bindings, profile, context.userId),
+            );
+            let incomplete = inventory.warnings.length > 0;
+            for (const source of inventory.sources) {
+              if (!source.present) continue;
+              cloudWorkspace.assertNativeContext(context);
+              if (stopped) throw Error("Schedule lifecycle stopped");
+              try {
+                engine = await createEngine(source, context);
+                if (stopped) throw Error("Schedule lifecycle stopped");
+                if ((await engine?.sync())?.status !== "synced")
+                  incomplete = true;
+              } catch {
+                cloudWorkspace.assertNativeContext(context);
+                if (stopped) throw Error("Schedule lifecycle stopped");
+                incomplete = true;
+              } finally {
+                engine?.stop();
+                engine = null;
+              }
             }
-            try {
-              return (
-                (await engine?.sync()) ?? {
+            return incomplete ||
+              !inventory.sources.some((source) => source.present)
+              ? {
                   status: "deferred" as const,
-                  reason: "schedule-not-connected",
+                  reason: "schedule-profiles-unconfirmed",
                 }
-              );
-            } finally {
-              engine?.stop();
-            }
+              : { status: "synced" as const };
           }),
       };
     },

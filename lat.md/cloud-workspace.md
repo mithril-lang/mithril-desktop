@@ -607,4 +607,6 @@ Pause and resume preparation use the original Agent policy while preserving auth
 
 [[src/main/cronjobs.ts#prepareOriginalCronTransition]] captures owner, profile, timezone, operation and original source before invoking the readonly command. [[src/main/cron-source-transition.ts#parseOriginalCronTransitionResult]] rejects stale identity, lost counters, altered unknown metadata and active claims. The shared source validator allows only the original ordered skill canonicalization. Workspace 0.6.17 supplies this codec to both consumers. Source preparation is not yet installed-runtime qualification or a complete synchronized scheduler.
 
-The vendored Workspace 0.6.17 archive SHA-256 is `23c34df802d8a327bf83de0901c2906ced94f79a3a3902e6a4db51d3ab5d1deb`. Its compiled exports include the original source, lifecycle adapter and complete-file codecs; the consumer imports those artifacts rather than copying UI or schedule semantics.
+The vendored Workspace 0.6.17 archive SHA-256 is `0ab207a81b30afa505b6f8e7a17d1fba17e2e2b3a33611506d920eed187f16bc`. Its compiled exports include the original source, lifecycle adapter and complete-file codecs; the consumer imports those artifacts rather than copying UI or schedule semantics.
+
+The archive was generated in a task-specific directory from Fund source `0352e6577dd8d466245bb4faca1f0f5944a1e56c`, and all three original schedule JS/type exports were checked before installation. A generic temporary archive is not accepted as source provenance.

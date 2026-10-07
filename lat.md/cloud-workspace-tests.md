@@ -710,3 +710,24 @@ Confirmed native results survive failed reporting. Only exact API acknowledgemen
 ## Original manual journal account isolation
 
 A-B-A journals isolate request identities. Unconfirmed transport outcomes cannot become completion, and a reserved request cannot retain a completed result before its dispatch fence is committed.
+
+
+## Original manual consumer retained report replay
+
+An actual SQLite journal is reopened after a lost report; only the retained result is resent, without another Agent invocation.
+
+## Original manual consumer nonblocking execution
+
+A long Agent peer releases the replica lock so another store can synchronize. Simultaneous local polls cannot dispatch a second effect.
+
+## Original manual consumer uncertainty retention
+
+Unknown child outcomes and lost take acknowledgements never rerun. Even a faulty peer repeating a fresh take cannot bypass the committed dispatch fence.
+
+## Original manual consumer identity admission
+
+Fresh take receipts must match account, profile, timezone, source and custody bindings. Foreign, mismatched and replayed responses cannot reach the Agent port.
+
+## Original manual consumer account change fence
+
+Stopping or switching accounts during execution retains uncertainty and refuses stale reporting; reopening never invokes that request again.

@@ -834,3 +834,12 @@ Manual execution records share the original private owner/profile/timezone repli
 [[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#reserveManual]] binds the exact portable request, custody revision and native source version. [[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#beginManual]] commits unknown once; a replay or reopened unknown never authorizes another dispatch. [[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#recordManualResult]] retains only an exact native receipt and refuses contradictory terminal outcomes. [[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#acknowledgeManual]] requires the matching API completion receipt before clearing the report obligation. No native credentials or path bindings enter these records.
 
 The existing FULL-synchronous SQLite journal holds bounded, digest-checked entries. Tests reopen real storage after simulated external/report failures and exercise A-B-A isolation. The caller still must verify a fresh API take and selected custody/resources before reservation and dispatch. A journal entry is not an execution grant. The background consumer, unknown reconciliation and installed production flow remain unfinished.
+
+
+## Original manual consumer coordinator (draft)
+
+The manual consumer combines main-only take/report transport with the private dispatch journal, while keeping long Agent execution outside the replica lock.
+
+[[src/main/original-schedule-manual-consumer.ts#OriginalScheduleManualConsumer#poll]] reports retained outcomes first, accepts only fresh validated API takes, and requires a matching synchronized native-source/custody binding. It commits the dispatch fence under the existing cross-process lock, invokes the original source-run port outside that lock, and retains only exact results. Failed reporting retries the result, never the effect. Account changes and stop invalidate later acknowledgements. Unknown recovery does not invoke the Agent; reserved recovery and unknown reconciliation remain separate unfinished work.
+
+Tests use real private SQLite and synthetic transport/Agent peers to verify reopening, replay refusal, identity fences and nonblocking execution. This coordinator is not yet mounted into the lifecycle or supplied with the concrete synchronized resource/custody binding. Production API, original route mount, installer and installed-client verification remain required.

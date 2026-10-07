@@ -76,37 +76,59 @@ export function patchProfileMetadataFile(
   root: string,
   patch: Partial<Record<"name" | "color" | "avatar", string | undefined>>,
 ): void {
-  checked(root);
-  mkdirSync(root, { recursive: true, mode: 0o700 });
-  checked(root);
   const before = readProfileMetadataFile(root);
   const next = patchProfileMetadataBytes(before ?? Buffer.from("{}"), patch);
+  replaceProfileMetadataFile(root, before, next);
+}
+
+/** Compare exact captured bytes after download, before any native mutation.
+ * Null is absence, not an empty JSON object. Conflicts retain the newer file.
+ */
+// @lat: [[cloud-workspace#Original profile metadata compare and swap (draft)]]
+export function replaceProfileMetadataFile(
+  root: string,
+  expected: Uint8Array | null,
+  target: Uint8Array | null,
+): void {
+  // Snapshot caller-owned buffers before validating or touching the filesystem.
+  const before = expected === null ? null : Buffer.from(expected);
+  const next = target === null ? null : Buffer.from(target);
+  if (next !== null) profileMetadataValue(next);
+  const matches = (current: Buffer | null): boolean =>
+    before === null
+      ? current === null
+      : current !== null && before.equals(current);
+  checked(root);
+  if (!matches(readProfileMetadataFile(root)))
+    throw Error("Profile metadata changed before saving");
+  if (next === null && before === null) return;
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  checked(root);
   const path = join(root, "profile-meta.json"),
     temp = join(root, `.mithril-profile-meta-${randomUUID()}`);
   try {
-    const fd = openSync(
-      temp,
-      constants.O_WRONLY |
-        constants.O_CREAT |
-        constants.O_EXCL |
-        (constants.O_NOFOLLOW ?? 0),
-      0o600,
-    );
-    try {
-      writeFileSync(fd, next);
-      fsyncSync(fd);
-    } finally {
-      closeSync(fd);
+    if (next !== null) {
+      const fd = openSync(
+        temp,
+        constants.O_WRONLY |
+          constants.O_CREAT |
+          constants.O_EXCL |
+          (constants.O_NOFOLLOW ?? 0),
+        0o600,
+      );
+      try {
+        writeFileSync(fd, next);
+        fsyncSync(fd);
+      } finally {
+        closeSync(fd);
+      }
     }
-    const current = readProfileMetadataFile(root);
-    if (
-      (before === null) !== (current === null) ||
-      (before && current && !before.equals(current))
-    )
+    if (!matches(readProfileMetadataFile(root)))
       throw Error("Profile metadata changed before saving");
     checked(root);
     checked(path);
-    renameSync(temp, path);
+    if (next === null) unlinkSync(path);
+    else renameSync(temp, path);
     if (process.platform !== "win32") {
       const directory = openSync(
         root,

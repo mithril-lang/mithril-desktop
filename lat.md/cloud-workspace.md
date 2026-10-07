@@ -933,3 +933,9 @@ Every Settings command in the mounted Desktop workspace uses the same original s
 Original profile edits use the shared token-preserving metadata patcher and an atomic main-process file replacement before profile resource replication can be enabled.
 
 [[src/main/profile-meta-files.ts#readProfileMetadataFile]] captures exact bounded UTF-8 object bytes without following linked storage. [[src/main/profile-meta-files.ts#patchProfileMetadataFile]] synchronously reads, patches only the authored name/color/avatar token, checks the source again and fsyncs a private temporary file before rename. Unknown extension fields, opaque integer precision, whitespace and BOM survive. All original `profile-meta.ts` appearance handlers use this lane; malformed or ambiguous source is retained instead of being replaced with empty projected metadata. This prepares the original edit surface for bidirectional sync but does not itself enable profile replication or prove installed-client publication.
+
+## Original profile metadata compare and swap (draft)
+
+Downloaded profile metadata can replace or remove a native file only when its exact captured bytes still match; concurrent appearance edits remain intact.
+
+[[src/main/profile-meta-files.ts#replaceProfileMetadataFile]] snapshots caller buffers, validates the target, compares absence separately from an empty object, and checks again immediately before atomic replacement or deletion. Parent-directory fsync follows both mutations. Original appearance handlers share this lane. This is a file primitive for pending replica integration, not proof of automatic synchronization or publication.

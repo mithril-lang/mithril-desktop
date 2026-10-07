@@ -820,3 +820,11 @@ The original public name, color, avatar and removal handlers use the lossless la
 ## Original profile metadata resource transport
 
 Profile resources use the fixed main-process API with captured owner and existing scopes. Invalid resource ids, another owner, stale account replies and read-only writes are rejected without expanding credentials.
+
+## Profile metadata downloaded writes preserve concurrent edits
+
+A download captured before a newer local appearance edit cannot replace or delete that edit, and an absent-file baseline cannot overwrite a created file.
+
+## Profile metadata exact replacement and tombstone
+
+A matched source accepts exact cloud bytes including BOM and opaque integers; invalid targets preserve the file, and matched deletion does not accept a stale recreation baseline.

@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import {
   patchProfileMetadataFile,
   readProfileMetadataFile,
+  replaceProfileMetadataFile,
 } from "./profile-meta-files";
 const profileFixture = vi.hoisted(() => ({ root: "" }));
 vi.mock("./utils", () => ({
@@ -136,4 +137,45 @@ it("routes the original name, color and avatar handlers through lossless atomic 
   writeFileSync(path, "{broken");
   expect((await setProfileName("research", "new")).success).toBe(false);
   expect(readFileSync(path, "utf8")).toBe("{broken");
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Profile metadata downloaded writes preserve concurrent edits]]
+it("rejects stale downloaded replacements and deletions, including absence changes", () => {
+  const root = fixture(),
+    path = join(root, "profile-meta.json");
+  const before = Buffer.from('{"name":"old"}');
+  writeFileSync(path, before);
+  const captured = readProfileMetadataFile(root);
+  patchProfileMetadataFile(root, { name: "newer local edit" });
+  for (const target of [Buffer.from('{"name":"cloud"}'), null]) {
+    expect(() => replaceProfileMetadataFile(root, captured, target)).toThrow(
+      "changed",
+    );
+  }
+  expect(readFileSync(path, "utf8")).toBe('{"name":"newer local edit"}');
+  expect(() => replaceProfileMetadataFile(root, null, before)).toThrow(
+    "changed",
+  );
+  expect(readdirSync(root)).toEqual(["profile-meta.json"]);
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Profile metadata exact replacement and tombstone]]
+it("installs original cloud bytes exactly and applies a matched tombstone", () => {
+  const root = fixture();
+  const bytes = Buffer.from(
+    '\ufeff{\r\n "opaque":9223372036854775807,"name":"cloud" }\r\n',
+  );
+  replaceProfileMetadataFile(root, null, bytes);
+  expect(readProfileMetadataFile(root)?.equals(bytes)).toBe(true);
+  expect(() =>
+    replaceProfileMetadataFile(root, bytes, Buffer.from("{broken")),
+  ).toThrow();
+  expect(readProfileMetadataFile(root)?.equals(bytes)).toBe(true);
+  replaceProfileMetadataFile(root, bytes, null);
+  expect(readProfileMetadataFile(root)).toBeNull();
+  expect(() => replaceProfileMetadataFile(root, bytes, bytes)).toThrow(
+    "changed",
+  );
+  replaceProfileMetadataFile(root, null, null);
+  expect(readdirSync(root)).toEqual([]);
 });

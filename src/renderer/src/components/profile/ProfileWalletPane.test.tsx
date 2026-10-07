@@ -78,6 +78,19 @@ function installApi(): void {
 }
 
 describe("ProfileWalletPane balance chips", () => {
+  // @lat: [[cloud-workspace-tests#Original wallet canonical deletion display]]
+  it("hides a deleted canonical card without deleting a retained native key through the actual shared adapter", async () => {
+    installApi();
+    vi.mocked(window.hermesAPI.syncWallets).mockResolvedValue({
+      status: "ok",
+      authoritative: true,
+      wallets: [],
+    });
+    const view = render(<ProfileWalletPane profile="default" />);
+    await view.findByText("agents.walletManagedEmpty");
+    expect(view.queryByText("Primary")).toBeNull();
+    expect(window.hermesAPI.listWallets).toHaveBeenCalledTimes(1);
+  });
   // @lat: [[cloud-workspace-tests#Original wallet card refresh after synchronization]]
   it("uses the compiled shared pane to refresh a restored original name after synchronization", async () => {
     installApi();

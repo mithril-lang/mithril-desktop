@@ -1069,3 +1069,11 @@ Account retirement or a mismatched returned address rejects the response instead
 ## Canonical wallet fixed API transport
 
 The Native main-process transport uses the same public balance response validator and fixed authenticated API route as Web, refusing malformed results and unsafe identifiers.
+
+## Wallet remote tombstone visibility
+
+A remote tombstone removes the public record from repeated Native synchronization without deleting or republishing its retained encrypted original key record.
+
+## Original wallet canonical deletion display
+
+The actual Native adapter consumes the compiled shared pane and hides a removed canonical card without issuing a native key deletion.

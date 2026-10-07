@@ -44,7 +44,7 @@ Vitest test suites for wallet store and balance reads.
 
 ## Shared original wallet pane (draft)
 
-The original Wallet pane is provided by workspace 0.6.29-schedules.26 and consumed through the Desktop IPC adapter, preserving cards, balances, copying and deletion confirmation.
+The original Wallet pane is provided by workspace 0.6.29-schedules.27 and consumed through the Desktop IPC adapter, preserving cards, balances, copying and deletion confirmation.
 
 Visible local/cloud origin badges are removed. Public DTOs share one definition; recovery phrases and encrypted wallet files remain behind the native store. Service-unavailable routes return an error instead of falsely reporting sign-out. Profile replacement retires pending list/sync results. The shared Web adapter reads owner-bound descriptors and balances through the canonical API; installed-update and production parity remain unverified.
 
@@ -58,7 +58,13 @@ The Desktop startup data loop automatically publishes original public wallet met
 
 Remote-only wallets appear as read-only cards in the original pane. Remote names restore through [[src/main/wallet-source.ts#restoreWalletSource]] only when the original source still matches its captured baseline. The atomic private file replacement preserves exact ciphertext and all other records; cloud edits cannot change native address, network or custody provenance. Restart after file restoration adopts the already-observed cloud revision instead of republishing it. Concurrent native/cloud changes remain retained conflicts.
 
-Cloud tombstones do not erase native keys. Unified cloud deletion visibility remains unfinished. No live API publication or installed Desktop update is proven by these fixture tests.
+Cloud tombstones do not erase native keys. The canonical active snapshot omits deleted public records, and the shared pane replaces its displayed list instead of merging retained keys back into it. No live API publication or installed Desktop update is proven by these fixture tests.
+
+## Canonical wallet deletion visibility (draft)
+
+Successful canonical snapshots replace the wallet card list in both clients, so retained native key records cannot resurrect deleted public cards.
+
+The shared WalletSyncResult marks complete active snapshots with `authoritative`. Web's repository adapter and Native synchronization set it; the shared pane preserves error handling and profile fencing while accepting empty successful lists. Native binds custody controls only to original records with matching public identity, and keeps remote-only cards read-only. Deletion is represented by the repository tombstone, never by automatic key erasure. The `.27` archive has 461 matching producer/vendor/installed files; SHA256 is `a68570cbdabdf027c647ebf875f01f09a7b8e5c3dac79806f5a15682d311b2f1`.
 
 ## Canonical native wallet balance adapter (draft)
 

@@ -14,7 +14,6 @@ import {
   repositorySourceOwned,
 } from "./repository-kanban-runtime";
 import { HERMES_HOME } from "./installer";
-import { listWallets } from "./wallet-store";
 import { WalletRepositoryStore } from "./wallet-repository-store";
 import { WalletReplication } from "./wallet-replication";
 import { WorkspaceReplicationLoop } from "./original-schedule-replication-loop";
@@ -155,12 +154,20 @@ export async function synchronizeWallets(
       const current = engine(source, c);
       try {
         const wallets = await current.sync();
-        const nativeIds = new Set(
-          listWallets(profile).map((wallet) => wallet.id),
+        const native = new Map(
+          current.originalWallets().map((wallet) => [wallet.id, wallet]),
         );
         return {
           status: "ok",
-          wallets: wallets.filter((wallet) => !nativeIds.has(wallet.id)),
+          authoritative: true,
+          wallets: wallets.map((wallet) => {
+            const original = native.get(wallet.id);
+            return original &&
+              original.address.toLowerCase() === wallet.address.toLowerCase() &&
+              original.network === wallet.network
+              ? { ...wallet, source: "local" as const }
+              : wallet;
+          }),
         };
       } finally {
         current.stop();

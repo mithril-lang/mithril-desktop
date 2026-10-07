@@ -33,6 +33,15 @@ export class WalletReplication {
   stop(): void {
     this.stopped = true;
   }
+  originalWallets(): ProfileWallet[] {
+    this.guard();
+    return this.ports
+      .capture()
+      .map(
+        (wallet) =>
+          publicWalletDescriptor(this.ports.store.profile, wallet).wallet,
+      );
+  }
   private guard(): void {
     if (this.stopped) throw Error("Wallet synchronization retired");
     this.ports.guard();
@@ -187,9 +196,9 @@ export class WalletReplication {
           )
             throw Error("Wallet deletion requires conflict resolution");
         }
-        return (await editor.list(store.profile)).map((row) =>
-          walletDescriptorView(row.descriptor),
-        );
+        const active = await editor.list(store.profile);
+        this.guard();
+        return active.map((row) => walletDescriptorView(row.descriptor));
       } finally {
         sync.stop();
       }

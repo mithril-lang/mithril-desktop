@@ -258,3 +258,18 @@ it("refuses retired account access and unlocked or foreign-owner journal access"
   await expect(f.engine().sync()).rejects.toThrow("Account changed");
   expect(f.rows.size).toBe(0);
 });
+
+// @lat: [[cloud-workspace-tests#Wallet remote tombstone visibility]]
+it("omits a remote tombstone without deleting or resurrecting the original encrypted record on repeated synchronization", async () => {
+  const f = fixture();
+  await f.engine().sync();
+  const [id, row] = [...f.rows.entries()][0];
+  f.rows.set(id, { ...row, revision: 2, deleted: true, body: null });
+  expect(await f.engine().sync()).toEqual([]);
+  expect(await f.engine().sync()).toEqual([]);
+  expect(f.local()).toMatchObject([
+    { name: "Primary", encryptedRecoveryPhrase: "private-ciphertext" },
+  ]);
+  expect(f.calls).toHaveLength(1);
+  expect(f.rows.get(id)).toMatchObject({ revision: 2, deleted: true });
+});

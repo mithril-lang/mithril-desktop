@@ -935,4 +935,12 @@ The Native adapter renders the canonical shared Sync pane without a manual synch
 
 ## Shared profile Sync target outcome
 
-The Native adapter uses the shared pane to show only the selected profile outcome and invokes the existing sync transport on explicit request.
+The Native adapter verifies the selected original metadata record through the canonical workspace repository and invokes its real sync transport, never the retired agent-sync handlers.
+
+## Canonical profile Sync transient failure
+
+An identity transport error remains retryable in the original shared pane without misreporting the authenticated user as signed out.
+
+## Canonical profile Sync stale identity
+
+An old account identity resolving after an account-change refresh cannot mount or request another repository synchronization pass.

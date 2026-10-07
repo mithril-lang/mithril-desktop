@@ -1037,3 +1037,11 @@ Workspace `0.6.29-schedules.17` updates an already loaded pane every 20 seconds 
 Native ProfileSyncPane now imports the original shared Sync body and styles, while its agent-sync effects remain behind the Native adapter.
 
 Workspace `0.6.29-schedules.18` adds DesktopProfileSync and removes duplicate Native JSX/CSS. Web uses the same component with observed owner-bound repository status for original profile metadata only. Verified rows require a successful pass; pending/conflicting edits and failed transports remain visible and retryable. This extraction does not change agent execution authority or claim whole-profile synchronization. Archive: 445 files, SHA256 `d1af6fbf61de7815ba8764d7bfcd92f1f52a0f70d5e3350375a1570edba6bb17`. Publication and installed cross-device proof remain incomplete.
+
+## Canonical Desktop profile Sync adapter (draft)
+
+The original Sync pane now uses the same account-bound repository lifecycle as Web, replacing retired handlers that always reported signed out.
+
+Workspace `0.6.29-schedules.19` exposes RepositoryProfileSync with owner-fenced background refresh, real repository metadata verification and explicit retry. Native obtains the current cloudWorkspace identity, enables only existing authorized workspace access, and invalidates late authentication on account/profile changes. Transient failures do not display the sign-in hint. Native tests exercise the actual shared repository component and verify that no retired agent-sync bridge is called. Full synchronization, public API/Web and installed behavior remain unfinished.
+
+The canonical Sync candidate archive has 447 files with SHA256 `c66061dd0712f5f3d00010dce62c6577fdfedf346103a44e1e81497febfa2d5c`; producer, package and installed bytes are compared independently.

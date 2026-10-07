@@ -1,71 +1,100 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DesktopProfileSync } from "@mithril/workspace/desktop-profile-sync";
+import { RepositoryProfileSync } from "@mithril/workspace/repository-profile-sync";
 import { useI18n } from "../useI18n";
-import type { AgentSyncStatus } from "../../../../shared/agent-sync";
 
-interface ProfileSyncPaneProps {
-  /** Stable profile id — matches `outcome.profile` from a sync pass. */
-  profile: string;
-}
-
-/**
- * Per-profile cloud-sync controls, shown as the profile modal's "Sync" tab.
- * Sync itself is app-wide (one pass reconciles every profile), so "Sync now"
- * triggers the same `syncAgents()` the Agents screen uses and then surfaces
- * this profile's result — a manual path when the auto-sync-on-visit hasn't run.
- */
-export default function ProfileSyncPane({
+function CanonicalProfileSync({
   profile,
-}: ProfileSyncPaneProps): React.JSX.Element {
-  const { t } = useI18n();
-  const [status, setStatus] = useState<AgentSyncStatus | null>(null);
-  const [linkedAgentId, setLinkedAgentId] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
-
+}: {
+  profile: string;
+}): React.JSX.Element {
+  const { t, locale } = useI18n();
+  const [state, setState] = useState({
+    owner: null as string | null,
+    error: "",
+    signedOut: false,
+    checking: true,
+  });
+  const generation = useRef(0);
   const refresh = useCallback(async (): Promise<void> => {
+    const captured = ++generation.current;
+    setState({ owner: null, error: "", signedOut: false, checking: true });
     try {
-      const [s, linked] = await Promise.all([
-        window.hermesAPI.getAgentSyncStatus(),
-        window.hermesAPI.getLinkedAgentId(profile),
-      ]);
-      setStatus(s);
-      setLinkedAgentId(linked);
-    } catch {
-      // Bridge unavailable (old preload/tests): leave the pane in its hint state.
+      let status = await window.hermesAPI.cloudWorkspace.status();
+      if (captured !== generation.current) return;
+      if (status.userId && !status.enabled) {
+        status = await window.hermesAPI.cloudWorkspace.enable();
+        if (captured !== generation.current) return;
+      }
+      if (status.userId && !status.enabled)
+        throw Error("Workspace connection unavailable");
+      setState({
+        owner: status.userId,
+        error: "",
+        signedOut: !status.userId,
+        checking: false,
+      });
+    } catch (error) {
+      if (captured === generation.current)
+        setState({
+          owner: null,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Workspace connection unavailable",
+          signedOut: false,
+          checking: false,
+        });
     }
-  }, [profile]);
-
+  }, []);
+  const invalidate = useCallback(() => {
+    generation.current++;
+  }, []);
   useEffect(() => {
     void refresh();
-  }, [refresh]);
-
-  useEffect(() => {
-    if (!window.hermesAPI.onAgentSyncUpdated) return undefined;
-    return window.hermesAPI.onAgentSyncUpdated(() => {
-      void refresh();
-    });
-  }, [refresh]);
-
-  const runSync = useCallback(async (): Promise<void> => {
-    setSyncing(true);
-    try {
-      await window.hermesAPI.syncAgents();
-    } catch {
-      // Result is surfaced via the status refresh below.
-    } finally {
-      setSyncing(false);
-      void refresh();
-    }
-  }, [refresh]);
-
+    const unsubscribe = window.hermesAPI.onCloudWorkspaceAccountChanged?.(
+      () => {
+        void refresh();
+      },
+    );
+    return () => {
+      invalidate();
+      unsubscribe?.();
+    };
+  }, [refresh, invalidate]);
+  if (state.owner)
+    return (
+      <RepositoryProfileSync
+        key={state.owner}
+        owner={state.owner}
+        profile={profile}
+        transport={window.hermesAPI.cloudWorkspace.repository}
+        locale={locale}
+      />
+    );
   return (
     <DesktopProfileSync
       profile={profile}
-      status={status}
-      linkedAgentId={linkedAgentId}
-      syncing={syncing}
-      onSync={runSync}
+      linkedAgentId={null}
+      onSync={refresh}
       t={t}
+      status={{
+        signedIn: !state.signedOut,
+        accountLabel: "api.mithril.fund",
+        running: state.checking,
+        lastResult: state.error
+          ? { status: "error", error: state.error, outcomes: [], finishedAt: 0 }
+          : null,
+      }}
     />
   );
+}
+
+/** Original Sync presentation, authenticated through the canonical workspace API. */
+export default function ProfileSyncPane({
+  profile,
+}: {
+  profile: string;
+}): React.JSX.Element {
+  return <CanonicalProfileSync key={profile} profile={profile} />;
 }

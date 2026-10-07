@@ -542,3 +542,11 @@ Failed identity checks display readable sign-in guidance and no chat operation i
 ## Signed-in scoped authorization recovery
 
 Chat distinguishes missing scoped permission from account expiry and transport errors. Its original shared welcome action offers permission approval or network retry; retries never start device sign-in or change stored credentials.
+
+## Original schedule Agent binding bridge
+
+Real child processes receive exact anchors on stdin for A/B/A profiles; fixed command arguments and account checks surround persistence receipts, and changed accounts cannot accept a receipt.
+
+## Original schedule Agent binding refusal
+
+Foreign identities, extra fields, oversized output, lost acknowledgements and malformed anchors cannot confirm persistence or leak child stderr. Invalid anchors never reach the account guard or child invocation.

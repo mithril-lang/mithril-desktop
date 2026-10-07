@@ -742,3 +742,9 @@ The route's receipt has no repository schemaVersion. It uses [[src/main/original
 Real local HTTP qualification covers A/B/A credentials, original microsecond identity, foreign/extra/oversized receipts, redirect refusal, lost acknowledgements, missing grants and identity changes during streamed responses. Bypassing receipt validation made the foreign-owner regression fail; restoring it passes. This is the Native main transport needed by automatic execution admission. Durable per-source/occurrence binding, lifecycle mounting, unknown-result reconciliation, production API publication and installer qualification remain unfinished; adding this transport does not activate schedules.
 
 Qualification passed 40 tests across five main-process transport, runtime binding, bound source and retained journal files. Main/renderer typechecks, changed-file ESLint, the complete Electron build, whitespace validation and lat check passed. The signed/installed release and production backend are separate evidence gates; this candidate remains draft.
+
+## Original schedule Agent binding bridge (draft)
+
+The main process can persist a published original source's execution policy through the selected profile's owned Agent CLI, without a migration panel or raw-source IPC.
+
+[[src/main/cronjobs.ts#bindOriginalCronExecution]] uses the existing profile credential environment and local interpreter. [[src/main/original-schedule-agent-binding.ts#bindOriginalScheduleAgent]] sends an exact bounded anchor on stdin, fixes the named profile and command, bounds output and time, checks account guards before and after the child, and accepts only the exact persistence receipt. Child errors and credentials are not exposed. This does not admit any occurrence, publish the source, select an executor or silently grant scopes. Background lifecycle mounting, full source/resource reconciliation, production publication and installed behavior remain required.

@@ -1,3 +1,8 @@
+import {
+  bindOriginalScheduleAgent,
+  validOriginalScheduleAgentBinding,
+  type OriginalScheduleAgentBinding,
+} from "./original-schedule-agent-binding";
 import { projectLocalSchedules } from "./local-schedule-preview";
 import {
   captureOriginalCronFile,
@@ -601,5 +606,24 @@ export async function previewLocalSchedules(
       .filter((value) => value && typeof value === "object")
       .map((value) => normalizeJob(value as Record<string, unknown>))
       .filter((job): job is CronJob => !!job),
+  );
+}
+
+/** Main lifecycle producer after exact source/resource publication; never renderer IPC. */
+export async function bindOriginalCronExecution(
+  request: OriginalScheduleAgentBinding,
+  assertActive: () => Promise<void>,
+): Promise<{ bindingDigest: string }> {
+  if (isRemoteMode() || !validOriginalScheduleAgentBinding(request))
+    throw Error("Original schedule binding unavailable");
+  return bindOriginalScheduleAgent(
+    request,
+    {
+      executable: HERMES_PYTHON,
+      cliArgs: hermesCliArgs(),
+      cwd: join(HERMES_HOME, "hermes-agent"),
+      env: { ...process.env, ...secureSpawnEnv(request.profile) },
+    },
+    assertActive,
   );
 }

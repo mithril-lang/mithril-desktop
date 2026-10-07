@@ -13,6 +13,10 @@ export interface SettingsModalContextValue {
    * lands on the first item.
    */
   openSettings: (section?: string, opts?: OpenSettingsOptions) => void;
+  /** Main workspace routes share canonical preferences; bootstrap may retain native setup. */
+  registerWorkspaceSettings: (
+    handler: (section?: string, opts?: OpenSettingsOptions) => boolean,
+  ) => () => void;
   /** Close the modal if open. */
   closeSettings: () => void;
 }

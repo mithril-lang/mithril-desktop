@@ -868,7 +868,7 @@ Actual Agent A/B/A tests verify read-only completed inspection after original so
 
 ## Current-main shared schedules package
 
-Desktop now pins workspace `0.6.29-schedules.7`, packed from Fund `2cf4521e`, including current-main shared UI changes, the unified schedule adapter and individual browser settings pane support. Earlier archives remain immutable.
+Desktop now pins workspace `0.6.29-schedules.8`, packed from Fund `51d1b162`, including current-main shared UI changes, the unified schedule adapter and individual browser settings pane support. Earlier archives remain immutable.
 
 The installer candidate is preview.37 because preview.36 already has published assets.
 
@@ -905,3 +905,13 @@ The existing reconciler automatically recovers temporary startup connection fail
 [[src/renderer/src/screens/CloudWorkspace/RepositoryReplication.tsx#RepositoryReplication]] serializes status/enable reads and retries transient failures with a five-second delay growing to thirty seconds. Online events can retry immediately, but never overlap an outstanding request. Missing scopes or expired/refused authentication do not automatically prompt or grant authority. Identity generations are checked before enable and before applying owner state; cleanup removes timers and listeners. History and repository reconciliation begin only after the same owner is confirmed.
 
 This fixes the one-shot startup recovery gap; it does not qualify complete cloud data synchronization, release or installed-client behavior.
+
+## Canonical Settings entry points
+
+Main-workspace settings entry points use the same account repository and original modal, with route-owned visibility and section selection.
+
+[[src/renderer/src/components/settings/SettingsModalProvider.tsx#SettingsModalProvider]] delegates accepted commands to the handler registered by [[src/renderer/src/screens/Layout/Layout.tsx#Layout]]. Sidebar, shortcut and ordinary settings commands reset the requested section and open the canonical Cloud Workspace route. [[src/renderer/src/screens/CloudWorkspace/CloudWorkspace.tsx#CloudWorkspace]] forwards the original section argument and returns to Chat on close. Workspace `.8` closes its portaled modal when the retained screen is inactive.
+
+Bootstrap setup and an explicit different native profile still use the original provider; multi-profile canonical targeting remains required. This is not full preference migration or installed-client proof.
+
+The `.8` archive was verified against all 426 producer and installed files with lock SHA512; SHA256 `f09d12e8b5fcbb10b4de133a63c855f271406197b29be6f16b421c17a5427784`. Original Settings provider/modal/workspace tests passed 10 cases; shared browser Settings/Chat tests passed nine. Publication and installed-client qualification remain separate.

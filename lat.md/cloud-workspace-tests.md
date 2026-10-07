@@ -774,3 +774,9 @@ Changed script bytes, custody revisions, passive devices and stopped contexts re
 Transient startup failures retry scoped connection reads automatically; missing authority and stale identities never enable background synchronization.
 
 The original background reconciler resumes native history after a five-second network retry without another sign-in. Online signals cannot overlap an in-flight read. Account changes suppress late status replies before enable; unmount clears timers/listeners. Missing scope waits for explicit account authorization.
+
+## Canonical Settings command routing
+
+Global settings commands delegate to the active workspace instead of opening a second native preference editor.
+
+The command retains its requested section and explicit profile. An accepted workspace handler mounts no bootstrap modal; cleanup restores the original setup path. A declined different-profile target retains its exact native setup selection until the canonical route supports that profile. Browser tests separately exercise the original dialog's active/inactive lifecycle without replacing transports.

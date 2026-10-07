@@ -23,6 +23,7 @@ import "@mithril/workspace/desktop-styles.css";
 export default function CloudWorkspace({
   profile,
   initialView,
+  settingsInitialSection,
   embedded = false,
   discoverFocus,
   locale = "en",
@@ -32,6 +33,7 @@ export default function CloudWorkspace({
 }: {
   profile: string;
   initialView?: WorkspaceView;
+  settingsInitialSection?: string;
   embedded?: boolean;
   discoverFocus?: { kind: "skills" | "mcps"; nonce: number };
   locale?: string;
@@ -129,6 +131,7 @@ export default function CloudWorkspace({
       <WorkspaceApp
         key={profile}
         initialView={initialView}
+        settingsInitialSection={settingsInitialSection}
         embedded={embedded}
         discoverFocus={discoverFocus}
         autoConnect

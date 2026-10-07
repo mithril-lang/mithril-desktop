@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useRef } from "react";
 import SettingsModal from "./SettingsModal";
 import {
   SettingsModalContext,
@@ -23,9 +23,27 @@ export function SettingsModalProvider({
 }): React.JSX.Element {
   const [open, setOpen] = useState<OpenState | null>(null);
   const [visible, setVisible] = useState(false);
+  const workspaceSettings = useRef<
+    ((section?: string, opts?: OpenSettingsOptions) => boolean) | null
+  >(null);
+  const registerWorkspaceSettings = useCallback(
+    (handler: (section?: string, opts?: OpenSettingsOptions) => boolean) => {
+      workspaceSettings.current = handler;
+      return () => {
+        if (workspaceSettings.current === handler)
+          workspaceSettings.current = null;
+      };
+    },
+    [],
+  );
 
   const openSettings = useCallback(
     (section?: string, opts?: OpenSettingsOptions) => {
+      if (workspaceSettings.current?.(section, opts)) {
+        setVisible(false);
+        setOpen(null);
+        return;
+      }
       setOpen({ section, profile: opts?.profile });
       setVisible(true);
     },
@@ -37,8 +55,8 @@ export function SettingsModalProvider({
   }, [visible]);
 
   const value = useMemo(
-    () => ({ openSettings, closeSettings }),
-    [openSettings, closeSettings],
+    () => ({ openSettings, closeSettings, registerWorkspaceSettings }),
+    [openSettings, closeSettings, registerWorkspaceSettings],
   );
 
   return (

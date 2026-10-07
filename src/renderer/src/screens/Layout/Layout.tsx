@@ -114,7 +114,7 @@ function Layout({
   onDismissVerifyWarning,
 }: LayoutProps): React.JSX.Element {
   const { t, locale } = useI18n();
-  const { openSettings } = useSettingsModal();
+  const { openSettings, registerWorkspaceSettings } = useSettingsModal();
   const [view, setView] = useState<View>("mithril-chat");
   const [codingProject, setCodingProject] = useState<{
     title: string;
@@ -217,10 +217,30 @@ function Layout({
     overflow: "hidden",
   });
 
+  const [settingsRequest, setSettingsRequest] = useState<{
+    section?: string;
+    nonce: number;
+  }>({ nonce: 0 });
   const goTo = useCallback((v: View) => {
     setVisitedViews((prev) => (prev.has(v) ? prev : new Set(prev).add(v)));
     setView(v);
   }, []);
+
+  useEffect(
+    () =>
+      registerWorkspaceSettings((section, opts) => {
+        // An explicit different profile remains its selected native configuration until
+        // the account repository supports selecting that profile here.
+        if (opts?.profile && opts.profile !== activeProfile) return false;
+        setSettingsRequest((previous) => ({
+          section,
+          nonce: previous.nonce + 1,
+        }));
+        goTo("cloud-settings");
+        return true;
+      }),
+    [registerWorkspaceSettings, activeProfile, goTo],
+  );
 
   useEffect(() => {
     const handleNavigation = (e: Event): void => {
@@ -238,12 +258,12 @@ function Layout({
     const handleKey = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key === ",") {
         e.preventDefault();
-        goTo("cloud-settings");
+        openSettings();
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [goTo]);
+  }, [openSettings]);
 
   const focusDiscover = useCallback(
     (kind: "skills" | "mcps") => {
@@ -726,7 +746,7 @@ function Layout({
               </button>
               <button
                 className="sidebar-footer-action"
-                onClick={() => goTo("cloud-settings")}
+                onClick={() => openSettings()}
                 aria-label={t("navigation.settings")}
                 data-tooltip={t("navigation.settings")}
               >
@@ -947,9 +967,12 @@ function Layout({
               <CloudWorkspace
                 profile={activeProfile}
                 locale={locale}
+                key={settingsRequest.nonce}
                 initialView="settings"
+                settingsInitialSection={settingsRequest.section}
                 embedded
                 active={view === "cloud-settings"}
+                onOpenChat={() => goTo("mithril-chat")}
               />
             </div>
           )}

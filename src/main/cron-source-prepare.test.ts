@@ -41,6 +41,35 @@ it("accepts the exact original parser preparation and retains complete metadata"
     ),
   ).toEqual({ success: true, preparation });
 });
+// @lat: [[cloud-workspace#Cloud workspace#Exact original schedule preparation source (draft)]]
+it("retains exact prepared source text including opaque integers and refuses a different source", () => {
+  const sourceText = JSON.stringify(preparation.job).replace(
+    '"future_metadata"',
+    '"opaqueCounter":9223372036854775807,"future_metadata"',
+  );
+  const raw = { ...preparation, job: JSON.parse(sourceText), sourceText };
+  expect(
+    parseOriginalCronPrepareResult(
+      JSON.stringify({ success: true, preparation: raw }),
+      request,
+    ),
+  ).toEqual({ success: true, preparation: raw });
+  for (const text of [
+    sourceText.replace("Original", "Other"),
+    "{broken /private/secret",
+    "null",
+    '{"id":"other"}',
+  ])
+    expect(
+      parseOriginalCronPrepareResult(
+        JSON.stringify({
+          success: true,
+          preparation: { ...raw, sourceText: text },
+        }),
+        request,
+      ),
+    ).toEqual({ success: false, error: "Schedule preparation unavailable" });
+});
 it("refuses preparations belonging to a different owner, profile, timezone, input or operation", () => {
   for (const changed of [
     { ...preparation, owner: "bob" },

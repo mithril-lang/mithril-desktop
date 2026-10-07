@@ -616,3 +616,9 @@ The archive was generated in a task-specific directory from Fund source `0352e65
 The complete schedule capture now carries exact UTF-8 source text, and restoration can preserve those bytes through the original locked CLI path.
 
 [[src/main/cron-source-files.ts#captureOriginalCronFile]] retains BOM, CRLF, file formatting and opaque integer metadata in `sourceText`, alongside the parsed preview and byte digest. [[src/main/cron-source-restore.ts#validOriginalCronRestoreRequest]] admits exactly one bounded representation: the existing parsed file or exact source text. [[src/main/cron-source-restore.ts#parseOriginalCronRestoreResult]] verifies a text-mode receipt against the exact requested source SHA256. [[src/main/cronjobs.ts#restoreOriginalCronSource]] snapshots the request before awaiting the child. Raw source remains main-only; no upload, resource permission, execution ownership or renderer IPC is added.
+
+## Exact original schedule preparation source (draft)
+
+Original parser receipts can carry complete prepared JSON source text, checked against the bound parsed job. The text preserves opaque numeric tokens and stays in the main process.
+
+Older Agent receipts remain readable but do not supply the raw source required by the full-file create adapter. This does not mount the shared Schedules screen, upgrade the Agent pin, authorize private upload or establish execution ownership. Tests reject malformed or mismatched source with static errors.

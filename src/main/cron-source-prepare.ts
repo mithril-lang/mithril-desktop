@@ -13,6 +13,7 @@ export interface OriginalCronPrepareRequest {
 }
 export type OriginalCronPreparation = OriginalCronPrepareRequest & {
   job: Record<string, JsonValue>;
+  sourceText?: string;
 };
 export type OriginalCronPrepareResult =
   | { success: true; preparation: OriginalCronPreparation }
@@ -89,10 +90,24 @@ export function parseOriginalCronPrepareResult(
     if (result.success === true && result.preparation) {
       const prepared = result.preparation;
       const job = prepared.job;
+      const sourceTextMatches =
+        prepared.sourceText === undefined ||
+        (typeof prepared.sourceText === "string" &&
+          Buffer.byteLength(prepared.sourceText) <= 20 * 1024 * 1024 &&
+          Buffer.from(prepared.sourceText).toString("utf8") ===
+            prepared.sourceText &&
+          sourceObject(JSON.parse(prepared.sourceText)) &&
+          repositoryFingerprint({
+            body: JSON.parse(prepared.sourceText),
+            deleted: false,
+          }) === repositoryFingerprint({ body: job, deleted: false }));
       if (
         Object.keys(result).length === 2 &&
-        Object.keys(prepared).sort().join(",") ===
-          "input,job,operationId,owner,profile,timeZone" &&
+        [
+          "input,job,operationId,owner,profile,timeZone",
+          "input,job,operationId,owner,profile,sourceText,timeZone",
+        ].includes(Object.keys(prepared).sort().join(",")) &&
+        sourceTextMatches &&
         prepared.owner === request.owner &&
         prepared.profile === request.profile &&
         prepared.operationId === request.operationId &&

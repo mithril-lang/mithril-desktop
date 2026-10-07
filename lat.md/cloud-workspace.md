@@ -921,3 +921,9 @@ The `.8` archive was verified against all 426 producer and installed files with 
 Desktop applies confirmed account preferences independently of the selected screen using the canonical shared preferences observer.
 
 The background reconciler observes the same rich `preferences/presentation` record as Settings and forwards validated values through the original Desktop theme, font, language, spellcheck and sound providers. Owner/profile epochs suppress old replies; pending values are not applied as confirmed. Startup does not seed defaults or grant authority. This candidate still requires production publication and installed-client verification.
+
+## Explicit profile Settings routing
+
+Every Settings command in the mounted Desktop workspace uses the same original shared modal, including commands targeting another profile.
+
+[[src/renderer/src/screens/CloudWorkspace/useWorkspaceSettingsRoute.ts#useWorkspaceSettingsRoute]] preserves the explicit profile, section and request generation. Layout passes that profile to the original native Settings provider, while general preferences stay account-scoped. Opening settings never switches the current Chat agent or starts another conversation. Bootstrap setup remains available before Layout mounts.

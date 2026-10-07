@@ -1,3 +1,4 @@
+import { useWorkspaceSettingsRoute } from "../CloudWorkspace/useWorkspaceSettingsRoute";
 import Code from "../Code/Code";
 import { Code2 } from "lucide-react";
 import CloudSecurity from "../CloudWorkspace/CloudSecurity";
@@ -217,29 +218,19 @@ function Layout({
     overflow: "hidden",
   });
 
-  const [settingsRequest, setSettingsRequest] = useState<{
-    section?: string;
-    nonce: number;
-  }>({ nonce: 0 });
   const goTo = useCallback((v: View) => {
     setVisitedViews((prev) => (prev.has(v) ? prev : new Set(prev).add(v)));
     setView(v);
   }, []);
 
-  useEffect(
-    () =>
-      registerWorkspaceSettings((section, opts) => {
-        // An explicit different profile remains its selected native configuration until
-        // the account repository supports selecting that profile here.
-        if (opts?.profile && opts.profile !== activeProfile) return false;
-        setSettingsRequest((previous) => ({
-          section,
-          nonce: previous.nonce + 1,
-        }));
-        goTo("cloud-settings");
-        return true;
-      }),
-    [registerWorkspaceSettings, activeProfile, goTo],
+  const openWorkspaceSettings = useCallback(
+    () => goTo("cloud-settings"),
+    [goTo],
+  );
+  const settingsRequest = useWorkspaceSettingsRoute(
+    registerWorkspaceSettings,
+    activeProfile,
+    openWorkspaceSettings,
   );
 
   useEffect(() => {
@@ -965,7 +956,7 @@ function Layout({
           {visitedViews.has("cloud-settings") && (
             <div style={paneStyle("cloud-settings")}>
               <CloudWorkspace
-                profile={activeProfile}
+                profile={settingsRequest.profile}
                 locale={locale}
                 key={settingsRequest.nonce}
                 initialView="settings"

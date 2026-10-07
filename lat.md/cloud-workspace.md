@@ -34,6 +34,13 @@ While the shared workspace is active and connected, read-only observation refres
 
 [[src/main/native-workspace.ts#NativeWorkspace#previewImport]] includes reviewed selected SOUL/USER content and model preference, linked working-folder titles and current toolset preferences. Only opaque IDs and portable authored fields enter the preview. Absolute folder paths, credentials and execution grants are excluded; selected import leaves native files unchanged.
 
+### Agency contact templates
+
+Workspace 0.6.25-agency.1 adds fourteen contact templates across eleven agency solutions to the original shared Bot profiles screen. Selecting a template fills a draft; explicit Save retains owner-scoped synchronization.
+
+Desktop preview.36 pins the tarball built from Fund main `ed3698c1990715cf147d35ae4b5a54c92961eb30`, SHA256 `eb8095215b95d9321e49c7b692e6bc3f4a6ffcfc4cfb912e81b292727764763f`. The Registry catalog is pinned to `99b65915095b2d765aa0a595cd24db5224694527`. Instructions distinguish local JSON evaluation from planned video, traffic, financial and maritime modules. Templates grant no credentials, official identity or executor authority. Native installer publication and configured bot replies require separate receipts.
+
+
 ## Canonical catalog
 
 [[src/main/cloud-workspace.ts#CloudWorkspace#catalog]] reads public release-pinned catalog metadata only through api.mithril.fund. Both clients receive the same Mithril and Hermes registry entries, category tabs and cards. No metadata action installs code or grants permissions.

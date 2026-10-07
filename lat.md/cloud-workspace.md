@@ -697,3 +697,9 @@ Script and workdir resource stages now compose with mandatory runtime binding un
 Native process claims now become portable references and restore only from the receiving device's exact source, under mandatory execution admission.
 
 [[src/main/original-schedule-runtime-bindings.ts#OriginalScheduleRuntimeBindings]] implements the runtime stage required by the composed resource binder. The original Agent's run_claim, fire_claim and pending_slot fields are replaced by canonical profile/job/field references before upload. Restoration rejects raw or foreign references, requires exact-source execution admission, verifies the current native file CAS and reuses exact receiving-device claim tokens. New inventories receive null claims. Unrelated source bytes and opaque metadata remain unchanged. This adapter never executes jobs or grants ownership. The cloud execution authority implementation and automatic lifecycle mounting remain unfinished; callers cannot supply a permissive production fallback.
+
+## Original schedule shared workdir restoration (draft)
+
+Jobs sharing a working directory restore one snapshot once. All private targets are resolved before filesystem writes, and aliases must agree on the source snapshot and native baseline.
+
+[[src/main/original-schedule-workdir-resources.ts#OriginalScheduleWorkdirResources]] groups normalized absolute targets in original source order. The first job's existing operation receipt owns the shared directory transaction, so restart reuses that receipt instead of recapturing newer local edits. Conflicting manifests or baselines fail before directory writes. This remains draft resource integration; global execution ownership and automatic lifecycle installation are still required.

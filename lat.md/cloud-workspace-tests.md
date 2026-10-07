@@ -518,3 +518,11 @@ Verify raw and foreign cloud claims, changed native CAS and unavailable executio
 ## Original schedule runtime absent native claims
 
 Verify new native inventories receive null runtime claims while preserving original schedule data and account changes refuse further binding work.
+
+## Original schedule shared workdir restart
+
+Verify multiple original jobs sharing one directory restore it once, and a real restored receipt after process restart retains newer local edits even when the source write previously failed.
+
+## Original schedule shared workdir conflict preflight
+
+Verify jobs resolving to one native directory cannot request different cloud snapshots or local baselines; reject before any destination bytes change.

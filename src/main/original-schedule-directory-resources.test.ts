@@ -669,3 +669,133 @@ it("composes script and workdir restoration with durable baselines across a fail
     "newer local data",
   );
 });
+
+function sharedWorkdirSource(
+  home: string,
+  first: string,
+  second: string,
+): NonNullable<ReturnType<typeof captureOriginalCronFile>> {
+  const source = workdirFile(home, first);
+  const text = source.sourceText.replace(
+    "]}",
+    ',{"id":"two","name":"two","prompt":"hello","enabled":false,"state":"paused","schedule":{"kind":"cron","expr":"18 9 * * 1-5"},"workdir":' +
+      JSON.stringify(second) +
+      "}]}",
+  );
+  writeFileSync(join(home, "workdir-source", "cron", "jobs.json"), text);
+  return captureOriginalCronFile(join(home, "workdir-source"), "default")!;
+}
+
+// @lat: [[cloud-workspace-tests#Original schedule shared workdir restart]]
+it("restores a directory shared by two original jobs once and retains new edits on restart", async () => {
+  const f = setup();
+  writeFileSync(join(f.local, "data.bin"), Buffer.from([1]));
+  const baseline = await f.service.capture(f.local);
+  writeFileSync(join(f.remote, "data.bin"), Buffer.from([255, 0, 42]));
+  const source = sharedWorkdirSource(f.home, f.remote, f.remote);
+  const binder = new OriginalScheduleWorkdirResources(
+    f.scope,
+    f.service,
+    f.guard,
+  );
+  const portable = patchOriginalScheduleBindingsText(
+    source.sourceText,
+    f.scope.profile,
+    f.scope.timeZone,
+    await binder.capture(source),
+  );
+  const write = {
+    ...f.scope,
+    operationId: "shared_workdir",
+    sourceText: portable,
+    expectedVersion: null,
+  };
+  const target = async (
+    jobId: string,
+  ): Promise<{ root: string; expectedManifest: string }> => ({
+    root: jobId === "one" ? f.local : f.local + "/.",
+    expectedManifest: baseline.pointer.manifest,
+  });
+  const patches = await binder.restore(write, target);
+  expect(patches).toHaveLength(2);
+  expect(patches.map((p) => JSON.parse(p.replacementSourceText))).toEqual([
+    f.local,
+    f.local,
+  ]);
+  expect(readFileSync(join(f.local, "data.bin"))).toEqual(
+    Buffer.from([255, 0, 42]),
+  );
+  writeFileSync(
+    join(f.local, "data.bin"),
+    "new edit after source write failed",
+  );
+  const restarted = new OriginalScheduleDirectoryResources(
+    f.scope,
+    f.store.transport,
+    "/usr/bin/python3",
+    join(f.home, "state"),
+    f.guard,
+  );
+  await new OriginalScheduleWorkdirResources(
+    f.scope,
+    restarted,
+    f.guard,
+  ).restore(write, target);
+  expect(readFileSync(join(f.local, "data.bin"), "utf8")).toBe(
+    "new edit after source write failed",
+  );
+});
+
+// @lat: [[cloud-workspace-tests#Original schedule shared workdir conflict preflight]]
+it("refuses two different snapshots or baselines for one target before writing any directory", async () => {
+  const f = setup();
+  writeFileSync(join(f.local, "data.txt"), "local");
+  const baseline = await f.service.capture(f.local);
+  writeFileSync(join(f.remote, "data.txt"), "first remote");
+  const other = join(f.home, "other");
+  mkdirSync(other);
+  writeFileSync(join(other, "data.txt"), "second remote");
+  const binder = new OriginalScheduleWorkdirResources(
+    f.scope,
+    f.service,
+    f.guard,
+  );
+  const makeWrite = async (
+    second: string,
+  ): Promise<{
+    owner: string;
+    profile: string;
+    timeZone: string;
+    operationId: string;
+    expectedVersion: null;
+    sourceText: string;
+  }> => {
+    const source = sharedWorkdirSource(f.home, f.remote, second);
+    return {
+      ...f.scope,
+      operationId: "conflicting_shared_workdir",
+      expectedVersion: null,
+      sourceText: patchOriginalScheduleBindingsText(
+        source.sourceText,
+        f.scope.profile,
+        f.scope.timeZone,
+        await binder.capture(source),
+      ),
+    };
+  };
+  await expect(
+    binder.restore(await makeWrite(other), async () => ({
+      root: f.local,
+      expectedManifest: baseline.pointer.manifest,
+    })),
+  ).rejects.toThrow("Conflicting shared");
+  expect(readFileSync(join(f.local, "data.txt"), "utf8")).toBe("local");
+  await expect(
+    binder.restore(await makeWrite(f.remote), async (jobId) => ({
+      root: f.local,
+      expectedManifest:
+        jobId === "one" ? baseline.pointer.manifest : "a".repeat(64),
+    })),
+  ).rejects.toThrow("Conflicting shared");
+  expect(readFileSync(join(f.local, "data.txt"), "utf8")).toBe("local");
+});

@@ -152,13 +152,34 @@ export class OriginalScheduleWorkdirResources {
       ),
     }));
     const resourceId = await originalScheduleResourceId(this.scope.profile);
-    const patches: OriginalScheduleBindingPatch[] = [];
+    // Resolve every durable target before the first filesystem write. Multiple
+    // jobs may share one directory, but must agree on both snapshot and baseline.
+    const targets = [] as {
+      token: OriginalScheduleBindingToken;
+      manifest: string;
+      root: string;
+      expectedManifest: string;
+    }[];
+    const groups = new Map<string, (typeof targets)[number]>();
     for (const { token, manifest } of refs) {
       await this.assertActive();
       const target = await targetForJob(token.jobId!, manifest);
       await this.assertActive();
       if (!target || !isAbsolute(target.root) || target.root.includes("\0"))
         throw Error("Invalid private workdir target");
+      const row = { token, manifest, ...target, root: resolve(target.root) };
+      const previous = groups.get(row.root);
+      if (
+        previous &&
+        (previous.manifest !== row.manifest ||
+          previous.expectedManifest !== row.expectedManifest)
+      )
+        throw Error("Conflicting shared original workdir target");
+      if (!previous) groups.set(row.root, row);
+      targets.push(row);
+    }
+    for (const { token, manifest, root, expectedManifest } of groups.values()) {
+      await this.assertActive();
       const status = await this.directories.restore(
         {
           format: "mithril-original-schedule-directory-v1",
@@ -166,19 +187,19 @@ export class OriginalScheduleWorkdirResources {
           resourceId,
           manifest,
         },
-        target.root,
-        target.expectedManifest,
+        root,
+        expectedManifest,
         "workdir_" + sha(JSON.stringify([write.operationId, token.jobId])),
       );
       if (status !== "applied")
         throw Error("Original workdir resource restoration " + status);
       await this.assertActive();
-      patches.push({
-        ...token,
-        expectedSourceText: token.sourceText,
-        replacementSourceText: JSON.stringify(target.root),
-      });
     }
+    const patches = targets.map(({ token, root }) => ({
+      ...token,
+      expectedSourceText: token.sourceText,
+      replacementSourceText: JSON.stringify(root),
+    }));
     return patches;
   }
 }

@@ -1171,3 +1171,15 @@ Workspace `.33` serializes initial reads with five-to-thirty-second backoff and 
 
 
 The `.33` consumer archive was compared against all 463 producer and installed files, with matching lock SHA512. SHA256 is `84a8174f0e53928c5e6f0443e3bc2ed984a6f7f5f1f0749b594077d47b02b0c6`. Shared qualification passed 375 tests and Native connection/route regressions passed 20 tests. Type checking and lat validation passed; publication and installed upgrade remain outstanding.
+
+
+## Canonical account connection pane
+
+The normal cloud Settings route uses the same original ConnectionPane cloud account renderer as Web, with native effects supplied through ports.
+
+[[src/renderer/src/screens/CloudWorkspace/CloudConnectionPane.tsx#CloudConnectionPane]] reads main-owned canonical account status and opens the existing account dialog only after explicit account management. Its scope follows profile and account epochs, so late replies cannot restore another identity's display. The original complete native connection component remains under a closed execution subsection and mounts only on expansion. It does not create a separate local workspace or transfer native credentials into browser authority. Standalone native setup remains available through the original settings provider.
+
+Workspace `.34` is a source candidate. Full Data archive adapters, authenticated release/upgrade/cross-device qualification and current-main publication remain required.
+
+
+The `.34` archive SHA256 is `6cab4b70ee2c4aebed56898018dd1cb46a8c2b74851bace6e818e165a911690b`; all 463 files match producer and installed bytes and the lock SHA512 matches. Shared qualification passed 378 tests, browser Settings/Logs passed 13 and Native connection/modal/routes passed 13. Both builds, type checking, changed-file lint and lat validation passed. These checks do not substitute for installed-client or production evidence.

@@ -1,4 +1,5 @@
 import { useWorkspacePreferences } from "./useWorkspacePreferences";
+import CloudConnectionPane from "./CloudConnectionPane";
 import * as Dialog from "@radix-ui/react-dialog";
 import MithrilAccountSection from "../../components/MithrilAccountSection";
 import { saveTaskAttachmentDownload } from "@mithril/workspace/task-attachment-download";
@@ -114,7 +115,16 @@ export default function CloudWorkspace({
               {children}
             </NativeSettingsProvider>
           ),
-          renderPane: (section) => <NativeSettingsPane section={section} />,
+          renderPane: (section) =>
+            section === "connection" ? (
+              <CloudConnectionPane
+                scope={`${profile}:${identityEpoch}`}
+                locale={locale}
+                onManageAccount={() => setSignInOpen(true)}
+              />
+            ) : (
+              <NativeSettingsPane section={section} />
+            ),
         }}
         onOpenNativeSection={onOpenNativeSection}
         onOpenChat={onOpenChat}

@@ -1146,3 +1146,8 @@ The regression in src/main/cloud-workspace.test.ts verifies a foreign expected o
 ## Terminal background connection errors
 
 Owner changes, rejected nontransient HTTP requests and invalid schemas stop automatic background retries; online events do not repeat status or enable reads until explicit recovery.
+
+
+## Canonical cloud connection settings
+
+The Native consumer mounts the actual shared account status component with main-owned reads, keeps original execution settings unmounted until expansion and opens account management only on an explicit click.

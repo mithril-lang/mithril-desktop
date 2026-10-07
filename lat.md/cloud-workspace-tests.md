@@ -828,3 +828,23 @@ A download captured before a newer local appearance edit cannot replace or delet
 ## Profile metadata exact replacement and tombstone
 
 A matched source accepts exact cloud bytes including BOM and opaque integers; invalid targets preserve the file, and matched deletion does not accept a stale recreation baseline.
+
+## Profile metadata durable interruption recovery
+
+Real SQLite pending intents recover exact bytes on reopening whether interruption occurred before or after the file rename.
+
+## Profile metadata durable receipt replay
+
+Completed receipts survive reopening, preserve later local edits, and reject a reused operation identity with a changed fingerprint.
+
+## Profile metadata interrupted restoration conflict
+
+Interrupted restoration refuses newer local bytes and retains its pending intent; another owner cannot access that intent.
+
+## Profile metadata receipt binds target bytes
+
+A mismatched target digest or foreign profile receipt is rejected before any original metadata mutation.
+
+## Profile metadata durable tombstone restoration
+
+Physical metadata deletion retains its completed receipt across restart, and replay never deletes a later recreated file.

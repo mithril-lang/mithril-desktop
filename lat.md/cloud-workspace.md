@@ -939,3 +939,9 @@ Original profile edits use the shared token-preserving metadata patcher and an a
 Downloaded profile metadata can replace or remove a native file only when its exact captured bytes still match; concurrent appearance edits remain intact.
 
 [[src/main/profile-meta-files.ts#replaceProfileMetadataFile]] snapshots caller buffers, validates the target, compares absence separately from an empty object, and checks again immediately before atomic replacement or deletion. Parent-directory fsync follows both mutations. Original appearance handlers share this lane. This is a file primitive for pending replica integration, not proof of automatic synchronization or publication.
+
+## Durable profile metadata restoration (draft)
+
+A private owner/profile/root SQLite journal commits exact pending bytes before replacement, retains completed receipts, and recovers interruptions without overwriting newer local edits.
+
+[[src/main/profile-metadata-replica.ts#ProfileMetadataReplica]] uses FULL synchronous transactions and separate committed intent and completion phases. Restoration is synchronous; its caller must revalidate workspace authorization before calling apply or recover. Exact target bytes are bound to the profile pointer digest and size. Replayed results are read before recapturing a newer source. This pending native replica integration does not yet activate automatic metadata synchronization or publish an installer.

@@ -42,6 +42,7 @@ function installApi(
 }
 
 describe("ProfileSyncPane", () => {
+  // @lat: [[cloud-workspace-tests#Shared profile Sync signed out]]
   it("shows a sign-in hint and no Sync button when signed out", async () => {
     installApi(
       { signedIn: false, accountLabel: null, running: false, lastResult: null },
@@ -54,6 +55,7 @@ describe("ProfileSyncPane", () => {
     expect(view.queryByText("agents.syncNow")).toBeNull();
   });
 
+  // @lat: [[cloud-workspace-tests#Shared profile Sync target outcome]]
   it("shows link state + this profile's outcome and runs a sync on click", async () => {
     const status: AgentSyncStatus = {
       signedIn: true,

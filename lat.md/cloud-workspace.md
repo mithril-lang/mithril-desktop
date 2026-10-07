@@ -1031,3 +1031,9 @@ Workspace `0.6.29-schedules.16` refreshes clean Web identity panes from the exis
 Native and Web share periodic profile Memory refresh, with frozen entry drafts and observed save baselines retained across remote changes.
 
 Workspace `0.6.29-schedules.17` updates an already loaded pane every 20 seconds without overlapping reads or retrying an initial failed load automatically. Scope invalidation refuses late results. Removing the last remote entry cannot hide an active original entry editor or delete confirmation; adapter-provided portable-note baselines are preserved. The immutable archive contains 443 files, SHA256 `88aec801017fbc9508ebf8497b544a9c8f0c2997891ffbe089c873d97e2d3acd`. Timer/adapter regression tests and local builds remain distinct from publication and installed cross-device proof.
+
+## Original profile Sync shared presentation (draft)
+
+Native ProfileSyncPane now imports the original shared Sync body and styles, while its agent-sync effects remain behind the Native adapter.
+
+Workspace `0.6.29-schedules.18` adds DesktopProfileSync and removes duplicate Native JSX/CSS. Web uses the same component with observed owner-bound repository status for original profile metadata only. Verified rows require a successful pass; pending/conflicting edits and failed transports remain visible and retryable. This extraction does not change agent execution authority or claim whole-profile synchronization. Archive: 445 files, SHA256 `d1af6fbf61de7815ba8764d7bfcd92f1f52a0f70d5e3350375a1570edba6bb17`. Publication and installed cross-device proof remain incomplete.

@@ -1,24 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, Refresh } from "../../assets/icons";
+import { DesktopProfileSync } from "@mithril/workspace/desktop-profile-sync";
 import { useI18n } from "../useI18n";
-import type {
-  AgentSyncOutcome,
-  AgentSyncResult,
-  AgentSyncStatus,
-} from "../../../../shared/agent-sync";
+import type { AgentSyncStatus } from "../../../../shared/agent-sync";
 
 interface ProfileSyncPaneProps {
   /** Stable profile id — matches `outcome.profile` from a sync pass. */
   profile: string;
-}
-
-/** The last pass's outcome for this specific profile, if any. */
-function outcomeForProfile(
-  result: AgentSyncResult | null,
-  profileId: string,
-): AgentSyncOutcome | null {
-  if (!result) return null;
-  return result.outcomes.find((o) => o.profile === profileId) ?? null;
 }
 
 /**
@@ -71,90 +58,14 @@ export default function ProfileSyncPane({
     }
   }, [refresh]);
 
-  const outcome = outcomeForProfile(status?.lastResult ?? null, profile);
-  const warnings = outcome?.warnings ?? [];
-
-  function actionLabel(action: AgentSyncOutcome["action"]): string {
-    return t(`agents.syncAction.${action}`);
-  }
-
   return (
-    <div className="profile-modal-pane profile-sync-pane">
-      <div className="profile-sync-header">
-        <div>
-          <div className="profile-sync-heading">{t("agents.syncTitle")}</div>
-          <div className="profile-sync-subtitle">
-            {t("agents.syncPaneSubtitle")}
-          </div>
-        </div>
-        {status?.signedIn && (
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => void runSync()}
-            disabled={syncing || status.running}
-          >
-            <Refresh size={14} />
-            {syncing || status.running
-              ? t("agents.syncing")
-              : t("agents.syncNow")}
-          </button>
-        )}
-      </div>
-
-      {status && !status.signedIn ? (
-        <div className="profile-sync-note">{t("agents.syncSignInHint")}</div>
-      ) : status ? (
-        <div className="profile-sync-body">
-          <div className="profile-sync-row">
-            <span className="profile-sync-label">
-              {t("agents.syncAccount")}
-            </span>
-            <span className="profile-sync-value">
-              {status.accountLabel ?? "—"}
-            </span>
-          </div>
-          <div className="profile-sync-row">
-            <span className="profile-sync-label">{t("agents.syncLink")}</span>
-            <span className="profile-sync-value">
-              {linkedAgentId ? (
-                <span className="profile-sync-linked">
-                  <Check size={14} />
-                  {t("agents.syncLinked")}
-                </span>
-              ) : (
-                t("agents.syncNotLinked")
-              )}
-            </span>
-          </div>
-          {outcome && (
-            <div className="profile-sync-row">
-              <span className="profile-sync-label">
-                {t("agents.syncLastResult")}
-              </span>
-              <span className="profile-sync-value">
-                {actionLabel(outcome.action)}
-              </span>
-            </div>
-          )}
-          {status.lastResult?.status === "unauthorized" && (
-            <div className="profile-sync-note profile-sync-note-warn">
-              {t("agents.syncUnauthorized")}
-            </div>
-          )}
-          {status.lastResult?.status === "error" && (
-            <div className="profile-sync-note profile-sync-note-warn">
-              {status.lastResult.error || t("agents.syncFailed")}
-            </div>
-          )}
-          {warnings.length > 0 && (
-            <ul className="profile-sync-warnings">
-              {warnings.map((w, i) => (
-                <li key={i}>{w}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ) : null}
-    </div>
+    <DesktopProfileSync
+      profile={profile}
+      status={status}
+      linkedAgentId={linkedAgentId}
+      syncing={syncing}
+      onSync={runSync}
+      t={t}
+    />
   );
 }

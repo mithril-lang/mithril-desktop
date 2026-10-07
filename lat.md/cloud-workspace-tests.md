@@ -928,3 +928,11 @@ Real HTTP tests require a valid captured active account context for another prof
 ## Shared original profile Memory native adapter
 
 The actual ProfileModal renders the shared Agent Memory editor and saves to its original Native profile with the exact observed MEMORY and USER baseline.
+
+## Shared profile Sync signed out
+
+The Native adapter renders the canonical shared Sync pane without a manual synchronization button when its observed account status is signed out.
+
+## Shared profile Sync target outcome
+
+The Native adapter uses the shared pane to show only the selected profile outcome and invokes the existing sync transport on explicit request.

@@ -1161,3 +1161,13 @@ The data-only synchronization lifecycle survives a cached inactive workspace, wh
 Saved metadata carries the renderer's checked owner through trusted preload IPC to [[src/main/cloud-workspace.ts#CloudWorkspace#applyOperations]]. The current installation owner must match before POST. The fixed owner header lets the canonical API reject a cookie-owner change before D1 admission. Missing caller/header values remain compatible with older consumers; API-first rollout is required. The new Native regression verifies refusal without POST and the exact owner header.
 
 Consumer verification: workspace schedules.32 has 461 files and all explicit exports. Producer/archive/installed bytes and lock SHA512 match; archive SHA256 `e8de76d5ff7463796d39b9fb1905afcb0b5a98a322e5ffa4bbb9b4ebb1d8449f`. Native 32 targeted cloud transport/Settings regressions, types, build and lint pass. Shared 360, API/local D1 13 and Web 17 targeted tests pass separately. No production or installed-client qualification is claimed.
+
+
+## Shared initial connection recovery
+
+The original WorkspaceApp recovers transient startup transport failures without showing a separate device migration flow.
+
+Workspace `.33` serializes initial reads with five-to-thirty-second backoff and online recovery. Native background reconciliation uses the same transient failure classifier; authentication, owner, schema, persistence and unknown failures stop retries. Disposal fences late enable replies before snapshot reads. This does not automatically authorize access or replay inference/tool calls. Web requests default to a fifteen-second deadline. Source tests are separate from production and installed-client qualification.
+
+
+The `.33` consumer archive was compared against all 463 producer and installed files, with matching lock SHA512. SHA256 is `84a8174f0e53928c5e6f0443e3bc2ed984a6f7f5f1f0749b594077d47b02b0c6`. Shared qualification passed 375 tests and Native connection/route regressions passed 20 tests. Type checking and lat validation passed; publication and installed upgrade remain outstanding.

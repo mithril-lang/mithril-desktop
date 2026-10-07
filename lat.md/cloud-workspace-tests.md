@@ -1141,3 +1141,8 @@ The real history engine, scoped canonical HTTP adapter and durable on-disk journ
 Saved metadata from the renderer must match the current installation owner before a native POST is admitted.
 
 The regression in src/main/cloud-workspace.test.ts verifies a foreign expected owner causes no POST, while a matching owner sends x-mithril-workspace-owner to the canonical API. The shared SyncClient supplies the checked owner through preload and trusted IPC into [[src/main/cloud-workspace.ts#CloudWorkspace#applyOperations]]. API/local D1 tests independently check cookie-owner switching returns 409 before any operation row is written. Source tests do not establish installed or production qualification.
+
+
+## Terminal background connection errors
+
+Owner changes, rejected nontransient HTTP requests and invalid schemas stop automatic background retries; online events do not repeat status or enable reads until explicit recovery.

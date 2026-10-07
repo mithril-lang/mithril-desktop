@@ -412,3 +412,27 @@ it("shows the source profile and sends its reviewed choice without switching the
     }),
   );
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Terminal background connection errors]]
+it.each([
+  "Workspace owner changed during connection",
+  "Workspace request failed (400)",
+  "Invalid workspace schema",
+])(
+  "does not retry a terminal background connection failure: %s",
+  async (message) => {
+    vi.useFakeTimers();
+    const status = vi
+      .spyOn(window.hermesAPI.cloudWorkspace, "status")
+      .mockRejectedValue(Error(message));
+    const enable = vi.spyOn(window.hermesAPI.cloudWorkspace, "enable");
+    render(<RepositoryReplication profile="default" locale="en" enabled />);
+    await act(async () => {});
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+      await vi.advanceTimersByTimeAsync(60000);
+    });
+    expect(status).toHaveBeenCalledOnce();
+    expect(enable).not.toHaveBeenCalled();
+  },
+);

@@ -9661,25 +9661,6 @@ body:has(.shell-vibrant),
   white-space: nowrap;
 }
 
-.agents-create-clone {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.agents-create-clone input[type="checkbox"] {
-  accent-color: var(--accent);
-}
-
-.agents-create-error {
-  font-size: 13px;
-  color: var(--error);
-}
-
 /* Shared animated modal primitive. Radix handles portal/focus, Motion handles
    mount/unmount transitions, and feature modals provide their own layout. */
 .app-modal-overlay {
@@ -10716,57 +10697,6 @@ body:has(.shell-vibrant),
 }
 .btn-danger-ghost:hover {
   border-color: var(--error);
-}
-
-/* ── New-profile modal ── */
-.agents-create-modal {
-  z-index: 301;
-  height: fit-content;
-  width: min(460px, calc(100vw - 32px));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-bright);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
-}
-
-.agents-create-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--border);
-}
-
-.agents-create-modal-title {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.agents-create-modal-body {
-  display: grid;
-  gap: 16px;
-  padding: 20px;
-}
-
-.agents-create-field {
-  display: grid;
-  gap: 8px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.agents-create-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 4px;
 }
 
 /* ========================================================================

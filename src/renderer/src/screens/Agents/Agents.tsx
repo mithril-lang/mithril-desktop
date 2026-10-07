@@ -1,8 +1,8 @@
+import { DesktopAgentCreateModal } from "@mithril/workspace/desktop-agent-create";
 import { DesktopAgentsTable } from "@mithril/workspace/desktop-agents";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, ChatBubble, Pencil, X } from "../../assets/icons";
 import ProfileAvatar from "../../components/common/ProfileAvatar";
-import { AppModal, AppModalTitle } from "../../components/modal/AppModal";
 import { useI18n } from "../../components/useI18n";
 import { OrbLoader } from "../../components/OrbLoader";
 import { useProfileModal } from "../../components/profile/ProfileModalContext";
@@ -253,83 +253,27 @@ function Agents({
         <div className="agents-create-error">{error}</div>
       )}
 
-      <AppModal
+      <DesktopAgentCreateModal
         open={showCreate}
-        onOpenChange={(open) => {
-          if (!open) closeCreate();
+        name={newName}
+        error={error}
+        creating={creating}
+        onNameChange={(name) => {
+          setNewName(name);
+          setError("");
         }}
-        className="agents-create-modal"
-        labelledBy="agents-create-title"
-      >
-        <div className="agents-create-modal-header">
-          <AppModalTitle
-            id="agents-create-title"
-            className="agents-create-modal-title"
-          >
-            {t("agents.createTitle")}
-          </AppModalTitle>
-          <button
-            className="profile-modal-close"
-            onClick={closeCreate}
-            aria-label={t("common.close")}
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <div className="agents-create-modal-body">
-          <label className="agents-create-field">
-            <span>{t("agents.nameLabel")}</span>
-            <input
-              className="input"
-              placeholder={t("agents.namePlaceholder")}
-              value={newName}
-              onChange={(e) => {
-                setNewName(e.target.value);
-                setError("");
-              }}
-              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-              autoFocus
-            />
-          </label>
-          <label className="agents-create-clone">
-            <input
-              type="checkbox"
-              checked={cloneConfig}
-              onChange={(e) => setCloneConfig(e.target.checked)}
-            />
-            <span>{t("agents.cloneConfig")}</span>
-          </label>
-          {cloneConfig && (
-            <label className="agents-create-field">
-              <span>{t("agents.cloneFromLabel")}</span>
-              <select
-                className="input"
-                value={cloneSource}
-                onChange={(e) => setCloneSource(e.target.value)}
-              >
-                {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {error && <div className="agents-create-error">{error}</div>}
-          <div className="agents-create-modal-actions">
-            <button className="btn btn-secondary" onClick={closeCreate}>
-              {t("common.cancel")}
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleCreate}
-              disabled={creating || !newName.trim()}
-            >
-              {creating ? t("agents.creating") : t("agents.create")}
-            </button>
-          </div>
-        </div>
-      </AppModal>
+        onCancel={closeCreate}
+        onCreate={handleCreate}
+        t={t}
+        X={X}
+        clone={{
+          enabled: cloneConfig,
+          source: cloneSource,
+          profiles,
+          onEnabled: setCloneConfig,
+          onSource: setCloneSource,
+        }}
+      />
 
       <DesktopAgentsTable
         profiles={profiles}

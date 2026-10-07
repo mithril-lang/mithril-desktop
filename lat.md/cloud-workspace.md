@@ -1065,3 +1065,11 @@ Native and Web now import DesktopAgentsTable and the original table styles from 
 Native retains its original creation modal, profile selection, gateway polling, edit modal and Chat operations. Web uses owner-bound metadata resources and the same edit action without inventing runtime state or exposing unavailable execution. Original column layout scrolls on narrow browser viewports. Shared row tests cover keyboard event isolation and unknown state; Native creation/retry tests exercise the compiled package. Full management parity, release and installed proof remain incomplete.
 
 The immutable shared archive contains 449 files with SHA256 `d6db9999d3308c2f722d2ec9e105ec5ec0dd8eb8cce7cc5b90459f31adf14fd2`; producer, archive, Native vendor and installed package bytes were independently compared.
+
+## Original profile creation shared consumption (draft)
+
+Native and Web use the original shared profile creation modal and its styles from workspace 0.6.29-schedules.21.
+
+Native cloning remains behind its original adapter. Browser creation uploads public original metadata under the authenticated owner, requires a revision-zero receipt and selects only accepted profiles. Existing/tombstoned IDs cannot be reused; conflicts and offline operations stay durable without replacement requests. Account changes fence completion. Credentials and execution grants are not cloned. Real shared-form tests cover cloud creation and Native's existing ambiguous-create recovery; publication and installed cross-device proof remain unfinished.
+
+The immutable creation archive contains 451 files with SHA256 `2e39b59ec70e8bc2723bbbe9f2eabee45b469bdf8b3bce169433bc334c4e63f0`; producer, archive, Native vendor and installed package bytes were compared independently.

@@ -69,3 +69,28 @@ it("permits only fixed GitHub routes, forwards transient credentials and returns
   });
   expect(fetcher).toHaveBeenCalledTimes(3);
 });
+
+it("recompilation forwards only source and excludes supplied account and GitHub credentials", async () => {
+  const fetcher = vi.fn(async () =>
+    Response.json({ format: "mithril.language-compilation/v1" }),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  expect(
+    await codeApi(
+      "/api/compile",
+      { source: "(mithril/app-agent)" },
+      { github: "private-github", provider: "private-mithril" },
+    ),
+  ).toMatchObject({ ok: true });
+  const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+  expect(url).toBe("https://code.mithril.fund/api/compile");
+  expect(init.headers).not.toHaveProperty("authorization");
+  expect(init.headers).not.toHaveProperty("x-mithril-token");
+  expect(JSON.parse(String(init.body))).toEqual({
+    source: "(mithril/app-agent)",
+  });
+  expect(
+    await codeApi("/api/compile", { source: "x", token: "private" }, {}),
+  ).toMatchObject({ ok: false });
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});

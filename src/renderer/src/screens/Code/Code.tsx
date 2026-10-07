@@ -2,14 +2,16 @@
 import { useMemo } from "react";
 import { browserCodeSandbox } from "@mithril/workspace/code-kuro";
 import { CodeWorkspace } from "@mithril/workspace/code-react";
-import type { CodeTransport } from "@mithril/workspace/code";
+import type { CodeTransport, CodeFile } from "@mithril/workspace/code";
 import "@mithril/workspace/code-styles.css";
 export default function Code({
   profile,
   locale,
+  initialProject,
 }: {
   profile: string;
   locale: string;
+  initialProject?: { title: string; files: CodeFile[] };
 }): React.JSX.Element {
   const transport = useMemo<CodeTransport>(
     () => ({
@@ -50,6 +52,8 @@ export default function Code({
       transport={transport}
       sandbox={browserCodeSandbox()}
       locale={locale}
+      initialProject={initialProject}
+      artifactOnly={Boolean(initialProject)}
     />
   );
 }

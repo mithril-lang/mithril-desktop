@@ -78,7 +78,7 @@ async function peer(): Promise<Peer> {
       const { action: _action, ...input } = command;
       const manual = {
         userId,
-        profile,
+        profile: command.profile,
         jobId: "original-job",
         operationId: "original-operation",
         sourceRevision: 2,
@@ -482,6 +482,35 @@ it("uses captured active account authority for another profile and refuses stale
     p.identity("b");
     await expect(
       p.cloud.originalScheduleCustody(command, context),
+    ).rejects.toThrow("stale native context");
+    expect(p.calls).toHaveLength(calls);
+  } finally {
+    await p.close();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#All-profile manual transport identity]]
+it("uses a captured account for another profile manual mailbox and rejects foreign receipts and stale contexts", async () => {
+  const p = await peer();
+  try {
+    await p.cloud.enable();
+    const context = await p.cloud.nativeContext(true);
+    const command = { action: "take" as const, profile: "research" };
+    await expect(p.cloud.originalScheduleManual(command)).rejects.toThrow(
+      "Invalid original",
+    );
+    const result = await p.cloud.originalScheduleManual(command, context);
+    expect(result).toMatchObject({
+      request: { profile: "research", userId: "a" },
+    });
+    p.mode("foreign");
+    await expect(
+      p.cloud.originalScheduleManual(command, context),
+    ).rejects.toThrow("unconfirmed");
+    const calls = p.calls.length;
+    p.identity("b");
+    await expect(
+      p.cloud.originalScheduleManual(command, context),
     ).rejects.toThrow("stale native context");
     expect(p.calls).toHaveLength(calls);
   } finally {

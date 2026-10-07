@@ -700,15 +700,22 @@ export class CloudWorkspace {
   // @lat: [[cloud-workspace#Original manual main consumer transport (draft)]]
   async originalScheduleManual(
     command: OriginalManualCommand,
+    context?: Parameters<CloudWorkspace["assertNativeContext"]>[0],
   ): Promise<OriginalManualResult> {
     if (
       !validOriginalManualCommand(command) ||
-      command.profile !== this.deps.profile()
+      (!context && command.profile !== this.deps.profile())
     )
       throw Error("Invalid original manual execution command");
+    if (context) this.assertNativeContext(context);
     const input = structuredClone(command);
     const session = await this.session();
-    if (session.profile !== input.profile)
+    if (context) this.assertNativeContext(context);
+    if (
+      context
+        ? session.userId !== context.userId
+        : session.profile !== input.profile
+    )
       throw Error("Workspace account changed; schedule request discarded");
     if (
       !["workspace:write", "chat:write", "inference"].every((scope) =>
@@ -724,6 +731,7 @@ export class CloudWorkspace {
       15000,
       ORIGINAL_MANUAL_BYTES,
     );
+    if (context) this.assertNativeContext(context);
     if (!validOriginalManualResult(value, session.userId, input))
       throw Error("Schedule execution receipt unconfirmed");
     return value;

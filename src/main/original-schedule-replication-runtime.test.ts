@@ -82,15 +82,17 @@ vi.mock("./cronjobs", () => ({
 }));
 vi.mock("./original-schedule-replication", () => ({
   OriginalScheduleReplication: class {
+    private profile: string;
     constructor(ports: OriginalScheduleReplicationPorts) {
+      this.profile = ports.scope.profile;
       f.ports.push(ports);
     }
     manualConsumer(ports: (typeof f.manualPorts)[number]): {
-      poll: typeof f.manual;
+      poll: () => Promise<void>;
       stop: typeof f.manualStop;
     } {
       f.manualPorts.push(ports);
-      return { poll: f.manual, stop: f.manualStop };
+      return { poll: () => f.manual(this.profile), stop: f.manualStop };
     }
     sync = f.sync;
     assertScreenScope = f.check;
@@ -343,7 +345,7 @@ it("starts manual consumption independently and leaves original screen operation
 });
 
 // @lat: [[cloud-workspace-tests#All-profile original schedule lifecycle]]
-it("replicates each owned present profile without switching the active profile or creating extra execution consumers", async () => {
+it("replicates each owned present profile without switching the active profile or consuming absent profiles", async () => {
   const research = join(f.root, "research");
   mkdirSync(research);
   f.inventory.mockReturnValue({
@@ -362,7 +364,7 @@ it("replicates each owned present profile without switching the active profile o
     const port = f.ports.find((p) => p.scope.profile === "research")!;
     expect(port.home).toBe(research);
     await port.assertActive();
-    expect(f.manualPorts).toHaveLength(1);
+    await vi.waitFor(() => expect(f.manualPorts).toHaveLength(2));
     rmSync(research, { recursive: true });
     await expect(port.assertActive()).rejects.toThrow();
     expect(f.ports.some((p) => p.scope.profile === "absent")).toBe(false);
@@ -393,5 +395,49 @@ it("continues later profiles after a source failure but aborts on an account cha
     await expect(port.assertActive()).rejects.toThrow("Account changed");
   } finally {
     stop();
+  }
+});
+
+// @lat: [[cloud-workspace-tests#All-profile manual independent polling]]
+it("keeps polling another owned profile while one manual run remains busy", async () => {
+  vi.useFakeTimers();
+  const research = join(f.root, "research");
+  mkdirSync(research);
+  f.inventory.mockReturnValue({
+    sources: [
+      { profile: "default", root: f.root, present: true },
+      { profile: "research", root: research, present: true },
+    ],
+    warnings: [],
+  });
+  let release!: () => void;
+  f.manual.mockImplementation((profile: string) =>
+    profile === "default"
+      ? new Promise<void>((resolve) => {
+          release = resolve;
+        })
+      : Promise.resolve(),
+  );
+  const stop = startOriginalScheduleReplication();
+  try {
+    await vi.advanceTimersByTimeAsync(0);
+    expect(f.manual.mock.calls.map((call) => call[0])).toEqual([
+      "default",
+      "research",
+    ]);
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(
+      f.manual.mock.calls.filter((call) => call[0] === "default"),
+    ).toHaveLength(1);
+    expect(
+      f.manual.mock.calls.filter((call) => call[0] === "research"),
+    ).toHaveLength(2);
+    stop();
+    release();
+    await vi.advanceTimersByTimeAsync(40000);
+    expect(f.manual).toHaveBeenCalledTimes(3);
+  } finally {
+    stop();
+    vi.useRealTimers();
   }
 });

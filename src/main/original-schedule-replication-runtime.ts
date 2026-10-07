@@ -293,59 +293,138 @@ export function startOriginalScheduleReplication(): () => void {
       };
     },
   });
-  // A separate lifecycle keeps long Agent work out of the replication poller.
+  // Each owned profile has its own busy lane: long work in one profile must
+  // not suppress polling in another. Only short replica operations serialize.
+  const children = new Map<
+    string,
+    { key: string; loop: OriginalScheduleReplicationLoop }
+  >();
+  let manualStopped = false;
+  const stopChildren = (): void => {
+    for (const child of children.values()) child.loop.stop();
+    children.clear();
+  };
+  const unsubscribeManual = onCloudWorkspaceAccountChanged(stopChildren);
   const manual = new OriginalScheduleReplicationLoop({
     changed: onCloudWorkspaceAccountChanged,
-    create: async () => {
-      let stopped = false;
-      let engine: OriginalScheduleReplication | null = null;
-      let consumer: OriginalScheduleManualConsumer | null = null;
-      return {
-        stop: () => {
-          stopped = true;
-          consumer?.stop();
-          engine?.stop();
-        },
-        sync: async () => {
-          engine = await serial(createEngine);
-          if (stopped) {
-            engine?.stop();
-            throw Error("Manual schedule lifecycle stopped");
-          }
-          if (!engine)
+    create: async () => ({
+      // Discovery pass completion must not stop the persistent child loops.
+      stop: () => {},
+      sync: () =>
+        serial(async () => {
+          if (manualStopped) throw Error("Manual schedule lifecycle stopped");
+          const context = await authenticatedContext();
+          if (!context) {
+            stopChildren();
             return {
               status: "deferred" as const,
               reason: "schedule-not-connected",
             };
-          const active = engine;
-          consumer = active.manualConsumer({
-            command: (command) =>
-              cloudWorkspace.originalScheduleManual(command),
-            run: (request) =>
-              runOriginalCronSource(request, () =>
-                active.assertScreenScope(request.profile),
-              ),
-            inspect: (request) =>
-              inspectOriginalCronSource(request, () =>
-                active.assertScreenScope(request.profile),
-              ),
-            serialize: serial,
-          });
-          try {
-            await consumer.poll();
-            return { status: "synced" as const };
-          } finally {
-            // Original output/counters are ordinary data on the existing outbox.
-            if (!stopped) await serial(() => active.sync()).catch(() => {});
-            active.stop();
           }
-        },
-      };
-    },
+          const bindings = join(
+            app.getPath("userData"),
+            "repository-source-owners",
+          );
+          const inventory = profileMetadataInventory(
+            HERMES_HOME,
+            bindings,
+            context.userId,
+            (profile) =>
+              bindRepositorySource(bindings, profile, context.userId),
+          );
+          cloudWorkspace.assertNativeContext(context);
+          if (manualStopped) throw Error("Manual schedule lifecycle stopped");
+          const present = new Set(
+            inventory.sources
+              .filter((source) => source.present)
+              .map((source) => source.profile),
+          );
+          for (const [profile, child] of children)
+            if (!present.has(profile)) {
+              child.loop.stop();
+              children.delete(profile);
+            }
+          for (const source of inventory.sources) {
+            if (!source.present) continue;
+            const key = JSON.stringify([context, source.root]);
+            const existing = children.get(source.profile);
+            if (existing?.key === key) continue;
+            existing?.loop.stop();
+            const child = new OriginalScheduleReplicationLoop({
+              changed: onCloudWorkspaceAccountChanged,
+              create: async () => {
+                let stopped = false;
+                let engine: OriginalScheduleReplication | null = null;
+                let consumer: OriginalScheduleManualConsumer | null = null;
+                return {
+                  stop: () => {
+                    stopped = true;
+                    consumer?.stop();
+                    engine?.stop();
+                  },
+                  sync: async () => {
+                    engine = await serial(() => createEngine(source, context));
+                    if (stopped || manualStopped) {
+                      engine?.stop();
+                      throw Error("Manual schedule lifecycle stopped");
+                    }
+                    if (!engine)
+                      return {
+                        status: "deferred" as const,
+                        reason: "schedule-not-connected",
+                      };
+                    const active = engine;
+                    consumer = active.manualConsumer({
+                      command: async (command) => {
+                        await active.assertScreenScope(command.profile);
+                        const result =
+                          await cloudWorkspace.originalScheduleManual(
+                            command,
+                            context,
+                          );
+                        await active.assertScreenScope(command.profile);
+                        return result;
+                      },
+                      run: (request) =>
+                        runOriginalCronSource(request, () =>
+                          active.assertScreenScope(request.profile),
+                        ),
+                      inspect: (request) =>
+                        inspectOriginalCronSource(request, () =>
+                          active.assertScreenScope(request.profile),
+                        ),
+                      serialize: serial,
+                    });
+                    try {
+                      await consumer.poll();
+                      return { status: "synced" as const };
+                    } finally {
+                      if (!stopped && !manualStopped)
+                        await serial(() => active.sync()).catch(() => {});
+                      active.stop();
+                    }
+                  },
+                };
+              },
+            });
+            children.set(source.profile, { key, loop: child });
+            child.start();
+          }
+          return inventory.warnings.length
+            ? {
+                status: "deferred" as const,
+                reason: "schedule-profiles-unconfirmed",
+              }
+            : { status: "synced" as const };
+        }),
+    }),
   });
   loop.start();
   manual.start();
   return () => {
+    manualStopped = true;
+    unsubscribeManual();
+    stopChildren();
     manual.stop();
     loop.stop();
   };

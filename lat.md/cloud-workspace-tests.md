@@ -907,7 +907,7 @@ Tests change the original Skill file during chunk upload, refuse the stale repos
 
 ## All-profile original schedule lifecycle
 
-Runtime tests verify owned present profiles use their original homes without switching selection, adding manual consumers or recreating absent directories. Removing a captured root invalidates later operations.
+Runtime tests verify owned present profiles use their original homes without switching selection or recreating absent directories. Removing a captured root invalidates later operations.
 
 ## All-profile schedule failure isolation
 
@@ -916,3 +916,11 @@ A failed original source does not suppress later owned profiles. Captured engine
 ## All-profile schedule transport identity
 
 Real HTTP transport tests verify another profile requires an explicit valid captured account context, receipts bind the requested profile, and stale contexts send no custody request.
+
+## All-profile manual independent polling
+
+With one original manual consumer held busy, another owned profile polls again on its interval without duplicating the busy run. Stopping prevents further polling across every profile.
+
+## All-profile manual transport identity
+
+Real HTTP tests require a valid captured active account context for another profile mailbox, reject foreign receipts and send nothing after account identity changes.

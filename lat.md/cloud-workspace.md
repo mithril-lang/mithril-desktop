@@ -622,3 +622,12 @@ The complete schedule capture now carries exact UTF-8 source text, and restorati
 Original parser receipts can carry complete prepared JSON source text, checked against the bound parsed job. The text preserves opaque numeric tokens and stays in the main process.
 
 Older Agent receipts remain readable but do not supply the raw source required by the full-file create adapter. This does not mount the shared Schedules screen, upgrade the Agent pin, authorize private upload or establish execution ownership. Tests reject malformed or mismatched source with static errors.
+
+
+## Original schedule source resources
+
+The shared package 0.6.18 provides a main-only owner-scoped schedule resource transport through the fixed Mithril API.
+
+Its private R2 namespace is separate from Capability registration, and D1 stores verified complete-file pointers. Original Schedules components are unchanged.
+
+[[src/main/cloud-workspace.ts#CloudWorkspace]] retains Workspace read/write scope, owner and account-generation checks for these binary requests. No raw source IPC or automatic upload is introduced. Continuous source restoration still requires private resource binding, exact Native receipts and one execution authority; original screen separation removal remains pending.

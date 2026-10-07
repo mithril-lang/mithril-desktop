@@ -427,3 +427,10 @@ Automatic scoped reads never start authorization. An explicit reconnect after mi
 ## Transient reconnect never requests authorization
 
 A network failure retries the original transport and never opens an account prompt. No data mutation or permission grant occurs merely from reading or retrying the workspace.
+
+
+## Original schedule resource transport
+
+The original source transport uses only schedule-source resource IDs and the fixed Mithril API.
+
+Credentials and owner headers stay in main; wrong-owner responses, account changes and missing write scopes refuse access before storing bytes. It does not register a Capability, grant execution or automatically publish Native data.

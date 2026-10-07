@@ -917,3 +917,101 @@ it("preserves both migration revisions on the fixed native API transport and rej
   ).rejects.toThrow("Invalid repository edit");
   expect(fetcher.mock.calls).toHaveLength(count);
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Original schedule resource transport]]
+it("keeps original schedule source resources in the main-process owner-bound API transport", async () => {
+  const { digestBytes } = await import("@mithril/workspace/files");
+  const { originalScheduleResourceId } =
+    await import("@mithril/workspace/original-schedule-resources");
+  const bytes = new Uint8Array(new TextEncoder().encode("[]\r\n")),
+    digest = await digestBytes(bytes);
+  const id = await originalScheduleResourceId("default");
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  let release: ((response: Response) => void) | undefined;
+  let delayed = false;
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: token === tokenB ? "b" : "a" },
+        scopes: ["workspace:read", "workspace:write"],
+      });
+    calls.push({ url, init });
+    if (delayed)
+      return new Promise<Response>((resolve) => {
+        release = resolve;
+      });
+    if (init?.method === "HEAD")
+      return new Response(null, {
+        headers: {
+          "content-length": String(bytes.length),
+          "x-mithril-resource-digest": digest,
+        },
+      });
+    return init?.method === "POST"
+      ? Response.json({ digest, size: bytes.length })
+      : new Response(bytes.slice());
+  });
+  await client.enable();
+  const resources = client.scheduleResources.forOwner("a");
+  expect(await resources.putChunk(id, bytes)).toBe(digest);
+  expect(await resources.hasChunk!(id, digest, bytes.length)).toBe(true);
+  expect(await resources.getChunk(id, digest)).toEqual(bytes);
+  expect(calls[0].url).toBe(
+    `https://api.mithril.fund/v1/workspace/resources/schedule/${id}/chunks`,
+  );
+  expect(new Headers(calls[0].init?.headers).get("authorization")).toBe(
+    `Bearer ${tokenA}`,
+  );
+  expect(
+    new Headers(calls[0].init?.headers).get("x-mithril-workspace-owner"),
+  ).toBe("a");
+  expect(calls[0].init).toMatchObject({
+    credentials: "omit",
+    redirect: "error",
+  });
+  await expect(
+    client.scheduleResources.forOwner("b").getChunk(id, digest),
+  ).rejects.toThrow("owner changed");
+  await expect(
+    resources.getChunk("capability-default", digest),
+  ).rejects.toThrow("route");
+  await expect(
+    client.authorizedBinaryRequest(
+      "/v1/workspace/resources/schedule/other/chunks",
+    ),
+  ).rejects.toThrow("schedule resource route");
+  expect(calls).toHaveLength(3);
+  delayed = true;
+  const pending = resources.getChunk(id, digest);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  client.reset();
+  token = tokenB;
+  release!(new Response(bytes.slice()));
+  await expect(pending).rejects.toThrow("Account changed");
+});
+it("does not upgrade inference or read-only credentials to write original schedule resources", async () => {
+  const { originalScheduleResourceId } =
+    await import("@mithril/workspace/original-schedule-resources");
+  await client.enable();
+  fetcher.mockImplementation(async (url: string) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: "a" },
+        scopes: ["workspace:read"],
+      });
+    throw Error("Storage must not be requested");
+  });
+  await expect(
+    client.scheduleResources
+      .forOwner("a")
+      .putChunk(
+        await originalScheduleResourceId("default"),
+        new Uint8Array([1]),
+      ),
+  ).rejects.toThrow("write scope");
+  expect(fetcher.mock.calls.every((call) => call[0].endsWith("/v1/me"))).toBe(
+    true,
+  );
+});

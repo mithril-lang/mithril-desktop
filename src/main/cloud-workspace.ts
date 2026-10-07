@@ -1,3 +1,4 @@
+import { createOriginalScheduleResourceTransport } from "@mithril/workspace/original-schedule-resources";
 import {
   createTaskAttachmentTransport,
   type TaskAttachmentTransport,
@@ -98,9 +99,13 @@ export class CloudWorkspace {
   readonly taskAttachments: TaskAttachmentTransport;
   readonly files: ProjectFileTransport;
   readonly capabilityResources: CapabilityResourceTransport;
+  readonly scheduleResources: CapabilityResourceTransport;
   constructor(private deps: Dependencies) {
     this.taskAttachments = createTaskAttachmentTransport((path, init) =>
       this.authorizedBinaryRequest(path, init),
+    );
+    this.scheduleResources = createOriginalScheduleResourceTransport(
+      (path, init) => this.authorizedBinaryRequest(path, init),
     );
     this.capabilityResources = createCapabilityResourceTransport((path, init) =>
       this.authorizedBinaryRequest(path, init),
@@ -115,13 +120,13 @@ export class CloudWorkspace {
     init?: RequestInit,
   ): Promise<Response> {
     if (
-      !/^\/v1\/(?:workspace\/files(?:\/|$)|workspace\/resources\/(?:capability|task)\/[a-zA-Z0-9_-]{1,128}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
+      !/^\/v1\/(?:workspace\/files(?:\/|$)|workspace\/resources\/(?:capability|task|schedule)\/[a-zA-Z0-9_-]{1,128}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
         path,
       ) ||
       (!["GET", "POST"].includes(init?.method ?? "GET") &&
         !(
           init?.method === "HEAD" &&
-          /^\/v1\/workspace\/resources\/(?:capability|task)\/[a-zA-Z0-9_-]{1,128}\/chunks\/[a-f0-9]{64}$/.test(
+          /^\/v1\/workspace\/resources\/(?:capability|task|schedule)\/[a-zA-Z0-9_-]{1,128}\/chunks\/[a-f0-9]{64}$/.test(
             path,
           )
         ))
@@ -134,6 +139,13 @@ export class CloudWorkspace {
       )
     )
       throw Error("Unsupported task attachment route");
+    if (
+      /^\/v1\/workspace\/resources\/schedule\//.test(path) &&
+      !/^\/v1\/workspace\/resources\/schedule\/schedule-source-[a-f0-9]{64}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$/.test(
+        path,
+      )
+    )
+      throw Error("Unsupported schedule resource route");
     const session = await this.session(),
       generation = this.generation;
     if (

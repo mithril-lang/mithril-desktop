@@ -117,7 +117,7 @@ export class OriginalScheduleManualConsumer {
         !("fresh" in value)
       )
         throw Error("Manual take receipt unconfirmed");
-      if (!value.fresh || !value.request || !value.authorityRevision) return;
+      if (!value.request || !value.authorityRevision) return;
       const binding = await p.bind(value.request, value.authorityRevision);
       await this.check();
       if (
@@ -132,6 +132,19 @@ export class OriginalScheduleManualConsumer {
         )
       )
         throw Error("Manual source binding unconfirmed");
+      if (!value.fresh) {
+        // A recovered server request is inspection only. Retain uncertainty
+        // before reading the original Agent result; never invoke run from here.
+        const entry = await this.locked(async () => {
+          p.store.reserveManual(binding);
+          p.store.beginManual(binding);
+          return p.store
+            .manualRequests(p.scope)
+            .find((item) => item.binding.operationId === binding.operationId)!;
+        });
+        await this.report(await this.recover(entry));
+        return;
+      }
       const fresh = await this.locked(async () => {
         p.store.reserveManual(binding);
         return p.store.beginManual(binding);

@@ -200,7 +200,40 @@ it("does not rerun unknown outcomes or dispatch after a lost take", async () => 
   other.fresh(false);
   await other.consumer().poll();
   expect(other.run).not.toHaveBeenCalled();
-  expect(await other.read()).toEqual([]);
+  expect(await other.read()).toEqual([
+    { binding, status: "unknown", reported: true },
+  ]);
+});
+
+// @lat: [[cloud-workspace-tests#Original manual server uncertainty discovery]]
+it("recovers a server-unknown request without a native journal only through exact Agent inspection", async () => {
+  for (const status of [
+    "completed",
+    "rejected",
+    "unknown",
+    "absent",
+  ] as const) {
+    const f = fixture();
+    f.fresh(false);
+    f.inspect.mockResolvedValue({
+      success: true,
+      receipt: { ...originalManualNativeRequest(binding), status },
+    });
+    await f.consumer().poll();
+    expect(f.run).not.toHaveBeenCalled();
+    expect(f.inspect).toHaveBeenCalledTimes(1);
+    const retained = status === "absent" ? "unknown" : status;
+    expect(await f.read()).toEqual([
+      { binding, status: retained, reported: true },
+    ]);
+    expect(f.command).toHaveBeenLastCalledWith({
+      action: "complete",
+      ...originalManualWireRequest(binding),
+      status: retained,
+    });
+    await f.consumer().poll();
+    expect(f.run).not.toHaveBeenCalled();
+  }
 });
 
 // @lat: [[cloud-workspace-tests#Original manual consumer identity admission]]
@@ -229,7 +262,9 @@ it("refuses mismatched source/custody bindings and foreign or replayed take rece
   f.fresh(false);
   await f.consumer().poll();
   expect(f.run).not.toHaveBeenCalled();
-  expect(await f.read()).toEqual([]);
+  expect(await f.read()).toEqual([
+    { binding, status: "unknown", reported: true },
+  ]);
 });
 
 // @lat: [[cloud-workspace-tests#Original manual consumer account change fence]]

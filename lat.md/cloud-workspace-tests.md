@@ -730,6 +730,10 @@ A long Agent peer releases the replica lock so another store can synchronize. Si
 
 Unknown child outcomes and lost take acknowledgements never rerun. Even a faulty peer repeating a fresh take cannot bypass the committed dispatch fence.
 
+## Original manual server uncertainty discovery
+
+A server-unknown request without a native journal is inspection only: exact completed/rejected Agent receipts synchronize, while absent/unknown outcomes remain uncertain and never dispatch.
+
 ## Original manual consumer identity admission
 
 Fresh take receipts must match account, profile, timezone, source and custody bindings. Foreign, mismatched and replayed responses cannot reach the Agent port.

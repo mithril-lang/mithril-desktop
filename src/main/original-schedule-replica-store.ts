@@ -430,7 +430,7 @@ export class NativeOriginalScheduleReplicaStore
       createHash("sha256").update(payload).digest("hex"),
     );
   }
-  /** Fresh API take and confirmed Native binding must precede reservation. This method grants no authority. */
+  /** Validated API take/recovery and confirmed Native binding precede reservation. This grants no dispatch authority. */
   reserveManual(binding: OriginalManualBinding): OriginalManualJournalEntry {
     if (!validOriginalManualBinding(binding))
       throw Error("Invalid manual binding");

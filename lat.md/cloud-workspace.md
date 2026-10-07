@@ -1151,3 +1151,13 @@ Web uses the original shared card/meta layout, reports the loaded document build
 The consumer continues to use [[src/renderer/src/components/settings/AboutPane.tsx#AboutPane]] and its original SettingsDataContext. This change does not authorize native diagnostics or updates in browsers. Connection/Data browser adapters and authenticated upgrade/cross-device QA remain required.
 
 Consumer verification: all 461 archive files match producer and installed bytes; explicit exports and lock integrity are checked. SHA256 `6cddfb8e1f54dd6b42a7a03f79f0c687167c0a731bae9a870439af1fe851a53e`. Native TypeScript checks, build and 64 Settings/route regressions passed. Source/CI, publication and installed-client behavior remain separate.
+
+## Automatic saved metadata reconnect
+
+The shared Workspace renderer automatically resumes saved metadata edits with their original receipt IDs after checked-owner connection, retaining conflicts for explicit review.
+
+The data-only synchronization lifecycle survives a cached inactive workspace, while account change/unmount retires it. Unsaved drafts, inference and tool actions remain outside the outbox. Background synchronization errors clear after recovery without clearing unrelated form errors; a pending/conflicted/offline state no longer reports Cloud synced. Original owned D1 receipts keep accepted replay idempotent. Shared tests include an actual WorkspaceApp/IndexedDB reconnect and inactive-screen recovery. Canonical API/local D1 qualification drops an accepted HTTP response and verifies one retained history row/revision after restart/replay, with another account isolated. Workspace Vitest source suites and Node packaging tests now run in their respective runners. This is not full cloud/installer qualification.
+
+Saved metadata carries the renderer's checked owner through trusted preload IPC to [[src/main/cloud-workspace.ts#CloudWorkspace#applyOperations]]. The current installation owner must match before POST. The fixed owner header lets the canonical API reject a cookie-owner change before D1 admission. Missing caller/header values remain compatible with older consumers; API-first rollout is required. The new Native regression verifies refusal without POST and the exact owner header.
+
+Consumer verification: workspace schedules.32 has 461 files and all explicit exports. Producer/archive/installed bytes and lock SHA512 match; archive SHA256 `e8de76d5ff7463796d39b9fb1905afcb0b5a98a322e5ffa4bbb9b4ebb1d8449f`. Native 32 targeted cloud transport/Settings regressions, types, build and lint pass. Shared 360, API/local D1 13 and Web 17 targeted tests pass separately. No production or installed-client qualification is claimed.

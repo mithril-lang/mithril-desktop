@@ -1135,3 +1135,9 @@ A missing original home still admits selected-profile remote cache reconstructio
 ## All-profile real archival engine replay
 
 The real history engine, scoped canonical HTTP adapter and durable on-disk journals archive all owned source fixtures. A lost acknowledgement recovers through its receipt without duplicate sessions, history events or execution.
+
+## Saved metadata owner fencing
+
+Saved metadata from the renderer must match the current installation owner before a native POST is admitted.
+
+The regression in src/main/cloud-workspace.test.ts verifies a foreign expected owner causes no POST, while a matching owner sends x-mithril-workspace-owner to the canonical API. The shared SyncClient supplies the checked owner through preload and trusted IPC into [[src/main/cloud-workspace.ts#CloudWorkspace#applyOperations]]. API/local D1 tests independently check cookie-owner switching returns 409 before any operation row is written. Source tests do not establish installed or production qualification.

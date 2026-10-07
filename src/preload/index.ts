@@ -481,8 +481,12 @@ const hermesAPI = {
     applySidebar: (operation) =>
       ipcRenderer.invoke("cloud-workspace-sidebar-operation", operation),
     getSnapshot: () => ipcRenderer.invoke("cloud-workspace-snapshot"),
-    applyOperations: (operations) =>
-      ipcRenderer.invoke("cloud-workspace-operations", operations),
+    applyOperations: (operations, expectedOwner?: string) =>
+      ipcRenderer.invoke(
+        "cloud-workspace-operations",
+        operations,
+        expectedOwner,
+      ),
     history: (id: string, offset?: number) =>
       ipcRenderer.invoke("cloud-workspace-history", id, offset),
   } satisfies CloudWorkspaceAPI,

@@ -1539,10 +1539,13 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudWorkspace.getSnapshot();
   });
-  ipcMain.handle("cloud-workspace-operations", (event, operations) => {
-    trustedWorkspaceSender(event);
-    return cloudWorkspace.applyOperations(operations);
-  });
+  ipcMain.handle(
+    "cloud-workspace-operations",
+    (event, operations, expectedOwner) => {
+      trustedWorkspaceSender(event);
+      return cloudWorkspace.applyOperations(operations, expectedOwner);
+    },
+  );
   ipcMain.handle("cloud-workspace-history", (event, id, offset) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.history(id, offset);

@@ -306,6 +306,24 @@ describe("Desktop cloud workspace boundary", () => {
     expect(await client.getSnapshot()).toMatchObject({ userId: "a" });
   });
 
+  // @lat: [[cloud-workspace-tests#Cloud workspace tests#Saved metadata owner fencing]]
+  it("binds saved metadata to the renderer owner and refuses changed-owner replay before POST", async () => {
+    await client.enable();
+    fetcher.mockClear();
+    await expect(
+      client.applyOperations([operation], "other-owner"),
+    ).rejects.toThrow("owner changed");
+    expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST")).toBe(
+      false,
+    );
+    fetcher.mockClear();
+    await client.applyOperations([operation], "a");
+    const post = fetcher.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(post?.[1].headers).toMatchObject({
+      "x-mithril-workspace-owner": "a",
+    });
+  });
+
   // @lat: [[cloud-workspace-tests#Cloud workspace tests#Narrow data and fixed transport]]
   it("rejects config and secrets before network, sends only the explicit operation to a fixed API", async () => {
     await client.enable();

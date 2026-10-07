@@ -357,6 +357,7 @@ export class CloudWorkspace {
     body?: unknown,
     timeoutMs = 15000,
     responseLimit?: number,
+    expectedOwner?: string,
   ): Promise<unknown> {
     const generation = this.generation;
     if (token !== this.deps.token() || profile !== this.deps.profile()) {
@@ -370,6 +371,9 @@ export class CloudWorkspace {
         headers: {
           authorization: `Bearer ${token}`,
           accept: "application/json",
+          ...(expectedOwner === undefined
+            ? {}
+            : { "x-mithril-workspace-owner": expectedOwner }),
           ...(body === undefined ? {} : { "content-type": "application/json" }),
         },
         credentials: "omit",
@@ -829,6 +833,7 @@ export class CloudWorkspace {
 
   async applyOperations(
     operations: WorkspaceOperation[],
+    expectedOwner?: string,
   ): Promise<WorkspaceOperationsResponse> {
     if (
       !Array.isArray(operations) ||
@@ -840,6 +845,8 @@ export class CloudWorkspace {
       throw new Error("Unsupported workspace operations");
     const session = await this.session();
     const generation = this.generation;
+    if (expectedOwner !== undefined && expectedOwner !== session.userId)
+      throw new Error("Workspace owner changed; saved changes were not sent");
     if (!session.scopes.includes(this.deps.writeScope ?? "workspace:write"))
       throw new Error(
         "Editing requires explicit workspace:write authorization",
@@ -849,6 +856,9 @@ export class CloudWorkspace {
       session.token,
       session.profile,
       { schemaVersion: 1, operations },
+      15000,
+      undefined,
+      session.userId,
     )) as WorkspaceOperationsResponse;
     this.checkOwner(response, session.userId, generation);
     if (

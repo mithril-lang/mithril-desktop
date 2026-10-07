@@ -965,3 +965,9 @@ Original metadata replication inventories every valid native profile directory a
 [[src/main/profile-metadata-inventory.ts#profileMetadataInventory]] includes fresh empty directories and absent owned identities for deletion reconciliation. Different-owner sources are refused by the original source binding before bytes are captured. Symlinks, invalid names and forged binding identities are not adopted. The existing rich replica now claims each successfully captured metadata ID independently. Missing native profile directories defer nondeleted metadata download, including directory deletion during a resource await. This extends original metadata to all existing profiles; all-profile remaining file categories and creation of new cloud-only native profiles are not yet qualified.
 
 All-profile metadata inventory reauthenticates workspace:write once at the operation boundary. Each resource I/O stage then uses the original captured-context main-process guard and source-owner binding; enumerating profiles does not add a /v1/me request for each identity guard. Resource transports retain their own authorization checks.
+
+## Canonical original profile identity pane (draft)
+
+The original Desktop profile identity pane, avatar, palette, image resizer and CSS now have one shared workspace implementation for native and browser adapters.
+
+[[src/renderer/src/components/profile/ProfileModal.tsx#ProfileModal]] renders workspace DesktopProfileIdentity using original IPC, translation, chips and refresh callbacks. [[src/renderer/src/components/common/ProfileAvatar.tsx#ProfileAvatar]] supplies only the original logo to the shared avatar. Original Escape/blur cancellation and failed-save draft retention remain tested. Other modal panes remain original native components until their adapters are qualified. Browser metadata writes, live Web rendering and installer publication remain pending.

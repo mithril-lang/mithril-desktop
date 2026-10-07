@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Brain,
   Database,
@@ -15,7 +15,7 @@ import {
   X,
 } from "../../assets/icons";
 import ProfileAvatar from "../common/ProfileAvatar";
-import { PROFILE_COLORS } from "../../../../shared/profileColors";
+import { DesktopProfileIdentity } from "@mithril/workspace/desktop-profile";
 import { fileToAvatarDataUrl } from "../../utils/imageResize";
 import { useI18n } from "../useI18n";
 import Soul from "../../screens/Soul/Soul";
@@ -111,13 +111,6 @@ export default function ProfileModal({
   const [memoryError, setMemoryError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [nameDraft, setNameDraft] = useState("");
-  const [nameEditing, setNameEditing] = useState(false);
-  const [nameSaving, setNameSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-  const skipNextNameBlurSaveRef = useRef(false);
-  const profileName = profile?.name;
 
   const load = useCallback(async (): Promise<void> => {
     try {
@@ -131,17 +124,6 @@ export default function ProfileModal({
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    if (!profileName) return;
-    setNameDraft(profileName);
-  }, [profileName]);
-
-  useEffect(() => {
-    if (!nameEditing) return;
-    nameInputRef.current?.focus();
-    nameInputRef.current?.select();
-  }, [nameEditing]);
 
   const loadMemoryData = useCallback(async (): Promise<void> => {
     if (!profile) return;
@@ -172,83 +154,6 @@ export default function ProfileModal({
     await load();
     onChanged?.();
   }, [load, onChanged]);
-
-  async function handlePickColor(color: string): Promise<void> {
-    setProfile((cur) => (cur ? { ...cur, color } : cur));
-    const result = await window.hermesAPI.setProfileColor(id, color);
-    if (!result.success) setError(result.error || t("agents.appearanceFailed"));
-    await afterMutation();
-  }
-
-  async function handleAvatarFile(
-    e: React.ChangeEvent<HTMLInputElement>,
-  ): Promise<void> {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the same file
-    if (!file) return;
-    try {
-      const dataUrl = await fileToAvatarDataUrl(file);
-      const result = await window.hermesAPI.setProfileAvatar(id, dataUrl);
-      if (!result.success)
-        setError(result.error || t("agents.uploadImageFailed"));
-    } catch {
-      setError(t("agents.uploadImageFailed"));
-    }
-    await afterMutation();
-  }
-
-  async function handleRemoveAvatar(): Promise<void> {
-    const result = await window.hermesAPI.removeProfileAvatar(id);
-    if (!result.success) setError(result.error || t("agents.appearanceFailed"));
-    await afterMutation();
-  }
-
-  async function handleSaveName(): Promise<void> {
-    if (!profile || nameSaving) return;
-    const currentName = profile.name;
-    if (skipNextNameBlurSaveRef.current) {
-      skipNextNameBlurSaveRef.current = false;
-      setNameDraft(currentName);
-      return;
-    }
-    if (nameDraft.trim() === currentName) {
-      setNameDraft(currentName);
-      setNameEditing(false);
-      return;
-    }
-    setNameSaving(true);
-    setError("");
-    try {
-      const result = await window.hermesAPI.setProfileName(
-        profile.id,
-        nameDraft,
-      );
-      if (!result.success) {
-        setError(result.error || t("common.updateFailed"));
-        setNameEditing(true);
-        return;
-      }
-      setNameEditing(false);
-      await afterMutation();
-    } catch {
-      setError(t("common.updateFailed"));
-      setNameEditing(true);
-    } finally {
-      setNameSaving(false);
-    }
-  }
-
-  function handleCancelNameEdit(): void {
-    if (!profile) return;
-    skipNextNameBlurSaveRef.current = true;
-    setNameDraft(profile.name);
-    setNameEditing(false);
-  }
-
-  function handleStartNameEdit(): void {
-    skipNextNameBlurSaveRef.current = false;
-    setNameEditing(true);
-  }
 
   async function handleDelete(): Promise<void> {
     if (deleting) return;
@@ -375,130 +280,34 @@ export default function ProfileModal({
         {profile ? (
           <div className="profile-modal-content">
             {section === "profile" && (
-              <div className="profile-modal-pane">
-                <div className="profile-modal-identity">
-                  <div className="profile-modal-avatar-wrap">
-                    <ProfileAvatar
-                      name={profile.id}
-                      color={profile.color}
-                      avatar={profile.avatar}
-                      size={96}
-                    />
-                    {profile.gatewayRunning && (
-                      <span className="profile-modal-avatar-dot" />
-                    )}
-                  </div>
-                  <div className="profile-modal-identity-meta">
-                    <div className="profile-modal-name-row">
-                      {nameEditing ? (
-                        <input
-                          ref={nameInputRef}
-                          className="profile-modal-name-input"
-                          value={nameDraft}
-                          maxLength={80}
-                          placeholder={profile.name}
-                          aria-label={t("agents.nameLabel")}
-                          disabled={nameSaving}
-                          onChange={(e) => {
-                            setNameDraft(e.target.value);
-                            setError("");
-                          }}
-                          onBlur={() => {
-                            void handleSaveName();
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              e.currentTarget.blur();
-                            }
-                            if (e.key === "Escape") {
-                              e.preventDefault();
-                              handleCancelNameEdit();
-                            }
-                          }}
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          className="profile-modal-name-edit"
-                          onClick={handleStartNameEdit}
-                          aria-label={t("agents.nameLabel")}
-                          title={t("agents.nameLabel")}
-                        >
-                          <span className="profile-modal-name">
-                            {agentName}
-                          </span>
-                          <Pencil size={14} aria-hidden="true" />
-                        </button>
-                      )}
-                      {profile.id !== profile.name && (
-                        <span className="profile-modal-tag">{profile.id}</span>
-                      )}
-                      {nameSaving && (
-                        <span className="profile-modal-tag">
-                          {t("setup.saving")}
-                        </span>
-                      )}
-                    </div>
-                    <div className="profile-modal-image-actions">
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        {t("agents.uploadImage")}
-                      </button>
-                      {profile.avatar && (
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={handleRemoveAvatar}
-                        >
-                          {t("agents.removeImage")}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="profile-modal-stats">
-                  {profileChips.map(({ key, value, Icon, state }) => (
-                    <span
-                      className={`profile-modal-stat-value ${
-                        state ? `is-${state}` : ""
-                      }`}
-                      key={key}
-                    >
-                      <Icon size={14} className="profile-modal-stat-icon" />
-                      {value}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="profile-modal-section">
-                  <span className="profile-modal-label">
-                    {t("agents.color")}
-                  </span>
-                  <div className="profile-modal-swatches">
-                    {PROFILE_COLORS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        className={`profile-modal-swatch ${
-                          (profile.color || "").toLowerCase() ===
-                          c.toLowerCase()
-                            ? "active"
-                            : ""
+              <DesktopProfileIdentity
+                key={profile.id}
+                profile={profile}
+                api={window.hermesAPI}
+                t={t}
+                Avatar={ProfileAvatar}
+                Pencil={Pencil}
+                fileToAvatarDataUrl={fileToAvatarDataUrl}
+                onChanged={afterMutation}
+                onColorDraft={(color) =>
+                  setProfile((cur) => (cur ? { ...cur, color } : cur))
+                }
+                stats={
+                  <div className="profile-modal-stats">
+                    {profileChips.map(({ key, value, Icon, state }) => (
+                      <span
+                        className={`profile-modal-stat-value ${
+                          state ? `is-${state}` : ""
                         }`}
-                        style={{ background: c }}
-                        title={c}
-                        aria-label={c}
-                        onClick={() => handlePickColor(c)}
-                      />
+                        key={key}
+                      >
+                        <Icon size={14} className="profile-modal-stat-icon" />
+                        {value}
+                      </span>
                     ))}
                   </div>
-                </div>
-
-                {error && <div className="agents-create-error">{error}</div>}
-              </div>
+                }
+              />
             )}
 
             {section === "persona" && (
@@ -598,14 +407,6 @@ export default function ProfileModal({
           </button>
         </div>
       </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        style={{ display: "none" }}
-        onChange={handleAvatarFile}
-      />
     </AppModal>
   );
 }

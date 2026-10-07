@@ -677,3 +677,11 @@ Original script and monitor-script tokens now map to one immutable profile-scrip
 [[src/main/original-schedule-script-resources.ts#OriginalScheduleScriptResources]] resolves authored paths under the selected profile's scripts directory, captures actual permitted bytes, and emits canonical portable references containing only profile, manifest digest and relative path. Excluded/missing scripts cannot become valid references. Raw token patches preserve BOM, CRLF, unrelated fields and opaque numeric tokens.
 
 Restoration accepts only canonical references from the same scope and snapshot. The directory transaction verifies every referenced file before writing; its retained baseline, durable operation and existing receipts preserve concurrent local edits and retries. Original script fields return to the Agent's existing scripts-relative path convention. Workdir/private-runtime bindings, execution authority and lifecycle mounting still need to compose this stage before complete schedule synchronization can ship.
+
+## Original schedule workdir resources (draft)
+
+Original workdir fields now bind to verified directory snapshots while retaining machine paths privately and preserving original job source tokens.
+
+[[src/main/original-schedule-workdir-resources.ts#OriginalScheduleWorkdirResources]] captures authored absolute or home-relative working directories through the existing permitted-file resource transport. References bind profile, stable job ID and immutable manifest, without publishing the source device path. Restore resolves an operation-bound private target and baseline through its caller, then uses transactional directory CAS. Durable receipts preserve newer local edits on retry. Account guards surround storage and native restoration. Script semantics and unrelated raw source bytes remain unchanged.
+
+This stage adds no UI split or migration panel. It remains draft: private target lifecycle persistence, runtime/authority binding, complete coordinator mounting and actual cloud/installer qualification must compose these resources before automatic schedule synchronization is complete.

@@ -1,3 +1,4 @@
+import { OriginalScheduleWorkdirResources } from "./original-schedule-workdir-resources";
 import { OriginalScheduleScriptResources } from "./original-schedule-script-resources";
 import { captureOriginalCronFile } from "./cron-source-files";
 import { patchOriginalScheduleBindingsText } from "@mithril/workspace/original-schedule-text";
@@ -414,4 +415,140 @@ it("rejects escaped paths, raw remote paths, foreign directory scope and incompl
       baseline.pointer.manifest,
     ),
   ).rejects.toThrow("required file");
+});
+
+function workdirFile(
+  home: string,
+  workdir: string,
+): NonNullable<ReturnType<typeof captureOriginalCronFile>> {
+  const root = join(home, "workdir-source");
+  mkdirSync(join(root, "cron"), { recursive: true });
+  const raw =
+    '\uFEFF{\r\n"opaque":9007199254740993,"jobs":[{"id":"one","name":"one","prompt":"日本語","enabled":false,"state":"paused","schedule":{"kind":"cron","expr":"17 9 * * 1-5"},"workdir":' +
+    JSON.stringify(workdir) +
+    ',"script":"run.py"}]}\r\n';
+  writeFileSync(join(root, "cron", "jobs.json"), raw);
+  return captureOriginalCronFile(root, "default")!;
+}
+
+// @lat: [[cloud-workspace-tests#Original schedule workdir roundtrip]]
+it("roundtrips workdir bytes and native path tokens without altering original metadata or executing jobs", async () => {
+  const f = setup(),
+    binder = new OriginalScheduleWorkdirResources(f.scope, f.service, f.guard);
+  writeFileSync(join(f.local, "data.bin"), Buffer.from([1, 2]));
+  const baseline = await f.service.capture(f.local);
+  writeFileSync(join(f.remote, "data.bin"), Buffer.from([255, 0, 13, 10]));
+  writeFileSync(join(f.remote, ".env"), "PRIVATE_WORKDIR_SECRET");
+  const source = workdirFile(f.home, f.remote);
+  const portable = patchOriginalScheduleBindingsText(
+    source.sourceText,
+    f.scope.profile,
+    f.scope.timeZone,
+    await binder.capture(source),
+  );
+  expect(portable).not.toContain(f.remote);
+  expect(portable).toContain("9007199254740993");
+  expect(
+    [...f.store.chunks.values()].some((b) =>
+      Buffer.from(b).includes("PRIVATE_WORKDIR_SECRET"),
+    ),
+  ).toBe(false);
+  const write = {
+    ...f.scope,
+    operationId: "workdir_one",
+    sourceText: portable,
+    expectedVersion: null,
+  };
+  const target = async (): Promise<{
+    root: string;
+    expectedManifest: string;
+  }> => ({
+    root: f.local,
+    expectedManifest: baseline.pointer.manifest,
+  });
+  const restored = patchOriginalScheduleBindingsText(
+    portable,
+    f.scope.profile,
+    f.scope.timeZone,
+    await binder.restore(write, target),
+  );
+  expect(restored).toBe(
+    source.sourceText.replace(
+      JSON.stringify(f.remote),
+      JSON.stringify(f.local),
+    ),
+  );
+  expect(readFileSync(join(f.local, "data.bin"))).toEqual(
+    Buffer.from([255, 0, 13, 10]),
+  );
+  writeFileSync(join(f.local, "data.bin"), "new local edit");
+  await new OriginalScheduleWorkdirResources(
+    f.scope,
+    f.service,
+    f.guard,
+  ).restore(write, target);
+  expect(readFileSync(join(f.local, "data.bin"), "utf8")).toBe(
+    "new local edit",
+  );
+});
+
+// @lat: [[cloud-workspace-tests#Original schedule workdir conflict and scope]]
+it("refuses workdir conflicts, raw cloud paths and cross-job references without overwriting local data", async () => {
+  const f = setup(),
+    binder = new OriginalScheduleWorkdirResources(f.scope, f.service, f.guard);
+  writeFileSync(join(f.local, "data.txt"), "old");
+  const baseline = await f.service.capture(f.local);
+  writeFileSync(join(f.remote, "data.txt"), "remote");
+  const source = workdirFile(f.home, f.remote);
+  const portable = patchOriginalScheduleBindingsText(
+    source.sourceText,
+    f.scope.profile,
+    f.scope.timeZone,
+    await binder.capture(source),
+  );
+  const write = {
+    ...f.scope,
+    operationId: "conflict_one",
+    sourceText: portable,
+    expectedVersion: null,
+  };
+  const target = async (): Promise<{
+    root: string;
+    expectedManifest: string;
+  }> => ({
+    root: f.local,
+    expectedManifest: baseline.pointer.manifest,
+  });
+  writeFileSync(join(f.local, "data.txt"), "concurrent edit");
+  await expect(binder.restore(write, target)).rejects.toThrow("conflict");
+  expect(readFileSync(join(f.local, "data.txt"), "utf8")).toBe(
+    "concurrent edit",
+  );
+  await expect(
+    binder.restore({ ...write, sourceText: source.sourceText }, target),
+  ).rejects.toThrow("binding required");
+  const foreign =
+    "mithril-schedule-workdir:v1:" +
+    Buffer.from(
+      JSON.stringify(["default", "other", baseline.pointer.manifest]),
+    ).toString("base64url");
+  await expect(
+    binder.restore(
+      { ...write, sourceText: workdirFile(f.home, foreign).sourceText },
+      target,
+    ),
+  ).rejects.toThrow("reference");
+  expect(
+    () =>
+      new OriginalScheduleWorkdirResources(
+        { ...f.scope, owner: "bob" },
+        f.service,
+        f.guard,
+      ),
+  ).toThrow("scope");
+  await expect(
+    binder.capture(workdirFile(f.home, "relative/path")),
+  ).rejects.toThrow("absolute");
+  f.stop();
+  await expect(binder.capture(source)).rejects.toThrow("Account changed");
 });

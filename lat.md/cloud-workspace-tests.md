@@ -490,3 +490,11 @@ Real script and monitor files are published, rebound and restored while complete
 ## Original schedule script binding refusal
 
 Escaped paths, excluded or missing scripts, raw remote paths and foreign directory scopes refuse before schedule restoration; portable references must match the verified resource manifest.
+
+## Original schedule workdir roundtrip
+
+Verify actual binary working-directory bytes survive portable source capture and native restoration, raw numeric metadata stays exact, credentials are excluded, and acknowledged retries preserve newer local edits.
+
+## Original schedule workdir conflict and scope
+
+Verify concurrent directory edits, raw cloud paths, foreign job references, relative source paths and stale owners fail without overwriting the local working directory.

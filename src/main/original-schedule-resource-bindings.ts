@@ -21,6 +21,7 @@ export class OriginalScheduleFileResourceBindings implements OriginalScheduleRes
     private readonly workdirTarget: (
       jobId: string,
       manifest: string,
+      identity?: string,
     ) => Promise<OriginalSchedulePrivateDirectoryTarget>,
     private readonly assertActive: () => Promise<void>,
   ) {}
@@ -60,12 +61,12 @@ export class OriginalScheduleFileResourceBindings implements OriginalScheduleRes
     }
     const workdirs = await this.workdirs.restore(
       write,
-      (jobId, resourceManifest) =>
+      (jobId, resourceManifest, identity) =>
         this.store.retainDirectoryTarget(
           write,
           { kind: "workdir", jobId },
           resourceManifest,
-          () => this.workdirTarget(jobId, resourceManifest),
+          () => this.workdirTarget(jobId, resourceManifest, identity),
         ),
     );
     await this.assertActive();

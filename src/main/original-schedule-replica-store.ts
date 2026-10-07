@@ -4,7 +4,7 @@ import {
   type RepositoryState,
 } from "@mithril/workspace/repository-sync";
 import Database from "better-sqlite3";
-import { createHash } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { closeSync, lstatSync, mkdirSync, openSync, type Stats } from "fs";
 import { dirname, isAbsolute, join, resolve } from "path";
 import type { OriginalScheduleBoundTargets } from "./original-schedule-native-port";
@@ -135,10 +135,80 @@ export class NativeOriginalScheduleReplicaStore
       db.exec(
         "CREATE TABLE IF NOT EXISTS schedule_repository_state (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL)",
       );
+      db.exec(
+        "CREATE TABLE IF NOT EXISTS schedule_workdir_identities (root TEXT PRIMARY KEY, identity TEXT NOT NULL UNIQUE)",
+      );
       return db;
     } catch (error) {
       db.close();
       throw error;
+    }
+  }
+  /** Opaque folder identity is independent of bytes and remains private-path bound.
+   * The existing owner/profile lock fences capture and restore across processes. */
+  workdirIdentity(root: string, identity?: string): string {
+    if (
+      !isAbsolute(root) ||
+      root.includes("\0") ||
+      root.length > 32768 ||
+      (identity !== undefined && !/^[a-f0-9]{64}$/.test(identity))
+    )
+      throw Error("Invalid original workdir identity");
+    root = resolve(root);
+    checkPath(root);
+    const db = this.journal();
+    try {
+      const current = db
+        .prepare(
+          "SELECT identity FROM schedule_workdir_identities WHERE root=?",
+        )
+        .get(root) as { identity: string } | undefined;
+      const byIdentity =
+        identity === undefined
+          ? undefined
+          : (db
+              .prepare(
+                "SELECT root FROM schedule_workdir_identities WHERE identity=?",
+              )
+              .get(identity) as { root: string } | undefined);
+      if (
+        (current && !/^[a-f0-9]{64}$/.test(current.identity)) ||
+        (identity !== undefined && current && current.identity !== identity) ||
+        (byIdentity && byIdentity.root !== root)
+      )
+        throw Error("Original workdir identity conflict");
+      if (current) return current.identity;
+      const value = identity ?? randomBytes(32).toString("hex");
+      db.prepare(
+        "INSERT INTO schedule_workdir_identities(root,identity) VALUES(?,?)",
+      ).run(root, value);
+      return value;
+    } finally {
+      db.close();
+    }
+  }
+  workdirRoot(identity: string): string | null {
+    if (!/^[a-f0-9]{64}$/.test(identity))
+      throw Error("Invalid original workdir identity");
+    const db = this.journal();
+    try {
+      const row = db
+        .prepare(
+          "SELECT root FROM schedule_workdir_identities WHERE identity=?",
+        )
+        .get(identity) as { root: string } | undefined;
+      if (!row) return null;
+      if (
+        typeof row.root !== "string" ||
+        !isAbsolute(row.root) ||
+        row.root.includes("\0") ||
+        resolve(row.root) !== row.root
+      )
+        throw Error("Invalid retained original workdir identity");
+      checkPath(row.root);
+      return row.root;
+    } finally {
+      db.close();
     }
   }
   async exclusive<T>(

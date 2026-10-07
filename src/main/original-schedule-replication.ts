@@ -202,6 +202,7 @@ export class OriginalScheduleReplication {
         p.scope,
         directories,
         () => this.check(),
+        (root, identity) => store.workdirIdentity(root, identity),
       );
       const runtime = new OriginalScheduleRuntimeBindings(
         p.scope,
@@ -229,7 +230,7 @@ export class OriginalScheduleReplication {
           managedDirectory(scripts.root);
           return (await directories.capture(scripts.root)).pointer.manifest;
         },
-        async (jobId) => {
+        async (jobId, _manifest, identity) => {
           const captured = p.native.capture(p.scope.profile);
           const rows = captured
             ? Array.isArray(captured.file)
@@ -248,7 +249,9 @@ export class OriginalScheduleReplication {
               ? row.workdir
               : null;
           let root: string;
-          if (typeof authored === "string" && isAbsolute(authored))
+          const retained = identity ? store.workdirRoot(identity) : null;
+          if (retained) root = retained;
+          else if (typeof authored === "string" && isAbsolute(authored))
             root = resolve(authored);
           else if (typeof authored === "string" && authored.startsWith("~/"))
             root = resolve(homedir(), authored.slice(2));
@@ -257,7 +260,11 @@ export class OriginalScheduleReplication {
             authored === undefined ||
             authored === ""
           ) {
-            root = join(p.home, "workspaces", "schedule-" + sha(jobId));
+            root = join(
+              p.home,
+              "workspaces",
+              "schedule-" + (identity ?? sha(jobId)),
+            );
             managedDirectory(root);
           } else throw Error("Original schedule workdir binding unavailable");
           return {

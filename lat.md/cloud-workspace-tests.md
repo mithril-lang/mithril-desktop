@@ -634,3 +634,17 @@ The real coordinator rejects stale profiles, passive or foreign custody and stop
 ## Original Schedules background lane coordination
 
 The lifecycle poll queues behind an in-flight original screen action, avoiding concurrent entry into the same replica journal lock.
+
+## Original workdir identity durability
+
+Opaque working-directory identities remain stable across SQLite journal restart, require the existing cross-process lock, isolate owners and refuse rebinding an identity to another private root.
+
+## Automatic shared workdir device synchronization
+
+The actual coordinator preserves shared folders on a fresh passive device, keeps identical independent folders separate and retains identity across restart.
+
+A receiving-device edit synchronizes back to the original shared root without altering the independent folder; reopening does not republish unchanged source.
+
+## Original workdir alias preflight
+
+One portable folder identity cannot resolve to two private destination roots. The workdir stage rejects that conflict before replacing either folder's actual files.

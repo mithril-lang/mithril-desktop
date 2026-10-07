@@ -709,6 +709,8 @@ Native process claims now become portable references and restore only from the r
 
 Jobs sharing a working directory restore one snapshot once. All private targets are resolved before filesystem writes, and aliases must agree on the source snapshot and native baseline.
 
+Automatic capture now emits v2 workdir references with an opaque random folder identity retained in the owner/profile/timezone SQLite journal under the same process lock. The identity is independent of local path, job ID and content digest. A fresh device uses it for one managed destination across all referencing jobs; subsequent capture retains that identity. Identical independent folders remain separate. Alias-to-path binding refuses mismatched roots rather than merging local data. The decoder retains existing v1 per-job references; upgrading already divergent historical destinations still requires conflict qualification and is not implied by the fresh-device test.
+
 [[src/main/original-schedule-workdir-resources.ts#OriginalScheduleWorkdirResources]] groups normalized absolute targets in original source order. The first job's existing operation receipt owns the shared directory transaction, so restart reuses that receipt instead of recapturing newer local edits. Conflicting manifests or baselines fail before directory writes. This remains draft resource integration; global execution ownership and automatic lifecycle installation are still required.
 
 ## New Chat and automatic synchronization

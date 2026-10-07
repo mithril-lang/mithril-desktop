@@ -17,6 +17,7 @@ import { validOriginalCronScope } from "./cron-source-prepare";
 import { OriginalScheduleDirectoryResources } from "./original-schedule-directory-resources";
 
 const prefix = "mithril-schedule-workdir:v1:";
+const identityPrefix = "mithril-schedule-workdir:v2:";
 const sha = (text: string): string =>
   createHash("sha256").update(text).digest("hex");
 function tokens(
@@ -44,25 +45,31 @@ function tokens(
       }),
   );
 }
-function decode(value: string, profile: string, jobId: string): string {
-  if (!value.startsWith(prefix))
+function decode(
+  value: string,
+  profile: string,
+  jobId: string,
+): { manifest: string; identity?: string } {
+  const v2 = value.startsWith(identityPrefix);
+  if (!v2 && !value.startsWith(prefix))
     throw Error("Original workdir resource binding required");
-  const encoded = value.slice(prefix.length),
+  const encoded = value.slice(v2 ? identityPrefix.length : prefix.length),
     bytes = Buffer.from(encoded, "base64url");
   if (bytes.length > 8192 || bytes.toString("base64url") !== encoded)
     throw Error("Invalid original workdir reference");
   const row = JSON.parse(bytes.toString("utf8"));
   if (
     !Array.isArray(row) ||
-    row.length !== 3 ||
+    row.length !== (v2 ? 4 : 3) ||
     row[0] !== profile ||
     row[1] !== jobId ||
     typeof row[2] !== "string" ||
     !/^[a-f0-9]{64}$/.test(row[2]) ||
+    (v2 && (typeof row[3] !== "string" || !/^[a-f0-9]{64}$/.test(row[3]))) ||
     !Buffer.from(JSON.stringify(row)).equals(bytes)
   )
     throw Error("Invalid original workdir reference");
-  return row[2] as string;
+  return v2 ? { identity: row[2], manifest: row[3] } : { manifest: row[2] };
 }
 
 /** Workdir bytes travel through cloud resources; machine paths stay in the private binding journal. */
@@ -73,6 +80,7 @@ export class OriginalScheduleWorkdirResources {
     scope: OriginalScheduleReplicaScope,
     private readonly directories: OriginalScheduleDirectoryResources,
     private readonly assertActive: () => Promise<void>,
+    private readonly identify?: (root: string, identity?: string) => string,
   ) {
     if (
       !validOriginalCronScope({ ...scope, operationId: "scope" }) ||
@@ -113,13 +121,20 @@ export class OriginalScheduleWorkdirResources {
         captured.set(root, manifest);
       }
       await this.assertActive();
+      const identity = this.identify?.(root);
+      if (identity !== undefined && !/^[a-f0-9]{64}$/.test(identity))
+        throw Error("Invalid original workdir identity");
       patches.push({
         ...token,
         expectedSourceText: token.sourceText,
         replacementSourceText: JSON.stringify(
-          prefix +
+          (identity ? identityPrefix : prefix) +
             Buffer.from(
-              JSON.stringify([this.scope.profile, token.jobId, manifest]),
+              JSON.stringify(
+                identity
+                  ? [this.scope.profile, token.jobId, identity, manifest]
+                  : [this.scope.profile, token.jobId, manifest],
+              ),
             ).toString("base64url"),
         ),
       });
@@ -131,6 +146,7 @@ export class OriginalScheduleWorkdirResources {
     targetForJob: (
       jobId: string,
       manifest: string,
+      identity?: string,
     ) => Promise<{ root: string; expectedManifest: string }>,
   ): Promise<readonly OriginalScheduleBindingPatch[]> {
     await this.assertActive();
@@ -145,13 +161,10 @@ export class OriginalScheduleWorkdirResources {
     // Validate the complete source before restoring any directory.
     const refs = selected.map((token) => ({
       token,
-      manifest: decode(
-        JSON.parse(token.sourceText),
-        this.scope.profile,
-        token.jobId!,
-      ),
+      ...decode(JSON.parse(token.sourceText), this.scope.profile, token.jobId!),
     }));
     const resourceId = await originalScheduleResourceId(this.scope.profile);
+    const identities = new Map<string, { manifest: string; root: string }>();
     // Resolve every durable target before the first filesystem write. Multiple
     // jobs may share one directory, but must agree on both snapshot and baseline.
     const targets = [] as {
@@ -161,13 +174,22 @@ export class OriginalScheduleWorkdirResources {
       expectedManifest: string;
     }[];
     const groups = new Map<string, (typeof targets)[number]>();
-    for (const { token, manifest } of refs) {
+    for (const { token, manifest, identity } of refs) {
       await this.assertActive();
-      const target = await targetForJob(token.jobId!, manifest);
+      const target = await targetForJob(token.jobId!, manifest, identity);
       await this.assertActive();
       if (!target || !isAbsolute(target.root) || target.root.includes("\0"))
         throw Error("Invalid private workdir target");
       const row = { token, manifest, ...target, root: resolve(target.root) };
+      if (identity) {
+        const previous = identities.get(identity);
+        if (
+          previous &&
+          (previous.manifest !== manifest || previous.root !== row.root)
+        )
+          throw Error("Conflicting shared original workdir identity");
+        identities.set(identity, { manifest, root: row.root });
+      }
       const previous = groups.get(row.root);
       if (
         previous &&
@@ -177,6 +199,12 @@ export class OriginalScheduleWorkdirResources {
         throw Error("Conflicting shared original workdir target");
       if (!previous) groups.set(row.root, row);
       targets.push(row);
+    }
+    // Bind only after all aliases/targets agree, before any directory write.
+    for (const [identity, { root }] of identities) {
+      await this.assertActive();
+      if (!this.identify || this.identify(root, identity) !== identity)
+        throw Error("Original workdir identity binding unavailable");
     }
     for (const { token, manifest, root, expectedManifest } of groups.values()) {
       await this.assertActive();

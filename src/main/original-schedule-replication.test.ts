@@ -219,6 +219,74 @@ function device(
   };
   return { home, ports, events, failures };
 }
+// @lat: [[cloud-workspace-tests#Automatic shared workdir device synchronization]]
+it("keeps original shared folder aliases on a fresh device and after restart without merging equal independent snapshots", async () => {
+  const peer = cloud(),
+    a = device(peer, true),
+    b = device(peer, false);
+  const shared = join(a.home, "shared"),
+    separate = join(a.home, "separate");
+  mkdirSync(shared);
+  mkdirSync(separate);
+  mkdirSync(join(a.home, "cron"));
+  writeFileSync(join(shared, "data.bin"), Buffer.from([255, 0, 42]));
+  writeFileSync(join(separate, "data.bin"), Buffer.from([255, 0, 42]));
+  const job = (id: string, workdir: string): Record<string, unknown> => ({
+    id,
+    name: id,
+    prompt: "original",
+    enabled: false,
+    state: "paused",
+    schedule: { kind: "interval", minutes: 30 },
+    workdir,
+    run_claim: null,
+  });
+  writeFileSync(
+    join(a.home, "cron", "jobs.json"),
+    JSON.stringify({
+      jobs: [
+        job("one", shared),
+        job("two", shared),
+        job("independent", separate),
+      ],
+    }),
+  );
+  await expect(
+    new OriginalScheduleReplication(a.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  await expect(
+    new OriginalScheduleReplication(b.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  const read = (): { id: string; workdir: string }[] =>
+    JSON.parse(readFileSync(join(b.home, "cron", "jobs.json"), "utf8"))
+      .jobs as { id: string; workdir: string }[];
+  const rows = read();
+  expect(rows[0].workdir).toBe(rows[1].workdir);
+  expect(rows[2].workdir).not.toBe(rows[0].workdir);
+  for (const row of rows)
+    expect(readFileSync(join(row.workdir, "data.bin"))).toEqual(
+      Buffer.from([255, 0, 42]),
+    );
+  const accepted = peer.operations.length;
+  await expect(
+    new OriginalScheduleReplication(b.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  expect(peer.operations).toHaveLength(accepted);
+  expect(read()).toEqual(rows);
+  writeFileSync(join(rows[0].workdir, "data.bin"), "shared edit on B");
+  await expect(
+    new OriginalScheduleReplication(b.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  await expect(
+    new OriginalScheduleReplication(a.ports).sync(),
+  ).resolves.toEqual({ status: "synced" });
+  expect(readFileSync(join(shared, "data.bin"), "utf8")).toBe(
+    "shared edit on B",
+  );
+  expect(readFileSync(join(separate, "data.bin"))).toEqual(
+    Buffer.from([255, 0, 42]),
+  );
+}, 60000);
 // @lat: [[cloud-workspace-tests#Automatic original schedule device roundtrip]]
 it("composes real source, script and working-directory restoration to a fresh passive device and resumes after reopening", async () => {
   const peer = cloud(),

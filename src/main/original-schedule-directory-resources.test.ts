@@ -799,3 +799,49 @@ it("refuses two different snapshots or baselines for one target before writing a
   ).rejects.toThrow("Conflicting shared");
   expect(readFileSync(join(f.local, "data.txt"), "utf8")).toBe("local");
 });
+
+// @lat: [[cloud-workspace-tests#Original workdir alias preflight]]
+it("rejects one portable folder identity resolving to different roots before restoring either folder", async () => {
+  const f = setup(),
+    identity = "a".repeat(64),
+    other = join(f.home, "other-target");
+  mkdirSync(other);
+  writeFileSync(join(f.local, "data.txt"), "first local");
+  writeFileSync(join(other, "data.txt"), "second local");
+  writeFileSync(join(f.remote, "data.txt"), "remote");
+  const baseline = await f.service.capture(f.local),
+    otherBaseline = await f.service.capture(other);
+  const binder = new OriginalScheduleWorkdirResources(
+    f.scope,
+    f.service,
+    f.guard,
+    () => identity,
+  );
+  const source = sharedWorkdirSource(f.home, f.remote, f.remote);
+  const portable = patchOriginalScheduleBindingsText(
+    source.sourceText,
+    f.scope.profile,
+    f.scope.timeZone,
+    await binder.capture(source),
+  );
+  expect(portable).toContain("mithril-schedule-workdir:v2:");
+  await expect(
+    binder.restore(
+      {
+        ...f.scope,
+        operationId: "alias_preflight",
+        expectedVersion: null,
+        sourceText: portable,
+      },
+      async (jobId) => ({
+        root: jobId === "one" ? f.local : other,
+        expectedManifest:
+          jobId === "one"
+            ? baseline.pointer.manifest
+            : otherBaseline.pointer.manifest,
+      }),
+    ),
+  ).rejects.toThrow("Conflicting shared original workdir identity");
+  expect(readFileSync(join(f.local, "data.txt"), "utf8")).toBe("first local");
+  expect(readFileSync(join(other, "data.txt"), "utf8")).toBe("second local");
+});

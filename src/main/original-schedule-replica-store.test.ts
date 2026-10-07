@@ -44,6 +44,40 @@ afterEach(() => {
     rmSync(path, { recursive: true, force: true });
 });
 
+// @lat: [[cloud-workspace-tests#Original workdir identity durability]]
+it("retains opaque working-directory identities across restart under the profile lock and refuses aliases across roots", async () => {
+  const directory = root(),
+    first = new NativeOriginalScheduleReplicaStore(directory, scope);
+  const a = join(directory, "folder-a"),
+    b = join(directory, "folder-b");
+  mkdirSync(a);
+  mkdirSync(b);
+  expect(() => first.workdirIdentity(a)).toThrow("lock required");
+  let identity = "";
+  await first.exclusive(scope, async () => {
+    identity = first.workdirIdentity(a);
+    expect(identity).toMatch(/^[a-f0-9]{64}$/);
+    expect(first.workdirIdentity(a + "/.")).toBe(identity);
+    expect(first.workdirIdentity(b)).not.toBe(identity);
+    expect(() => first.workdirIdentity(b, identity)).toThrow("conflict");
+    expect(first.workdirRoot(identity)).toBe(a);
+    expect(() => first.workdirRoot("bad")).toThrow();
+  });
+  const restarted = new NativeOriginalScheduleReplicaStore(directory, scope);
+  await restarted.exclusive(scope, async () => {
+    expect(restarted.workdirIdentity(a)).toBe(identity);
+    expect(restarted.workdirRoot(identity)).toBe(a);
+  });
+  const foreign = new NativeOriginalScheduleReplicaStore(directory, {
+    ...scope,
+    owner: "bob",
+  });
+  await foreign.exclusive({ ...scope, owner: "bob" }, async () => {
+    expect(foreign.workdirRoot(identity)).toBeNull();
+    expect(foreign.workdirIdentity(a)).not.toBe(identity);
+  });
+});
+
 // @lat: [[cloud-workspace-tests#Durable original schedule replica journal]]
 it("commits exact pending source before external failure and reopens it with its original identity", async () => {
   const directory = root();

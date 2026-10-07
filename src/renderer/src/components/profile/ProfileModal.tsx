@@ -15,7 +15,10 @@ import {
   X,
 } from "../../assets/icons";
 import ProfileAvatar from "../common/ProfileAvatar";
-import { DesktopProfileIdentity } from "@mithril/workspace/desktop-profile";
+import {
+  DesktopProfileIdentity,
+  DesktopProfileNavigation,
+} from "@mithril/workspace/desktop-profile";
 import { fileToAvatarDataUrl } from "../../utils/imageResize";
 import { useI18n } from "../useI18n";
 import Soul from "../../screens/Soul/Soul";
@@ -229,41 +232,38 @@ export default function ProfileModal({
       overlayClassName="profile-modal-overlay"
       labelledBy="profile-modal-title"
     >
-      <aside className="profile-modal-sidebar">
-        <div className="profile-modal-sidebar-head">
-          {profile && (
+      <DesktopProfileNavigation<ProfileSection>
+        avatar={
+          profile ? (
             <ProfileAvatar
               name={profile.id}
               color={profile.color}
               avatar={profile.avatar}
               size={28}
             />
-          )}
+          ) : undefined
+        }
+        title={
           <AppModalTitle
             id="profile-modal-title"
             className="profile-modal-title"
           >
             {agentName}
           </AppModalTitle>
-        </div>
-        {profile && (
-          <nav className="profile-modal-nav" aria-label={t("agents.title")}>
-            {PROFILE_SECTIONS.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={`profile-modal-nav-item ${
-                  section === s.id ? "active" : ""
-                }`}
-                onClick={() => setSection(s.id)}
-              >
-                <s.Icon size={16} />
-                {t(s.labelKey)}
-              </button>
-            ))}
-          </nav>
-        )}
-      </aside>
+        }
+        label={t("agents.title")}
+        sections={
+          profile
+            ? PROFILE_SECTIONS.map((s) => ({
+                id: s.id,
+                label: t(s.labelKey),
+                Icon: s.Icon,
+              }))
+            : []
+        }
+        selected={section}
+        onSelect={setSection}
+      />
 
       <div className="profile-modal-main">
         <div className="profile-modal-topbar">

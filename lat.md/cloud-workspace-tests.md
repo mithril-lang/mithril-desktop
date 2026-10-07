@@ -687,6 +687,8 @@ The real child-process transport accepts only the exact request's finite status 
 
 The Native port executes harmless scripts through the actual Agent in isolated A→B→A homes. Replays retain the original result without changing files or repeating effects; stale full-source versions refuse execution.
 
+The same actual CLI path inspects absent and completed requests without altering source, effect or execution-ledger bytes. Inspection remains valid after the run changed the jobs source version.
+
 This explicit local qualification requires `MITHRIL_AGENT_SOURCE_RUN_CHECKOUT` and `MITHRIL_AGENT_SOURCE_RUN_PYTHON` test inputs. CI without that checkout skips this qualification rather than substituting a fake CLI. It does not prove installed-client or production operation.
 
 
@@ -736,6 +738,20 @@ Stopping or switching accounts during execution retains uncertainty and refuses 
 ## Original manual lifecycle wiring
 
 The manual lifecycle starts independently of the source poller. A long running peer does not block original screen operations, and stop invalidates the consumer and its captured engine.
+
+Both original execution and retained-result inspection are connected to their main-only ports with the captured engine's active-scope fence.
+
+## Original manual read-only native receipt boundary
+
+Inspection uses the fixed bounded status command, correlates every request field, and admits absent only as inspection data. Foreign, malformed or lost results and account changes refuse confirmation.
+
+## Original manual read-only result recovery
+
+Reopened actual SQLite journals recover exact terminal Agent receipts even after unknown was acknowledged by the API. Failed reporting retains the terminal result for acknowledgement-only replay; effects never repeat.
+
+## Original manual read-only uncertainty fence
+
+Absent, unknown, foreign and unavailable inspection results retain uncertainty without dispatch. An account change during inspection prevents retaining or reporting its stale terminal receipt.
 
 ## Original manual concrete source resource binding
 

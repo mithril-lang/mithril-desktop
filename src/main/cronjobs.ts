@@ -32,9 +32,11 @@ import {
 } from "./cron-source-transition";
 import {
   callOriginalCronRun,
+  callOriginalCronInspect,
   validOriginalCronRunRequest,
   type OriginalCronRunRequest,
   type OriginalCronRunResult,
+  type OriginalCronInspectResult,
 } from "./cron-source-run";
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
@@ -579,6 +581,28 @@ export async function runOriginalCronSource(
   if (isRemoteMode() || !validOriginalCronRunRequest(request))
     return { success: false, error: "Original schedule execution unavailable" };
   return callOriginalCronRun(
+    request,
+    {
+      executable: HERMES_PYTHON,
+      cliArgs: hermesCliArgs(),
+      cwd: join(HERMES_HOME, "hermes-agent"),
+      env: { ...process.env, ...secureSpawnEnv(request.profile) },
+    },
+    assertActive,
+  );
+}
+
+/** Main-only read-only retained-result recovery; no renderer IPC. */
+export async function inspectOriginalCronSource(
+  request: OriginalCronRunRequest,
+  assertActive: () => Promise<void>,
+): Promise<OriginalCronInspectResult> {
+  if (isRemoteMode() || !validOriginalCronRunRequest(request))
+    return {
+      success: false,
+      error: "Original schedule inspection unavailable",
+    };
+  return callOriginalCronInspect(
     request,
     {
       executable: HERMES_PYTHON,

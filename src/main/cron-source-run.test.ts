@@ -14,6 +14,8 @@ import { afterEach, expect, it } from "vitest";
 import type { OriginalScheduleAgentRuntime } from "./original-schedule-agent-binding";
 import {
   callOriginalCronRun,
+  callOriginalCronInspect,
+  parseOriginalCronInspectResult,
   parseOriginalCronRunResult,
   validOriginalCronRunRequest,
   type OriginalCronRunRequest,
@@ -31,7 +33,10 @@ const request: OriginalCronRunRequest = {
   jobId: "job_one",
   expectedVersion: "a".repeat(64),
 };
-function peer(mode = "completed"): OriginalScheduleAgentRuntime {
+function peer(
+  mode = "completed",
+  command = "source-run",
+): OriginalScheduleAgentRuntime {
   const cwd = mkdtempSync(join(tmpdir(), "mithril-source-run-"));
   roots.push(cwd);
   const path = join(cwd, "peer.cjs");
@@ -39,7 +44,7 @@ function peer(mode = "completed"): OriginalScheduleAgentRuntime {
     path,
     `let text='';process.stdin.on('data',v=>text+=v);process.stdin.on('end',()=>{
     const request=JSON.parse(text);
-    if(process.argv.slice(2).join(',')!== '-p,'+request.profile+',cron,source-run')process.exit(2);
+    if(process.argv.slice(2).join(',')!== '-p,'+request.profile+',cron,'+process.env.COMMAND)process.exit(2);
     const receipt={...request,status:process.env.MODE};
     if(process.env.MODE==='foreign')receipt.owner='bob';
     if(process.env.MODE==='extra')receipt.secret='synthetic-private';
@@ -52,7 +57,7 @@ function peer(mode = "completed"): OriginalScheduleAgentRuntime {
     executable: process.execPath,
     cliArgs: [path],
     cwd,
-    env: { MODE: mode },
+    env: { MODE: mode, COMMAND: command },
   };
 }
 // @lat: [[cloud-workspace-tests#Original manual execution receipt boundary]]
@@ -166,12 +171,27 @@ it.skipIf(!checkout || !python)(
         cwd: checkout!,
         env,
       };
+      const initial = readFileSync(source);
+      expect(
+        await callOriginalCronInspect(input, runtime, async () => {}),
+      ).toEqual({
+        success: true,
+        receipt: { ...input, status: "absent" },
+      });
+      expect(readFileSync(source)).toEqual(initial);
       const result = await callOriginalCronRun(input, runtime, async () => {});
       expect(result).toEqual({
         success: true,
         receipt: { ...input, status: "completed" },
       });
       const updated = readFileSync(source);
+      const effects = readFileSync(join(home, "effects.txt"));
+      const ledger = readFileSync(join(home, "cron", "executions.db"));
+      expect(
+        await callOriginalCronInspect(input, runtime, async () => {}),
+      ).toEqual(result);
+      expect(readFileSync(join(home, "cron", "executions.db"))).toEqual(ledger);
+      expect(readFileSync(join(home, "effects.txt"))).toEqual(effects);
       expect(await callOriginalCronRun(input, runtime, async () => {})).toEqual(
         result,
       );
@@ -191,3 +211,56 @@ it.skipIf(!checkout || !python)(
   },
   45000,
 );
+
+// @lat: [[cloud-workspace-tests#Original manual read-only native receipt boundary]]
+it("uses the bounded status command and admits absent only as inspection data", async () => {
+  for (const status of ["absent", "unknown", "completed", "rejected"]) {
+    const result = await callOriginalCronInspect(
+      request,
+      peer(status, "source-run-status"),
+      async () => {},
+    );
+    expect(result).toEqual({ success: true, receipt: { ...request, status } });
+  }
+  expect(
+    parseOriginalCronRunResult(
+      JSON.stringify({
+        success: true,
+        receipt: { ...request, status: "absent" },
+      }),
+      request,
+    ).success,
+  ).toBe(false);
+  expect(
+    parseOriginalCronInspectResult(
+      JSON.stringify({
+        success: true,
+        receipt: { ...request, status: "pending" },
+      }),
+      request,
+    ).success,
+  ).toBe(false);
+  for (const mode of ["foreign", "extra", "lost", "oversize"])
+    expect(
+      (
+        await callOriginalCronInspect(
+          request,
+          peer(mode, "source-run-status"),
+          async () => {},
+        )
+      ).success,
+    ).toBe(false);
+  let checks = 0;
+  expect(
+    (
+      await callOriginalCronInspect(
+        request,
+        peer("completed", "source-run-status"),
+        async () => {
+          if (++checks === 2) throw Error("account changed");
+        },
+      )
+    ).success,
+  ).toBe(false);
+  expect(checks).toBe(2);
+});

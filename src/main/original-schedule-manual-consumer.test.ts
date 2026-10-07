@@ -15,7 +15,10 @@ import type {
   OriginalManualCommand,
   OriginalManualResult,
 } from "./original-schedule-manual";
-import type { OriginalCronRunResult } from "./cron-source-run";
+import type {
+  OriginalCronRunResult,
+  OriginalCronInspectResult,
+} from "./cron-source-run";
 interface ConsumerFixture {
   store(): NativeOriginalScheduleReplicaStore;
   consumer(): OriginalScheduleManualConsumer;
@@ -26,6 +29,7 @@ interface ConsumerFixture {
     >
   >;
   run: ReturnType<typeof vi.fn<() => Promise<OriginalCronRunResult>>>;
+  inspect: ReturnType<typeof vi.fn<() => Promise<OriginalCronInspectResult>>>;
   bind: ReturnType<typeof vi.fn<() => Promise<OriginalManualBinding>>>;
   active(value: boolean): void;
   reportLoss(value: boolean): void;
@@ -78,6 +82,12 @@ function fixture(): ConsumerFixture {
       },
     }),
   );
+  const inspect = vi.fn(
+    async (): Promise<OriginalCronInspectResult> => ({
+      success: true,
+      receipt: { ...originalManualNativeRequest(binding), status: "unknown" },
+    }),
+  );
   const bind = vi.fn(
     async (): Promise<OriginalManualBinding> => structuredClone(binding),
   );
@@ -90,6 +100,7 @@ function fixture(): ConsumerFixture {
       store: store(),
       command,
       run,
+      inspect,
       bind,
       check,
     });
@@ -103,6 +114,7 @@ function fixture(): ConsumerFixture {
     read,
     command,
     run,
+    inspect,
     bind,
     active: (v: boolean) => {
       active = v;
@@ -250,4 +262,70 @@ it("retains uncertainty after account change or stop without reporting a stale c
     await f.consumer().poll();
     expect(f.run).toHaveBeenCalledTimes(1);
   }
+});
+
+// @lat: [[cloud-workspace-tests#Original manual read-only result recovery]]
+it("recovers exact terminal results after restart even when unknown was reported, without dispatching", async () => {
+  for (const status of ["completed", "rejected"] as const) {
+    const f = fixture();
+    f.run.mockRejectedValueOnce(Error("lost child reply"));
+    await f.consumer().poll();
+    expect(await f.read()).toEqual([
+      { binding, status: "unknown", reported: true },
+    ]);
+    f.fresh(false);
+    f.inspect.mockResolvedValue({
+      success: true,
+      receipt: { ...originalManualNativeRequest(binding), status },
+    });
+    f.reportLoss(true);
+    await expect(f.consumer().poll()).rejects.toThrow("lost report reply");
+    expect(await f.read()).toEqual([{ binding, status, reported: false }]);
+    f.reportLoss(false);
+    await f.consumer().poll();
+    expect(await f.read()).toEqual([{ binding, status, reported: true }]);
+    expect(f.run).toHaveBeenCalledTimes(1);
+    expect(f.inspect).toHaveBeenCalledTimes(1);
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Original manual read-only uncertainty fence]]
+it("never executes absent or uncertain inspection results and fences account changes before retaining terminal data", async () => {
+  const f = fixture();
+  f.run.mockRejectedValueOnce(Error("lost child reply"));
+  await f.consumer().poll();
+  f.fresh(false);
+  for (const status of ["absent", "unknown"] as const) {
+    f.inspect.mockResolvedValueOnce({
+      success: true,
+      receipt: { ...originalManualNativeRequest(binding), status },
+    });
+    await f.consumer().poll();
+  }
+  f.inspect.mockResolvedValueOnce({
+    success: true,
+    receipt: {
+      ...originalManualNativeRequest(binding),
+      owner: "bob",
+      status: "completed",
+    },
+  });
+  await f.consumer().poll();
+  f.inspect.mockRejectedValueOnce(Error("private failure"));
+  await f.consumer().poll();
+  expect(await f.read()).toEqual([
+    { binding, status: "unknown", reported: true },
+  ]);
+  f.inspect.mockImplementationOnce(async () => {
+    f.active(false);
+    return {
+      success: true,
+      receipt: { ...originalManualNativeRequest(binding), status: "completed" },
+    };
+  });
+  await expect(f.consumer().poll()).rejects.toThrow("account changed");
+  expect(await f.read()).toEqual([
+    { binding, status: "unknown", reported: true },
+  ]);
+  expect(f.run).toHaveBeenCalledTimes(1);
 });

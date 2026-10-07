@@ -17,6 +17,7 @@ import {
   prepareOriginalCronExecution,
   bindOriginalCronExecution,
   runOriginalCronSource,
+  inspectOriginalCronSource,
 } from "./cronjobs";
 import { OriginalScheduleReplication } from "./original-schedule-replication";
 import type { OriginalScheduleManualConsumer } from "./original-schedule-manual-consumer";
@@ -231,6 +232,10 @@ export function startOriginalScheduleReplication(): () => void {
               cloudWorkspace.originalScheduleManual(command),
             run: (request) =>
               runOriginalCronSource(request, () =>
+                active.assertScreenScope(request.profile),
+              ),
+            inspect: (request) =>
+              inspectOriginalCronSource(request, () =>
                 active.assertScreenScope(request.profile),
               ),
             serialize: serial,

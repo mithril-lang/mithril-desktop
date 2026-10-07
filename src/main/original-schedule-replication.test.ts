@@ -675,6 +675,9 @@ it("dispatches through the concrete synchronized source/resource binding and ret
   };
   const consumer = engine.manualConsumer({
     command,
+    inspect: async () => {
+      throw Error("terminal requests need no inspection");
+    },
     serialize: async <T>(action: () => Promise<T>): Promise<T> => action(),
     run: async (input) => {
       expect(input.expectedVersion).toBe(
@@ -698,6 +701,9 @@ it("dispatches through the concrete synchronized source/resource binding and ret
   const reopened = new OriginalScheduleReplication(a.ports);
   const replay = reopened.manualConsumer({
     command,
+    inspect: async () => {
+      throw Error("terminal requests need no inspection");
+    },
     serialize: async <T>(action: () => Promise<T>): Promise<T> => action(),
     run: async () => {
       throw Error("replay must not execute");

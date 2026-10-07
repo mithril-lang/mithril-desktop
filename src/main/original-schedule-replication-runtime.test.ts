@@ -18,10 +18,12 @@ const f = vi.hoisted(() => ({
   manualPorts: [] as {
     command: unknown;
     run: (input: unknown) => Promise<unknown>;
+    inspect: (input: unknown) => Promise<unknown>;
     serialize: unknown;
   }[],
   manualCommand: vi.fn(),
   sourceRun: vi.fn(),
+  sourceInspect: vi.fn(),
 }));
 vi.mock("electron", () => ({ app: { getPath: () => "/test/user-data" } }));
 vi.mock("./cloud-workspace-runtime", () => ({
@@ -64,6 +66,7 @@ vi.mock("./cronjobs", () => ({
   prepareOriginalCronExecution: vi.fn(),
   bindOriginalCronExecution: vi.fn(),
   runOriginalCronSource: f.sourceRun,
+  inspectOriginalCronSource: f.sourceInspect,
 }));
 vi.mock("./original-schedule-replication", () => ({
   OriginalScheduleReplication: class {
@@ -306,6 +309,8 @@ it("starts manual consumption independently and leaves original screen operation
     };
     await ports.run(request);
     expect(f.sourceRun).toHaveBeenCalledWith(request, expect.any(Function));
+    await ports.inspect(request);
+    expect(f.sourceInspect).toHaveBeenCalledWith(request, expect.any(Function));
     const action = vi.fn(async () => []);
     await runOriginalScheduleScreen("default", action, "read");
     expect(action).toHaveBeenCalledTimes(1);

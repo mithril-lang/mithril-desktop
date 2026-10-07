@@ -16,6 +16,14 @@ export type OriginalCronRunResult =
       };
     }
   | { success: false; error: string };
+export type OriginalCronInspectResult =
+  | {
+      success: true;
+      receipt: OriginalCronRunRequest & {
+        status: "completed" | "rejected" | "unknown" | "absent";
+      };
+    }
+  | { success: false; error: string };
 const unavailable = (): OriginalCronRunResult => ({
   success: false,
   error: "Schedule execution result unconfirmed",
@@ -42,6 +50,25 @@ export function parseOriginalCronRunResult(
   output: string,
   request: OriginalCronRunRequest,
 ): OriginalCronRunResult {
+  return parseOriginalCronResult(
+    output,
+    request,
+    false,
+  ) as OriginalCronRunResult;
+}
+
+export function parseOriginalCronInspectResult(
+  output: string,
+  request: OriginalCronRunRequest,
+): OriginalCronInspectResult {
+  return parseOriginalCronResult(output, request, true);
+}
+
+function parseOriginalCronResult(
+  output: string,
+  request: OriginalCronRunRequest,
+  inspect: boolean,
+): OriginalCronInspectResult {
   try {
     if (
       !validOriginalCronRunRequest(request) ||
@@ -57,7 +84,12 @@ export function parseOriginalCronRunResult(
       Object.keys(receipt).sort().join(",") ===
         "expectedVersion,jobId,operationId,owner,profile,status" &&
       Object.entries(request).every(([key, value]) => receipt[key] === value) &&
-      ["completed", "rejected", "unknown"].includes(receipt.status)
+      [
+        "completed",
+        "rejected",
+        "unknown",
+        ...(inspect ? ["absent"] : []),
+      ].includes(receipt.status)
     )
       return { success: true, receipt };
   } catch {
@@ -74,6 +106,29 @@ export async function callOriginalCronRun(
   runtime: OriginalScheduleAgentRuntime,
   assertActive: () => Promise<void>,
 ): Promise<OriginalCronRunResult> {
+  return callOriginalCronCommand(
+    input,
+    runtime,
+    assertActive,
+    false,
+  ) as Promise<OriginalCronRunResult>;
+}
+
+/** Read-only recovery. An absent marker never permits a new dispatch. */
+export async function callOriginalCronInspect(
+  input: OriginalCronRunRequest,
+  runtime: OriginalScheduleAgentRuntime,
+  assertActive: () => Promise<void>,
+): Promise<OriginalCronInspectResult> {
+  return callOriginalCronCommand(input, runtime, assertActive, true);
+}
+
+async function callOriginalCronCommand(
+  input: OriginalCronRunRequest,
+  runtime: OriginalScheduleAgentRuntime,
+  assertActive: () => Promise<void>,
+  inspect: boolean,
+): Promise<OriginalCronInspectResult> {
   if (!validOriginalCronRunRequest(input)) return unavailable();
   const request = structuredClone(input);
   try {
@@ -81,12 +136,18 @@ export async function callOriginalCronRun(
     const output = await new Promise<string>((resolve, reject) => {
       const child = execFile(
         runtime.executable,
-        [...runtime.cliArgs, "-p", request.profile, "cron", "source-run"],
+        [
+          ...runtime.cliArgs,
+          "-p",
+          request.profile,
+          "cron",
+          inspect ? "source-run-status" : "source-run",
+        ],
         {
           cwd: runtime.cwd,
           env: runtime.env,
           // Execution follows the original Agent watchdog, not a parser timeout.
-          timeout: 0,
+          timeout: inspect ? 15000 : 0,
           maxBuffer: 65536,
           windowsHide: true,
           encoding: "utf8",
@@ -103,7 +164,7 @@ export async function callOriginalCronRun(
       child.stdin.end(JSON.stringify(request));
     });
     await assertActive();
-    return parseOriginalCronRunResult(output, request);
+    return parseOriginalCronResult(output, request, inspect);
   } catch {
     return unavailable();
   }

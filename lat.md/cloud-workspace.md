@@ -840,7 +840,7 @@ The existing FULL-synchronous SQLite journal holds bounded, digest-checked entri
 
 The manual consumer combines main-only take/report transport with the private dispatch journal, while keeping long Agent execution outside the replica lock.
 
-[[src/main/original-schedule-manual-consumer.ts#OriginalScheduleManualConsumer#poll]] reports retained outcomes first, accepts only fresh validated API takes, and requires a matching synchronized native-source/custody binding. It commits the dispatch fence under the existing cross-process lock, invokes the original source-run port outside that lock, and retains only exact results. Failed reporting retries the result, never the effect. Account changes and stop invalidate later acknowledgements. Unknown recovery does not invoke the Agent; reserved recovery and unknown reconciliation remain separate unfinished work.
+[[src/main/original-schedule-manual-consumer.ts#OriginalScheduleManualConsumer#poll]] recovers and reports retained outcomes first, accepts only fresh validated API takes, and requires a matching synchronized native-source/custody binding. It commits the dispatch fence under the existing cross-process lock, invokes the original source-run port outside that lock, and retains only exact results. Failed reporting retries the result, never the effect. Account changes and stop invalidate later acknowledgements. Reserved recovery and API-unknown requests lacking a native journal remain separate unfinished work.
 
 Tests use real private SQLite and synthetic transport/Agent peers to verify reopening, replay refusal, identity fences and nonblocking execution. The lifecycle and concrete synchronized resource/custody binding are now connected as described below. Production API, original route mount, installer and installed-client verification remain required.
 
@@ -851,4 +851,14 @@ A separate main-process lifecycle consumes original manual requests without occu
 
 [[src/main/original-schedule-replication-runtime.ts#startOriginalScheduleReplication]] starts and stops both lifecycles under the existing account-change subscription. [[src/main/original-schedule-replication.ts#OriginalScheduleReplication#manualConsumer]] serializes source/resource synchronization and binding, then invokes the existing main source-run port outside that lane. [[src/main/original-schedule-replication.ts#OriginalScheduleReplication#manualBinding]] recaptures verified script/workdir/runtime references under their original private store lock and checks the exact native version, source digest and selected custody revision. The Agent's original source CAS and execution policy still admit the effect. Output/counter changes return through the existing durable replication path after completion or report failure.
 
-Runtime tests use synthetic Agent/transport peers. Concrete coordinator tests use real SQLite and files to verify binding and output replication. The updated Agent pin, unknown/reserved reconciliation, API schema publication, normal Web renderer, installer and installed-client execution remain unfinished; lifecycle wiring alone is not production proof.
+Runtime tests use synthetic Agent/transport peers. Concrete coordinator tests use real SQLite and files to verify binding and output replication. The updated Agent pin, reserved and missing-native-journal reconciliation, API schema publication, normal Web renderer, installer and installed-client execution remain unfinished; lifecycle wiring alone is not production proof.
+
+## Original manual retained-result recovery (draft)
+
+Uncertain native requests are inspected read-only before reporting, including requests already acknowledged as unknown. Only an exact retained terminal result can advance their status.
+
+[[src/main/cronjobs.ts#inspectOriginalCronSource]] invokes [[src/main/cron-source-run.ts#callOriginalCronInspect]] through the existing selected-profile runtime. The fixed `source-run-status` command has a 15-second bound and the same strict receipt identity and active-account checks. `absent` is accepted solely by [[src/main/cron-source-run.ts#parseOriginalCronInspectResult]], never by the execution parser.
+
+[[src/main/original-schedule-manual-consumer.ts#OriginalScheduleManualConsumer#recover]] inspects the saved original native version outside the replica lock. Completed or rejected results update the existing durable journal and clear its report acknowledgement, then report through the existing API port. Missing markers, unknown results and inspection failures do not authorize dispatch. Account changes and stop discard stale receipts. Terminal entries skip further inspection.
+
+Actual Agent A/B/A tests verify read-only completed inspection after original source changes; consumer tests reopen real SQLite with synthetic Agent receipts. These checks do not establish a production Web-to-installed-Agent path, and lost take acknowledgements without a native journal still need separate reconciliation.

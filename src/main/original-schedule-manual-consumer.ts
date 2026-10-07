@@ -17,6 +17,7 @@ import {
   parseOriginalCronRunResult,
   type OriginalCronRunRequest,
   type OriginalCronRunResult,
+  type OriginalCronInspectResult,
 } from "./cron-source-run";
 
 interface Ports {
@@ -30,6 +31,7 @@ interface Ports {
     authorityRevision: number,
   ): Promise<OriginalManualBinding>;
   run(request: OriginalCronRunRequest): Promise<OriginalCronRunResult>;
+  inspect(request: OriginalCronRunRequest): Promise<OriginalCronInspectResult>;
 }
 /** Fresh dispatch only, with durable results and short journal locks. The original
  * Agent owns effects/watchdogs; neither a replay nor unknown recovery reruns it.
@@ -71,6 +73,31 @@ export class OriginalScheduleManualConsumer {
       ),
     );
   }
+  private async recover(
+    entry: OriginalManualJournalEntry,
+  ): Promise<OriginalManualJournalEntry> {
+    if (entry.status !== "unknown") return entry;
+    await this.check();
+    const request = originalManualNativeRequest(entry.binding);
+    let result: OriginalCronInspectResult;
+    try {
+      result = await this.ports.inspect(request);
+    } catch {
+      result = { success: false, error: "Manual result unconfirmed" };
+    }
+    await this.check();
+    // Use the execution parser too: absent, unknown and malformed inspection
+    // never become permission to dispatch or an invented terminal result.
+    const confirmed = parseOriginalCronRunResult(
+      JSON.stringify(result),
+      request,
+    );
+    if (!confirmed.success || confirmed.receipt.status === "unknown")
+      return entry;
+    return this.locked(async () =>
+      this.ports.store.recordManualResult(entry.binding, confirmed),
+    );
+  }
   async poll(): Promise<void> {
     if (this.busy || this.stopped) return;
     this.busy = true;
@@ -79,7 +106,8 @@ export class OriginalScheduleManualConsumer {
       const retained = await this.locked(async () =>
         p.store.manualRequests(p.scope),
       );
-      for (const entry of retained) await this.report(entry);
+      for (const entry of retained)
+        await this.report(await this.recover(entry));
       await this.check();
       const command = { action: "take" as const, profile: p.scope.profile };
       const value = await p.command(command);

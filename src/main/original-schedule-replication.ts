@@ -49,6 +49,7 @@ import type {
 import type {
   OriginalCronRunRequest,
   OriginalCronRunResult,
+  OriginalCronInspectResult,
 } from "./cron-source-run";
 
 export interface OriginalScheduleReplicationPorts {
@@ -185,6 +186,7 @@ export class OriginalScheduleReplication {
   manualConsumer(ports: {
     command(input: OriginalManualCommand): Promise<OriginalManualResult>;
     run(input: OriginalCronRunRequest): Promise<OriginalCronRunResult>;
+    inspect(input: OriginalCronRunRequest): Promise<OriginalCronInspectResult>;
     serialize<T>(action: () => Promise<T>): Promise<T>;
   }): OriginalScheduleManualConsumer {
     return new OriginalScheduleManualConsumer({
@@ -196,6 +198,7 @@ export class OriginalScheduleReplication {
       check: () => this.check(),
       command: ports.command,
       run: ports.run,
+      inspect: ports.inspect,
       bind: (request, revision) =>
         ports.serialize(async () => {
           const result = await this.sync();

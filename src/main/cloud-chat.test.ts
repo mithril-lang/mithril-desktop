@@ -194,6 +194,43 @@ describe("Canonical Desktop chat transport", () => {
       ),
     ).toBe(true);
   });
+  it("advertises only the main-process Mithril tool protocol after scoped checkpoint validation", async () => {
+    const f = fixture(["chat:read", "chat:write", "inference"]);
+    await f.auth.enable();
+    const body = {
+      action: "next",
+      turnId: "tool-turn",
+      executionToken: "a".repeat(64),
+      round: 0,
+    };
+    await expect(
+      f.client.browserStep("s1", { ...body, toolProtocol: "other" }),
+    ).rejects.toThrow("Invalid tool checkpoint");
+    f.fetcher.mockImplementation(async (url: string) =>
+      url.endsWith("/v1/me")
+        ? f.response({
+            via: "api_token",
+            user: { id: "a" },
+            scopes: ["chat:read", "chat:write", "inference"],
+          })
+        : f.response({
+            schemaVersion: 1,
+            userId: "a",
+            phase: "ready",
+            round: 0,
+            calls: [],
+          }),
+    );
+    await f.client.browserStep("s1", body);
+    const checkpoints = f.fetcher.mock.calls.filter((call) =>
+      call[0].endsWith("/browser"),
+    );
+    expect(checkpoints).toHaveLength(1);
+    expect(JSON.parse(String(checkpoints[0]?.[1]?.body))).toEqual({
+      ...body,
+      toolProtocol: "mithril-language-v1",
+    });
+  });
   it("discards late prior-account data without disabling a newly enabled account", async () => {
     const f = fixture();
     await f.auth.enable();

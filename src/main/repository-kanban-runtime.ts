@@ -1248,6 +1248,30 @@ export async function nativeSkillResourceSnapshot(): Promise<
     capture.dispose();
   }
 }
+function profileMetadataPort(
+  before: Awaited<ReturnType<typeof replicaContext>>,
+): Promise<import("./profile-metadata-port").ProfileMetadataPort> {
+  return import("./profile-metadata-port").then(
+    ({ ProfileMetadataPort }) =>
+      new ProfileMetadataPort(
+        {
+          owner: before.userId,
+          profile: before.profile,
+          root: profileHome(before.profile),
+          replicaId: before.replicaId,
+        },
+        join(app.getPath("userData"), "repository-profile-transactions"),
+        cloudWorkspace.profileResources,
+        async () => {
+          if (
+            JSON.stringify(before.context) !==
+            JSON.stringify(await cloudWorkspace.nativeContext(true))
+          )
+            throw Error("Workspace identity changed");
+        },
+      ),
+  );
+}
 export async function nativeReplicaSnapshot(): Promise<
   import("@mithril/workspace/replica-sync").ReplicaSnapshot
 > {
@@ -1402,6 +1426,23 @@ export async function nativeReplicaSnapshot(): Promise<
       "Skill resource synchronization requires review or reconnect; original directories are retained",
     );
   }
+  snapshot.collections.push("profile");
+  const metadataScope = { collection: "profile" as const, ids: [] as string[] };
+  (snapshot.recordScopes ??= []).push(metadataScope);
+  try {
+    const port = await profileMetadataPort(before);
+    const metadata = await port.snapshot();
+    metadataScope.ids.push(port.id);
+    if (metadata) snapshot.documents.push(metadata);
+  } catch {
+    (snapshot.recoveryRecords ??= []).push({
+      collection: "profile",
+      id: `profile-metadata-${before.profile}`,
+    });
+    snapshot.warnings!.push(
+      "Profile metadata synchronization requires reconnect or conflict resolution; original data is retained",
+    );
+  }
   if (!snapshot.collections.length)
     throw Error("Native sources require synchronization review");
   if (
@@ -1442,7 +1483,9 @@ export async function nativeReplicaApply(
   )
     throw Error("Workspace identity changed");
   let result: import("@mithril/workspace/replica-sync").ReplicaResult;
-  if (
+  if (write.document.collection === "profile") {
+    result = await (await profileMetadataPort(before)).apply(write);
+  } else if (
     write.document.collection === "capability" &&
     write.document.id.startsWith("skill-resources-")
   ) {

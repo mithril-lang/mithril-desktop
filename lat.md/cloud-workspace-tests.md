@@ -848,3 +848,15 @@ A mismatched target digest or foreign profile receipt is rejected before any ori
 ## Profile metadata durable tombstone restoration
 
 Physical metadata deletion retains its completed receipt across restart, and replay never deletes a later recreated file.
+
+## Profile metadata replica resource roundtrip
+
+The original file is captured through the resource protocol, exact downloaded bytes are restored, and retained receipts preserve subsequent original edits.
+
+## Profile metadata download fences edits and identity
+
+Edits or authorization changes during resource download prevent native restoration and retain the current original file.
+
+## Profile metadata replica tombstone baseline
+
+Physical deletion produces a stable native tombstone, and documents for another profile never enter the metadata file adapter.

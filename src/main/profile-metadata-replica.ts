@@ -227,6 +227,22 @@ export class ProfileMetadataReplica {
       db.close();
     }
   }
+  latest(): ReplicaRecord | null {
+    const db = this.database();
+    try {
+      const row = db
+        .prepare(
+          "SELECT * FROM profile_operations WHERE state='complete' ORDER BY rowid DESC LIMIT 1",
+        )
+        .get() as Row | undefined;
+      if (!row) return null;
+      const record: unknown = JSON.parse(row.record);
+      this.validateTarget(record, row.target_bytes);
+      return record;
+    } finally {
+      db.close();
+    }
+  }
   /** Recover only under fresh authorization for this owner/profile, before publishing a native snapshot. */
   recover(): ReplicaRecord[] {
     const db = this.database();

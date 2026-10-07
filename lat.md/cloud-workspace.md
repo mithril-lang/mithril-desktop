@@ -951,3 +951,9 @@ A private owner/profile/root SQLite journal commits exact pending bytes before r
 Original profile integration tests run in Node against a canonical temporary directory so native Buffer validation and no-symlink storage checks match Electron main-process execution.
 
 The prior jsdom suite treated native Node buffers as foreign Uint8Arrays, and macOS temporary paths passed through a system symlink. tests/profiles.test.ts now exercises its original 23 cases using the actual Node environment without weakening production metadata validation.
+
+## Original profile metadata replica port (draft)
+
+The existing rich replica now captures and restores the selected original profile metadata file through owner-bound resources, exact version checks and the durable native journal.
+
+[[src/main/profile-metadata-port.ts#ProfileMetadataPort]] guards authorization before recovery and after each resource await. Concurrent original edits return a conflict. Completed receipts are replayed before recapture; physical deletion remains a stable tombstone. [[src/main/repository-kanban-runtime.ts#nativeReplicaSnapshot]] restricts profile completeness to the selected metadata ID and retains recovery records on unavailable source. [[src/main/repository-kanban-runtime.ts#nativeReplicaApply]] routes metadata restoration before Kanban fallback. All-profile inventory and Web original profile UI remain pending; this candidate is not production qualification.

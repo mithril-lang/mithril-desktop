@@ -1185,3 +1185,11 @@ Changed-session journal files preserve legacy pending operations, retain untouch
 ## Incremental journal failure fences dispatch
 
 A failed incremental journal write prevents cloud operations; compatibility adapters without incremental support still use the existing whole-journal durability boundary.
+
+## Complete large deletion inventory
+
+The original SQLite outbox returns all 1,205 retained deletions through stable keyset pages, excludes other owners/profiles, and prepares/acknowledges the exact final operation without scanning all intents per mutation.
+
+## Large original deletion receipt replay
+
+The real history engine synchronizes 1,005 original physical deletions, replays a lost acknowledgement with its retained ID/base revision and mirrors only tombstones without reconstructing pending or deleted conversations.

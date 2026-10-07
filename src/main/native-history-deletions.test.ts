@@ -32,6 +32,64 @@ afterEach(() => {
   binding.db = null;
   for (const db of databases.splice(0)) db.close();
 });
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Complete large deletion inventory]]
+it("reads all pending original deletions through stable pages and prepares only the exact retained target", () => {
+  const db = fixture();
+  const sources = Array.from({ length: 1205 }, (_, i) => ({
+    sourceId: `removed-${i}`,
+    sessionId: nativeCloudSessionId("default", `removed-${i}`),
+  }));
+  db.transaction(() => {
+    const insert = db.prepare("INSERT INTO sessions VALUES(?,NULL,'Retained')");
+    for (const source of sources) insert.run(source.sourceId);
+  })();
+  bindNativeHistorySources(db, "alice", "default", sources);
+  expect(
+    deleteSessions(
+      sources.map((source) => source.sourceId),
+      "default",
+    ).deleted,
+  ).toBe(1205);
+  const intents = nativeHistoryDeletions(db, "alice", "default");
+  expect(intents).toHaveLength(1205);
+  expect(new Set(intents.map((intent) => intent.operationId)).size).toBe(1205);
+  expect(nativeHistoryDeletions(db, "bob", "default")).toEqual([]);
+  expect(nativeHistoryDeletions(db, "alice", "other")).toEqual([]);
+  const last = intents.at(-1)!;
+  const prepared = prepareNativeHistoryDeletion(
+    db,
+    "alice",
+    "default",
+    last,
+    4,
+  );
+  expect(
+    prepareNativeHistoryDeletion(db, "alice", "default", last, 10),
+  ).toEqual(prepared);
+  acknowledgeNativeHistoryDeletion(db, "alice", "default", last, {
+    schemaVersion: 1,
+    userId: "alice",
+    operationId: last.operationId,
+    status: "accepted",
+    session: {
+      id: last.sessionId,
+      title: "Retained",
+      model: "mock",
+      revision: 5,
+      eventSeq: 1,
+      deleted: true,
+      activeTurn: null,
+    },
+  });
+  expect(nativeHistoryDeletions(db, "alice", "default")).toHaveLength(1204);
+  expect(
+    db
+      .prepare(
+        "SELECT receipt_json FROM mithril_history_source_deletions WHERE operation_id=?",
+      )
+      .get(last.operationId),
+  ).toMatchObject({ receipt_json: expect.any(String) });
+});
 // @lat: [[cloud-workspace-tests#Cloud workspace tests#Large original provenance mapping]]
 it("binds all original sources above one thousand and retains deletion provenance for the last row", () => {
   const db = fixture();

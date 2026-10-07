@@ -1282,6 +1282,68 @@ function deletedSourceFixture(): ReturnType<typeof fixture> & {
     },
   };
 }
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Large original deletion receipt replay]]
+it("synchronizes over one thousand physical deletions with retained receipts after a lost acknowledgement", async () => {
+  const f = deletedSourceFixture();
+  try {
+    const sources = Array.from({ length: 1005 }, (_, i) => ({
+      sourceId: `removed-${i}`,
+      sessionId: nativeCloudSessionId("default", `removed-${i}`),
+    }));
+    f.db.transaction(() => {
+      const insert = f.db.prepare("INSERT INTO sessions VALUES(?)");
+      for (const source of sources) insert.run(source.sourceId);
+    })();
+    bindNativeHistorySources(f.db, "alice", "default", sources);
+    f.db.transaction(() => {
+      for (const source of sources) {
+        recordNativeHistoryDeletion(f.db, source.sourceId);
+        f.db.prepare("DELETE FROM sessions WHERE id=?").run(source.sourceId);
+      }
+    })();
+    f.ports.source = async () => [];
+    for (const source of sources)
+      f.sessions.set(source.sessionId, {
+        id: source.sessionId,
+        title: "Retained",
+        model: "mock",
+        revision: 1,
+        eventSeq: 0,
+        deleted: false,
+        activeTurn: null,
+      });
+    const cache = vi.fn();
+    f.ports.cacheRemote = cache;
+    f.lose();
+    expect((await new NativeHistorySync(f.ports).run()).deferred).toHaveLength(
+      1,
+    );
+    const pending = nativeHistoryDeletions(f.db, "alice", "default");
+    expect(pending).toHaveLength(1);
+    expect(pending[0].baseRevision).toBe(1);
+    expect(
+      cache.mock.calls.some(([session]) => session.id === pending[0].sessionId),
+    ).toBe(false);
+    expect((await new NativeHistorySync(f.ports).run()).deferred).toEqual([]);
+    expect(nativeHistoryDeletions(f.db, "alice", "default")).toEqual([]);
+    expect(
+      [...f.sessions.values()].every(
+        (session) => session.deleted && session.revision === 2,
+      ),
+    ).toBe(true);
+    expect([...f.events.values()].every((events) => events.length === 1)).toBe(
+      true,
+    );
+    expect(
+      cache.mock.calls.every(
+        ([session, events]) => session.deleted && events.length === 0,
+      ),
+    ).toBe(true);
+    expect(f.executions()).toBe(0);
+  } finally {
+    f.db.close();
+  }
+});
 // @lat: [[cloud-workspace-tests#Original deletion receipt synchronization]]
 it("recovers a physical source deletion with the same receipt and prevents remote cache resurrection", async () => {
   const f = deletedSourceFixture(),

@@ -1028,7 +1028,6 @@ export class NativeHistorySync {
       const intents = await this.ports.deletions.list(identity);
       await check();
       if (
-        intents.length > 1000 ||
         new Set(intents.map((intent) => intent.sessionId)).size !==
           intents.length ||
         new Set(intents.map((intent) => intent.operationId)).size !==

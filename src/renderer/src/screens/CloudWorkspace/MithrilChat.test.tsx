@@ -128,16 +128,16 @@ describe("Default shared Mithril Chat", () => {
   });
 });
 
+// @lat: [[cloud-workspace-tests#New Chat before sign-in]]
 it("shows failed identity checks and offers account setup without submitting a turn", async () => {
   vi.mocked(window.hermesAPI.cloudChat.status).mockRejectedValueOnce(
     new Error("Access refused"),
   );
   const connect = vi.fn();
   render(<MithrilChat profile="default" onConnectAccount={connect} />);
-  await screen.findByText("Access refused");
-  fireEvent.click(
-    screen.getByRole("button", { name: "Connect Mithril account" }),
-  );
+  await screen.findByText("Sign in to Mithril to continue chatting.");
+  expect(screen.queryByText("Access refused")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
   expect(connect).toHaveBeenCalledOnce();
   expect(enable).not.toHaveBeenCalled();
   expect(apply).not.toHaveBeenCalled();

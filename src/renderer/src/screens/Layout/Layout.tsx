@@ -1,4 +1,3 @@
-import * as Dialog from "@radix-ui/react-dialog";
 import Code from "../Code/Code";
 import { Code2 } from "lucide-react";
 import CloudSecurity from "../CloudWorkspace/CloudSecurity";
@@ -8,7 +7,7 @@ import Memory from "../Memory/Memory";
 import { WorkspaceNavigation } from "@mithril/design-system/react";
 import MithrilChat from "../CloudWorkspace/MithrilChat";
 import type { CodeFile } from "@mithril/workspace/code";
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Chat from "../Chat/Chat";
 import {
   dbItemsToChatMessages,
@@ -24,13 +23,11 @@ import {
   findRunByLocation,
   cycleRunId,
   runIdAtOrdinal,
-  loadingSessionIds as deriveLoadingSessionIds,
 } from "./chatRuns";
 import { ActiveSessionsBar } from "./ActiveSessionsBar";
 import { StatusBar } from "./StatusBar";
 import Sessions from "../Sessions/Sessions";
 import ProfileSwitcher from "./ProfileSwitcher";
-import SidebarRecentSessions from "./SidebarRecentSessions";
 import Skills from "../Skills/Skills";
 import Gateway from "../Gateway/Gateway";
 import Providers from "../Providers/Providers";
@@ -101,7 +98,6 @@ const FOOTER_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
 ];
 
 const SIDEBAR_COLLAPSED_KEY = "hermes.sidebar.collapsed";
-const SIDEBAR_SCROLLBAR_HIDE_MS = 700;
 
 interface LayoutProps {
   onOpenDeviceRuntime?: () => void;
@@ -113,7 +109,6 @@ interface LayoutProps {
 
 function Layout({
   connectionId,
-  onOpenDeviceRuntime,
   verifyWarning,
   onReinstall,
   onDismissVerifyWarning,
@@ -140,103 +135,13 @@ function Layout({
   ]);
   const [activeRunId, setActiveRunId] = useState<string>(() => runs[0].runId);
   // While a resume's history is loading, show its spinner immediately.
-  const [resumingSessionId, setResumingSessionId] = useState<string | null>(
-    null,
-  );
+  const [, setResumingSessionId] = useState<string | null>(null);
   // Sessions whose resume is in flight — dedupes rapid double-clicks that would
   // otherwise mount two tabs for the same session (the live check straddles an
   // await, so it can't rely on `runs` state alone).
   const resumingRef = useRef<Set<string>>(new Set());
-  const sidebarChatScrollRef = useRef<HTMLDivElement | null>(null);
-  const sidebarScrollbarHideRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const [sidebarScrollbar, setSidebarScrollbar] = useState({
-    visible: false,
-    scrollable: false,
-    top: 0,
-    height: 0,
-  });
-
   const currentSessionId =
     runs.find((r) => r.runId === activeRunId)?.sessionId ?? null;
-
-  const loadingSessionIds = useMemo(
-    () => deriveLoadingSessionIds(runs),
-    [runs],
-  );
-
-  const updateSidebarScrollbar = useCallback((visible: boolean) => {
-    const root = sidebarChatScrollRef.current;
-    if (!root) {
-      setSidebarScrollbar((prev) =>
-        prev.scrollable || prev.visible
-          ? { visible: false, scrollable: false, top: 0, height: 0 }
-          : prev,
-      );
-      return;
-    }
-
-    const scrollable = root.scrollHeight > root.clientHeight + 1;
-    if (!scrollable) {
-      setSidebarScrollbar((prev) =>
-        prev.scrollable || prev.visible
-          ? { visible: false, scrollable: false, top: 0, height: 0 }
-          : prev,
-      );
-      return;
-    }
-
-    const trackHeight = root.clientHeight;
-    const thumbHeight = Math.max(
-      32,
-      Math.round((root.clientHeight / root.scrollHeight) * trackHeight),
-    );
-    const maxTop = Math.max(0, trackHeight - thumbHeight);
-    const maxScroll = Math.max(1, root.scrollHeight - root.clientHeight);
-    const top = Math.round((root.scrollTop / maxScroll) * maxTop);
-
-    setSidebarScrollbar((prev) => {
-      const next = { visible, scrollable, top, height: thumbHeight };
-      return prev.visible === next.visible &&
-        prev.scrollable === next.scrollable &&
-        prev.top === next.top &&
-        prev.height === next.height
-        ? prev
-        : next;
-    });
-  }, []);
-
-  useEffect(() => {
-    const root = sidebarChatScrollRef.current;
-    if (!root) return;
-
-    const showThenHide = (): void => {
-      updateSidebarScrollbar(true);
-      if (sidebarScrollbarHideRef.current) {
-        clearTimeout(sidebarScrollbarHideRef.current);
-      }
-      sidebarScrollbarHideRef.current = setTimeout(() => {
-        updateSidebarScrollbar(false);
-      }, SIDEBAR_SCROLLBAR_HIDE_MS);
-    };
-
-    const updateHidden = (): void => updateSidebarScrollbar(false);
-    root.addEventListener("scroll", showThenHide, { passive: true });
-    window.addEventListener("resize", updateHidden);
-    const observer = new ResizeObserver(updateHidden);
-    observer.observe(root);
-
-    updateHidden();
-    return () => {
-      root.removeEventListener("scroll", showThenHide);
-      window.removeEventListener("resize", updateHidden);
-      observer.disconnect();
-      if (sidebarScrollbarHideRef.current) {
-        clearTimeout(sidebarScrollbarHideRef.current);
-      }
-    };
-  }, [updateSidebarScrollbar]);
 
   // Per-profile avatar/colour, so the active-sessions bar (which only knows a
   // run's profile name) can render real avatars. Refreshed when the selected
@@ -291,7 +196,6 @@ function Layout({
   // the Cmd/Ctrl+K menu action). Reuses the Sessions screen inside a modal —
   // there is no longer a top-level Sessions view.
   const [sessionsModalOpen, setSessionsModalOpen] = useState(false);
-  const [legacyHistoryOpen, setLegacyHistoryOpen] = useState(false);
   // Tabs lazy-mount on first visit, then stay mounted (display:none toggle).
   // Keeps IPC refetch / DOM rebuild off the tab-switch hot path.
   const [visitedViews, setVisitedViews] = useState<Set<View>>(
@@ -762,94 +666,6 @@ function Layout({
           </div>
 
           <div id="cloud-session-sidebar" className="sidebar-cloud-history" />
-
-          <div className="sidebar-chat-section">
-            <Dialog.Root
-              open={legacyHistoryOpen}
-              onOpenChange={setLegacyHistoryOpen}
-            >
-              <Dialog.Trigger asChild>
-                <button className="device-history-button" type="button">
-                  {locale.startsWith("ja")
-                    ? "端末の履歴・移行"
-                    : "Device history and migration"}
-                </button>
-              </Dialog.Trigger>
-              <Dialog.Portal>
-                <Dialog.Overlay className="device-history-backdrop" />
-                <Dialog.Content
-                  className="device-history-dialog"
-                  aria-describedby={undefined}
-                >
-                  <Dialog.Close asChild>
-                    <button type="button" className="device-history-close">
-                      {locale.startsWith("ja") ? "閉じる" : "Close"}
-                    </button>
-                  </Dialog.Close>
-                  <div className="sidebar-nav-sessions">
-                    <div
-                      className="sidebar-chat-scroll"
-                      ref={sidebarChatScrollRef}
-                    >
-                      <div>
-                        <Dialog.Title>
-                          {locale.startsWith("ja")
-                            ? "端末の履歴・移行"
-                            : "Device history and migration"}
-                        </Dialog.Title>
-                        {onOpenDeviceRuntime && (
-                          <button
-                            onClick={() => {
-                              setLegacyHistoryOpen(false);
-                              onOpenDeviceRuntime();
-                            }}
-                          >
-                            Set up device runtime
-                          </button>
-                        )}
-                        {legacyHistoryOpen && (
-                          <SidebarRecentSessions
-                            open={!sidebarCollapsed}
-                            connectionId={connectionId}
-                            activeProfile={activeProfile}
-                            currentSessionId={currentSessionId}
-                            loadingSessionIds={loadingSessionIds}
-                            resumingSessionId={resumingSessionId}
-                            onSelect={(id) => {
-                              handleResumeSession(id);
-                              setLegacyHistoryOpen(false);
-                            }}
-                            onSessionDeleted={(id) => {
-                              // If the open chat was the one deleted, drop to a fresh chat
-                              // so the user isn't left viewing a now-gone conversation.
-                              if (id === currentSessionId) handleNewChat();
-                            }}
-                            scrollRootRef={sidebarChatScrollRef}
-                          />
-                        )}
-                      </div>
-                    </div>
-                    {sidebarScrollbar.scrollable && (
-                      <div
-                        className={`sidebar-chat-scrollbar ${
-                          sidebarScrollbar.visible ? "visible" : ""
-                        }`}
-                        aria-hidden="true"
-                      >
-                        <div
-                          className="sidebar-chat-scrollbar-thumb"
-                          style={{
-                            height: sidebarScrollbar.height,
-                            transform: `translateY(${sidebarScrollbar.top}px)`,
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </Dialog.Content>
-              </Dialog.Portal>
-            </Dialog.Root>
-          </div>
 
           <div className="sidebar-footer">
             {/* Show an upgrade affordance at startup when GitHub has a newer

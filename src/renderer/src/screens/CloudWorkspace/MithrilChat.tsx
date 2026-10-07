@@ -57,10 +57,12 @@ export default function MithrilChat({
       .then((status) => {
         if (!canceled) setAccountId(status.userId);
       })
-      .catch((error) => {
+      .catch(() => {
         if (!canceled)
           setConnectionError(
-            error instanceof Error ? error.message : "Sign-in unavailable",
+            locale.startsWith("ja")
+              ? "Mithril にサインインしてチャットを続けてください。"
+              : "Sign in to Mithril to continue chatting.",
           );
       })
       .finally(() => {
@@ -69,7 +71,7 @@ export default function MithrilChat({
     return () => {
       canceled = true;
     };
-  }, [profile, epoch]);
+  }, [profile, epoch, locale]);
   const [sourceInventory, setSourceInventory] = useState<{
     userId: string;
     profile: string;
@@ -189,20 +191,23 @@ export default function MithrilChat({
   );
   return (
     <div>
-      {identityChecked && !accountId && onConnectAccount && (
-        <div className="session-notice">
-          <button type="button" onClick={onConnectAccount}>
-            {locale.startsWith("ja")
-              ? "Mithril アカウントに接続"
-              : "Connect Mithril account"}
-          </button>
-        </div>
-      )}
+      {identityChecked &&
+        !accountId &&
+        !connectionError &&
+        onConnectAccount && (
+          <div className="session-notice">
+            <button type="button" onClick={onConnectAccount}>
+              {locale.startsWith("ja")
+                ? "Mithril アカウントに接続"
+                : "Connect Mithril account"}
+            </button>
+          </div>
+        )}
       {connectionError && (
         <div className="session-notice" role="alert">
           <p>{connectionError}</p>
-          <button type="button" onClick={() => setEpoch((value) => value + 1)}>
-            {locale.startsWith("ja") ? "再接続" : "Reconnect"}
+          <button type="button" onClick={onConnectAccount}>
+            {locale.startsWith("ja") ? "サインイン" : "Sign in"}
           </button>
         </div>
       )}
@@ -212,6 +217,7 @@ export default function MithrilChat({
         sidebarSourceInventory={sourceInventory}
         onSidebarSourceSelect={onSourceHistorySelect}
         onSidebarSelect={onSidebarSelect}
+        onConnectionRequired={onConnectAccount}
         onSidebarProjects={onSidebarProjects}
         key={`${profile}:${initialSessionId ?? ""}`}
         initialSessionId={initialSessionId}

@@ -38,10 +38,10 @@ function cloud(): {
   repository: RepositoryTransport;
   resources: CapabilityResourceTransport;
   documents: Map<string, RepositoryDocument>;
-  failures: { cloudAck: boolean };
+  failures: { cloudAck: boolean; contextAck: boolean };
   operations: string[];
 } {
-  const failures = { cloudAck: false },
+  const failures = { cloudAck: false, contextAck: false },
     operations: string[] = [];
   const documents = new Map<string, RepositoryDocument>(),
     receipts = new Map<string, RepositoryReceipt>(),
@@ -74,11 +74,13 @@ function cloud(): {
     },
   });
   const repository: RepositoryTransport = {
-    page: async (collection) => ({
+    page: async (collection, after = "") => ({
       schemaVersion: 1,
       userId: "alice",
       documents: structuredClone(
-        [...documents.values()].filter((d) => d.collection === collection),
+        [...documents.values()]
+          .filter((d) => d.collection === collection && d.id > after)
+          .sort((a, b) => a.id.localeCompare(b.id)),
       ),
       nextAfter: null,
     }),
@@ -108,8 +110,12 @@ function cloud(): {
         document,
       };
       receipts.set(edit.operationId, receipt);
-      if (failures.cloudAck) {
+      if (
+        (failures.cloudAck && edit.id.startsWith("schedule-file-")) ||
+        (failures.contextAck && edit.id.startsWith("schedule-profile-"))
+      ) {
         failures.cloudAck = false;
+        failures.contextAck = false;
         throw Error("lost cloud acknowledgement");
       }
       return structuredClone(receipt);
@@ -348,8 +354,8 @@ it("reopens retained outboxes after a committed cloud write loses its acknowledg
   await expect(
     new OriginalScheduleReplication(a.ports).sync(),
   ).resolves.toEqual({ status: "synced" });
-  expect(new Set(peer.operations).size).toBe(1);
-  expect([...peer.documents.values()].map((d) => d.revision)).toEqual([1]);
+  expect(new Set(peer.operations).size).toBe(2);
+  expect([...peer.documents.values()].map((d) => d.revision)).toEqual([1, 1]);
   expect(readFileSync(join(a.home, "cron", "jobs.json"), "utf8")).toBe(source);
 }, 30000);
 // @lat: [[cloud-workspace-tests#Automatic original schedule lost native acknowledgement]]
@@ -418,7 +424,7 @@ it("retains both independently edited inventories as a conflict instead of silen
     new OriginalScheduleReplication(b.ports).sync(),
   ).resolves.toEqual({ status: "conflict", reason: "both-sources-changed" });
   expect(readFileSync(join(b.home, "cron", "jobs.json"), "utf8")).toBe(local);
-  expect([...peer.documents.values()].map((d) => d.revision)).toEqual([2]);
+  expect([...peer.documents.values()].map((d) => d.revision)).toEqual([1, 2]);
 }, 30000);
 
 // @lat: [[cloud-workspace-tests#Original Schedules concrete custody gate]]
@@ -452,4 +458,71 @@ it("requires exact profile and fresh owner-bound selected custody at the concret
   await expect(engine.assertSelectedExecution()).rejects.toThrow(
     "identity changed",
   );
+});
+
+// @lat: [[cloud-workspace-tests#Empty original profile background registration]]
+it("registers a fresh original profile in background without creating or restoring a jobs source", async () => {
+  const peer = cloud();
+  const fresh = device(peer, true);
+  expect(captureOriginalCronFile(fresh.home, "default")).toBeNull();
+  expect(await new OriginalScheduleReplication(fresh.ports).sync()).toEqual({
+    status: "synced",
+  });
+  expect(captureOriginalCronFile(fresh.home, "default")).toBeNull();
+  expect(fresh.events).toEqual(["prepare"]);
+  expect(
+    [...peer.documents.values()].map((row) => ({ id: row.id, body: row.body })),
+  ).toEqual([
+    {
+      id: "schedule-profile-default",
+      body: {
+        format: "mithril-original-schedule-profile-v1",
+        profile: "default",
+        timeZone: "UTC",
+      },
+    },
+  ]);
+  const operations = peer.operations.length;
+  expect(await new OriginalScheduleReplication(fresh.ports).sync()).toEqual({
+    status: "synced",
+  });
+  expect(peer.operations).toHaveLength(operations);
+});
+
+// @lat: [[cloud-workspace-tests#Empty original profile acknowledgement recovery]]
+it("recovers a lost profile registration acknowledgement from its retained outbox without creating jobs", async () => {
+  const peer = cloud(),
+    fresh = device(peer, true);
+  peer.failures.contextAck = true;
+  await expect(
+    new OriginalScheduleReplication(fresh.ports).sync(),
+  ).rejects.toThrow("lost cloud acknowledgement");
+  expect(await new OriginalScheduleReplication(fresh.ports).sync()).toEqual({
+    status: "synced",
+  });
+  expect(new Set(peer.operations).size).toBe(1);
+  expect([...peer.documents.values()].map((row) => row.revision)).toEqual([1]);
+  expect(captureOriginalCronFile(fresh.home, "default")).toBeNull();
+  expect(fresh.events).not.toContain("restore");
+});
+
+// @lat: [[cloud-workspace-tests#Simultaneous empty original profile devices]]
+it("coalesces simultaneous fresh device profile registration through real independent private stores", async () => {
+  const peer = cloud(),
+    a = device(peer, true),
+    b = device(peer, false);
+  expect(
+    await Promise.all([
+      new OriginalScheduleReplication(a.ports).sync(),
+      new OriginalScheduleReplication(b.ports).sync(),
+    ]),
+  ).toEqual([{ status: "synced" }, { status: "synced" }]);
+  expect([...peer.documents.values()].map((row) => row.revision)).toEqual([1]);
+  expect(captureOriginalCronFile(a.home, "default")).toBeNull();
+  expect(captureOriginalCronFile(b.home, "default")).toBeNull();
+  const operations = peer.operations.length;
+  expect(await new OriginalScheduleReplication(b.ports).sync()).toEqual({
+    status: "synced",
+  });
+  expect(peer.operations).toHaveLength(operations);
 });

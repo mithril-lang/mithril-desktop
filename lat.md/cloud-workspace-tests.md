@@ -656,3 +656,15 @@ Original authored scripts and outputs synchronize while each device retains its 
 ## Original workdir private manifest refusal
 
 Incoming manifests containing destination-private state are refused before replacing files. Capturing private synchronization storage itself cannot publish chunks or recurse into its staging area.
+
+## Empty original profile background registration
+
+A fresh profile with no jobs source registers its account-bound timezone through the actual coordinator without creating or restoring jobs. Reopening does not publish another profile revision.
+
+## Empty original profile acknowledgement recovery
+
+A committed profile registration whose reply is lost reuses its retained outbox identity after reopening, with one cloud revision and no native source write.
+
+## Simultaneous empty original profile devices
+
+Two fresh devices use independent private journals and converge on one confirmed profile row without creating jobs. Reopening the passive device does not retain or republish a redundant registration.

@@ -790,3 +790,13 @@ Working directories retain authored files while device-specific execution author
 [[src/main/original-schedule-replication.ts#OriginalScheduleReplication#sync]] supplies exact private paths for the profile's original jobs source, execution policy/bindings, lock and SQLite ledger sidecars, plus the replication state root. The canonical jobs source synchronizes through its separate original full-file port. Workdir snapshots retain scripts, outputs and other authored data; they cannot copy raw device bindings through a duplicate runtime source.
 
 [[src/main/original-schedule-directory-resources.ts#OriginalScheduleDirectoryResources]] computes destination-relative exclusions, refuses roots inside private state, rejects incoming manifests covering reserved paths, and binds the exclusion set into restoration identity. [[src/main/resource-exclusions.ts#resourceExclusions]] validates the consumer-owned paths. Capture and locked file transactions apply the same paths; native restore receipt files remain excluded. Real Python filesystem tests preserve distinct device-private bytes while copying authored files and refuse a foreign authority manifest before changing either target file. This does not establish installed-client or production synchronization.
+
+## Empty original profile synchronization (draft)
+
+A fresh original profile is discoverable in Web before its first job exists. Background synchronization registers data context without creating jobs or altering original source bytes.
+
+Workspace `0.6.28-schedules.2` adds `ensureOriginalScheduleFileContext` to the original file port. The main coordinator registers the confirmed profile/timezone after loading its durable repository, using the existing owner-bound CAS/outbox. A source manifest remains distinct and supplies the source revision; conflicting timezone metadata refuses. No device path or execution claim appears in the profile row.
+
+The immutable archive replaces the draft consumer pin while retaining preceding archives. Actual coordinator tests cover an absent native source, repeated background polling and no source writes or binding calls. Shared and browser tests discover an empty profile, display the actual Desktop empty screen and create the first original job using test parser receipts. Production Agent parsing/execution, main publication, signed installers and installed-client qualification remain open.
+
+The candidate archive SHA256 is `1b4e6cb8f382f8785ea72b9b68987a212cb559efcbff1877d005064249652040`; all 415 packaged files match the shared source build and installed dependency. This is dependency provenance, not an installed application update.

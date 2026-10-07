@@ -3,7 +3,10 @@ import { existsSync, lstatSync, mkdirSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { originalScheduleReplicationAdmission } from "./original-schedule-replication-admission";
-import { OriginalScheduleFileRepository } from "@mithril/workspace/original-schedule-file";
+import {
+  ensureOriginalScheduleFileContext,
+  OriginalScheduleFileRepository,
+} from "@mithril/workspace/original-schedule-file";
 import {
   OriginalScheduleFileReplica,
   type OriginalScheduleReplicaResult,
@@ -178,6 +181,12 @@ export class OriginalScheduleReplication {
       this.repository = repository;
       await store.exclusive(p.scope, async () => {
         await repository.load();
+        await ensureOriginalScheduleFileContext(
+          repository,
+          p.scope.profile,
+          p.scope.timeZone,
+        );
+        await this.check();
       });
       const file = new OriginalScheduleFileRepository(
         repository,

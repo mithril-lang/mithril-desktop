@@ -1141,3 +1141,13 @@ Remote/SSH connections retain the existing authenticated history adapter. An abs
 Local protocol integration now exercises the real original history engine, canonical CloudChat HTTP adapter and durable on-disk journals together across owned source fixtures.
 
 The test simulates an accepted history write whose acknowledgement is lost. It checks that exactly one pending operation survives on disk, the next newly constructed profile engine queries the original receipt and clears that pending state, and another pass creates no duplicate sessions, events or execution. Original source database/cache ports remain controlled fixtures; this is not live D1/R2, installed upgrade or cross-device qualification. See [[cloud-workspace-tests#All-profile real archival engine replay]].
+
+## Browser About shared application information
+
+Workspace schedules.30 shares About information with Web while retaining native update and diagnostics ports.
+
+Web uses the original shared card/meta layout, reports the loaded document build identity and canonical API host, and opens the existing Desktop download page explicitly. Build identity is injected with the same Vite manifest identity; no latest-version or native update readiness is inferred. Missing metadata remains unknown. Native consumes the new immutable archive; no release or installed application update is claimed.
+
+The consumer continues to use [[src/renderer/src/components/settings/AboutPane.tsx#AboutPane]] and its original SettingsDataContext. This change does not authorize native diagnostics or updates in browsers. Connection/Data browser adapters and authenticated upgrade/cross-device QA remain required.
+
+Consumer verification: all 461 archive files match producer and installed bytes; explicit exports and lock integrity are checked. SHA256 `6cddfb8e1f54dd6b42a7a03f79f0c687167c0a731bae9a870439af1fe851a53e`. Native TypeScript checks, build and 64 Settings/route regressions passed. Source/CI, publication and installed-client behavior remain separate.

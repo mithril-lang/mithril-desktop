@@ -775,7 +775,7 @@ The tests exercise the actual source/resource adapters, shared repository engine
 
 Desktop now mounts the original shared Schedules component directly over its automatically synchronized original inventory, with no separate device dialog.
 
-Workspace `0.6.29-schedules.3` resets the original renderer's rows, dialogs and action state when its API or profile changes. Out-of-order refresh replies cannot replace the newest inventory, and a successful refresh clears a prior load error. The new immutable vendor archive includes the shared browser original-file context export; the preceding archive is retained unchanged. Source package tests and consumer build checks remain distinct from a signed installer or installed behavior.
+Workspace `0.6.29-schedules.4` resets the original renderer's rows, dialogs and action state when its API or profile changes. Out-of-order refresh replies cannot replace the newest inventory, and a successful refresh clears a prior load error. The new immutable vendor archive includes the shared browser original-file context export; the preceding archive is retained unchanged. Source package tests and consumer build checks remain distinct from a signed installer or installed behavior.
 
 [[src/renderer/src/screens/CloudWorkspace/CloudSchedules.tsx]] retains the original cards, creation form and lifecycle controls, remounting on account changes. The existing narrow Cron IPC operations call [[src/main/original-schedule-replication-runtime.ts#runOriginalScheduleScreen]] through the same serialized lane as background replication. Profile/account identity is captured before queuing and checked before/after actions; switching users cannot apply an old queued action to a new account.
 
@@ -862,3 +862,10 @@ Uncertain native requests are inspected read-only before reporting, including re
 [[src/main/original-schedule-manual-consumer.ts#OriginalScheduleManualConsumer#recover]] inspects the saved original native version outside the replica lock. Completed or rejected results update the existing durable journal and clear its report acknowledgement, then report through the existing API port. Missing markers, unknown results and inspection failures do not authorize dispatch. Account changes and stop discard stale receipts. Terminal entries skip further inspection.
 
 Actual Agent A/B/A tests verify read-only completed inspection after original source changes; consumer tests reopen real SQLite with synthetic Agent receipts. These checks do not establish a production Web-to-installed-Agent path, and lost take acknowledgements without a native journal still need separate reconciliation.
+
+
+## Current-main shared schedules package
+
+Desktop now pins workspace `0.6.29-schedules.4`, packed from Fund `db985e3f`, including current-main shared UI changes and the unified schedule adapter. Earlier archives remain immutable. The installer candidate is preview.37 because preview.36 already has published assets.
+
+Source, archive and installed files plus the lock integrity are checked together before consumer build verification. This package update does not change the Agent bootstrap pin, publish the original execution schema, or prove an installed-client release.

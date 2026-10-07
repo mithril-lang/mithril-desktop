@@ -17,6 +17,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Local Fastlane output
+scripts/store-release/macos/.bundle/
+scripts/store-release/macos/vendor/bundle/
+scripts/store-release/macos/fastlane/report.xml
+scripts/store-release/macos/fastlane/README.md
+
 # Environment files
 .env
 .env.*

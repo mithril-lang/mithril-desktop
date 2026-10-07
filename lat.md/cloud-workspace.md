@@ -866,6 +866,8 @@ Actual Agent A/B/A tests verify read-only completed inspection after original so
 
 ## Current-main shared schedules package
 
-Desktop now pins workspace `0.6.29-schedules.4`, packed from Fund `db985e3f`, including current-main shared UI changes and the unified schedule adapter. Earlier archives remain immutable. The installer candidate is preview.37 because preview.36 already has published assets.
+Desktop now pins workspace `0.6.29-schedules.4`, packed from Fund `db985e3f`, including current-main shared UI changes and the unified schedule adapter. Earlier archives remain immutable.
+
+The installer candidate is preview.37 because preview.36 already has published assets.
 
 Source, archive and installed files plus the lock integrity are checked together before consumer build verification. This package update does not change the Agent bootstrap pin, publish the original execution schema, or prove an installed-client release.

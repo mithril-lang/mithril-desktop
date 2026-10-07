@@ -1,5 +1,6 @@
 import { readFileSync } from "fs";
 import { join } from "path";
+import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -153,5 +154,58 @@ describe("Release quality gates", () => {
     expect(verifier).toContain("prebuilds/darwin-$ARCH.node");
     expect(verifier).toContain('grep -q "x86_64"');
     expect(verifier).toContain('grep -q "arm64"');
+  });
+});
+
+describe("Desktop store release boundaries", () => {
+  // @lat: [[desktop-updates#Store distribution#Credential and submission gates]]
+  it("validates store tooling without credentials or external writes", () => {
+    const result = spawnSync(
+      process.execPath,
+      [join(ROOT, "scripts/store-release/check-readiness.mjs")],
+      { encoding: "utf8" },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("no credentials or submissions");
+
+    const workflow = readFileSync(
+      join(ROOT, ".github/workflows/ci.yml"),
+      "utf8",
+    );
+    expect(workflow).toContain("verify-store-automation:");
+    expect(workflow).toContain("bundle exec fastlane mac verify");
+    expect(workflow).not.toContain("MITHRIL_MAS_API_KEY_PATH:");
+  });
+
+  // @lat: [[desktop-updates#Store distribution#Mac App Store boundary]]
+  it("keeps MAS upload separate from review and blocks automatic release", () => {
+    const fastfile = readFileSync(
+      join(ROOT, "scripts/store-release/macos/fastlane/Fastfile"),
+      "utf8",
+    );
+    const docs = readFileSync(
+      join(ROOT, "docs/desktop-store-release.md"),
+      "utf8",
+    );
+
+    expect(fastfile).toContain("lane :upload_pkg");
+    expect(fastfile).toContain("lane :submit_review");
+    expect(fastfile).toContain("submit_for_review: false");
+    expect(fastfile).toContain("automatic_release: false");
+    expect(docs).toContain("MITHRIL_MAS_CLOUD_ONLY=1");
+  });
+
+  // @lat: [[desktop-updates#Store distribution#Microsoft Store boundary]]
+  it("uses Microsoft tooling and defaults Windows submissions to draft", () => {
+    const script = readFileSync(
+      join(ROOT, "scripts/store-release/windows/publish.ps1"),
+      "utf8",
+    );
+
+    expect(script).toContain("msstore reconfigure");
+    expect(script).toContain('"--noCommit"');
+    expect(script).toContain("[switch]$Commit");
+    expect(script).not.toContain("fastlane");
   });
 });

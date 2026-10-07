@@ -32,6 +32,32 @@ afterEach(() => {
   binding.db = null;
   for (const db of databases.splice(0)) db.close();
 });
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Large original provenance mapping]]
+it("binds all original sources above one thousand and retains deletion provenance for the last row", () => {
+  const db = fixture();
+  const sources = Array.from({ length: 1205 }, (_, i) => ({
+    sourceId: `retained-${i}`,
+    sessionId: nativeCloudSessionId("default", `retained-${i}`),
+  }));
+  db.transaction(() => {
+    const insert = db.prepare("INSERT INTO sessions VALUES(?,NULL,'Retained')");
+    for (const source of sources) insert.run(source.sourceId);
+  })();
+  bindNativeHistorySources(db, "alice", "default", sources);
+  expect(() => bindNativeHistorySources(db, "bob", "default", sources)).toThrow(
+    "another owner",
+  );
+  deleteSession(sources.at(-1)!.sourceId, "default");
+  expect(nativeHistoryDeletions(db, "alice", "default")).toEqual([
+    expect.objectContaining({
+      sourceId: "retained-1204",
+      sessionId: sources.at(-1)!.sessionId,
+    }),
+  ]);
+  expect(db.prepare("SELECT COUNT(*) AS count FROM sessions").get()).toEqual({
+    count: 1207,
+  });
+});
 // @lat: [[cloud-workspace-tests#Atomic original session deletion intent]]
 it("records deletion with the real original single/batch transaction while preserving unselected children", () => {
   const db = fixture();

@@ -1161,3 +1161,19 @@ The main-owned Chat adapter completes stable-boundary API pages before returning
 ## Large multi-profile cloud history inventory
 
 The original NativeHistorySync engine archives the selected native source against an owner-bound cloud inventory above one thousand sessions without dispatching inference or tools.
+
+## Complete large original source inventory
+
+The owner-checked original inventory returns all 1,205 histories through bounded pages without capture, sign-in or provenance adoption.
+
+## Stable paged original SQLite inventory
+
+Bounded SQLite pages retain equal-timestamp rows and archived sources within the original read transaction; overlapping pages are refused.
+
+## Large original profile archival replay
+
+The real archival engine synchronizes 1,005 source sessions and durable journal entries, recovering a lost acknowledgement without duplicate history or execution.
+
+## Large original provenance mapping
+
+Original SQLite mappings retain source ownership and exact deletion provenance above one thousand source sessions, including the last row.

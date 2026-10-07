@@ -37,7 +37,6 @@ export function bindNativeHistorySources(
     typeof profile !== "string" ||
     !profile ||
     profile.length > 256 ||
-    sources.length > 1000 ||
     sources.some(
       (source) =>
         typeof source.sourceId !== "string" ||

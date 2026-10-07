@@ -290,7 +290,7 @@ export function listSessions(
         ${supportsArchive ? "s.archived" : "0"} AS archived
       FROM sessions s
       WHERE ${includeArchived ? "1 = 1" : sessionVisibilityPredicate(db)}
-      ORDER BY s.started_at DESC
+      ORDER BY s.started_at DESC, s.id COLLATE BINARY ASC
       LIMIT ? OFFSET ?`,
     )
     .all(limit, offset) as Array<{

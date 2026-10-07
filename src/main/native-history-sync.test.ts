@@ -554,6 +554,30 @@ it("keeps cloud reconstruction available when original device storage is unavail
   expect(f.executions()).toBe(0);
 });
 
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Large original profile archival replay]]
+it("archives over one thousand original sessions and replays a lost receipt without duplicating history", async () => {
+  const f = fixture();
+  f.ports.source = async () =>
+    Array.from({ length: 1005 }, (_, i) => ({
+      id: `source-${i}`,
+      title: `Original ${i}`,
+      model: "mock",
+      items: async () => [structuredClone(f.items[0])],
+    }));
+  f.lose();
+  await new NativeHistorySync(f.ports).run();
+  await new NativeHistorySync(f.ports).run();
+  expect(f.sessions.size).toBe(1005);
+  expect(Object.keys(f.state().entries)).toHaveLength(1005);
+  expect([...f.events.values()].every((events) => events.length === 1)).toBe(
+    true,
+  );
+  expect(
+    Object.values(f.state().entries).every((entry) => entry.pending === null),
+  ).toBe(true);
+  expect(f.executions()).toBe(0);
+}, 60000);
+
 // @lat: [[cloud-workspace-tests#Remote-only chat reconstruction]]
 it("reads bounded remote pages and refuses oversized histories before changing the retained cache", async () => {
   const f = fixture();

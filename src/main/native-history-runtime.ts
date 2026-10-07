@@ -35,6 +35,7 @@ import { getConnectionConfig } from "./config";
 import { getDbConnection } from "./db";
 import { activeStateDbPath } from "./utils";
 import { getSessionMessages, listSessions, type HistoryItem } from "./sessions";
+import { nativeSessionInventory } from "./native-session-inventory";
 import {
   bindRepositorySource,
   repositorySourceOwned,
@@ -484,7 +485,9 @@ export function createNativeHistoryRuntime(
         context.userId,
       );
       const sessions = db.transaction(() =>
-        listSessions(1001, 0, context.profile, true).map((session) => {
+        nativeSessionInventory((limit, offset) =>
+          listSessions(limit, offset, context.profile, true),
+        ).map((session) => {
           try {
             return {
               session,
@@ -670,12 +673,10 @@ export async function nativeHistoryInventory(): Promise<{
   const db = getDbConnection(true, context.profile);
   if (!db) return result;
   const sessions = db.transaction(() =>
-    listSessions(1001, 0, context.profile),
+    nativeSessionInventory((limit, offset) =>
+      listSessions(limit, offset, context.profile),
+    ),
   )();
-  if (sessions.length > 1000)
-    throw Error(
-      "Source history inventory exceeds supported bound; source retained",
-    );
   if (
     JSON.stringify(context) !==
     JSON.stringify(await cloudChat.auth.nativeContext())

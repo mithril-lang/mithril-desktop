@@ -214,8 +214,7 @@ export class NativeHistorySync {
       typeof state !== "object" ||
       !state.entries ||
       typeof state.entries !== "object" ||
-      Array.isArray(state.entries) ||
-      Object.keys(state.entries).length > 1000
+      Array.isArray(state.entries)
     )
       throw Error("Invalid history journal");
     const persist = async (): Promise<void> => {
@@ -236,13 +235,8 @@ export class NativeHistorySync {
           : "Native source unavailable; source retained";
     }
     await check();
-    if (
-      source.length > 1000 ||
-      new Set(source.map((s) => s.id)).size !== source.length
-    )
-      throw Error(
-        "Native history exceeds supported session bound; source retained",
-      );
+    if (new Set(source.map((s) => s.id)).size !== source.length)
+      throw Error("Duplicate native history source; source retained");
     const list = await this.ports.transport.list();
     await check();
     if (list.userId !== identity.userId) throw Error("History owner mismatch");

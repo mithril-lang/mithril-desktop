@@ -1201,3 +1201,11 @@ Stable and beta installer publication require the paged canonical API before cre
 The release gate reads only the fixed `https://api.mithril.fund/health` route with a deadline, no credentials and no redirects, and requires `chat-inventory-keyset-v1`. CI tests reject absent/older protocol and failed health responses. This establishes compatibility admission, not authenticated behavior or complete synchronization qualification.
 
 Local qualification: 56 targeted Native history/Chat tests, one Node release-gate test, Desktop build/typechecks, changed-file lint and `lat check` pass. Workspace `.36` archive SHA256 is `b0ebaa11496c737ba0c3e69bf0faadf66229de1ac4566eee3204dad4425f76f1`; all 463 archive files match the producer and installed consumer, and lockfile integrity matches. No installer or installed-client success is implied.
+
+## Complete original profile source inventory
+
+Original history reads use bounded hundred-row pages in one SQLite transaction with deterministic timestamp/ID ordering, preserving archived rows for synchronization.
+
+The source inventory, rich history journal and provenance mapping no longer impose a one-thousand-session count ceiling. The existing journal byte bound, attachment limits, event checkpoints and deletion-outbox bounds remain; this is not yet unlimited storage or full synchronization qualification. Source ownership, captured-account checks, original transactional deletion and receipt replay remain unchanged. No inference is dispatched by history synchronization.
+
+Local qualification covers 62 targeted tests, including 1,205 source rows and mappings, a 1,005-session real-engine archive/restart with a lost receipt, owner isolation and retained last-row deletion provenance. The large replay fixture takes about 21 seconds because it copies the complete journal at each durability boundary; production journal sharding and responsiveness remain further work. No production or installed-client result is claimed.

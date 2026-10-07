@@ -1,5 +1,6 @@
 import {
   cleanup,
+  act,
   fireEvent,
   render,
   screen,
@@ -58,7 +59,112 @@ beforeEach(() => {
     },
   });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+// @lat: [[cloud-workspace-tests#Automatic background connection recovery]]
+it("resumes background synchronization after transient startup failure without another sign-in", async () => {
+  vi.useFakeTimers();
+  const status = vi.spyOn(window.hermesAPI.cloudWorkspace, "status");
+  const enable = vi.spyOn(window.hermesAPI.cloudWorkspace, "enable");
+  status.mockRejectedValueOnce(Error("Network unavailable"));
+  const { unmount } = render(
+    <RepositoryReplication profile="default" locale="en" enabled />,
+  );
+  await act(async () => {});
+  expect(sync).not.toHaveBeenCalled();
+  expect(enable).not.toHaveBeenCalled();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  expect(status).toHaveBeenCalledTimes(2);
+  expect(enable).toHaveBeenCalledOnce();
+  expect(sync).toHaveBeenCalledOnce();
+  expect(screen.queryByText("Connection unavailable. Try again.")).toBeNull();
+  unmount();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60000);
+  });
+  expect(status).toHaveBeenCalledTimes(2);
+});
+
+it("does not retry missing authority or enable a stale account after an in-flight status read", async () => {
+  vi.useFakeTimers();
+  const originalStatus = window.hermesAPI.cloudWorkspace.status;
+  const status = vi.spyOn(window.hermesAPI.cloudWorkspace, "status");
+  const enable = vi.spyOn(window.hermesAPI.cloudWorkspace, "enable");
+  status.mockRejectedValueOnce(
+    Error("Cloud connection requires explicit workspace:read authorization"),
+  );
+  const first = render(
+    <RepositoryReplication profile="default" locale="en" enabled />,
+  );
+  await act(async () => {});
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60000);
+  });
+  expect(status).toHaveBeenCalledOnce();
+  expect(enable).not.toHaveBeenCalled();
+  first.unmount();
+
+  let finish!: (
+    value: Awaited<ReturnType<typeof window.hermesAPI.cloudWorkspace.status>>,
+  ) => void;
+  const oldStatus = await originalStatus();
+  status.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  render(<RepositoryReplication profile="default" locale="en" enabled />);
+  await act(async () => {});
+  owner = "bob";
+  await act(async () => {
+    changed();
+  });
+  expect(enable).toHaveBeenCalledOnce();
+  await act(async () => {
+    finish(oldStatus);
+  });
+  expect(enable).toHaveBeenCalledOnce();
+  expect(screen.queryByText(conflict.native)).toBeNull();
+});
+it("serializes online retries and cancels pending recovery on unmount", async () => {
+  vi.useFakeTimers();
+  let fail!: (error: Error) => void;
+  const status = vi
+    .spyOn(window.hermesAPI.cloudWorkspace, "status")
+    .mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          fail = reject;
+        }),
+    );
+  const { unmount } = render(
+    <RepositoryReplication profile="default" locale="en" enabled />,
+  );
+  await act(async () => {
+    window.dispatchEvent(new Event("online"));
+    window.dispatchEvent(new Event("online"));
+    await vi.advanceTimersByTimeAsync(30000);
+  });
+  expect(status).toHaveBeenCalledOnce();
+  await act(async () => {
+    fail(Error("Offline"));
+  });
+  unmount();
+  await act(async () => {
+    window.dispatchEvent(new Event("online"));
+    await vi.advanceTimersByTimeAsync(60000);
+  });
+  expect(status).toHaveBeenCalledOnce();
+  expect(sync).not.toHaveBeenCalled();
+});
+
 // @lat: [[cloud-workspace-tests#Title conflict review interaction]]
 it("shows both names and sends only the reviewed metadata choice", async () => {
   resolve.mockResolvedValue({ userId: "alice" });

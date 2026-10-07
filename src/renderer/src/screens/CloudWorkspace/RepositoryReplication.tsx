@@ -49,31 +49,58 @@ export default function RepositoryReplication({
     const generation = identityGeneration;
     generation.current++;
     setOwner(null);
+    setConnectionNotice("");
     setHistoryNotice("");
     setTitleConflicts([]);
     setModelConflicts([]);
     setVisibilityConflicts([]);
-    if (enabled)
-      void window.hermesAPI.cloudWorkspace
-        .status()
-        .then((status) =>
-          status.userId ? window.hermesAPI.cloudWorkspace.enable() : status,
-        )
-        .then((status) => {
-          if (active) {
-            setOwner(status.userId);
-            setConnectionNotice("");
-          }
-        })
-        .catch((error) => {
-          if (active)
-            setConnectionNotice(
-              describeConnectionFailure(error, locale).message,
-            );
-        });
+    const capturedGeneration = generation.current;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let busy = false;
+    let retryable = true;
+    let retryDelay = 5000;
+    const current = (): boolean =>
+      active && generation.current === capturedGeneration;
+    const connect = async (): Promise<void> => {
+      if (!enabled || !current() || busy || !retryable) return;
+      if (timer) clearTimeout(timer);
+      timer = undefined;
+      busy = true;
+      try {
+        const status = await window.hermesAPI.cloudWorkspace.status();
+        if (!current()) return;
+        const connected = status.userId
+          ? await window.hermesAPI.cloudWorkspace.enable()
+          : status;
+        if (!current()) return;
+        if (connected.userId !== status.userId)
+          throw Error("Workspace owner changed during connection");
+        setOwner(connected.userId);
+        setConnectionNotice("");
+        retryable = false;
+      } catch (error) {
+        if (!current()) return;
+        const failure = describeConnectionFailure(error, locale);
+        setConnectionNotice(failure.message);
+        retryable = failure.retry;
+        if (retryable) {
+          timer = setTimeout(() => void connect(), retryDelay);
+          retryDelay = Math.min(retryDelay * 2, 30000);
+        }
+      } finally {
+        busy = false;
+      }
+    };
+    void connect();
+    const online = (): void => {
+      void connect();
+    };
+    window.addEventListener("online", online);
     return () => {
       active = false;
       generation.current++;
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("online", online);
     };
   }, [profile, epoch, enabled, locale]);
   useEffect(() => {

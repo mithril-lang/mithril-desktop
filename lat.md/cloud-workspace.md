@@ -897,3 +897,11 @@ The Desktop consumer retains its original settings provider while using the same
 Workspace `.7` permits individual consumer panes to fall back when undefined. Web Community now mounts the original component and original branding with browser link handling. Desktop keeps its complete native pane provider; the shared X icon is decorative so its button has one accessible name. Native runtime credentials and update actions do not move into browser authority.
 
 The new immutable archive SHA256 is `9093df699c3dfa6e89b5f82520eb4d9661cebbabe297f23dc11efc45726058c9`. All 426 files match producer and installed dependency bytes, and lock SHA512 matches the archive. Browser route/component regressions passed 13 tests. Native build and 72 regressions across original Settings/Data/Connection and Cloud Workspace passed; lat validation passed. CI, publication and installed application behavior remain separate evidence gates. Browser Connection/Data/About/Logs adapters remain incomplete.
+
+## Background connection retry lifecycle
+
+The existing reconciler automatically recovers temporary startup connection failures without introducing a migration screen or requesting another sign-in.
+
+[[src/renderer/src/screens/CloudWorkspace/RepositoryReplication.tsx#RepositoryReplication]] serializes status/enable reads and retries transient failures with a five-second delay growing to thirty seconds. Online events can retry immediately, but never overlap an outstanding request. Missing scopes or expired/refused authentication do not automatically prompt or grant authority. Identity generations are checked before enable and before applying owner state; cleanup removes timers and listeners. History and repository reconciliation begin only after the same owner is confirmed.
+
+This fixes the one-shot startup recovery gap; it does not qualify complete cloud data synchronization, release or installed-client behavior.

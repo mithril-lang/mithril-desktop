@@ -768,3 +768,9 @@ The real coordinator, private SQLite and actual script files bind dispatch to sy
 ## Original manual concrete stale resource refusal
 
 Changed script bytes, custody revisions, passive devices and stopped contexts refuse the concrete dispatch binding before reaching the Agent port.
+
+## Automatic background connection recovery
+
+Transient startup failures retry scoped connection reads automatically; missing authority and stale identities never enable background synchronization.
+
+The original background reconciler resumes native history after a five-second network retry without another sign-in. Online signals cannot overlap an in-flight read. Account changes suppress late status replies before enable; unmount clears timers/listeners. Missing scope waits for explicit account authorization.

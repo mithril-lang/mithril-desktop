@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   mkdirSync,
+  readFileSync,
+  readdirSync,
   mkdtempSync,
   realpathSync,
   renameSync,
@@ -19,6 +21,7 @@ const f = vi.hoisted(() => ({
   epoch: 1,
   mode: "local",
   missingSource: false,
+  realEngine: false,
   selected: "research",
   token: "mf_" + "a".repeat(43),
   action: undefined as undefined | ((profile: string) => void),
@@ -127,9 +130,9 @@ vi.mock("./native-history-cache", () => ({
   replaceRemoteSessionCache: vi.fn(),
   remoteSessionCacheRevision: vi.fn(),
 }));
-vi.mock("./native-history-sync", () => ({
-  nativeCloudSessionId: (profile: string, id: string) => profile + "-" + id,
-  NativeHistorySync: class {
+vi.mock("./native-history-sync", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./native-history-sync")>();
+  class ControlledHistorySync {
     constructor(private ports: NativeHistoryPorts) {}
     async run(): Promise<Awaited<ReturnType<NativeHistorySync["run"]>>> {
       if (this.ports.cacheRemote)
@@ -183,8 +186,18 @@ vi.mock("./native-history-sync", () => ({
       f.resolutions.push({ profile: request.profile, field: "visibility" });
       return this.run();
     }
-  },
-}));
+  }
+  return {
+    ...actual,
+    NativeHistorySync: function (
+      ports: NativeHistoryPorts,
+    ): NativeHistorySync | ControlledHistorySync {
+      return f.realEngine
+        ? new actual.NativeHistorySync(ports)
+        : new ControlledHistorySync(ports);
+    },
+  };
+});
 import { serializeNativeHistory } from "./native-history-runtime";
 import * as historyRuntime from "./native-history-runtime";
 import {
@@ -213,6 +226,7 @@ beforeEach(() => {
   f.epoch = 1;
   f.mode = "local";
   f.missingSource = false;
+  f.realEngine = false;
   f.selected = "research";
   f.action = undefined;
   vi.stubGlobal(
@@ -443,4 +457,148 @@ it("retains selected-profile remote reconstruction when the original home is abs
   expect(report.synced).toBe(1);
   expect(report.deferred).toEqual([]);
   expect(f.completed).toEqual(["default"]);
+});
+
+// @lat: [[cloud-workspace-tests#All-profile real archival engine replay]]
+it("archives all profiles through the real engine and canonical HTTP adapter, replaying a lost receipt without duplicate history", async () => {
+  f.realEngine = true;
+  type Session = import("@mithril/workspace/sessions").ChatSession;
+  type Event = import("@mithril/workspace/sessions").ChatEvent;
+  type Operation = import("@mithril/workspace/sessions").ChatOperation;
+  type Receipt = import("@mithril/workspace/sessions").ChatOperationResponse;
+  const sessions = new Map<string, Session>();
+  const events = new Map<string, Event[]>();
+  const receipts = new Map<string, Receipt>();
+  const sent: Array<{ sessionId: string; operation: Operation }> = [];
+  let lose = true;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input));
+      expect(url.origin).toBe("https://api.mithril.fund");
+      if (url.pathname === "/v1/me")
+        return Response.json({
+          user: { id: "owner" },
+          via: "api_token",
+          scopes: ["chat:read", "chat:write"],
+        });
+      if (url.pathname === "/v1/chat/sessions")
+        return Response.json({
+          schemaVersion: 1,
+          userId: "owner",
+          sessions: [...sessions.values()],
+        });
+      const route =
+        /^\/v1\/chat\/sessions\/([^/]+)\/(events|operations)(?:\/([^/]+))?$/.exec(
+          url.pathname,
+        );
+      if (!route) throw Error("Unexpected route: " + url.pathname);
+      const [, id, kind, operationId] = route;
+      if (kind === "events")
+        return Response.json({
+          schemaVersion: 1,
+          userId: "owner",
+          session: sessions.get(id),
+          events: events.get(id) ?? [],
+          hasMore: false,
+          nextAfter: null,
+        });
+      if (operationId)
+        return Response.json(
+          receipts.get(operationId) ?? {
+            schemaVersion: 1,
+            userId: "owner",
+            operationId,
+            status: "unknown",
+            session: null,
+          },
+        );
+      const operation = JSON.parse(String(init?.body)) as Operation;
+      if (!["create", "history"].includes(operation.type))
+        throw Error("Unexpected execution or mutation");
+      sent.push({ sessionId: id, operation: structuredClone(operation) });
+      const priorReceipt = receipts.get(operation.operationId);
+      if (priorReceipt) return Response.json(priorReceipt);
+      const old = sessions.get(id);
+      expect(operation.baseRevision).toBe(old?.revision ?? 0);
+      if (operation.type !== "create" && operation.type !== "history")
+        throw Error("Unreachable operation");
+      const session: Session = {
+        id,
+        title: operation.data.title,
+        model: operation.data.model,
+        revision: (old?.revision ?? 0) + 1,
+        eventSeq: old?.eventSeq ?? 0,
+        deleted: false,
+        activeTurn: null,
+      };
+      if (operation.type === "history") {
+        const rows = events.get(id) ?? [];
+        for (const item of operation.data.items)
+          rows.push({
+            seq: ++session.eventSeq,
+            type: "history_item",
+            turnId: null,
+            data: { sourceId: item.id, payload: JSON.stringify(item) },
+            createdAt: 1,
+          });
+        events.set(id, rows);
+      }
+      sessions.set(id, session);
+      const receipt: Receipt = {
+        schemaVersion: 1,
+        userId: "owner",
+        operationId: operation.operationId,
+        status: "accepted",
+        session: structuredClone(session),
+      };
+      receipts.set(operation.operationId, receipt);
+      if (lose && operation.type === "history") {
+        lose = false;
+        throw Error("Lost acknowledgement");
+      }
+      return Response.json(receipt);
+    }),
+  );
+  const first = await synchronizeAllProfileHistories(false);
+  expect(first.deferred).toHaveLength(1);
+  expect(sessions.size).toBe(3);
+  const journalStates =
+    (): import("./native-history-sync").NativeHistoryJournal[] =>
+      readdirSync(join(f.data, "history-replication"))
+        .filter((name) => name.endsWith(".json"))
+        .map((name) =>
+          JSON.parse(
+            readFileSync(join(f.data, "history-replication", name), "utf8"),
+          ),
+        );
+  const pending = journalStates()
+    .flatMap((state) => Object.values(state.entries))
+    .filter((entry) => entry.pending);
+  expect(pending).toHaveLength(1);
+  expect(
+    sent.filter(
+      (row) =>
+        row.operation.operationId === pending[0].pending?.operation.operationId,
+    ),
+  ).toHaveLength(1);
+  const second = await synchronizeAllProfileHistories(false);
+  expect(second.deferred).toEqual([]);
+  expect(second.conflicts).toEqual([]);
+  expect(
+    journalStates()
+      .flatMap((state) => Object.values(state.entries))
+      .every((entry) => entry.pending === null),
+  ).toBe(true);
+  const third = await synchronizeAllProfileHistories(false);
+  expect(third.deferred).toEqual([]);
+  expect(sent).toHaveLength(6);
+  expect([...events.values()].flat()).toHaveLength(3);
+  expect(
+    [...events.values()]
+      .flat()
+      .map((row) => JSON.parse(row.data.payload).content)
+      .sort(),
+  ).toEqual(["Original default", "Original empty", "Original research"]);
+  expect(f.selected).toBe("research");
 });

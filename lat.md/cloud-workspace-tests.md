@@ -1131,3 +1131,7 @@ A changed account generation during reviewed metadata resolution rejects the res
 ## All-profile history empty installation reconstruction
 
 A missing original home still admits selected-profile remote cache reconstruction without inventing original sources or requiring an agent installation.
+
+## All-profile real archival engine replay
+
+The real history engine, scoped canonical HTTP adapter and durable on-disk journals archive all owned source fixtures. A lost acknowledgement recovers through its receipt without duplicate sessions, history events or execution.

@@ -434,3 +434,19 @@ A network failure retries the original transport and never opens an account prom
 The original source transport uses only schedule-source resource IDs and the fixed Mithril API.
 
 Credentials and owner headers stay in main; wrong-owner responses, account changes and missing write scopes refuse access before storing bytes. It does not register a Capability, grant execution or automatically publish Native data.
+
+## Durable original schedule replica journal
+
+A committed pending operation retains exact source bytes and identity after external failure and store reopening. Files remain private.
+
+## Original schedule replica process lock
+
+Concurrent instances and separate processes cannot reconcile the same scope at once. Abrupt process termination releases the OS lock without deleting committed pending work.
+
+## Original schedule replica identity isolation
+
+Different owners, profiles and timezones have separate journals; wrong-identity writes and reads are refused.
+
+## Original schedule replica storage isolation
+
+Redirected and publicly readable storage is refused without changing the redirect target.

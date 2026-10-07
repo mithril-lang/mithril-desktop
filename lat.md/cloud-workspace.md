@@ -631,3 +631,9 @@ The shared package 0.6.21-schedules.2 provides a main-only owner-scoped schedule
 Its private R2 namespace is separate from Capability registration, and D1 stores verified complete-file pointers. Original Schedules components are unchanged.
 
 [[src/main/cloud-workspace.ts#CloudWorkspace]] retains Workspace read/write scope, owner and account-generation checks for these binary requests. No raw source IPC or automatic upload is introduced. Continuous source restoration still requires private resource binding, exact Native receipts and one execution authority; original screen separation removal remains pending.
+
+## Durable original schedule replica journal (draft)
+
+The main process retains portable pending schedule source and its operation identity before network writes, using a private owner/profile/timezone journal.
+
+[[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore]] commits journal writes independently of its separate SQLite process lock. Abrupt process exit releases the OS-held lock without losing pending work; another window fails busy immediately and can retry its existing coordinator. Paths, permissions and identities are checked before access. This store does not capture, upload or restore Native scheduler files and is not yet mounted in the service lifecycle.

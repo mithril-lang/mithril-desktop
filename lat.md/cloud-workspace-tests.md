@@ -427,3 +427,7 @@ Automatic scoped reads never start authorization. An explicit reconnect after mi
 ## Transient reconnect never requests authorization
 
 A network failure retries the original transport and never opens an account prompt. No data mutation or permission grant occurs merely from reading or retrying the workspace.
+
+## New Chat before sign-in
+
+Failed identity checks display readable sign-in guidance and no chat operation is sent. Shared tests cover opening without identity/models and retaining the new screen after an initial session link.

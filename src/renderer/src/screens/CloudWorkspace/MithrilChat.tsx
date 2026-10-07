@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { connectionNotice } from "./connection-notice";
 import { ChatSessions } from "@mithril/workspace/session-react";
 import "@mithril/workspace/styles.css";
 import {
@@ -37,7 +38,9 @@ export default function MithrilChat({
     setSidebarTarget(document.getElementById("cloud-session-sidebar"));
   }, []);
   const [identityChecked, setIdentityChecked] = useState(false);
-  const [connectionError, setConnectionError] = useState("");
+  const [connectionError, setConnectionError] = useState<ReturnType<
+    typeof connectionNotice
+  > | null>(null);
   const [epoch, setEpoch] = useState(0);
   const [accountId, setAccountId] = useState<string | null>(null);
   useEffect(
@@ -50,20 +53,15 @@ export default function MithrilChat({
   useEffect(() => {
     let canceled = false;
     setAccountId(null);
-    setConnectionError("");
+    setConnectionError(null);
     setIdentityChecked(false);
     void window.hermesAPI.cloudChat
       .status()
       .then((status) => {
         if (!canceled) setAccountId(status.userId);
       })
-      .catch(() => {
-        if (!canceled)
-          setConnectionError(
-            locale.startsWith("ja")
-              ? "Mithril にサインインしてチャットを続けてください。"
-              : "Sign in to Mithril to continue chatting.",
-          );
+      .catch((error) => {
+        if (!canceled) setConnectionError(connectionNotice(error, locale));
       })
       .finally(() => {
         if (!canceled) setIdentityChecked(true);
@@ -205,10 +203,7 @@ export default function MithrilChat({
         )}
       {connectionError && (
         <div className="session-notice" role="alert">
-          <p>{connectionError}</p>
-          <button type="button" onClick={onConnectAccount}>
-            {locale.startsWith("ja") ? "サインイン" : "Sign in"}
-          </button>
+          <p>{connectionError.message}</p>
         </div>
       )}
       <ChatSessions
@@ -217,7 +212,12 @@ export default function MithrilChat({
         sidebarSourceInventory={sourceInventory}
         onSidebarSourceSelect={onSourceHistorySelect}
         onSidebarSelect={onSidebarSelect}
-        onConnectionRequired={onConnectAccount}
+        onConnectionRequired={
+          connectionError?.retry
+            ? () => setEpoch((value) => value + 1)
+            : onConnectAccount
+        }
+        connectionRequiredLabel={connectionError?.action}
         onSidebarProjects={onSidebarProjects}
         key={`${profile}:${initialSessionId ?? ""}`}
         initialSessionId={initialSessionId}

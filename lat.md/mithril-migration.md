@@ -175,3 +175,9 @@ Desktop exposes only Mithril Agent for inference, using the fixed Mithril API en
 [[src/shared/mithril-provider-policy.ts#requireMithrilProvider]] rejects foreign providers and substituted endpoints before Desktop model writes, discovery or chat dispatch. Exact legacy Mithril aliases normalize to the named provider; reads never rewrite stored legacy data.
 
 Settings replaces legacy provider/key/OAuth/credential-pool controls with the Mithril account and model selector. Setup offers only Mithril. Local and remote model libraries are filtered, and session-only choices cannot bypass the provider boundary. Existing generic library helpers remain for legacy data compatibility, not user selection.
+
+## Signed-in authorization status
+
+A valid account is labeled Signed in independently of Chat and Workspace access. Missing explicit scopes open the existing account approval flow; generic transport failure offers retry rather than another sign-in.
+
+Shared Chat dependency for this repair is workspace 0.6.24-auth.1, SHA256 `808053fad14f293ef5c5cc325705fee6032993dead6db1a5994e313f51dcf753`. It adds a consumer authorization action label to the original welcome. Native keeps its explicit passkey device flow and distinguishes scoped approval from network retry.

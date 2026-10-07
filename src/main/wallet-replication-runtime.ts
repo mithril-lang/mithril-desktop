@@ -20,7 +20,22 @@ import { WalletReplication } from "./wallet-replication";
 import { WorkspaceReplicationLoop } from "./original-schedule-replication-loop";
 import { captureWalletSource, restoreWalletSource } from "./wallet-source";
 import type { WalletSyncResult } from "@mithril/workspace/desktop-wallet-types";
+import type { TokenBalancesResponse } from "@mithril/workspace/desktop-wallet-types";
+import { readCloudWalletBalances } from "./cloud-wallet-balances";
 let lane: Promise<void> = Promise.resolve();
+export async function canonicalWalletBalances(
+  profile: string,
+  address: string,
+): Promise<TokenBalancesResponse> {
+  await cloudWorkspace.enable();
+  const c = await cloudWorkspace.nativeContext();
+  return readCloudWalletBalances(profile, address, {
+    owner: c.userId,
+    guard: () => cloudWorkspace.assertNativeContext(c),
+    page: (after) => cloudWorkspace.repositoryPage("profile", after),
+    balances: (id) => cloudWorkspace.walletBalances(id),
+  });
+}
 function serial<T>(operation: () => Promise<T>): Promise<T> {
   const next = lane.then(operation);
   lane = next.then(

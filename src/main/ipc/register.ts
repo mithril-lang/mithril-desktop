@@ -1,4 +1,7 @@
-import { synchronizeWallets } from "../wallet-replication-runtime";
+import {
+  synchronizeWallets,
+  canonicalWalletBalances,
+} from "../wallet-replication-runtime";
 import { runOriginalScheduleScreen } from "../original-schedule-replication-runtime";
 import { registerTaskAttachmentIPC } from "../task-attachment-ipc";
 import { registerCapabilityResourceIPC } from "../capability-resource-ipc";
@@ -360,7 +363,6 @@ import {
   removeCustomProvider,
   upsertCustomProvider,
 } from "../providers-store";
-import { getTokenBalances } from "../wallet-balances";
 import type { ImportWalletInput } from "../../shared/wallets";
 import {
   readMemory,
@@ -3307,8 +3309,13 @@ export function registerIpcHandlers(context: IpcContext): void {
     status: "error" as const,
     error: walletUnavailable,
   }));
-  ipcMain.handle("get-token-balances", (_event, address: string) =>
-    getTokenBalances(address),
+  ipcMain.handle(
+    "get-token-balances",
+    (_event, address: string, profile?: string) =>
+      canonicalWalletBalances(
+        profile || getActiveProfileNameSync() || "default",
+        address,
+      ),
   );
 
   // Memory

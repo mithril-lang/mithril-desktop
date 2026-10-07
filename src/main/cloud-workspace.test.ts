@@ -4,6 +4,57 @@ import type { RepositoryEdit } from "@mithril/workspace/repository";
 import type { WorkspaceOperation } from "@mithril/workspace/protocol";
 
 const tokenA = `mf_${"a".repeat(43)}`;
+
+// @lat: [[cloud-workspace-tests#Canonical wallet fixed API transport]]
+it("uses the shared Web balance validator on a fixed authenticated API route and rejects malformed results", async () => {
+  const original = fetcher.getMockImplementation()! as (
+    url: string,
+  ) => Promise<Response>;
+  const id = "wallet-" + "a".repeat(64);
+  let malformed = false;
+  fetcher.mockImplementation(async (url: string) => {
+    if (url.endsWith(`/wallets/${id}/balances`))
+      return reply(
+        malformed
+          ? { address: "invalid" }
+          : {
+              address: "0x1234567890abcdef1234567890abcdef12345678",
+              fetchedAt: 1,
+              balances: [
+                {
+                  tokenId: "eth",
+                  symbol: "ETH",
+                  raw: "",
+                  formatted: "—",
+                  formattedFull: "—",
+                  error: "Unavailable",
+                },
+              ],
+            },
+      );
+    return original(url);
+  });
+  await client.enable();
+  expect((await client.walletBalances(id)).balances[0].error).toBe(
+    "Unavailable",
+  );
+  expect(
+    fetcher.mock.calls.some(
+      (call) =>
+        call[0] ===
+        `https://api.mithril.fund/v1/workspace/wallets/${id}/balances`,
+    ),
+  ).toBe(true);
+  malformed = true;
+  await expect(client.walletBalances(id)).rejects.toThrow(
+    "Invalid wallet balances",
+  );
+  const count = fetcher.mock.calls.length;
+  await expect(client.walletBalances("../other")).rejects.toThrow(
+    "Invalid wallet identity",
+  );
+  expect(fetcher.mock.calls).toHaveLength(count);
+});
 const tokenB = `mf_${"b".repeat(43)}`;
 const operation: WorkspaceOperation = {
   operationId: "op1",

@@ -1053,3 +1053,19 @@ Cloud restoration changes only the wallet name, preserving exact native cipherte
 ## Original wallet card refresh after synchronization
 
 The actual Native adapter consumes the compiled shared pane and displays the restored original name after synchronization even with no remote-only wallets.
+
+## Canonical wallet balance resolution
+
+Native balance reads resolve a stable owner/profile descriptor across repository pages before calling the same canonical endpoint as Web.
+
+## Canonical wallet scope rejection
+
+Foreign owners, other profiles, deleted records and forged public descriptor identities refuse reads before balance transport.
+
+## Canonical wallet response fencing
+
+Account retirement or a mismatched returned address rejects the response instead of applying it to another card or presenting missing balances as zero.
+
+## Canonical wallet fixed API transport
+
+The Native main-process transport uses the same public balance response validator and fixed authenticated API route as Web, refusing malformed results and unsafe identifiers.

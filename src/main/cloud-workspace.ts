@@ -15,6 +15,7 @@ import {
 } from "@mithril/workspace/registry-bundle";
 import {
   repositoryCollections,
+  createRepositoryTransport,
   validRepositoryEdit,
   validRepositoryPage,
   validRepositoryReceipt,
@@ -22,6 +23,7 @@ import {
   type RepositoryCollection,
   type RepositoryEdit,
 } from "@mithril/workspace/repository";
+import type { TokenBalancesResponse } from "@mithril/workspace/desktop-wallet-types";
 import {
   validSecuritySnapshot,
   validSecuritySubmit,
@@ -547,6 +549,22 @@ export class CloudWorkspace {
     if (!validRepositoryPage(value, collection, after))
       throw Error("Invalid repository page");
     return value;
+  }
+
+  /** Public balances use the same fixed route and validator as the Web consumer. */
+  async walletBalances(id: string): Promise<TokenBalancesResponse> {
+    if (!/^wallet-[a-f0-9]{64}$/.test(id))
+      throw Error("Invalid wallet identity");
+    const session = await this.session();
+    const transport = createRepositoryTransport(async (path) => {
+      if (path !== `/v1/workspace/wallets/${id}/balances`)
+        throw Error("Invalid wallet route");
+      const value = await this.request(path, session.token, session.profile);
+      return new Response(JSON.stringify(value), {
+        headers: { "content-type": "application/json" },
+      });
+    });
+    return transport.walletBalances!(id);
   }
   async repositoryHistory(
     collection: RepositoryCollection,

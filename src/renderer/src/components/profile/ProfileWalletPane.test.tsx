@@ -92,6 +92,10 @@ describe("ProfileWalletPane balance chips", () => {
     await view.findByText("Renamed on Web");
     expect(view.queryByText("Primary")).toBeNull();
     expect(window.hermesAPI.listWallets).toHaveBeenCalledTimes(2);
+    expect(window.hermesAPI.getTokenBalances).toHaveBeenCalledWith(
+      WALLET.address,
+      "default",
+    );
   });
   it("renders the symbol label exactly once per token and the icon only when known", async () => {
     installApi();

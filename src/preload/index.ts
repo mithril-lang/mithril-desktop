@@ -1320,8 +1320,11 @@ const hermesAPI = {
   ): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke("delete-wallet", profile, id),
 
-  getTokenBalances: (address: string): Promise<TokenBalancesResponse> =>
-    ipcRenderer.invoke("get-token-balances", address),
+  getTokenBalances: (
+    address: string,
+    profile?: string,
+  ): Promise<TokenBalancesResponse> =>
+    ipcRenderer.invoke("get-token-balances", address, profile),
 
   // Memory
   readMemory: (

@@ -14,9 +14,9 @@ Local **creation/import is being retired** in favour of backend-provisioned wall
 
 ## Token Balances
 
-On-chain balance reads for Base mainnet ERC-20 tokens, fetched via ethers v6 `JsonRpcProvider`.
+The active Wallet UI reads Base mainnet balances through the canonical Mithril API. The older direct-RPC module remains for historical tests.
 
-[[src/main/wallet-balances.ts#getTokenBalances]] takes a wallet address and returns a `TokenBalancesResponse` containing native ETH plus all configured ERC-20 token balances. Uses `Promise.allSettled()` so one token RPC failure does not block others — each failed token gets an `error` field.
+The retained [[src/main/wallet-balances.ts#getTokenBalances]] takes a wallet address and returns a `TokenBalancesResponse` containing native ETH plus all configured ERC-20 token balances. It uses `Promise.allSettled()` so one token RPC failure does not block others. The active IPC no longer calls this direct-RPC implementation.
 
 Each RPC read is wrapped in [[src/main/wallet-balances.ts#withTimeout]] (10s default; ethers v6 has no per-request timeout) so a hung endpoint surfaces as a per-token timeout error instead of a chip that spins forever.
 
@@ -28,7 +28,9 @@ Token metadata (contract address, symbol, decimals) lives in [[src/shared/tokens
 
 ### IPC & UI
 
-The `get-token-balances` IPC channel exposes balance reads to the renderer. Balances auto-fetch when the wallet pane loads; previously cached balances display immediately while fresh ones load, then update in place.
+The `get-token-balances` IPC channel exposes canonical API balance reads to the renderer, using the dialog profile to resolve the correct public wallet.
+
+The original Native adapter includes its dialog profile so a different active profile cannot redirect the lookup. Balances auto-fetch when the wallet pane loads; previously cached balances display immediately while fresh ones load, then update in place.
 
 Balance data is cached at module level (keyed by wallet address) so it survives tab switches — when the component remounts, it hydrates from the cache instantly and refreshes in the background. Each balance renders as a chip: token icon (only when a known icon is mapped) + symbol label (exactly once) + compact amount (K/M). Hovering a chip shows a native tooltip with the full amount via `formattedFull`. Wallet deletion uses a confirmation modal with red warnings.
 
@@ -56,4 +58,10 @@ The Desktop startup data loop automatically publishes original public wallet met
 
 Remote-only wallets appear as read-only cards in the original pane. Remote names restore through [[src/main/wallet-source.ts#restoreWalletSource]] only when the original source still matches its captured baseline. The atomic private file replacement preserves exact ciphertext and all other records; cloud edits cannot change native address, network or custody provenance. Restart after file restoration adopts the already-observed cloud revision instead of republishing it. Concurrent native/cloud changes remain retained conflicts.
 
-Cloud tombstones do not erase native keys. Canonical API balance reads for native cards and unified cloud deletion visibility remain unfinished. No live API publication or installed Desktop update is proven by these fixture tests.
+Cloud tombstones do not erase native keys. Unified cloud deletion visibility remains unfinished. No live API publication or installed Desktop update is proven by these fixture tests.
+
+## Canonical native wallet balance adapter (draft)
+
+The original Wallet pane sends its profile to the Native IPC adapter, which resolves the authenticated account's public descriptor and uses the same fixed API route and response validator as Web.
+
+[[src/main/cloud-wallet-balances.ts#readCloudWalletBalances]] checks owner, profile, stable record identity, pagination and returned address; an unpublished wallet remains unavailable until synchronization succeeds. [[src/main/cloud-workspace.ts#CloudWorkspace#walletBalances]] calls the canonical `/v1/workspace/wallets/:id/balances` route through existing scoped account authentication and shared validation. [[src/main/wallet-replication-runtime.ts#canonicalWalletBalances]] fences account changes. The IPC path no longer calls the direct Base RPC module; that module remains for historical tests. Existing Workspace connection authorization is required and scopes are never upgraded. Fixture results do not prove a live API or installed-client read.

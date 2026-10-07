@@ -90,6 +90,12 @@ export interface NativeHistoryPorts {
   transport: SessionTransport;
   read(owner: string, profile: string): NativeHistoryJournal;
   write(owner: string, profile: string, journal: NativeHistoryJournal): void;
+  writeEntry?(
+    owner: string,
+    profile: string,
+    sessionId: string,
+    entry: NativeHistoryJournal["entries"][string],
+  ): void;
 }
 const fingerprint = (item: ArchivedHistoryItem): string =>
   createHash("sha256")
@@ -217,10 +223,6 @@ export class NativeHistorySync {
       Array.isArray(state.entries)
     )
       throw Error("Invalid history journal");
-    const persist = async (): Promise<void> => {
-      await check();
-      this.ports.write(identity.userId, identity.profile, state);
-    };
     let source: NativeHistorySource[];
     let sourceFailure: string | null = null;
     try {
@@ -260,6 +262,17 @@ export class NativeHistorySync {
     for (const native of source) {
       const sid = nativeCloudSessionId(identity.profile, native.id);
       const journal = (state.entries[sid] ??= { hashes: {}, pending: null });
+      const persist = async (): Promise<void> => {
+        await check();
+        if (this.ports.writeEntry)
+          this.ports.writeEntry(
+            identity.userId,
+            identity.profile,
+            sid,
+            journal,
+          );
+        else this.ports.write(identity.userId, identity.profile, state);
+      };
       if (
         !journal ||
         typeof journal.hashes !== "object" ||

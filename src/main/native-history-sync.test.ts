@@ -105,6 +105,9 @@ function fixture(): {
     write: (_owner, _profile, value) => {
       state = structuredClone(value);
     },
+    writeEntry: (_owner, _profile, sid, entry) => {
+      state.entries[sid] = structuredClone(entry);
+    },
     transport: {
       list: async () => ({
         schemaVersion: 1,
@@ -373,12 +376,24 @@ describe("automatic rich native history archival", () => {
   // @lat: [[cloud-workspace-tests#Continuous rich chat history]]
   it("requires a durable journal before submitting any operation", async () => {
     const f = fixture();
+    delete f.ports.writeEntry;
     f.ports.write = () => {
       throw Error("Disk unavailable");
     };
     const result = await new NativeHistorySync(f.ports).run();
     expect(result.deferred[0]).toContain("Disk unavailable");
     expect(f.sessions.size).toBe(0);
+  });
+  // @lat: [[cloud-workspace-tests#Cloud workspace tests#Incremental journal failure fences dispatch]]
+  it("does not dispatch when the incremental durability boundary fails", async () => {
+    const f = fixture();
+    f.ports.writeEntry = () => {
+      throw Error("Entry disk unavailable");
+    };
+    const result = await new NativeHistorySync(f.ports).run();
+    expect(result.deferred[0]).toContain("Entry disk unavailable");
+    expect(f.sessions.size).toBe(0);
+    expect(f.executions()).toBe(0);
   });
   // @lat: [[cloud-workspace-tests#Cloud history working cache]]
   it("pulls cloud-only edits to the working cache without echoing stale native data", async () => {
@@ -576,7 +591,7 @@ it("archives over one thousand original sessions and replays a lost receipt with
     Object.values(f.state().entries).every((entry) => entry.pending === null),
   ).toBe(true);
   expect(f.executions()).toBe(0);
-}, 60000);
+});
 
 // @lat: [[cloud-workspace-tests#Remote-only chat reconstruction]]
 it("reads bounded remote pages and refuses oversized histories before changing the retained cache", async () => {

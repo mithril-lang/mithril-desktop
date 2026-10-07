@@ -1177,3 +1177,11 @@ The real archival engine synchronizes 1,005 source sessions and durable journal 
 ## Large original provenance mapping
 
 Original SQLite mappings retain source ownership and exact deletion provenance above one thousand source sessions, including the last row.
+
+## Incremental durable history journal
+
+Changed-session journal files preserve legacy pending operations, retain untouched entries, survive interrupted temporary writes and reject mixed owners or symlinked storage.
+
+## Incremental journal failure fences dispatch
+
+A failed incremental journal write prevents cloud operations; compatibility adapters without incremental support still use the existing whole-journal durability boundary.

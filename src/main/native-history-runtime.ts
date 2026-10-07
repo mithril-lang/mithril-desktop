@@ -10,18 +10,13 @@ import {
   applyCloudSessionArchive,
 } from "./native-history-title";
 import { app } from "electron";
-import { createHash, randomUUID } from "crypto";
+import { createHash } from "crypto";
 import {
   existsSync,
   lstatSync,
   mkdirSync,
   readFileSync,
   writeFileSync,
-  renameSync,
-  openSync,
-  fsyncSync,
-  closeSync,
-  unlinkSync,
 } from "fs";
 import { dirname, join, resolve, basename } from "path";
 import { cloudChat, onCloudChatAccountChanged } from "./cloud-chat-runtime";
@@ -35,6 +30,10 @@ import { getConnectionConfig } from "./config";
 import { getDbConnection } from "./db";
 import { activeStateDbPath } from "./utils";
 import { getSessionMessages, listSessions, type HistoryItem } from "./sessions";
+import {
+  readNativeHistoryJournal,
+  writeNativeHistoryEntry,
+} from "./native-history-journal";
 import { nativeSessionInventory } from "./native-session-inventory";
 import {
   bindRepositorySource,
@@ -75,55 +74,16 @@ function checked(path: string): void {
     current = parent;
   }
 }
-function journalPath(owner: string, profile: string): string {
-  checked(root());
-  mkdirSync(root(), { recursive: true, mode: 0o700 });
-  const file = join(
-    root(),
-    createHash("sha256")
-      .update(JSON.stringify([owner, profile]))
-      .digest("hex") + ".json",
-  );
-  checked(file);
-  return file;
-}
 function read(owner: string, profile: string): NativeHistoryJournal {
-  const file = journalPath(owner, profile);
-  if (!existsSync(file)) return { entries: {} };
-  if (!lstatSync(file).isFile() || lstatSync(file).size > 64 * 1024 * 1024)
-    throw Error("History journal exceeds supported bound; source retained");
-  return JSON.parse(readFileSync(file, "utf8"));
+  return readNativeHistoryJournal(root(), owner, profile);
 }
 function write(
   owner: string,
   profile: string,
   state: NativeHistoryJournal,
 ): void {
-  const file = journalPath(owner, profile),
-    temp = file + "." + randomUUID() + ".tmp",
-    value = JSON.stringify(state);
-  if (Buffer.byteLength(value) > 64 * 1024 * 1024)
-    throw Error("History journal exceeds supported bound; source retained");
-  try {
-    writeFileSync(temp, value, { flag: "wx", mode: 0o600 });
-    const fd = openSync(temp, "r");
-    try {
-      fsyncSync(fd);
-    } finally {
-      closeSync(fd);
-    }
-    renameSync(temp, file);
-    if (process.platform !== "win32") {
-      const directory = openSync(dirname(file), "r");
-      try {
-        fsyncSync(directory);
-      } finally {
-        closeSync(directory);
-      }
-    }
-  } finally {
-    if (existsSync(temp)) unlinkSync(temp);
-  }
+  for (const [sessionId, entry] of Object.entries(state.entries))
+    writeNativeHistoryEntry(root(), owner, profile, sessionId, entry);
 }
 const attachments = new Map<string, HistoryAttachment>();
 function attachmentBytes(file: Attachment): Uint8Array {
@@ -407,6 +367,8 @@ export function createNativeHistoryRuntime(
     transport: cloudChat,
     read,
     write,
+    writeEntry: (owner, profile, sessionId, entry) =>
+      writeNativeHistoryEntry(root(), owner, profile, sessionId, entry),
     deletions: {
       list: async (identity) => {
         if (JSON.stringify(identity) !== JSON.stringify(await historyContext()))

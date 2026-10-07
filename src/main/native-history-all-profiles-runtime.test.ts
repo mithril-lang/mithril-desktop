@@ -572,12 +572,22 @@ it("archives all profiles through the real engine and canonical HTTP adapter, re
   const journalStates =
     (): import("./native-history-sync").NativeHistoryJournal[] =>
       readdirSync(join(f.data, "history-replication"))
-        .filter((name) => name.endsWith(".json"))
-        .map((name) =>
-          JSON.parse(
-            readFileSync(join(f.data, "history-replication", name), "utf8"),
+        .filter((name) => name.endsWith(".entries"))
+        .map((name) => ({
+          entries: Object.fromEntries(
+            readdirSync(join(f.data, "history-replication", name))
+              .filter((file) => file.endsWith(".json"))
+              .map((file) => {
+                const row = JSON.parse(
+                  readFileSync(
+                    join(f.data, "history-replication", name, file),
+                    "utf8",
+                  ),
+                );
+                return [row.sessionId, row.entry];
+              }),
           ),
-        );
+        }));
   const pending = journalStates()
     .flatMap((state) => Object.values(state.entries))
     .filter((entry) => entry.pending);

@@ -1,3 +1,4 @@
+import { OriginalScheduleRuntimeBindings } from "./original-schedule-runtime-bindings";
 import { OriginalScheduleFileResourceBindings } from "./original-schedule-resource-bindings";
 import { NativeOriginalScheduleReplicaStore } from "./original-schedule-replica-store";
 import { OriginalScheduleWorkdirResources } from "./original-schedule-workdir-resources";
@@ -572,7 +573,12 @@ it("composes script and workdir restoration with durable baselines across a fail
   const scriptBaseline = await f.service.capture(targetScripts),
     workBaseline = await f.service.capture(f.local);
   const source = workdirFile(f.home, f.remote);
-  const runtime = { capture: async () => [], restore: async () => [] };
+  const runtime = new OriginalScheduleRuntimeBindings(
+    f.scope,
+    { capture: () => null },
+    { assert: async () => undefined },
+    f.guard,
+  );
   const journal = join(f.home, "replica-journal");
   const store = new NativeOriginalScheduleReplicaStore(journal, f.scope);
   const sender = new OriginalScheduleFileResourceBindings(

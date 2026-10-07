@@ -506,3 +506,15 @@ Verify a process stop before filesystem restoration leaves the exact private pat
 ## Original schedule resource composition restart
 
 Verify real script and workdir files restore together through the composed binding and SQLite journal, then a failed source write and restart preserve newer local file edits without recapturing baselines or rebinding destinations.
+
+## Original schedule private runtime claim roundtrip
+
+Verify portable source contains no originating PID or process nonce, destination claim tokens retain opaque integers exactly, and execution admission receives the complete source digest and stable job identities.
+
+## Original schedule runtime claim admission refusal
+
+Verify raw and foreign cloud claims, changed native CAS and unavailable execution authority refuse before native capture or any restoration can occur.
+
+## Original schedule runtime absent native claims
+
+Verify new native inventories receive null runtime claims while preserving original schedule data and account changes refuse further binding work.

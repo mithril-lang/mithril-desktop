@@ -470,3 +470,15 @@ A real private SQLite journal preserves the exact bound target after restart, ne
 ## New Chat before sign-in
 
 The shared New Chat action navigates before cloud authentication or model discovery and creates no empty cloud session. A failed Native identity check displays readable sign-in guidance without sending a turn.
+
+## Original schedule directory byte roundtrip
+
+Real temporary script/binary files roundtrip through owner-scoped resource storage and transactional restoration, retaining executable flags, excluding credentials and preserving newer edits when a receipt is replayed after restart.
+
+## Original schedule directory isolation
+
+Foreign owners/profiles, symlink sources and invalidated accounts cannot restore schedule directory files; destination bytes remain intact.
+
+## Original schedule directory integrity
+
+Tampered downloaded chunk bytes are rejected before any destination mutation, retaining original files for recovery.

@@ -659,3 +659,13 @@ The shared sidebar opens an empty Chat without waiting for cloud identity or mod
 Normal workspace screens and the Desktop sidebar no longer expose Device data/history migration sections. [[src/renderer/src/screens/CloudWorkspace/RepositoryReplication.tsx#RepositoryReplication]] continues background owner-scoped synchronization. [[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx]] shows a readable sign-in action instead of raw scope errors. Authentication and permissions remain enforced; no tokens gain scopes automatically.
 
 The New Chat candidate pins workspace 0.6.23-schedules.2 from Fund b8f68349, SHA256 `8e17de27e7930368fbaed553c6143a0a3395e5c6f4c461fa5e35280d79f8b699`. The immutable archive contains 411 files and was packed only after the completed build; it remains a draft dependency pending production publication.
+
+## Original schedule directory resources (draft)
+
+Original scripts and workdir trees can be retained through owner-scoped schedule resources, preserving permitted file bytes and executable flags without running jobs.
+
+[[src/main/original-schedule-directory-resources.ts#OriginalScheduleDirectoryResources]] uses the fixed schedule resource namespace with an immutable profile-bound manifest. Capture publishes verified chunks before returning its pointer and disposes staging files. Known credential/cache filenames are excluded by the existing directory capture policy; the main-only result retains the exclusion count. This is permitted-file synchronization, not synchronization of secrets, arbitrary runtime interpreters, empty directories or symbolic links.
+
+[[src/main/skill-resource-snapshot.ts#downloadDirectoryResources]] reuses the existing bounded manifest/chunk verifier for schedule directories; the Skill-specific wrapper still validates its original pointer contract. Restoration downloads the retained baseline and target, then uses the original transactional directory CAS and durable operation receipts. Concurrent local changes produce a conflict, while an acknowledged retry leaves newer edits untouched. Private state is separated by owner/profile/timezone. Account guards surround asynchronous I/O and the native write. Windows restoration remains deferred by the existing filesystem adapter.
+
+This primitive is tested against real temporary files and an owner-scoped storage fixture. Concrete job-field bindings, execution authority admission, lifecycle mounting, real-cloud qualification and installer publication are still required before claiming automatic original schedule synchronization. No new migration panel or renderer IPC is added.

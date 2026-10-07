@@ -294,25 +294,49 @@ export async function downloadSkillResources(
 ): Promise<SkillResourceCapture> {
   if (!validSkillResourcePointer(pointer))
     throw new Error("Invalid Skill resource pointer");
-  await guard();
-  const manifest = await transport.getManifest(
+  return downloadDirectoryResources(
     pointer.capabilityId,
     pointer.manifest,
+    transport,
+    stateRoot,
+    guard,
   );
+}
+
+/** Main-process data download shared by Skills and original schedule directory bindings. */
+export async function downloadDirectoryResources(
+  resourceId: string,
+  manifestDigest: string,
+  transport: CapabilityResourceTransport,
+  stateRoot: string,
+  guard: () => Promise<void>,
+): Promise<SkillResourceCapture> {
+  if (
+    !validCapabilityResourceManifest({
+      version: 1,
+      capabilityId: resourceId,
+      files: [],
+    }) ||
+    typeof manifestDigest !== "string" ||
+    !/^[a-f0-9]{64}$/.test(manifestDigest)
+  )
+    throw new Error("Invalid directory resource pointer");
+  await guard();
+  const manifest = await transport.getManifest(resourceId, manifestDigest);
   await guard();
   if (
     !validCapabilityResourceManifest(manifest) ||
-    manifest.capabilityId !== pointer.capabilityId ||
+    manifest.capabilityId !== resourceId ||
     createHash("sha256")
       .update(capabilityResourceManifestBytes(manifest))
-      .digest("hex") !== pointer.manifest
+      .digest("hex") !== manifestDigest
   )
     throw new Error("Skill resource manifest integrity mismatch");
   checked(stateRoot);
   mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
   checked(stateRoot);
   const stage = mkdtempSync(join(stateRoot, ".mithril-sync-skill-download-"));
-  const capture = stagedResources(stage, manifest, pointer.manifest, 0);
+  const capture = stagedResources(stage, manifest, manifestDigest, 0);
   try {
     const downloaded = new Set<string>();
     for (const file of manifest.files) {
@@ -325,7 +349,7 @@ export async function downloadSkillResources(
         const digest = file.chunks[index];
         await guard();
         if (!downloaded.has(digest)) {
-          const bytes = await transport.getChunk(pointer.capabilityId, digest);
+          const bytes = await transport.getChunk(resourceId, digest);
           await guard();
           if (
             bytes.length > CHUNK_BYTES ||

@@ -583,4 +583,6 @@ New Chat opens the shared empty conversation before authentication or model disc
 
 The sidebar uses the same shared history and workspace across Web and Desktop. Background owner-scoped reconciliation in [[src/renderer/src/screens/CloudWorkspace/RepositoryReplication.tsx#RepositoryReplication]] continues without an import prompt. [[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx]] displays readable sign-in guidance on failed identity checks. Existing tokens remain scoped and never gain permissions automatically.
 
-The installer candidate pins immutable workspace `0.6.24-chat.1`, SHA256 `ece54a29e2b5e631091a266a1b2b6865df1ee42dfd0b85a95117539b177662b3`, built from Fund `4af2586b`. It excludes the unfinished original schedule resource/replica draft and includes only the normal Chat/migration-navigation repair on current main.
+The installer candidate pins immutable workspace `0.6.24-chat.4`, SHA256 `2e32c3e3bec3927eb22310bf2ec8fab60b6b0d79fd2272e67b8cab7caf0c04cf`, built from Fund `a47f138f`. It excludes the unfinished original schedule resource/replica draft and includes only the normal Chat/migration-navigation repair on current main.
+
+Preview.34 preserves the shared editor compile action approved in preview.33, and the Web URL history fix. The producer passed 228 workspace tests; Web consumer results are tracked independently.

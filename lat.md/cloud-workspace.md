@@ -915,3 +915,9 @@ Main-workspace settings entry points use the same account repository and origina
 Bootstrap setup and an explicit different native profile still use the original provider; multi-profile canonical targeting remains required. This is not full preference migration or installed-client proof.
 
 The `.8` archive was verified against all 426 producer and installed files with lock SHA512; SHA256 `f09d12e8b5fcbb10b4de133a63c855f271406197b29be6f16b421c17a5427784`. Original Settings provider/modal/workspace tests passed 10 cases; shared browser Settings/Chat tests passed nine. Publication and installed-client qualification remain separate.
+
+## Background presentation synchronization
+
+Desktop applies confirmed account preferences independently of the selected screen using the canonical shared preferences observer.
+
+The background reconciler observes the same rich `preferences/presentation` record as Settings and forwards validated values through the original Desktop theme, font, language, spellcheck and sound providers. Owner/profile epochs suppress old replies; pending values are not applied as confirmed. Startup does not seed defaults or grant authority. This candidate still requires production publication and installed-client verification.

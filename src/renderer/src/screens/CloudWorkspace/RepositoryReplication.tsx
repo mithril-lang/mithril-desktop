@@ -1,3 +1,5 @@
+import { usePresentation } from "@mithril/workspace/react";
+import { useWorkspacePreferences } from "./useWorkspacePreferences";
 import { connectionNotice as describeConnectionFailure } from "./connection-notice";
 import { useEffect, useRef, useState } from "react";
 import { useRepositoryReplication } from "@mithril/workspace/repository-react";
@@ -143,6 +145,14 @@ export default function RepositoryReplication({
       clearInterval(timer);
     };
   }, [enabled, owner, profile, epoch, locale]);
+  const applyPreferences = useWorkspacePreferences();
+  const presentation = usePresentation({
+    owner: enabled ? owner : null,
+    transport: window.hermesAPI.cloudWorkspace.repository,
+    identityEpoch: `${profile}:${epoch}`,
+    legacy: [],
+    onApply: applyPreferences,
+  });
   const replication = useRepositoryReplication(
     owner,
     window.hermesAPI.cloudWorkspace.repository,
@@ -217,7 +227,11 @@ export default function RepositoryReplication({
           ? "表示"
           : "Visible"
       : value;
-  const notice = connectionNotice || replication.notice || historyNotice;
+  const notice =
+    connectionNotice ||
+    replication.notice ||
+    presentation.notice ||
+    historyNotice;
   if (
     !enabled ||
     (!notice &&

@@ -780,3 +780,9 @@ The original background reconciler resumes native history after a five-second ne
 Global settings commands delegate to the active workspace instead of opening a second native preference editor.
 
 The command retains its requested section and explicit profile. An accepted workspace handler mounts no bootstrap modal; cleanup restores the original setup path. A declined different-profile target retains its exact native setup selection until the canonical route supports that profile. Browser tests separately exercise the original dialog's active/inactive lifecycle without replacing transports.
+
+## Background presentation synchronization
+
+Confirmed cloud presentation preferences apply while Chat is active, without opening Workspace or writing startup defaults.
+
+The always-mounted reconciler applies the initial theme and language, refreshes a revision edited on another device after ten seconds, and does not write preferences. An old-account reply after account change cannot reach Desktop providers.

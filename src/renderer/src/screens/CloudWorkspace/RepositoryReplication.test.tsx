@@ -1,3 +1,4 @@
+import "fake-indexeddb/auto";
 import {
   cleanup,
   act,
@@ -8,6 +9,10 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import RepositoryReplication from "./RepositoryReplication";
+const preferences = vi.hoisted(() => ({ apply: vi.fn() }));
+vi.mock("./useWorkspacePreferences", () => ({
+  useWorkspacePreferences: () => preferences.apply,
+}));
 vi.mock("@mithril/workspace/repository-react", () => ({
   useRepositoryReplication: () => ({
     notice: "",
@@ -28,7 +33,12 @@ const resolveModel = vi.fn();
 const resolveVisibility = vi.fn();
 let changed: () => void;
 let owner: string;
-beforeEach(() => {
+beforeEach(async () => {
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase("mithril-repository");
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
   vi.clearAllMocks();
   owner = "alice";
   sync.mockImplementation(async () => ({
@@ -47,7 +57,15 @@ beforeEach(() => {
       cloudWorkspace: {
         status: async () => ({ userId: owner }),
         enable: async () => ({ userId: owner }),
-        repository: {},
+        repository: {
+          page: vi.fn(async () => ({
+            schemaVersion: 1,
+            userId: owner,
+            documents: [],
+            nextAfter: null,
+          })),
+          apply: vi.fn(),
+        },
         replica: {},
       },
       cloudChat: {
@@ -268,4 +286,105 @@ it("reviews visibility in the existing notice without exposing a separate histor
   );
   expect(resolve).not.toHaveBeenCalled();
   expect(resolveModel).not.toHaveBeenCalled();
+});
+
+// @lat: [[cloud-workspace-tests#Background presentation synchronization]]
+it("applies confirmed cloud settings while no Workspace screen is open and refreshes other-device changes", async () => {
+  const timers: { run: () => void; delay: number | undefined }[] = [];
+  const originalInterval = globalThis.setInterval;
+  vi.spyOn(globalThis, "setInterval").mockImplementation((run, delay) => {
+    timers.push({ run: run as () => void, delay });
+    return originalInterval(run, delay);
+  });
+  let revision = 1;
+  const page = vi.spyOn(window.hermesAPI.cloudWorkspace.repository, "page");
+  page.mockImplementation(async () => ({
+    schemaVersion: 1,
+    userId: owner,
+    nextAfter: null,
+    documents: [
+      {
+        collection: "preferences",
+        id: "presentation",
+        revision,
+        deleted: false,
+        updatedAt: revision,
+        body: {
+          schemaVersion: 1,
+          scope: "presentation",
+          values: { theme: revision === 1 ? "light" : "dark", locale: "ja" },
+        },
+      },
+    ],
+  }));
+  render(<RepositoryReplication profile="default" locale="en" enabled />);
+  await waitFor(() => expect(page).toHaveBeenCalled());
+  await waitFor(() =>
+    expect(preferences.apply).toHaveBeenLastCalledWith({
+      theme: "light",
+      locale: "ja",
+    }),
+  );
+  expect(
+    window.hermesAPI.cloudWorkspace.repository.apply,
+  ).not.toHaveBeenCalled();
+  revision = 2;
+  await act(async () => {
+    const timer = timers.find((timer) => timer.delay === 10000);
+    expect(timer).toBeTruthy();
+    timer!.run();
+  });
+  await waitFor(() =>
+    expect(preferences.apply).toHaveBeenLastCalledWith({
+      theme: "dark",
+      locale: "ja",
+    }),
+  );
+  expect(
+    window.hermesAPI.cloudWorkspace.repository.apply,
+  ).not.toHaveBeenCalled();
+});
+it("rejects an old-account preference reply after account change", async () => {
+  let complete!: (
+    value: Awaited<
+      ReturnType<typeof window.hermesAPI.cloudWorkspace.repository.page>
+    >,
+  ) => void;
+  vi.spyOn(
+    window.hermesAPI.cloudWorkspace.repository,
+    "page",
+  ).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+  );
+  render(<RepositoryReplication profile="default" locale="en" enabled />);
+  await waitFor(() => expect(complete).toBeTruthy());
+  owner = "bob";
+  await act(async () => {
+    changed();
+  });
+  await act(async () => {
+    complete({
+      schemaVersion: 1,
+      userId: "alice",
+      nextAfter: null,
+      documents: [
+        {
+          collection: "preferences",
+          id: "presentation",
+          revision: 1,
+          deleted: false,
+          updatedAt: 1,
+          body: {
+            schemaVersion: 1,
+            scope: "presentation",
+            values: { theme: "light" },
+          },
+        },
+      ],
+    });
+  });
+  expect(preferences.apply).not.toHaveBeenCalled();
 });

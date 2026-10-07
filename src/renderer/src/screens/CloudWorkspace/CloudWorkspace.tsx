@@ -1,17 +1,12 @@
+import { useWorkspacePreferences } from "./useWorkspacePreferences";
 import * as Dialog from "@radix-ui/react-dialog";
 import MithrilAccountSection from "../../components/MithrilAccountSection";
 import { saveTaskAttachmentDownload } from "@mithril/workspace/task-attachment-download";
-import { useFont } from "../../components/FontProvider";
 import { useChatPreferences } from "../../components/ChatPreferencesProvider";
-import { THEMES, FONT_OPTIONS } from "../../constants";
-import { setAnalyticsConsent } from "../../utils/analytics";
 import {
   NativeSettingsPane,
   NativeSettingsProvider,
 } from "../../components/settings/SettingsModal";
-import { useTheme } from "../../components/ThemeProvider";
-import { useI18n } from "../../components/useI18n";
-import { APP_LOCALES, type AppLocale } from "../../../../shared/i18n";
 import { portableRepositorySeeds } from "@mithril/workspace/repository-migration";
 import type { RuntimeSection } from "@mithril/workspace/runtime";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -49,47 +44,8 @@ export default function CloudWorkspace({
     }),
     [],
   );
-  const { setTheme, setRounded } = useTheme();
-  const { setFont } = useFont();
+  const preferences = useWorkspacePreferences();
   const chat = useChatPreferences();
-  const { setLocale } = useI18n();
-  const preferences = useCallback(
-    (data: Record<string, unknown>): void => {
-      if (
-        typeof data.theme === "string" &&
-        (data.theme === "system" ||
-          THEMES.some((theme) => theme.id === data.theme))
-      )
-        setTheme(data.theme);
-      if (
-        typeof data.font === "string" &&
-        FONT_OPTIONS.some((font) => font.value === data.font)
-      )
-        setFont(data.font);
-      if (typeof data.rounded === "boolean") setRounded(data.rounded);
-      if (typeof data.completionSoundEnabled === "boolean")
-        chat.setCompletionSoundEnabled(data.completionSoundEnabled);
-      if (typeof data.spellcheckEnabled === "boolean")
-        chat.setSpellcheckEnabled(data.spellcheckEnabled);
-      if (typeof data.spellcheckUseSystemLanguages === "boolean")
-        chat.setSpellcheckUseSystemLanguages(data.spellcheckUseSystemLanguages);
-      if (
-        Array.isArray(data.spellcheckLanguages) &&
-        data.spellcheckLanguages.every(
-          (language) => typeof language === "string",
-        )
-      )
-        chat.setSpellcheckLanguages(data.spellcheckLanguages);
-      if (typeof data.analyticsEnabled === "boolean")
-        setAnalyticsConsent(data.analyticsEnabled);
-      if (
-        typeof data.locale === "string" &&
-        (APP_LOCALES as readonly string[]).includes(data.locale)
-      )
-        setLocale(data.locale as AppLocale);
-    },
-    [setTheme, setLocale, setRounded, setFont, chat],
-  );
   const [identityEpoch, setIdentityEpoch] = useState(0);
   const [signInOpen, setSignInOpen] = useState(false);
   useEffect(() => setSignInOpen(false), [profile]);

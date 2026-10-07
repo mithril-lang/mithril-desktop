@@ -42,6 +42,14 @@ Vitest test suites for wallet store and balance reads.
 
 ## Shared original wallet pane (draft)
 
-The original Wallet pane is provided by workspace 0.6.29-schedules.23 and consumed through the Desktop IPC adapter, preserving cards, balances, copying and deletion confirmation.
+The original Wallet pane is provided by workspace 0.6.29-schedules.25 and consumed through the Desktop IPC adapter, preserving cards, balances, copying and deletion confirmation.
 
-Visible local/cloud origin badges are removed. Public DTOs share one definition; recovery phrases and encrypted wallet files remain behind the native store. Service-unavailable compatibility routes return an error instead of falsely reporting sign-out. Profile replacement retires pending list/sync results. Canonical wallet descriptor synchronization and the Web adapter remain unfinished; this extraction is not live parity or installed-update evidence.
+Visible local/cloud origin badges are removed. Public DTOs share one definition; recovery phrases and encrypted wallet files remain behind the native store. Service-unavailable routes return an error instead of falsely reporting sign-out. Profile replacement retires pending list/sync results. The shared Web adapter reads owner-bound descriptors and balances through the canonical API; installed-update and production parity remain unverified.
+
+## Automatic public wallet replication (draft)
+
+The Desktop startup data loop automatically publishes original public wallet metadata through the canonical workspace repository, with a durable receipt journal and account fencing.
+
+[[src/main/wallet-replication-runtime.ts#startWalletReplication]] connects the existing account lifecycle poller to all owned original profile sources. [[src/main/wallet-source.ts#captureWalletSource]] validates a single file snapshot and strips encrypted recovery phrases; malformed or replaced sources never imply deletion. [[src/main/wallet-replication.ts#WalletReplication]] preserves authored intents before admission, replays lost receipts and retains concurrent conflicts. [[src/main/wallet-repository-store.ts#WalletRepositoryStore]] stores only public records in owner/profile-bound private SQLite files. The existing Wallet IPC invokes [[src/main/wallet-replication-runtime.ts#synchronizeWallets]] without a migration screen.
+
+Remote-only wallets appear as read-only cards in the original pane. Remote metadata writeback to native key records, canonical API balance reads for native cards and signing custody remain separate unfinished work. No live API publication or installed Desktop update is proven by these fixture tests.

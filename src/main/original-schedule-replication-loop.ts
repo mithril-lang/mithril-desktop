@@ -1,6 +1,9 @@
-import type { OriginalScheduleReplication } from "./original-schedule-replication";
+interface ReplicationEngine {
+  sync(): Promise<unknown>;
+  stop(): void;
+}
 interface Ports {
-  create(): Promise<Pick<OriginalScheduleReplication, "sync" | "stop"> | null>;
+  create(): Promise<ReplicationEngine | null>;
   changed(callback: () => void): () => void;
 }
 /** Single main lifecycle poller: no screen dependency or manual migration action. */
@@ -8,8 +11,7 @@ export class OriginalScheduleReplicationLoop {
   private stopped = true;
   private busy = false;
   private generation = 0;
-  private engine: Pick<OriginalScheduleReplication, "sync" | "stop"> | null =
-    null;
+  private engine: ReplicationEngine | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private unsubscribe: (() => void) | null = null;
   constructor(
@@ -60,3 +62,6 @@ export class OriginalScheduleReplicationLoop {
     }
   }
 }
+
+/** Same lifecycle discipline for every data-only workspace replica. */
+export class WorkspaceReplicationLoop extends OriginalScheduleReplicationLoop {}

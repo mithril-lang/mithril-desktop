@@ -1,3 +1,4 @@
+import { synchronizeWallets } from "../wallet-replication-runtime";
 import { runOriginalScheduleScreen } from "../original-schedule-replication-runtime";
 import { registerTaskAttachmentIPC } from "../task-attachment-ipc";
 import { registerCapabilityResourceIPC } from "../capability-resource-ipc";
@@ -3295,11 +3296,9 @@ export function registerIpcHandlers(context: IpcContext): void {
   );
   const walletUnavailable =
     "Cloud wallet services are unavailable in this Mithril preview.";
-  ipcMain.handle("wallet-sync", () => ({
-    status: "error" as const,
-    wallets: [],
-    error: walletUnavailable,
-  }));
+  ipcMain.handle("wallet-sync", (_event, profile: string) =>
+    synchronizeWallets(profile),
+  );
   ipcMain.handle("wallet-portfolio", () => ({
     status: "error" as const,
     error: walletUnavailable,

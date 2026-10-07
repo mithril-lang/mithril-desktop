@@ -1,3 +1,4 @@
+import { startWalletReplication } from "../wallet-replication-runtime";
 import { startOriginalScheduleReplication } from "../original-schedule-replication-runtime";
 import { applyResponseHeaders } from "./response-headers";
 import {
@@ -85,6 +86,8 @@ export function startMainProcess(): void {
     }
 
     stopOriginalSchedules = startOriginalScheduleReplication();
+    const stopWallets = startWalletReplication();
+    app.once("before-quit", stopWallets);
 
     app.on("browser-window-created", (_, window) => {
       optimizer.watchWindowShortcuts(window);

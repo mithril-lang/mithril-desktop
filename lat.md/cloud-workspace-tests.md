@@ -1013,3 +1013,27 @@ A pending original IPC read stops waiting after twelve seconds; a retry can reco
 ## Profile dialog late deletion
 
 A previously authorized deletion completing after selection changes cannot close another profile dialog or publish stale UI callbacks.
+
+## Wallet original publication and deletion
+
+The original public wallet metadata is published, subsequent edits advance its revision, and original deletion publishes a tombstone without transferring ciphertext.
+
+## Wallet retained acceptance recovery
+
+Creation and update acknowledgements lost in transport recover through the reopened SQLite journal with the same operation ID and no duplicate revisions.
+
+## Wallet concurrent cloud edit conflict
+
+A concurrent remote edit retains both the remote document and the exact queued native edit rather than silently overwriting either.
+
+## Wallet retired owner scope
+
+The wallet journal refuses unlocked, foreign-owner and retired-account access before publication.
+
+## Wallet source snapshot
+
+A single original wallet file snapshot projects public fields only and refuses malformed, unknown-field or duplicate records instead of interpreting them as deletions.
+
+## Wallet source replacement fencing
+
+Dangling links, account retirement and source replacement after capture refuse publication so an unsafe source cannot erase the cloud wallet list.

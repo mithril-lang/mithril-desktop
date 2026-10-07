@@ -1,5 +1,8 @@
 import {
   bindOriginalScheduleAgent,
+  prepareOriginalScheduleAgent,
+  validOriginalScheduleAgentPreparation,
+  type OriginalScheduleAgentPreparation,
   validOriginalScheduleAgentBinding,
   type OriginalScheduleAgentBinding,
 } from "./original-schedule-agent-binding";
@@ -617,6 +620,25 @@ export async function bindOriginalCronExecution(
   if (isRemoteMode() || !validOriginalScheduleAgentBinding(request))
     throw Error("Original schedule binding unavailable");
   return bindOriginalScheduleAgent(
+    request,
+    {
+      executable: HERMES_PYTHON,
+      cliArgs: hermesCliArgs(),
+      cwd: join(HERMES_HOME, "hermes-agent"),
+      env: { ...process.env, ...secureSpawnEnv(request.profile) },
+    },
+    assertActive,
+  );
+}
+
+/** Guard original source before the automatic coordinator writes authored enabled/state data. */
+export async function prepareOriginalCronExecution(
+  request: OriginalScheduleAgentPreparation,
+  assertActive: () => Promise<void>,
+): Promise<{ bindingDigest: string }> {
+  if (isRemoteMode() || !validOriginalScheduleAgentPreparation(request))
+    throw Error("Original schedule binding unavailable");
+  return prepareOriginalScheduleAgent(
     request,
     {
       executable: HERMES_PYTHON,

@@ -8,6 +8,11 @@ export interface OriginalScheduleAgentBinding {
   authorityRevision: number;
   nativeVersion: string;
 }
+export interface OriginalScheduleAgentPreparation {
+  owner: string;
+  profile: string;
+  nativeVersion: string | null;
+}
 export interface OriginalScheduleAgentRuntime {
   executable: string;
   cliArgs: readonly string[];
@@ -39,15 +44,14 @@ export function validOriginalScheduleAgentBinding(
 /** Main-only internal producer. Source and secrets stay out of argv and errors.
  * A receipt confirms local policy persistence, not occurrence execution or cloud publication.
  */
-// @lat: [[cloud-workspace#Original schedule Agent binding bridge (draft)]]
-export async function bindOriginalScheduleAgent(
-  input: OriginalScheduleAgentBinding,
+async function callOriginalScheduleAgent(
+  input: OriginalScheduleAgentBinding | OriginalScheduleAgentPreparation,
+  action: "binding" | "prepare",
   runtime: OriginalScheduleAgentRuntime,
   assertActive: () => Promise<void>,
 ): Promise<{ bindingDigest: string }> {
   const unavailable = (): Error =>
     Error("Original schedule execution binding unconfirmed");
-  if (!validOriginalScheduleAgentBinding(input)) throw unavailable();
   const request = structuredClone(input);
   await assertActive();
   const { owner, ...binding } = request;
@@ -78,7 +82,7 @@ export async function bindOriginalScheduleAgent(
         reject(unavailable());
         return;
       }
-      child.stdin.end(JSON.stringify({ owner, binding }));
+      child.stdin.end(JSON.stringify({ owner, [action]: binding }));
     } catch {
       reject(unavailable());
     }
@@ -94,7 +98,7 @@ export async function bindOriginalScheduleAgent(
       typeof receipt !== "object" ||
       Array.isArray(receipt) ||
       Object.keys(receipt).sort().join(",") !==
-        "authorityRevision,bindingDigest,nativeVersion,owner,profile,sourceDigest,sourceRevision" ||
+        [...Object.keys(request), "bindingDigest"].sort().join(",") ||
       !Object.entries(request).every(
         ([key, value]) => receipt[key] === value,
       ) ||
@@ -105,4 +109,41 @@ export async function bindOriginalScheduleAgent(
   } catch {
     throw unavailable();
   }
+}
+
+export function validOriginalScheduleAgentPreparation(
+  input: unknown,
+): input is OriginalScheduleAgentPreparation {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return false;
+  const value = input as Record<string, unknown>;
+  return (
+    Object.keys(value).sort().join(",") === "nativeVersion,owner,profile" &&
+    [value.owner, value.profile].every(
+      (part) => typeof part === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(part),
+    ) &&
+    (value.profile as string).length <= 64 &&
+    (value.nativeVersion === null || digest(value.nativeVersion))
+  );
+}
+
+// @lat: [[cloud-workspace#Original schedule Agent binding bridge (draft)]]
+export async function bindOriginalScheduleAgent(
+  input: OriginalScheduleAgentBinding,
+  runtime: OriginalScheduleAgentRuntime,
+  assertActive: () => Promise<void>,
+): Promise<{ bindingDigest: string }> {
+  if (!validOriginalScheduleAgentBinding(input))
+    throw Error("Original schedule execution binding unconfirmed");
+  return callOriginalScheduleAgent(input, "binding", runtime, assertActive);
+}
+
+/** Require a policy lane before source restoration or executor selection; no execution grant. */
+export async function prepareOriginalScheduleAgent(
+  input: OriginalScheduleAgentPreparation,
+  runtime: OriginalScheduleAgentRuntime,
+  assertActive: () => Promise<void>,
+): Promise<{ bindingDigest: string }> {
+  if (!validOriginalScheduleAgentPreparation(input))
+    throw Error("Original schedule execution binding unconfirmed");
+  return callOriginalScheduleAgent(input, "prepare", runtime, assertActive);
 }

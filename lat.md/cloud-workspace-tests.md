@@ -550,3 +550,7 @@ Real child processes receive exact anchors on stdin for A/B/A profiles; fixed co
 ## Original schedule Agent binding refusal
 
 Foreign identities, extra fields, oversized output, lost acknowledgements and malformed anchors cannot confirm persistence or leak child stderr. Invalid anchors never reach the account guard or child invocation.
+
+## Original schedule Agent preparation
+
+Absent and existing original sources can enter the required policy lane through bounded stdin. Foreign, damaged or lost receipts cannot confirm preparation; preparation does not select an executor.

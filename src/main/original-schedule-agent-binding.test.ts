@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 import {
   bindOriginalScheduleAgent,
+  prepareOriginalScheduleAgent,
   type OriginalScheduleAgentBinding,
   type OriginalScheduleAgentRuntime,
 } from "./original-schedule-agent-binding";
@@ -28,7 +29,7 @@ function runtime(mode = "ok"): OriginalScheduleAgentRuntime {
   writeFileSync(
     script,
     `let text='';process.stdin.on('data',v=>text+=v);process.stdin.on('end',()=>{
-    const {owner,binding}=JSON.parse(text);
+    const envelope=JSON.parse(text);const {owner}=envelope;const binding=envelope.binding||envelope.prepare;
     const args=process.argv.slice(2);
     if(args.join(',')!=='-p,'+binding.profile+',mithril-schedule-custody,--stdin')process.exit(2);
     const receipt={owner,...binding,bindingDigest:'c'.repeat(64)};
@@ -86,4 +87,26 @@ it("refuses foreign, enlarged, lost receipts and malformed source anchors withou
     ).rejects.toThrow(/^Original schedule execution binding unconfirmed$/);
   }
   expect(calls).toBe(0);
+});
+
+// @lat: [[cloud-workspace-tests#Original schedule Agent preparation]]
+it("guards both absent and existing original sources through the same bounded child without selecting execution", async () => {
+  for (const nativeVersion of [null, request.nativeVersion]) {
+    await expect(
+      prepareOriginalScheduleAgent(
+        { owner: request.owner, profile: request.profile, nativeVersion },
+        runtime(),
+        async () => {},
+      ),
+    ).resolves.toEqual({ bindingDigest: "c".repeat(64) });
+    for (const mode of ["foreign", "extra", "lost", "oversize"]) {
+      await expect(
+        prepareOriginalScheduleAgent(
+          { owner: request.owner, profile: request.profile, nativeVersion },
+          runtime(mode),
+          async () => {},
+        ),
+      ).rejects.toThrow(/^Original schedule execution binding unconfirmed$/);
+    }
+  }
 });

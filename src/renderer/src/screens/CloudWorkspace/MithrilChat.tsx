@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChatSessions } from "@mithril/workspace/session-react";
 import "@mithril/workspace/styles.css";
+import {
+  createClientToolTurnRunner,
+  createKuroToolHost,
+} from "@mithril/workspace/client-tool-turn";
+import type { SessionTransport } from "@mithril/workspace/session-sync";
+import { createCodeProject, type CodeFile } from "@mithril/workspace/code";
 
 /** New default Chat uses only the canonical Mithril model inventory and D1 sessions. */
 export default function MithrilChat({
@@ -11,6 +17,7 @@ export default function MithrilChat({
   onSidebarProjects,
   onSourceHistorySelect,
   onConnectAccount,
+  onOpenCodeProject,
   visible = true,
   locale = "en",
 }: {
@@ -21,6 +28,7 @@ export default function MithrilChat({
   onSidebarProjects?: () => void;
   onSourceHistorySelect?: (sourceId: string) => void;
   onConnectAccount?: () => void;
+  onOpenCodeProject?: (project: { title: string; files: CodeFile[] }) => void;
   visible?: boolean;
   locale?: string;
 }): React.JSX.Element {
@@ -108,6 +116,77 @@ export default function MithrilChat({
     }),
     [],
   );
+  const toolRunner = useMemo(
+    () =>
+      createClientToolTurnRunner(
+        async (id, body, signal) => {
+          signal.throwIfAborted();
+          const result = await window.hermesAPI.cloudChat.browserStep(id, body);
+          signal.throwIfAborted();
+          return result;
+        },
+        async (call, signal) => {
+          if (call.function.name === "mithril_code") {
+            const args = JSON.parse(call.function.arguments);
+            if (
+              !args ||
+              Object.keys(args).length !== 1 ||
+              typeof args.goal !== "string" ||
+              !args.goal.trim() ||
+              args.goal.length > 2000
+            )
+              throw Error("Invalid Mithril request");
+            signal.throwIfAborted();
+            const response = await window.hermesAPI.codeHarness(
+              "run",
+              args.goal,
+              profile,
+            );
+            signal.throwIfAborted();
+            if (!response.ok || !("result" in response))
+              throw Error(
+                response.ok ? "Missing Mithril result" : response.error,
+              );
+            const value = response.result;
+            if (value.format !== "mithril.language-project/v1")
+              throw Error(
+                "Update the Mithril Code plugin before coding in Mithril",
+              );
+            const files = await createCodeProject(value, "Mithril application");
+            return {
+              id: call.id,
+              receipt: value.receipt!,
+              result: {
+                format: value.format,
+                verified: true,
+                metrics: value.metrics,
+              },
+              files: Object.fromEntries(files.map((f) => [f.path, f.content])),
+            };
+          }
+          const host = createKuroToolHost();
+          try {
+            return await host.call(call, signal);
+          } finally {
+            host.dispose();
+          }
+        },
+      ),
+    [profile],
+  );
+  // Account changes revoke active work while keeping consumed operation IDs claimed.
+  useEffect(() => () => toolRunner.stop(), [toolRunner, accountId, epoch]);
+  const chatTransport = useMemo<SessionTransport>(
+    () => ({
+      ...window.hermesAPI.cloudChat,
+      apply: async (id, operation) => {
+        const response = await window.hermesAPI.cloudChat.apply(id, operation);
+        toolRunner.start(id, operation, response);
+        return response;
+      },
+    }),
+    [toolRunner],
+  );
   return (
     <div>
       {identityChecked && !accountId && onConnectAccount && (
@@ -137,10 +216,12 @@ export default function MithrilChat({
         key={`${profile}:${initialSessionId ?? ""}`}
         initialSessionId={initialSessionId}
         autoConnect
+        browserTools
+        onOpenCodeProject={onOpenCodeProject}
         accountId={accountId}
         visible={visible}
         locale={locale}
-        transport={window.hermesAPI.cloudChat}
+        transport={chatTransport}
         workspaceTransport={workspaceTransport}
         beforeWorkspaceConnect={async () => {
           await window.hermesAPI.cloudWorkspace.enable();
@@ -153,7 +234,10 @@ export default function MithrilChat({
         beforeConnect={async () => {
           await window.hermesAPI.cloudChat.enable();
         }}
-        afterDisconnect={() => window.hermesAPI.cloudChat.disable()}
+        afterDisconnect={async () => {
+          toolRunner.stop();
+          await window.hermesAPI.cloudChat.disable();
+        }}
       />
     </div>
   );

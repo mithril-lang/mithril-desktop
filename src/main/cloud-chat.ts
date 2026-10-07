@@ -97,7 +97,7 @@ export class CloudChat implements SessionTransport {
       { schemaVersion: 1, ...operation },
       operation.type === "runtime_turn"
         ? ["inference", "sandbox"]
-        : operation.type === "turn"
+        : operation.type === "turn" || operation.type === "browser_turn"
           ? "inference"
           : undefined,
     );
@@ -126,6 +126,55 @@ export class CloudChat implements SessionTransport {
         : !validateChatSession(result.session) || result.session.id !== id)
     )
       throw new Error("Chat receipt invalid");
+    return result;
+  }
+  async browserStep(
+    id: string,
+    body: Record<string, unknown>,
+  ): Promise<{
+    phase: string;
+    round: number;
+    calls: import("@mithril/workspace/client-tool-turn").ClientToolCall[];
+  }> {
+    if (
+      !chatId(id) ||
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body) ||
+      Object.keys(body).some(
+        (k) =>
+          !["action", "turnId", "executionToken", "round", "results"].includes(
+            k,
+          ),
+      ) ||
+      !chatId(body.turnId) ||
+      typeof body.executionToken !== "string" ||
+      !/^[a-f0-9]{64}$/.test(body.executionToken) ||
+      !Number.isSafeInteger(body.round) ||
+      (body.round as number) < 0 ||
+      !["next", "result", "failed"].includes(String(body.action)) ||
+      JSON.stringify(body).length > 524288
+    )
+      throw Error("Invalid tool checkpoint");
+    const { value } = await this.auth.authorizedRequest(
+      `/v1/chat/sessions/${encodeURIComponent(id)}/browser`,
+      body,
+      "inference",
+    );
+    const result = value as {
+      phase: string;
+      round: number;
+      calls: import("@mithril/workspace/client-tool-turn").ClientToolCall[];
+    };
+    if (
+      !["ready", "tools_wait", "completed", "uncertain"].includes(
+        result.phase,
+      ) ||
+      !Number.isSafeInteger(result.round) ||
+      (result.calls !== undefined &&
+        (!Array.isArray(result.calls) || result.calls.length > 2))
+    )
+      throw Error("Invalid tool response");
     return result;
   }
 }

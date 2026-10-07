@@ -1,12 +1,13 @@
 export interface CodeHarnessResult {
-  format: "mithril.code-project/v1";
+  format: "mithril.code-project/v1" | "mithril.language-project/v1";
   verified: true;
   files: Record<string, string>;
   logic: Record<string, unknown>;
   metrics: Record<string, unknown>;
+  receipt?: Record<string, unknown>;
 }
 export type CodeHarnessResponse =
-  | { ok: true; ready: true; busy: boolean; template: "todo" }
+  | { ok: true; ready: true; busy: boolean; template: "todo" | "mithril-app" }
   | { ok: true; result: CodeHarnessResult }
   | { ok: false; error: string };
 
@@ -38,14 +39,35 @@ export function parseCodeHarnessResponse(output: string): CodeHarnessResponse {
           : "invalid_runner_response",
       };
     }
-    if (value.ok === true && value.ready === true && value.template === "todo")
+    if (
+      value.ok === true &&
+      value.ready === true &&
+      ["todo", "mithril-app"].includes(String(value.template))
+    )
       return {
         ok: true,
         ready: true,
         busy: value.busy === true,
-        template: "todo",
+        template: value.template as "todo" | "mithril-app",
       };
     const result = value.result as CodeHarnessResult | undefined;
+    if (
+      value.ok === true &&
+      result?.format === "mithril.language-project/v1" &&
+      result.verified === true &&
+      result.metrics?.["verification-passed"] === true &&
+      result.logic?.format === "https://mithril.fund/artifact/app-agent-v1" &&
+      result.receipt?.format === "mithril.language-inference-receipt/v1" &&
+      result.receipt?.status === "admitted" &&
+      result.receipt?.compiler === "https://app.mithril.fund/api/compile" &&
+      result.receipt?.source === result.files?.["application.mith"] &&
+      Object.keys(result.files ?? {})
+        .sort()
+        .join(",") ===
+        ".nojekyll,README.md,application.mith,artifact.json,index.html" &&
+      Object.values(result.files).every((source) => typeof source === "string")
+    )
+      return { ok: true, result };
     if (
       value.ok === true &&
       result?.verified === true &&

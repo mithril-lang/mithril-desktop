@@ -7,6 +7,7 @@ import Tools from "../Tools/Tools";
 import Memory from "../Memory/Memory";
 import { WorkspaceNavigation } from "@mithril/design-system/react";
 import MithrilChat from "../CloudWorkspace/MithrilChat";
+import type { CodeFile } from "@mithril/workspace/code";
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import Chat from "../Chat/Chat";
 import {
@@ -120,6 +121,11 @@ function Layout({
   const { t, locale } = useI18n();
   const { openSettings } = useSettingsModal();
   const [view, setView] = useState<View>("mithril-chat");
+  const [codingProject, setCodingProject] = useState<{
+    title: string;
+    files: CodeFile[];
+    id: string;
+  }>();
   const [cloudResultSession, setCloudResultSession] = useState<
     string | undefined
   >();
@@ -128,6 +134,7 @@ function Layout({
   // preserve existing conversations and activate a scratch run for the selected
   // agent so `activeProfile` stays aligned with the visible chat transport.
   const [activeProfile, setActiveProfile] = useState("default");
+  useEffect(() => setCodingProject(undefined), [activeProfile]);
   const [runs, setRuns] = useState<ChatRun[]>(() => [
     mintRun(connectionId, "default"),
   ]);
@@ -895,7 +902,7 @@ function Layout({
               ))}
               <button
                 className={`sidebar-footer-action ${view === "code" ? "active" : ""}`}
-                onClick={() => goTo("code")}
+                onClick={() => goTo("mithril-chat")}
                 aria-label="Code"
                 data-tooltip="Code"
               >
@@ -1003,9 +1010,10 @@ function Layout({
           {visitedViews.has("code") && (
             <div style={paneStyle("code")}>
               <Code
-                key={activeProfile}
+                key={`${activeProfile}:${codingProject?.id ?? ""}`}
                 profile={activeProfile}
                 locale={locale}
+                initialProject={codingProject}
               />
             </div>
           )}
@@ -1021,6 +1029,10 @@ function Layout({
                 onSourceHistorySelect={handleResumeSession}
                 onConnectAccount={() => goTo("providers")}
                 visible={view === "mithril-chat"}
+                onOpenCodeProject={(project) => {
+                  setCodingProject({ ...project, id: crypto.randomUUID() });
+                  goTo("code");
+                }}
               />
             </div>
           )}

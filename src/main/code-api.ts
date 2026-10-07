@@ -6,6 +6,22 @@ export async function codeApi(
   body: unknown,
   keys: unknown,
 ): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
+  if (path === "/api/compile") {
+    const value = body as { source?: unknown } | undefined;
+    if (
+      !value ||
+      Object.keys(value).length !== 1 ||
+      typeof value.source !== "string" ||
+      Buffer.byteLength(value.source) > 8192
+    )
+      return { ok: false, error: "request_budget" };
+    return sendCode(
+      path,
+      JSON.stringify(value),
+      { github: "", provider: "" },
+      true,
+    );
+  }
   if (
     typeof path !== "string" ||
     !codeRequestPath(path) ||
@@ -55,7 +71,11 @@ export async function codeServiceRun(
   const credentials = { github: "", provider: c.provider };
   return sendCode(
     "/api/runs",
-    JSON.stringify({ template: "todo", goal, request_id: crypto.randomUUID() }),
+    JSON.stringify({
+      template: "mithril-app",
+      goal,
+      request_id: crypto.randomUUID(),
+    }),
     credentials,
     true,
   );

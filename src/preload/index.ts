@@ -378,6 +378,8 @@ const hermesAPI = {
       ipcRenderer.invoke("cloud-chat-native-import", id, choices),
   } satisfies NativeSessionImportAPI,
   cloudChat: {
+    browserStep: (id, body) =>
+      ipcRenderer.invoke("cloud-chat-browser-step", id, body),
     nativeHistoryInventory: () =>
       ipcRenderer.invoke("cloud-chat-native-history-inventory"),
     resolveNativeHistoryTitle: (request) =>

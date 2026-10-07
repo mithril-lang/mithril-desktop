@@ -1,6 +1,6 @@
 # Mithril Code
 
-Desktop calls Hermes's owned Mithril Code plugin to assemble two bounded To-do functions, review generated CLJK and show typed logic with actual execution measurements.
+Desktop uses its ordinary Chat harness and profile-scoped Hermes plugin to generate bounded Mithril applications, then opens the shared source and GitHub editor.
 
 ## Native execution
 
@@ -20,13 +20,13 @@ The prior Code case qualifies toggle/count against fixed checks and 511 vectors.
 
 [[src/main/code-api.ts#codeApi]] accepts only fixed Code GitHub routes through trusted IPC. The user's GitHub credential stays in the owning screen's memory and is cleared when the profile changes or the user disconnects.
 
-Desktop, App `/code` and Code use the compiled workspace `CodeWorkspace`, including Desktop's composer, file navigation, tabs and receipt disclosure. The shared editor builds the immutable starter plus actual verified source and typed logic. CLJK edits do not recompile the runtime artifacts. Source edits invalidate the saved version; saving retains the verification distinction. GitHub uses a captured head and non-force update. Pages publishes only the saved public branch and refuses conflicting settings. Unknown write outcomes are not retried.
+Desktop, App `/code` and Code use the compiled workspace `CodeWorkspace`, including Desktop's composer, file navigation, tabs and receipt disclosure. The shared editor retains admitted Mithril source, App IR, HTML and receipts. Editing Mithril requires explicit recompilation before GitHub saving. Historical To-do CLJK artifacts remain a separate legacy contract. Source edits invalidate the saved version; saving retains the verification distinction. GitHub uses a captured head and non-force update. Pages publishes only the saved public branch and refuses conflicting settings. Unknown write outcomes are not retried.
 
 ## Execution destination
 
 Desktop explicitly offers a configured Hermes profile runner or the fixed Code service. Selecting a destination never starts execution or silently falls back after a failure.
 
-[[src/main/code-api.ts#codeServiceRun]] validates a bounded brief and sends only the fixed To-do task to Code with a transient Mithril API token and fresh request ID; GitHub credentials are excluded. The service admits typed ASTs and checks 511 vectors before source emission. Receipts state actual model and usage, not Jev identity or fabricated API cost. This choice needs no local device runtime and does not borrow the browser's session-only free allowance. [[src/main/code-api.ts#codeServiceStatus]] reads readiness without credentials or inference.
+[[src/main/code-api.ts#codeServiceRun]] validates a bounded brief and sends the bounded Mithril application task to Code with a transient Mithril API token and fresh request ID; GitHub credentials are excluded. The service emits Mithril Form source and requires the existing App compiler to admit its ontology application and semantic stages. Receipts state actual model and usage, not Jev identity or fabricated API cost. This choice needs no local device runtime and does not borrow the browser's session-only free allowance. [[src/main/code-api.ts#codeServiceStatus]] reads readiness without credentials or inference.
 
 ## Kuro source execution
 
@@ -38,6 +38,18 @@ Desktop preserves the pinned public Kuro asset CSP through [[src/main/app/respon
 
 ## Owned HTTP client
 
-Hermes sends its own Mithril-Code-Hermes identifier because Cloudflare rejects the default Python identifier. Preview.27 pins the reviewed Agent fix and workspace 0.6.10.
+Hermes sends its own Mithril-Code-Hermes identifier because Cloudflare rejects the default Python identifier. Preview.30 pins the reviewed Agent language-tool merge and workspace 0.6.18.
+
+Installer digests match the exact published script bytes; local builds are distinct from installer publication and live qualification.
 
 Code preserves consumed attempts and receipt IDs while moving its external-runner pilot admission limit from 3 to 50/account/UTC day. Its service cap remains 100; Mithril API independently enforces its inference allowance and scopes. Web discloses the limit; native identity remains profile scoped.
+
+## System One coding in the normal chat harness
+
+The canonical Chat starts the same client-bound tool turn as App and Code after an explicit acknowledged send.
+
+Mithril generation uses the owning profile's existing `mithril_code` Hermes plugin. The plugin returns `application.mith`, the admitted App IR, compiler/semantic receipts and static HTML. Supported output is a bounded static ontology application; arbitrary runtime logic remains outside this contract. Existing imported history never starts tools, and duplicate acknowledgements cannot replay generation after an uncertain result.
+
+The tool checkpoint opens the existing shared Code source/GitHub editor. The Code navigation entry returns to Chat. Editing `.mith` requires an explicit recompilation before saving, and GitHub creation/commit/Pages retain the existing reviewed, non-force operations. Compiler calls carry source only. Native chat uses narrow owner-scoped IPC for canonical tool checkpoints; no bearer credential reaches the renderer or sandbox frame.
+
+[[src/main/cloud-chat.ts#CloudChat]] owns the authenticated checkpoint request. [[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx]] adapts the shared client tool runner to the profile harness. [[src/renderer/src/screens/Code/Code.tsx]] adapts the shared artifact editor and publication transport.

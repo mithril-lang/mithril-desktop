@@ -48,9 +48,18 @@ export class OriginalScheduleDirectoryResources {
     );
   }
 
+  matchesScope(scope: OriginalScheduleReplicaScope): boolean {
+    return (
+      scope.owner === this.scope.owner &&
+      scope.profile === this.scope.profile &&
+      scope.timeZone === this.scope.timeZone
+    );
+  }
+
   async capture(root: string): Promise<{
     pointer: OriginalScheduleDirectoryPointer;
     excluded: number;
+    paths: readonly string[];
   }> {
     await this.assertActive();
     const resourceId = await originalScheduleResourceId(this.scope.profile);
@@ -82,6 +91,7 @@ export class OriginalScheduleDirectoryResources {
           manifest,
         },
         excluded: capture.excluded,
+        paths: capture.manifest.files.map((file) => file.path),
       };
     } finally {
       capture.dispose();
@@ -94,6 +104,7 @@ export class OriginalScheduleDirectoryResources {
     root: string,
     expectedManifest: string,
     operationId: string,
+    requiredFiles: readonly string[] = [],
   ): Promise<SkillApplyStatus> {
     if (
       !pointer ||
@@ -134,6 +145,16 @@ export class OriginalScheduleDirectoryResources {
         this.assertActive,
       );
       try {
+        if (
+          !Array.isArray(requiredFiles) ||
+          requiredFiles.length > 20000 ||
+          !requiredFiles.every(
+            (path) =>
+              typeof path === "string" &&
+              after.manifest.files.some((file) => file.path === path),
+          )
+        )
+          throw Error("Schedule directory required file unavailable");
         await this.assertActive();
         const status = applySkillResources(
           root,

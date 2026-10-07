@@ -482,3 +482,11 @@ Foreign owners/profiles, symlink sources and invalidated accounts cannot restore
 ## Original schedule directory integrity
 
 Tampered downloaded chunk bytes are rejected before any destination mutation, retaining original files for recovery.
+
+## Original schedule script binding roundtrip
+
+Real script and monitor files are published, rebound and restored while complete original source retains BOM, CRLF and opaque integers; retrying an acknowledged directory operation preserves newer local edits.
+
+## Original schedule script binding refusal
+
+Escaped paths, excluded or missing scripts, raw remote paths and foreign directory scopes refuse before schedule restoration; portable references must match the verified resource manifest.

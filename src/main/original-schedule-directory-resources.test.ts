@@ -1,3 +1,6 @@
+import { OriginalScheduleScriptResources } from "./original-schedule-script-resources";
+import { captureOriginalCronFile } from "./cron-source-files";
+import { patchOriginalScheduleBindingsText } from "@mithril/workspace/original-schedule-text";
 // @vitest-environment node
 import { afterEach, expect, it } from "vitest";
 import { createHash } from "node:crypto";
@@ -243,4 +246,172 @@ it("rejects damaged resource bytes before modifying the destination", async () =
   expect(readFileSync(join(f.local, "run.py"), "utf8")).toBe(
     "local original\n",
   );
+});
+
+// @lat: [[cloud-workspace-tests#Original schedule script binding roundtrip]]
+it("binds real original script/monitor resources to portable source and restores original relative paths without rewriting opaque tokens", async () => {
+  const f = setup();
+  mkdirSync(join(f.remote, "nested"));
+  writeFileSync(
+    join(f.remote, "nested", "run.py"),
+    "raise Exception('never execute')\n",
+  );
+  writeFileSync(join(f.remote, "monitor.py"), "print('monitor bytes')\n");
+  const sourceRoot = join(f.home, "source");
+  mkdirSync(join(sourceRoot, "cron"), { recursive: true });
+  const raw =
+    '\uFEFF{\r\n "metadata":9223372036854775807,"jobs":[{"id":"one","name":"one","prompt":"日本語","enabled":false,"state":"paused","schedule":{"kind":"cron","expr":"17 9 * * 1-5"},"script":' +
+    JSON.stringify(join(f.remote, "nested", "run.py")) +
+    ',"monitor_script":"monitor.py","opaque":9007199254740993}]\r\n}';
+  writeFileSync(join(sourceRoot, "cron", "jobs.json"), raw);
+  const source = captureOriginalCronFile(sourceRoot, "default")!;
+  const origin = new OriginalScheduleScriptResources(
+    f.scope,
+    f.remote,
+    f.service,
+    f.guard,
+  );
+  const captured = await origin.capture(source);
+  const portable = patchOriginalScheduleBindingsText(
+    raw,
+    f.scope.profile,
+    f.scope.timeZone,
+    captured,
+  );
+  expect(portable).not.toContain(f.home);
+  expect(portable).toContain("9223372036854775807");
+  expect(portable).toContain("9007199254740993");
+  expect(portable.startsWith("\uFEFF{\r\n")).toBe(true);
+  const baseline = await f.service.capture(f.local);
+  const destination = new OriginalScheduleScriptResources(
+    f.scope,
+    f.local,
+    f.service,
+    f.guard,
+  );
+  const write = {
+    ...f.scope,
+    operationId: "scripts_roundtrip",
+    sourceText: portable,
+    expectedVersion: source.version,
+  };
+  const patches = await destination.restore(write, baseline.pointer.manifest);
+  const restored = patchOriginalScheduleBindingsText(
+    portable,
+    f.scope.profile,
+    f.scope.timeZone,
+    patches,
+  );
+  expect(restored).toBe(
+    raw.replace(
+      JSON.stringify(join(f.remote, "nested", "run.py")),
+      '"nested/run.py"',
+    ),
+  );
+  expect(readFileSync(join(f.local, "nested", "run.py"), "utf8")).toBe(
+    "raise Exception('never execute')\n",
+  );
+  expect(readFileSync(join(f.local, "monitor.py"), "utf8")).toBe(
+    "print('monitor bytes')\n",
+  );
+  writeFileSync(join(f.local, "nested", "run.py"), "new local edit\n");
+  await destination.restore(write, baseline.pointer.manifest);
+  expect(readFileSync(join(f.local, "nested", "run.py"), "utf8")).toBe(
+    "new local edit\n",
+  );
+});
+
+// @lat: [[cloud-workspace-tests#Original schedule script binding refusal]]
+it("rejects escaped paths, raw remote paths, foreign directory scope and incomplete script manifests before changing destination files", async () => {
+  const f = setup();
+  const sourceRoot = join(f.home, "source");
+  mkdirSync(join(sourceRoot, "cron"), { recursive: true });
+  const file = (script: string): ReturnType<typeof captureOriginalCronFile> => {
+    writeFileSync(
+      join(sourceRoot, "cron", "jobs.json"),
+      JSON.stringify({
+        jobs: [
+          {
+            id: "one",
+            name: "one",
+            prompt: "日本語",
+            enabled: false,
+            state: "paused",
+            schedule: { kind: "cron", expr: "17 9 * * 1-5" },
+            script,
+          },
+        ],
+      }),
+    );
+    return captureOriginalCronFile(sourceRoot, "default");
+  };
+  const binder = new OriginalScheduleScriptResources(
+    f.scope,
+    f.remote,
+    f.service,
+    f.guard,
+  );
+  await expect(binder.capture(file("../../outside.py")!)).rejects.toThrow(
+    "outside",
+  );
+  writeFileSync(join(f.remote, ".env"), "never publish");
+  await expect(binder.capture(file(".env")!)).rejects.toThrow("unavailable");
+  expect(
+    () =>
+      new OriginalScheduleScriptResources(
+        { ...f.scope, owner: "bob" },
+        f.remote,
+        f.service,
+        f.guard,
+      ),
+  ).toThrow("scope");
+  const baseline = await f.service.capture(f.local);
+  const raw = file("relative.py")!;
+  await expect(
+    binder.restore(
+      {
+        ...f.scope,
+        operationId: "raw_remote",
+        sourceText: raw.sourceText,
+        expectedVersion: null,
+      },
+      baseline.pointer.manifest,
+    ),
+  ).rejects.toThrow("binding required");
+  const escaped =
+    "mithril-schedule-script:v1:" +
+    Buffer.from(
+      JSON.stringify([
+        f.scope.profile,
+        baseline.pointer.manifest,
+        "../outside.py",
+      ]),
+    ).toString("base64url");
+  await expect(
+    binder.restore(
+      {
+        ...f.scope,
+        operationId: "escaped",
+        sourceText: file(escaped)!.sourceText,
+        expectedVersion: null,
+      },
+      baseline.pointer.manifest,
+    ),
+  ).rejects.toThrow("reference");
+  const missing =
+    "mithril-schedule-script:v1:" +
+    Buffer.from(
+      JSON.stringify([f.scope.profile, baseline.pointer.manifest, "absent.py"]),
+    ).toString("base64url");
+  await expect(
+    binder.restore(
+      {
+        ...f.scope,
+        operationId: "missing",
+        sourceText: file(missing)!.sourceText,
+        expectedVersion: null,
+      },
+      baseline.pointer.manifest,
+    ),
+  ).rejects.toThrow("required file");
 });

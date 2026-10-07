@@ -669,3 +669,11 @@ Original scripts and workdir trees can be retained through owner-scoped schedule
 [[src/main/skill-resource-snapshot.ts#downloadDirectoryResources]] reuses the existing bounded manifest/chunk verifier for schedule directories; the Skill-specific wrapper still validates its original pointer contract. Restoration downloads the retained baseline and target, then uses the original transactional directory CAS and durable operation receipts. Concurrent local changes produce a conflict, while an acknowledged retry leaves newer edits untouched. Private state is separated by owner/profile/timezone. Account guards surround asynchronous I/O and the native write. Windows restoration remains deferred by the existing filesystem adapter.
 
 This primitive is tested against real temporary files and an owner-scoped storage fixture. Concrete job-field bindings, execution authority admission, lifecycle mounting, real-cloud qualification and installer publication are still required before claiming automatic original schedule synchronization. No new migration panel or renderer IPC is added.
+
+## Original schedule script resources (draft)
+
+Original script and monitor-script tokens now map to one immutable profile-script resource snapshot without reducing the rest of the original schedule source.
+
+[[src/main/original-schedule-script-resources.ts#OriginalScheduleScriptResources]] resolves authored paths under the selected profile's scripts directory, captures actual permitted bytes, and emits canonical portable references containing only profile, manifest digest and relative path. Excluded/missing scripts cannot become valid references. Raw token patches preserve BOM, CRLF, unrelated fields and opaque numeric tokens.
+
+Restoration accepts only canonical references from the same scope and snapshot. The directory transaction verifies every referenced file before writing; its retained baseline, durable operation and existing receipts preserve concurrent local edits and retries. Original script fields return to the Agent's existing scripts-relative path convention. Workdir/private-runtime bindings, execution authority and lifecycle mounting still need to compose this stage before complete schedule synchronization can ship.

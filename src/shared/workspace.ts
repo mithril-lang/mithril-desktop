@@ -92,18 +92,21 @@ export interface CloudChatAPI extends SessionTransport {
     reconstructed?: number;
     conflicts: string[];
     titleConflicts?: Array<{
+      profile?: string;
       sessionId: string;
       native: string;
       cloud: string;
       cloudRevision: number;
     }>;
     modelConflicts?: Array<{
+      profile?: string;
       sessionId: string;
       native: string;
       cloud: string;
       cloudRevision: number;
     }>;
     visibilityConflicts?: Array<{
+      profile?: string;
       sessionId: string;
       native: string;
       cloud: string;

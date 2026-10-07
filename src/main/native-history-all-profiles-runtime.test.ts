@@ -9,15 +9,20 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import type { NativeHistoryPorts } from "./native-history-sync";
+import type {
+  NativeHistorySync,
+  NativeHistoryPorts,
+} from "./native-history-sync";
 const f = vi.hoisted(() => ({
   home: "",
   data: "",
   epoch: 1,
   mode: "local",
+  missingSource: false,
   selected: "research",
   token: "mf_" + "a".repeat(43),
   action: undefined as undefined | ((profile: string) => void),
+  resolutions: [] as Array<{ profile: string; field: string }>,
   runs: [] as string[],
   completed: [] as string[],
   bound: new Map<string, string>(),
@@ -82,10 +87,13 @@ vi.mock("./repository-kanban-runtime", () => ({
     f.bound.get(profile) === owner,
 }));
 vi.mock("./db", () => ({
-  getDbConnection: () => ({
-    name: "fixture",
-    transaction: (operation: () => unknown) => operation,
-  }),
+  getDbConnection: () =>
+    f.missingSource
+      ? null
+      : {
+          name: "fixture",
+          transaction: (operation: () => unknown) => operation,
+        },
 }));
 vi.mock("./sessions", () => ({
   listSessions: (_limit: number, _offset: number, profile: string) => [
@@ -123,24 +131,67 @@ vi.mock("./native-history-sync", () => ({
   nativeCloudSessionId: (profile: string, id: string) => profile + "-" + id,
   NativeHistorySync: class {
     constructor(private ports: NativeHistoryPorts) {}
-    async run(): Promise<void> {
-      expect(this.ports.cacheRemote).toBeUndefined();
+    async run(): Promise<Awaited<ReturnType<NativeHistorySync["run"]>>> {
+      if (this.ports.cacheRemote)
+        expect((await this.ports.context()).profile).toBe(f.selected);
       const context = await this.ports.context();
       f.runs.push(context.profile);
       f.action?.(context.profile);
       const sources = await this.ports.source();
-      expect(sources[0].id).toBe("original-" + context.profile);
-      const items = await sources[0].items("fixture-session");
-      expect(items[0]).toMatchObject({
-        kind: "user",
-        content: "Original " + context.profile,
-      });
+      if (sources.length) {
+        expect(sources[0].id).toBe("original-" + context.profile);
+        const items = await sources[0].items("fixture-session");
+        expect(items[0]).toMatchObject({
+          kind: "user",
+          content: "Original " + context.profile,
+        });
+      }
       f.completed.push(context.profile);
+      return {
+        userId: context.userId,
+        synced: 1,
+        reconstructed: 0,
+        conflicts: [context.profile],
+        titleConflicts: [
+          {
+            sessionId: "session-" + context.profile,
+            native: "old",
+            cloud: "new",
+            cloudRevision: 1,
+          },
+        ],
+        modelConflicts: [],
+        visibilityConflicts: [],
+        deferred: [],
+      };
+    }
+    async resolveTitle(request: {
+      profile: string;
+    }): Promise<Awaited<ReturnType<NativeHistorySync["run"]>>> {
+      f.resolutions.push({ profile: request.profile, field: "title" });
+      return this.run();
+    }
+    async resolveModel(request: {
+      profile: string;
+    }): Promise<Awaited<ReturnType<NativeHistorySync["run"]>>> {
+      f.resolutions.push({ profile: request.profile, field: "model" });
+      return this.run();
+    }
+    async resolveVisibility(request: {
+      profile: string;
+    }): Promise<Awaited<ReturnType<NativeHistorySync["run"]>>> {
+      f.resolutions.push({ profile: request.profile, field: "visibility" });
+      return this.run();
     }
   },
 }));
 import { serializeNativeHistory } from "./native-history-runtime";
-import { startAllProfileHistoryReplication } from "./native-history-all-profiles-runtime";
+import * as historyRuntime from "./native-history-runtime";
+import {
+  startAllProfileHistoryReplication,
+  synchronizeAllProfileHistories,
+  resolveOwnedProfileHistory,
+} from "./native-history-all-profiles-runtime";
 let stop: (() => void) | undefined;
 let directory = "";
 beforeEach(() => {
@@ -156,10 +207,12 @@ beforeEach(() => {
   ])
     mkdirSync(path, { recursive: true });
   f.bound = new Map([["foreign", "another-owner"]]);
+  f.resolutions = [];
   f.runs = [];
   f.completed = [];
   f.epoch = 1;
   f.mode = "local";
+  f.missingSource = false;
   f.selected = "research";
   f.action = undefined;
   vi.stubGlobal(
@@ -176,6 +229,7 @@ beforeEach(() => {
 afterEach(() => {
   stop?.();
   stop = undefined;
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   rmSync(directory, { recursive: true, force: true });
 });
@@ -274,4 +328,119 @@ it("serializes foreground and background journal work and releases the lane afte
   await failure;
   await second;
   expect(events).toEqual(["first-start", "first-finish", "second-start"]);
+});
+
+// @lat: [[cloud-workspace-tests#All-profile history review coverage]]
+it("aggregates profile-labelled conflicts without changing the selected profile", async () => {
+  const result = await synchronizeAllProfileHistories();
+  expect(result.synced).toBe(3);
+  expect(result.titleConflicts.map((row) => row.profile)).toEqual([
+    "default",
+    "empty",
+    "research",
+  ]);
+  expect(f.selected).toBe("research");
+});
+
+// @lat: [[cloud-workspace-tests#All-profile history resolution ownership]]
+it("routes reviewed metadata to its owned source and rejects foreign or retired owners", async () => {
+  const request = {
+    userId: "owner",
+    profile: "default",
+    sessionId: "session-default",
+    native: "old",
+    cloud: "new",
+    cloudRevision: 1,
+    choice: "cloud" as const,
+  };
+  for (const field of ["title", "model", "visibility"] as const)
+    await resolveOwnedProfileHistory(request, field);
+  expect(f.resolutions).toEqual(
+    ["title", "model", "visibility"].map((field) => ({
+      profile: "default",
+      field,
+    })),
+  );
+  expect(f.selected).toBe("research");
+  await expect(
+    resolveOwnedProfileHistory({ ...request, profile: "foreign" }, "title"),
+  ).rejects.toThrow("Owned history profile unavailable");
+  await expect(
+    resolveOwnedProfileHistory(
+      { ...request, userId: "another-owner" },
+      "title",
+    ),
+  ).rejects.toThrow("History owner changed");
+  expect(f.resolutions).toHaveLength(3);
+});
+
+// @lat: [[cloud-workspace-tests#All-profile history remote compatibility]]
+it("preserves remote history and resolution through the existing authenticated adapter", async () => {
+  f.mode = "ssh";
+  const report = {
+    userId: "owner",
+    synced: 0,
+    reconstructed: 1,
+    conflicts: [],
+    titleConflicts: [],
+    modelConflicts: [],
+    visibilityConflicts: [],
+    deferred: [],
+  };
+  const sync = vi
+    .spyOn(historyRuntime, "synchronizeNativeHistory")
+    .mockResolvedValue(report);
+  const resolve = vi
+    .spyOn(historyRuntime, "resolveNativeHistoryTitle")
+    .mockResolvedValue(report);
+  expect(await synchronizeAllProfileHistories()).toMatchObject({
+    reconstructed: 1,
+  });
+  const request = {
+    userId: "owner",
+    profile: "research",
+    sessionId: "remote",
+    native: "old",
+    cloud: "new",
+    cloudRevision: 1,
+    choice: "cloud" as const,
+  };
+  await resolveOwnedProfileHistory(request, "title");
+  expect(sync).toHaveBeenCalledOnce();
+  expect(resolve).toHaveBeenCalledWith(request);
+  expect(f.runs).toEqual([]);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+// @lat: [[cloud-workspace-tests#All-profile history stale resolution retirement]]
+it("rejects a reviewed result when the captured account retires during resolution", async () => {
+  f.action = () => {
+    f.epoch++;
+  };
+  await expect(
+    resolveOwnedProfileHistory(
+      {
+        userId: "owner",
+        profile: "default",
+        sessionId: "session-default",
+        native: "old",
+        cloud: "new",
+        cloudRevision: 1,
+        choice: "cloud",
+      },
+      "title",
+    ),
+  ).rejects.toThrow("retired");
+  expect(f.completed).toEqual([]);
+});
+
+// @lat: [[cloud-workspace-tests#All-profile history empty installation reconstruction]]
+it("retains selected-profile remote reconstruction when the original home is absent", async () => {
+  rmSync(f.home, { recursive: true });
+  f.selected = "default";
+  f.missingSource = true;
+  const report = await synchronizeAllProfileHistories();
+  expect(report.synced).toBe(1);
+  expect(report.deferred).toEqual([]);
+  expect(f.completed).toEqual(["default"]);
 });

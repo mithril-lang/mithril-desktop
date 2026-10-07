@@ -1,17 +1,15 @@
 import {
+  synchronizeAllProfileHistories,
+  resolveOwnedProfileHistory,
+} from "../native-history-all-profiles-runtime";
+import {
   synchronizeWallets,
   canonicalWalletBalances,
 } from "../wallet-replication-runtime";
 import { runOriginalScheduleScreen } from "../original-schedule-replication-runtime";
 import { registerTaskAttachmentIPC } from "../task-attachment-ipc";
 import { registerCapabilityResourceIPC } from "../capability-resource-ipc";
-import {
-  synchronizeNativeHistory,
-  resolveNativeHistoryTitle,
-  resolveNativeHistoryModel,
-  resolveNativeHistoryVisibility,
-  nativeHistoryInventory,
-} from "../native-history-runtime";
+import { nativeHistoryInventory } from "../native-history-runtime";
 import {
   nativeRepositorySeed,
   nativeMemorySnapshot,
@@ -1307,19 +1305,19 @@ export function registerIpcHandlers(context: IpcContext): void {
   });
   ipcMain.handle("cloud-chat-native-title-resolve", (event, request) => {
     trustedWorkspaceSender(event);
-    return resolveNativeHistoryTitle(request);
+    return resolveOwnedProfileHistory(request, "title");
   });
   ipcMain.handle("cloud-chat-native-model-resolve", (event, request) => {
     trustedWorkspaceSender(event);
-    return resolveNativeHistoryModel(request);
+    return resolveOwnedProfileHistory(request, "model");
   });
   ipcMain.handle("cloud-chat-native-visibility-resolve", (event, request) => {
     trustedWorkspaceSender(event);
-    return resolveNativeHistoryVisibility(request);
+    return resolveOwnedProfileHistory(request, "visibility");
   });
   ipcMain.handle("cloud-chat-native-history-sync", (event) => {
     trustedWorkspaceSender(event);
-    return synchronizeNativeHistory();
+    return synchronizeAllProfileHistories();
   });
   ipcMain.handle("cloud-chat-list", (event) => {
     trustedWorkspaceSender(event);

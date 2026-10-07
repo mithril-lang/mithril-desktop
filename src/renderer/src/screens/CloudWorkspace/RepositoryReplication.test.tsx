@@ -388,3 +388,27 @@ it("rejects an old-account preference reply after account change", async () => {
   });
   expect(preferences.apply).not.toHaveBeenCalled();
 });
+
+// @lat: [[cloud-workspace-tests#Cross-profile history review interaction]]
+it("shows the source profile and sends its reviewed choice without switching the selected profile", async () => {
+  const other = { ...conflict, profile: "research" };
+  sync.mockResolvedValue({
+    userId: "alice",
+    conflicts: [other.sessionId],
+    titleConflicts: [other],
+    deferred: [],
+  });
+  resolve.mockResolvedValue({ userId: "alice" });
+  render(<RepositoryReplication profile="default" locale="ja" enabled />);
+  expect(
+    await screen.findByText("チャット名の変更を確認 · research"),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "同期された名前を使用" }));
+  await waitFor(() =>
+    expect(resolve).toHaveBeenCalledWith({
+      ...other,
+      userId: "alice",
+      choice: "cloud",
+    }),
+  );
+});

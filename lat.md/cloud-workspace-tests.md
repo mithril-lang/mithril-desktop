@@ -1107,3 +1107,27 @@ Stopping the lifecycle fences in-flight source results, prevents later profile v
 ## Shared history journal serialization
 
 Foreground and background consumers share one serial lane. A waiting operation cannot overlap the prior source journal mutation, and a failed operation releases the lane for retained-intent recovery.
+
+## All-profile history review coverage
+
+The foreground report labels each owned profile's conflicts and combines counts without changing the selected profile or creating foreign-owner sources.
+
+## All-profile history resolution ownership
+
+Title, model and visibility choices route to the owned source without selecting it; foreign profiles and a mismatched authenticated owner are rejected before resolution.
+
+## Cross-profile history review interaction
+
+The existing review UI displays the source profile and sends that profile's reviewed choice even when a different profile is selected.
+
+## All-profile history remote compatibility
+
+Remote history reconstruction and reviewed choices retain the existing authenticated adapter without visiting local original profiles.
+
+## All-profile history stale resolution retirement
+
+A changed account generation during reviewed metadata resolution rejects the result before accepting source effects.
+
+## All-profile history empty installation reconstruction
+
+A missing original home still admits selected-profile remote cache reconstruction without inventing original sources or requiring an agent installation.

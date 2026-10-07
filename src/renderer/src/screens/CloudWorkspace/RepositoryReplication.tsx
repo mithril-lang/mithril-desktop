@@ -179,7 +179,7 @@ export default function RepositoryReplication({
       const result = await resolver({
         ...conflict,
         userId: capturedOwner,
-        profile,
+        profile: conflict.profile ?? profile,
         choice,
       });
       if (generation !== identityGeneration.current) return;
@@ -279,8 +279,13 @@ export default function RepositoryReplication({
         ] as const
       ).flatMap(({ field, conflicts }) =>
         conflicts.map((conflict) => (
-          <details key={`${field}:${conflict.sessionId}`}>
-            <summary>{metadataLabels[field].summary}</summary>
+          <details
+            key={`${field}:${conflict.profile ?? profile}:${conflict.sessionId}`}
+          >
+            <summary>
+              {metadataLabels[field].summary}
+              {conflict.profile ? ` · ${conflict.profile}` : ""}
+            </summary>
             <p>{displayMetadata(field, conflict.native)}</p>
             <p>{displayMetadata(field, conflict.cloud)}</p>
             <button

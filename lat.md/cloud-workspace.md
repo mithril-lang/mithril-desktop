@@ -1013,3 +1013,9 @@ The same account-bound inventory discovers and removes profile pollers without s
 The original ProfileModal sidebar and section selection now render through DesktopProfileNavigation, shared directly with the Web profile surface.
 
 Workspace `0.6.29-schedules.14` keeps Native's original section labels, icons, title primitive and selection handlers behind its consumer adapter. Web uses the same navigation and original Persona editor with owner-bound memory-file storage. The archive has 441 files, SHA256 `1645ef8388616098fa52585771ce92f6726e869fbd5b81457036a005edc141f9`. Remaining Web profile panes, publication and installed cross-device qualification are unfinished.
+
+## Original Agent Memory shared consumption (draft)
+
+Native ProfileModal and Web profiles now render DesktopProfileMemory from one component, using their existing storage adapters.
+
+Workspace `0.6.29-schedules.15` removes the duplicate Native loader and connects Web Agent Memory to owner-bound original MEMORY resources. Failed loads require explicit retry instead of repeating forever, and late responses from replaced profiles are ignored. Entry saves retain the original MEMORY/USER baseline. Native preload Memory types now describe the actual main-process result. Publication and installed cross-device behavior remain unverified.

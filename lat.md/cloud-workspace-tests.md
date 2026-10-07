@@ -924,3 +924,7 @@ With one original manual consumer held busy, another owned profile polls again o
 ## All-profile manual transport identity
 
 Real HTTP tests require a valid captured active account context for another profile mailbox, reject foreign receipts and send nothing after account identity changes.
+
+## Shared original profile Memory native adapter
+
+The actual ProfileModal renders the shared Agent Memory editor and saves to its original Native profile with the exact observed MEMORY and USER baseline.

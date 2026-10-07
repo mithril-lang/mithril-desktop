@@ -31,10 +31,6 @@ vi.mock("../../screens/Soul/Soul", () => ({
   default: (): React.JSX.Element => <div data-testid="soul" />,
 }));
 
-vi.mock("../../screens/Memory/MemoryEntries", () => ({
-  MemoryEntries: (): React.JSX.Element => <div data-testid="memory" />,
-}));
-
 vi.mock("./ProfileWalletPane", () => ({
   default: (): React.JSX.Element => <div data-testid="wallet" />,
 }));
@@ -196,4 +192,45 @@ describe("ProfileModal deletion failures", () => {
     expect(deleteProfile).toHaveBeenCalledTimes(2);
     expect(deleteProfile).toHaveBeenLastCalledWith("alpha");
   });
+});
+
+// @lat: [[cloud-workspace-tests#Shared original profile Memory native adapter]]
+it("uses the shared original Agent Memory pane with the exact Native source baseline", async () => {
+  installHermesAPI([profile()]);
+  vi.mocked(window.hermesAPI.readMemory).mockResolvedValue({
+    memory: {
+      content: "Original entry",
+      entries: [{ index: 0, content: "Original entry" }],
+      exists: true,
+      lastModified: null,
+      charCount: 14,
+      charLimit: 2200,
+    },
+    user: {
+      content: "Original user",
+      exists: true,
+      lastModified: null,
+      charCount: 13,
+      charLimit: 1375,
+    },
+    stats: { totalSessions: 0, totalMessages: 0 },
+  });
+  const save = vi.fn().mockResolvedValue({ success: true });
+  Object.assign(window.hermesAPI, { updateMemoryEntry: save });
+  renderModal();
+  fireEvent.click(
+    await screen.findByRole("button", { name: "agents.sectionAgentMemory" }),
+  );
+  await screen.findByText("Original entry");
+  fireEvent.click(screen.getByRole("button", { name: "memory.edit" }));
+  fireEvent.change(screen.getByRole("textbox"), {
+    target: { value: "Edited entry" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "memory.save" }));
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith(0, "Edited entry", "default", {
+      memory: "Original entry",
+      user: "Original user",
+    }),
+  );
 });

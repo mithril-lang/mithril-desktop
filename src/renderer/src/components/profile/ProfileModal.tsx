@@ -22,8 +22,7 @@ import {
 import { fileToAvatarDataUrl } from "../../utils/imageResize";
 import { useI18n } from "../useI18n";
 import Soul from "../../screens/Soul/Soul";
-import { MemoryEntries } from "../../screens/Memory/MemoryEntries";
-import type { MemoryData } from "../../screens/Memory/types";
+import { DesktopProfileMemory } from "@mithril/workspace/desktop-memory";
 import { AppModal, AppModalTitle } from "../modal/AppModal";
 import ProfileWalletPane from "./ProfileWalletPane";
 import ProfileSyncPane from "./ProfileSyncPane";
@@ -98,7 +97,7 @@ export default function ProfileModal({
   initialSection,
 }: ProfileModalProps): React.JSX.Element {
   const id = name;
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [profile, setProfile] = useState<ProfileInfo | null>(null);
   const [section, setSection] = useState<ProfileSection>(
     initialSection ?? "profile",
@@ -109,9 +108,6 @@ export default function ProfileModal({
     if (open) setSection(initialSection ?? "profile");
   }, [open, initialSection]);
   const [error, setError] = useState("");
-  const [memoryData, setMemoryData] = useState<MemoryData | null>(null);
-  const [memoryLoading, setMemoryLoading] = useState(false);
-  const [memoryError, setMemoryError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -127,31 +123,6 @@ export default function ProfileModal({
   useEffect(() => {
     load();
   }, [load]);
-
-  const loadMemoryData = useCallback(async (): Promise<void> => {
-    if (!profile) return;
-    setMemoryLoading(true);
-    setMemoryError("");
-    try {
-      const data = await window.hermesAPI.readMemory(profile.id);
-      setMemoryData(data as MemoryData);
-    } catch {
-      setMemoryError(t("memory.loadFailed"));
-    } finally {
-      setMemoryLoading(false);
-    }
-  }, [profile, t]);
-
-  useEffect(() => {
-    setMemoryData(null);
-    setMemoryError("");
-  }, [id]);
-
-  useEffect(() => {
-    if (section === "agentMemory" && profile && !memoryData && !memoryLoading) {
-      void loadMemoryData();
-    }
-  }, [loadMemoryData, memoryData, memoryLoading, profile, section]);
 
   const afterMutation = useCallback(async (): Promise<void> => {
     await load();
@@ -319,26 +290,12 @@ export default function ProfileModal({
             )}
 
             {section === "agentMemory" && (
-              <div className="profile-modal-pane profile-modal-memory-pane">
-                {memoryLoading && !memoryData ? (
-                  <div className="profile-modal-loading">
-                    <OrbLoader state="searching" size={64} />
-                  </div>
-                ) : memoryData ? (
-                  <MemoryEntries
-                    key={profile.id}
-                    entries={memoryData.memory.entries}
-                    expected={{
-                      memory: memoryData.memory.content,
-                      user: memoryData.user.content,
-                    }}
-                    profile={profile.id}
-                    onRefresh={loadMemoryData}
-                  />
-                ) : memoryError ? (
-                  <div className="memory-error">{memoryError}</div>
-                ) : null}
-              </div>
+              <DesktopProfileMemory
+                api={window.hermesAPI}
+                profile={profile.id}
+                t={t}
+                locale={locale}
+              />
             )}
 
             {section === "wallet" && <ProfileWalletPane profile={profile.id} />}

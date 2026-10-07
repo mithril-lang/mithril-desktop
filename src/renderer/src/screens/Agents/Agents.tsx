@@ -1,3 +1,4 @@
+import { DesktopAgentsTable } from "@mithril/workspace/desktop-agents";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, ChatBubble, Pencil, X } from "../../assets/icons";
 import ProfileAvatar from "../../components/common/ProfileAvatar";
@@ -194,12 +195,6 @@ function Agents({
     loadProfiles();
   }
 
-  function providerLabel(provider: string): string {
-    if (!provider || provider === "auto") return t("agents.auto");
-    if (provider === "custom") return t("agents.local");
-    return provider.charAt(0).toUpperCase() + provider.slice(1);
-  }
-
   if (loading) {
     return (
       <div className="agents-container">
@@ -336,116 +331,26 @@ function Agents({
         </div>
       </AppModal>
 
-      <div className="agents-table">
-        <div className="agents-table-head">
-          <span className="agents-cell-profile">{t("agents.colProfile")}</span>
-          <span className="agents-cell-model">{t("agents.colModel")}</span>
-          <span className="agents-cell-status">{t("agents.colStatus")}</span>
-          <span className="agents-cell-actions">{t("agents.colActions")}</span>
-        </div>
-        {profiles.map((p) => (
-          <div
-            key={p.id}
-            className={`agents-row ${activeProfile === p.id ? "active" : ""}`}
-            onClick={() => handleSelect(p.id)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              // Only the row itself — not Enter bubbling up from the edit/chat
-              // buttons — should switch the profile.
-              if (e.key === "Enter" && e.target === e.currentTarget) {
-                handleSelect(p.id);
-              }
-            }}
-          >
-            <div className="agents-cell-profile">
-              <ProfileAvatar
-                name={p.id}
-                color={p.color}
-                avatar={p.avatar}
-                size={36}
-              />
-              <div className="agents-row-info">
-                <div className="agents-row-name">{p.name}</div>
-                <div className="agents-row-sub">
-                  {p.id !== p.name ? `${p.id} · ` : ""}
-                  {providerLabel(p.provider)} ·{" "}
-                  {t("agents.skillsCount", { count: p.skillCount })}
-                </div>
-              </div>
-            </div>
-            <div className="agents-cell-model">
-              {p.model ? (
-                <code className="agents-model-chip">
-                  {p.model.split("/").pop()}
-                </code>
-              ) : (
-                <span className="agents-model-empty">
-                  {t("agents.noModel")}
-                </span>
-              )}
-            </div>
-            <div className="agents-cell-status">
-              {startingProfile === p.id && !p.gatewayRunning ? (
-                <span className="agents-status-pill starting">
-                  <span className="agents-status-spinner" />
-                  {t("agents.starting")}
-                </span>
-              ) : (
-                <span
-                  className={`agents-status-pill ${
-                    p.gatewayRunning ? "on" : "off"
-                  }`}
-                  title={
-                    p.gatewayRunning
-                      ? p.gatewayShared
-                        ? t("agents.gatewayShared")
-                        : t("agents.gatewayRunning")
-                      : t("agents.gatewayOff")
-                  }
-                >
-                  <span className="agents-status-dot" />
-                  {p.gatewayRunning ? t("agents.running") : t("agents.off")}
-                </span>
-              )}
-            </div>
-            <div className="agents-cell-actions">
-              <button
-                type="button"
-                className="agents-row-edit"
-                title={t("agents.editAppearanceFor", {
-                  name: p.name,
-                })}
-                aria-label={t("agents.editAppearanceFor", {
-                  name: p.name,
-                })}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setError("");
-                  openProfile(p.id, {
-                    onChanged: loadProfiles,
-                    onDeleted: (n) => {
-                      if (activeProfile === n) onSelectProfile("default");
-                    },
-                  });
-                }}
-              >
-                <Pencil size={14} />
-              </button>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleChatWith(p.id);
-                }}
-              >
-                <ChatBubble size={13} />
-                {t("agents.chat")}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+      <DesktopAgentsTable
+        profiles={profiles}
+        activeProfile={activeProfile}
+        startingProfile={startingProfile}
+        onSelect={(id) => void handleSelect(id)}
+        onChatWith={(id) => void handleChatWith(id)}
+        onEdit={(id) => {
+          setError("");
+          openProfile(id, {
+            onChanged: loadProfiles,
+            onDeleted: (name) => {
+              if (activeProfile === name) onSelectProfile("default");
+            },
+          });
+        }}
+        Avatar={ProfileAvatar}
+        Pencil={Pencil}
+        ChatBubble={ChatBubble}
+        t={t}
+      />
     </div>
   );
 }

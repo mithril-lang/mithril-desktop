@@ -1057,3 +1057,11 @@ The hook fences old account/profile responses and enables only already authorize
 New remote original metadata can materialize a named Desktop profile automatically, while retained missing original sources remain deleted.
 
 The replica transport verifies owner-scoped resource bytes before creation. A durable creation intent distinguishes first materialization from retained deletion, and canonical authority is rechecked before directory mutations. No credentials, runtime configuration or active selection are cloned. Existing original metadata CAS and receipts perform the actual content restoration. Public and installed cross-device qualification remain unfinished.
+
+## Original Agents table shared consumption (draft)
+
+Native and Web now import DesktopAgentsTable and the original table styles from workspace 0.6.29-schedules.20 instead of maintaining separate profile lists.
+
+Native retains its original creation modal, profile selection, gateway polling, edit modal and Chat operations. Web uses owner-bound metadata resources and the same edit action without inventing runtime state or exposing unavailable execution. Original column layout scrolls on narrow browser viewports. Shared row tests cover keyboard event isolation and unknown state; Native creation/retry tests exercise the compiled package. Full management parity, release and installed proof remain incomplete.
+
+The immutable shared archive contains 449 files with SHA256 `d6db9999d3308c2f722d2ec9e105ec5ec0dd8eb8cce7cc5b90459f31adf14fd2`; producer, archive, Native vendor and installed package bytes were independently compared.

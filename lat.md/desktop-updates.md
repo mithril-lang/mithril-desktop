@@ -89,3 +89,29 @@ The `WIN_SIGNING` repository variable selects `azure`, `esigner`, or the backwar
 Prerelease versions such as `0.8.0-preview.1` bake `channel: preview` into `app-update.yml`, so the generic provider requests `preview*.yml` and the preview workflow publishes those names.
 
 electron-updater requests `preview.yml` (Windows), `preview-mac.yml`, `preview-linux.yml` and `preview-linux-arm64.yml`. [[tests/first-run-mithril.test.ts]] pins this; the inherited `latest*.yml` names belong to the disabled stable workflow.
+
+## Store distribution
+
+Store editions are separate from the full direct-download Desktop because their sandbox, identity, signing, update, and review contracts differ.
+
+The direct notarized DMG/ZIP and signed NSIS/portable artifacts remain the full local-agent edition and continue to use the Mithril generic update feed. Store packages use Store-managed updates and never consume that feed. `docs/desktop-store-release.md` records the release architecture and external account gates.
+
+### Mac App Store boundary
+
+The MAS edition is blocked until a cloud-only runtime removes local process, SSH, unrestricted filesystem, self-update, and updater behavior and passes clean-account `mas-dev` QA.
+
+Electron Builder's future `mas` target owns sandboxed packaging and Apple distribution signing. `scripts/store-release/macos/fastlane/Fastfile` only accepts an already-tested `.pkg`: `upload_pkg` uploads without review, while `submit_review` is a separate action and automatic release remains off. `scripts/store-release/check-readiness.mjs` requires the cloud-only QA acknowledgement and external credential/package paths before release mode can proceed.
+
+### Microsoft Store boundary
+
+Windows Store publication uses Partner Center's assigned identity and Microsoft Store Developer CLI, not Fastlane.
+
+`scripts/store-release/windows/publish.ps1` authenticates with protected Partner Center credentials and adds `--noCommit` unless the caller explicitly supplies `-Commit`. The Store identity and publisher are not guessed in source; AppX/MSIX packaging stays blocked until Partner Center assigns them.
+
+### Credential and submission gates
+
+Credential-free verification checks repository structure and required MAS entitlements without contacting a store.
+
+The `verify-store-automation` CI job installs the pinned Ruby/Fastlane bundle, lists the lanes, and runs the same credential-free gate on every PR and main push.
+
+Release-mode checks require secret file inputs to be absolute paths outside the checkout. Packaging, upload, review submission, draft creation, and committed publication are distinct evidence gates. [[tests/release-artifacts.test.ts]] protects the Apple lane separation, disabled automatic release, Microsoft draft default, and credential-free structural check.

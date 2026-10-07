@@ -41,3 +41,33 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+  verify-store-automation:
+    runs-on: ubuntu-latest
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/scripts/store-release/macos/Gemfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4.11"
+          bundler-cache: true
+
+      - name: Verify store release structure
+        run: node scripts/store-release/check-readiness.mjs
+
+      - name: List Mac App Store lanes
+        working-directory: scripts/store-release/macos
+        run: bundle exec fastlane lanes
+
+      - name: Verify Mac App Store lane
+        working-directory: scripts/store-release/macos
+        run: bundle exec fastlane mac verify

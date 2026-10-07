@@ -668,3 +668,13 @@ A committed profile registration whose reply is lost reuses its retained outbox 
 ## Simultaneous empty original profile devices
 
 Two fresh devices use independent private journals and converge on one confirmed profile row without creating jobs. Reopening the passive device does not retain or republish a redundant registration.
+
+## Original parser mailbox background roundtrip
+
+An independent client submits a confirmed request that the actual coordinator processes on a passive device. The result retains raw integer text and reopening does not parse again or create a native jobs source.
+
+An original scheduled resume receipt remains available even when the subsequent execution-policy admission fails; no authored source is restored.
+
+## Original parser mailbox runtime scope
+
+The runtime forwards exact preparation and transition requests to the original Cron ports. Foreign owner requests and a timezone change during parsing cannot return an accepted result.

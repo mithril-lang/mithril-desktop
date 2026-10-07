@@ -25,6 +25,11 @@ import {
   OriginalScheduleReplication,
   type OriginalScheduleReplicationPorts,
 } from "./original-schedule-replication";
+import {
+  RepositorySync,
+  emptyRepository,
+} from "@mithril/workspace/repository-sync";
+import { OriginalSchedulePreparationMailbox } from "@mithril/workspace/original-schedule-preparation";
 import { captureOriginalCronFile } from "./cron-source-files";
 const roots: string[] = [];
 afterEach(() =>
@@ -173,6 +178,14 @@ function device(
       );
       events.push("bind");
       return { bindingDigest: "b".repeat(64) };
+    },
+    parser: {
+      prepareCreate: async () => {
+        throw Error("No parser peer configured");
+      },
+      prepareTransition: async () => {
+        throw Error("No parser peer configured");
+      },
     },
     native: {
       capture: (profile) => captureOriginalCronFile(home, profile),
@@ -525,4 +538,86 @@ it("coalesces simultaneous fresh device profile registration through real indepe
     status: "synced",
   });
   expect(peer.operations).toHaveLength(operations);
+});
+
+// @lat: [[cloud-workspace-tests#Original parser mailbox background roundtrip]]
+it("processes confirmed parser requests on a passive device while retaining original source and private journals", async () => {
+  const peer = cloud(),
+    passive = device(peer, false);
+  await new OriginalScheduleReplication(passive.ports).sync();
+  let state = emptyRepository();
+  const browser = new RepositorySync(
+    "alice",
+    peer.repository,
+    {
+      read: async () => structuredClone(state),
+      update: async (_owner, change) => {
+        state = change(structuredClone(state));
+        return structuredClone(state);
+      },
+    },
+    () => {},
+    ["schedule"],
+  );
+  await browser.load();
+  const mailbox = new OriginalSchedulePreparationMailbox(
+    browser,
+    passive.ports.scope,
+  );
+  const request = {
+    ...passive.ports.scope,
+    operationId: crypto.randomUUID(),
+    input: { schedule: "17 9 * * 1-5", prompt: "Example" },
+  };
+  let parses = 0;
+  passive.ports.parser.prepareCreate = async (input) => {
+    parses++;
+    expect(input).toEqual(request);
+    const sourceText =
+      '{"id":"012345abcdef","name":"Example","prompt":"Example","schedule":{"kind":"cron","expr":"17 9 * * 1-5"},"enabled":true,"state":"scheduled","opaque":9223372036854775807}';
+    return { ...input, job: JSON.parse(sourceText), sourceText };
+  };
+  await mailbox.submit("create", request);
+  expect(await mailbox.result("create", request)).toBeNull();
+  expect(await new OriginalScheduleReplication(passive.ports).sync()).toEqual({
+    status: "synced",
+  });
+  expect(
+    ((await mailbox.result("create", request)) as { sourceText: string })
+      .sourceText,
+  ).toContain("9223372036854775807");
+  expect(captureOriginalCronFile(passive.home, "default")).toBeNull();
+  expect(passive.events).not.toContain("restore");
+  expect(passive.events).not.toContain("bind");
+  expect(
+    [...peer.documents.values()].some((row) =>
+      row.id.startsWith("schedule-file-"),
+    ),
+  ).toBe(false);
+  await new OriginalScheduleReplication(passive.ports).sync();
+  expect(parses).toBe(1);
+  const created = (await mailbox.result("create", request))!;
+  const transition = {
+    ...passive.ports.scope,
+    operationId: crypto.randomUUID(),
+    action: "resume" as const,
+    source: { ...created.job, enabled: false, state: "paused" },
+  };
+  passive.ports.parser.prepareTransition = async (input) => ({
+    ...input,
+    job: { ...input.source, enabled: true, state: "scheduled" },
+  });
+  await mailbox.submit("transition", transition);
+  passive.ports.prepare = async () => {
+    throw Error("execution policy unavailable");
+  };
+  expect(
+    await new OriginalScheduleReplication(passive.ports)
+      .sync()
+      .catch((error) => error.message),
+  ).toBe("execution policy unavailable");
+  expect((await mailbox.result("transition", transition))?.job.state).toBe(
+    "scheduled",
+  );
+  expect(captureOriginalCronFile(passive.home, "default")).toBeNull();
 });

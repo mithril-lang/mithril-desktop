@@ -1,3 +1,4 @@
+import type { OriginalScheduleReplicationPorts } from "./original-schedule-replication";
 vi.mock("./mithril-token-store", () => ({ readMithrilToken: () => f.token }));
 import { beforeEach, expect, it, vi } from "vitest";
 const f = vi.hoisted(() => ({
@@ -8,6 +9,10 @@ const f = vi.hoisted(() => ({
   tokenGuard: vi.fn(),
   bind: vi.fn(),
   token: "synthetic-account-a",
+  timeZone: "UTC",
+  ports: [] as OriginalScheduleReplicationPorts[],
+  parseCreate: vi.fn(),
+  parseTransition: vi.fn(),
 }));
 vi.mock("electron", () => ({ app: { getPath: () => "/test/user-data" } }));
 vi.mock("./cloud-workspace-runtime", () => ({
@@ -31,7 +36,7 @@ vi.mock("./cloud-workspace-runtime", () => ({
 }));
 vi.mock("./config", () => ({
   getConnectionConfig: () => ({ mode: "local" }),
-  getConfigValue: () => "UTC",
+  getConfigValue: () => f.timeZone,
 }));
 vi.mock("./utils", () => ({
   getActiveProfileNameSync: () => "default",
@@ -43,12 +48,17 @@ vi.mock("./repository-kanban-runtime", () => ({
 }));
 vi.mock("./cronjobs", () => ({
   readOriginalCronSource: vi.fn(),
+  prepareOriginalCronSource: f.parseCreate,
+  prepareOriginalCronTransition: f.parseTransition,
   restoreOriginalCronSource: vi.fn(),
   prepareOriginalCronExecution: vi.fn(),
   bindOriginalCronExecution: vi.fn(),
 }));
 vi.mock("./original-schedule-replication", () => ({
   OriginalScheduleReplication: class {
+    constructor(ports: OriginalScheduleReplicationPorts) {
+      f.ports.push(ports);
+    }
     sync = f.sync;
     assertScreenScope = f.check;
     assertSelectedExecution = f.selected;
@@ -62,6 +72,8 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   f.token = "synthetic-account-a";
+  f.timeZone = "UTC";
+  f.ports = [];
   f.sync.mockResolvedValue({ status: "synced" });
   f.check.mockResolvedValue(undefined);
   f.selected.mockResolvedValue(undefined);
@@ -202,4 +214,52 @@ it("queues the background poll behind an in-flight screen action instead of ente
   } finally {
     stop();
   }
+});
+
+// @lat: [[cloud-workspace-tests#Original parser mailbox runtime scope]]
+it("calls the original Cron preparation ports under the captured account profile and timezone", async () => {
+  await runOriginalScheduleScreen("default", async () => [], "read");
+  const ports = f.ports.at(-1)!;
+  const request = {
+    ...ports.scope,
+    operationId: "original-operation",
+    input: { schedule: "every 5m" },
+  };
+  const preparation = {
+    ...request,
+    job: { id: "012345abcdef" },
+    sourceText: '{"id":"012345abcdef"}',
+  };
+  f.parseCreate.mockResolvedValue({ success: true, preparation });
+  expect(await ports.parser.prepareCreate(request)).toEqual(preparation);
+  expect(f.parseCreate).toHaveBeenCalledWith(request);
+  await expect(
+    ports.parser.prepareCreate({ ...request, owner: "bob" }),
+  ).rejects.toThrow("identity changed");
+  expect(f.parseCreate).toHaveBeenCalledTimes(1);
+  const transition = {
+    ...ports.scope,
+    operationId: "transition-operation",
+    action: "pause" as const,
+    source: { id: "012345abcdef" },
+  };
+  f.parseTransition.mockResolvedValue({
+    success: true,
+    preparation: {
+      ...transition,
+      job: { ...transition.source, enabled: false },
+    },
+  });
+  expect(await ports.parser.prepareTransition(transition)).toEqual({
+    ...transition,
+    job: { ...transition.source, enabled: false },
+  });
+  expect(f.parseTransition).toHaveBeenCalledWith(transition);
+  f.parseCreate.mockImplementationOnce(async () => {
+    f.timeZone = "Asia/Tokyo";
+    return { success: true, preparation };
+  });
+  await expect(ports.parser.prepareCreate(request)).rejects.toThrow(
+    "profile changed",
+  );
 });

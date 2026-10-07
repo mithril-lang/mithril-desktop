@@ -11,6 +11,8 @@ import { HERMES_PYTHON } from "./installer";
 import { bindRepositorySource } from "./repository-kanban-runtime";
 import {
   readOriginalCronSource,
+  prepareOriginalCronSource,
+  prepareOriginalCronTransition,
   restoreOriginalCronSource,
   prepareOriginalCronExecution,
   bindOriginalCronExecution,
@@ -40,7 +42,9 @@ async function createEngine(): Promise<OriginalScheduleReplication | null> {
     cloudWorkspace.assertNativeContext(context);
     if (
       getConnectionConfig().mode !== "local" ||
-      (getActiveProfileNameSync() || "default") !== profile
+      (getActiveProfileNameSync() || "default") !== profile ||
+      (getConfigValue("timezone", profile)?.trim() ||
+        Intl.DateTimeFormat().resolvedOptions().timeZone) !== timeZone
     )
       throw Error("Schedule profile changed");
   };
@@ -66,6 +70,34 @@ async function createEngine(): Promise<OriginalScheduleReplication | null> {
         cloudWorkspace.repositoryHistory(collection, id, before),
     },
     resources: cloudWorkspace.scheduleResources,
+    parser: {
+      prepareCreate: async (request) => {
+        await assertActive();
+        if (
+          request.owner !== context.userId ||
+          request.profile !== profile ||
+          request.timeZone !== timeZone
+        )
+          throw Error("Schedule preparation identity changed");
+        const result = await prepareOriginalCronSource(request);
+        await assertActive();
+        if (!result.success) throw Error(result.error);
+        return result.preparation;
+      },
+      prepareTransition: async (request) => {
+        await assertActive();
+        if (
+          request.owner !== context.userId ||
+          request.profile !== profile ||
+          request.timeZone !== timeZone
+        )
+          throw Error("Schedule preparation identity changed");
+        const result = await prepareOriginalCronTransition(request);
+        await assertActive();
+        if (!result.success) throw Error(result.error);
+        return result.preparation;
+      },
+    },
     native: {
       capture: readOriginalCronSource,
       restore: restoreOriginalCronSource,

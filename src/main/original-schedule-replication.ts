@@ -12,6 +12,10 @@ import {
   type OriginalScheduleReplicaResult,
   type OriginalScheduleReplicaScope,
 } from "@mithril/workspace/original-schedule-file-replica";
+import {
+  OriginalSchedulePreparationMailbox,
+  type OriginalScheduleParser,
+} from "@mithril/workspace/original-schedule-preparation";
 import { RepositorySync } from "@mithril/workspace/repository-sync";
 import type { RepositoryTransport } from "@mithril/workspace/repository";
 import type { CapabilityResourceTransport } from "@mithril/workspace/capability-resources";
@@ -43,6 +47,7 @@ export interface OriginalScheduleReplicationPorts {
   repository: RepositoryTransport;
   resources: CapabilityResourceTransport;
   native: OriginalScheduleNativeBoundary;
+  parser: OriginalScheduleParser;
   prepare(
     input: OriginalScheduleAgentPreparation,
   ): Promise<{ bindingDigest: string }>;
@@ -118,6 +123,56 @@ export class OriginalScheduleReplication {
     try {
       await this.check();
       const original = p.native.capture(p.scope.profile);
+      const store = new NativeOriginalScheduleReplicaStore(
+        join(p.stateRoot, "schedule-replicas"),
+        p.scope,
+      );
+      const repository = new RepositorySync(
+        p.scope.owner,
+        p.repository,
+        {
+          read: async (owner) => {
+            if (owner !== p.scope.owner) throw Error("Schedule owner changed");
+            await this.check();
+            return store.readRepository(p.scope);
+          },
+          update: async (owner, change) => {
+            if (owner !== p.scope.owner) throw Error("Schedule owner changed");
+            await this.check();
+            return store.updateRepository(p.scope, change);
+          },
+        },
+        () => {},
+        ["schedule"],
+      );
+      this.repository = repository;
+      await store.exclusive(p.scope, async () => {
+        await repository.load();
+        await ensureOriginalScheduleFileContext(
+          repository,
+          p.scope.profile,
+          p.scope.timeZone,
+        );
+        await this.check();
+        await new OriginalSchedulePreparationMailbox(
+          repository,
+          p.scope,
+        ).processOne({
+          prepareCreate: async (request) => {
+            await this.check();
+            const result = await p.parser.prepareCreate(request);
+            await this.check();
+            return result;
+          },
+          prepareTransition: async (request) => {
+            await this.check();
+            const result = await p.parser.prepareTransition(request);
+            await this.check();
+            return result;
+          },
+        });
+        await this.check();
+      });
       // Required lane precedes either authored restore or executor selection.
       await p.prepare({
         owner: p.scope.owner,
@@ -156,38 +211,6 @@ export class OriginalScheduleReplication {
       }
       await this.check();
       const authorityRevision = authority.revision;
-      const store = new NativeOriginalScheduleReplicaStore(
-        join(p.stateRoot, "schedule-replicas"),
-        p.scope,
-      );
-      const repository = new RepositorySync(
-        p.scope.owner,
-        p.repository,
-        {
-          read: async (owner) => {
-            if (owner !== p.scope.owner) throw Error("Schedule owner changed");
-            await this.check();
-            return store.readRepository(p.scope);
-          },
-          update: async (owner, change) => {
-            if (owner !== p.scope.owner) throw Error("Schedule owner changed");
-            await this.check();
-            return store.updateRepository(p.scope, change);
-          },
-        },
-        () => {},
-        ["schedule"],
-      );
-      this.repository = repository;
-      await store.exclusive(p.scope, async () => {
-        await repository.load();
-        await ensureOriginalScheduleFileContext(
-          repository,
-          p.scope.profile,
-          p.scope.timeZone,
-        );
-        await this.check();
-      });
       const file = new OriginalScheduleFileRepository(
         repository,
         p.scope.profile,

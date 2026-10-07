@@ -945,3 +945,9 @@ Downloaded profile metadata can replace or remove a native file only when its ex
 A private owner/profile/root SQLite journal commits exact pending bytes before replacement, retains completed receipts, and recovers interruptions without overwriting newer local edits.
 
 [[src/main/profile-metadata-replica.ts#ProfileMetadataReplica]] uses FULL synchronous transactions and separate committed intent and completion phases. Restoration is synchronous; its caller must revalidate workspace authorization before calling apply or recover. Exact target bytes are bound to the profile pointer digest and size. Replayed results are read before recapturing a newer source. This pending native replica integration does not yet activate automatic metadata synchronization or publish an installer.
+
+## Native profile test environment
+
+Original profile integration tests run in Node against a canonical temporary directory so native Buffer validation and no-symlink storage checks match Electron main-process execution.
+
+The prior jsdom suite treated native Node buffers as foreign Uint8Arrays, and macOS temporary paths passed through a system symlink. tests/profiles.test.ts now exercises its original 23 cases using the actual Node environment without weakening production metadata validation.

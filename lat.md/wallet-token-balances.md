@@ -42,9 +42,11 @@ Vitest test suites for wallet store and balance reads.
 
 ## Shared original wallet pane (draft)
 
-The original Wallet pane is provided by workspace 0.6.29-schedules.25 and consumed through the Desktop IPC adapter, preserving cards, balances, copying and deletion confirmation.
+The original Wallet pane is provided by workspace 0.6.29-schedules.26 and consumed through the Desktop IPC adapter, preserving cards, balances, copying and deletion confirmation.
 
 Visible local/cloud origin badges are removed. Public DTOs share one definition; recovery phrases and encrypted wallet files remain behind the native store. Service-unavailable routes return an error instead of falsely reporting sign-out. Profile replacement retires pending list/sync results. The shared Web adapter reads owner-bound descriptors and balances through the canonical API; installed-update and production parity remain unverified.
+
+Successful synchronization re-reads the original working copy, including when no remote-only wallets exist. The shared pane deduplicates public identities while retaining native custody controls and rejects late refreshes from a retired profile. The immutable `.26` archive contains 461 matching producer/vendor/installed files; SHA256 is `91cf40247121519ebb4b8e1d26d4957bdaf58894c2a92aebe854424fbb508910`.
 
 ## Automatic public wallet replication (draft)
 

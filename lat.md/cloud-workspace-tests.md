@@ -1049,3 +1049,7 @@ Interruption after the original record was restored but before its checkpoint co
 ## Wallet original custody preservation
 
 Cloud restoration changes only the wallet name, preserving exact native ciphertext and other records while refusing signing identity replacement and concurrent native edits.
+
+## Original wallet card refresh after synchronization
+
+The actual Native adapter consumes the compiled shared pane and displays the restored original name after synchronization even with no remote-only wallets.

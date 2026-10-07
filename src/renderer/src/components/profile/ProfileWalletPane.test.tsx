@@ -78,6 +78,21 @@ function installApi(): void {
 }
 
 describe("ProfileWalletPane balance chips", () => {
+  // @lat: [[cloud-workspace-tests#Original wallet card refresh after synchronization]]
+  it("uses the compiled shared pane to refresh a restored original name after synchronization", async () => {
+    installApi();
+    vi.mocked(window.hermesAPI.listWallets)
+      .mockResolvedValueOnce([WALLET])
+      .mockResolvedValue([{ ...WALLET, name: "Renamed on Web" }]);
+    vi.mocked(window.hermesAPI.syncWallets).mockResolvedValue({
+      status: "ok",
+      wallets: [],
+    });
+    const view = render(<ProfileWalletPane profile="default" />);
+    await view.findByText("Renamed on Web");
+    expect(view.queryByText("Primary")).toBeNull();
+    expect(window.hermesAPI.listWallets).toHaveBeenCalledTimes(2);
+  });
   it("renders the symbol label exactly once per token and the icon only when known", async () => {
     installApi();
     const view = render(<ProfileWalletPane profile="default" />);

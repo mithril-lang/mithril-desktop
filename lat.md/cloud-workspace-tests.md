@@ -697,3 +697,16 @@ Real HTTP A/B/A take/report requests retain exact source and operation identity;
 ## Original manual main transport identity fence
 
 Missing execution grants never upgrade the credential or send manual commands. Spoofed owner fields refuse before transmission; account/profile changes during streamed responses discard stale receipts.
+
+
+## Original manual durable dispatch fence
+
+An exact request/native-version binding commits unknown before external effects. Reopening after failure cannot dispatch it again; changed identities conflict, and the existing private cross-process lock remains mandatory.
+
+## Original manual durable result reporting
+
+Confirmed native results survive failed reporting. Only exact API acknowledgements mark them reported; repeated acknowledgement is idempotent and contradictory or foreign results cannot replace retained outcomes.
+
+## Original manual journal account isolation
+
+A-B-A journals isolate request identities. Unconfirmed transport outcomes cannot become completion, and a reserved request cannot retain a completed result before its dispatch fence is committed.

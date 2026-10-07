@@ -17,6 +17,12 @@ import { join } from "path";
 import { NativeOriginalScheduleReplicaStore } from "./original-schedule-replica-store";
 import type { OriginalScheduleReplicaJournal } from "@mithril/workspace/original-schedule-file-replica";
 
+import {
+  originalManualNativeRequest,
+  originalManualWireRequest,
+  type OriginalManualBinding,
+} from "./original-schedule-manual-journal";
+
 const roots: string[] = [];
 const scope = { owner: "alice", profile: "default", timeZone: "Asia/Tokyo" };
 function root(): string {
@@ -363,4 +369,157 @@ it("retains the repository operation after failure and refuses unlocked or forei
       edit.body,
     );
   });
+});
+
+const manualBinding: OriginalManualBinding = {
+  ...scope,
+  jobId: "original-job",
+  operationId: "original-manual",
+  sourceRevision: 7,
+  sourceDigest: "a".repeat(64),
+  authorityRevision: 3,
+  nativeVersion: "b".repeat(64),
+};
+// @lat: [[cloud-workspace-tests#Original manual durable dispatch fence]]
+it("commits uncertainty before effects and refuses another dispatch after failure and reopening", async () => {
+  const directory = root();
+  const first = new NativeOriginalScheduleReplicaStore(directory, scope);
+  expect(() => first.reserveManual(manualBinding)).toThrow("lock required");
+  await expect(
+    first.exclusive(scope, async () => {
+      expect(first.reserveManual(manualBinding).status).toBe("reserved");
+      expect(first.beginManual(manualBinding)).toBe(true);
+      throw Error("external execution lost");
+    }),
+  ).rejects.toThrow("external execution lost");
+  const reopened = new NativeOriginalScheduleReplicaStore(directory, scope);
+  await reopened.exclusive(scope, async () => {
+    expect(reopened.manualRequests(scope)).toEqual([
+      { binding: manualBinding, status: "unknown", reported: false },
+    ]);
+    expect(reopened.beginManual(manualBinding)).toBe(false);
+    expect(() =>
+      reopened.beginManual({ ...manualBinding, nativeVersion: "c".repeat(64) }),
+    ).toThrow("identity conflict");
+    const reordered = Object.fromEntries(
+      Object.entries(manualBinding).reverse(),
+    ) as unknown as OriginalManualBinding;
+    expect(reopened.reserveManual(reordered).status).toBe("unknown");
+  });
+});
+
+// @lat: [[cloud-workspace-tests#Original manual durable result reporting]]
+it("retains confirmed results through report failure and only acknowledges exact API receipts", async () => {
+  const directory = root();
+  const first = new NativeOriginalScheduleReplicaStore(directory, scope);
+  await first.exclusive(scope, async () => {
+    expect(() => first.beginManual(manualBinding)).toThrow(
+      "reservation required",
+    );
+    first.reserveManual(manualBinding);
+    expect(first.beginManual(manualBinding)).toBe(true);
+    const result = {
+      success: true as const,
+      receipt: {
+        ...originalManualNativeRequest(manualBinding),
+        status: "completed" as const,
+      },
+    };
+    expect(first.recordManualResult(manualBinding, result).status).toBe(
+      "completed",
+    );
+    expect(() =>
+      first.acknowledgeManual(manualBinding, {
+        userId: "bob",
+        ...originalManualWireRequest(manualBinding),
+        status: "completed",
+      }),
+    ).toThrow("receipt unconfirmed");
+  });
+  const reopened = new NativeOriginalScheduleReplicaStore(directory, scope);
+  await reopened.exclusive(scope, async () => {
+    expect(reopened.manualRequests(scope)[0]).toMatchObject({
+      status: "completed",
+      reported: false,
+    });
+    expect(reopened.beginManual(manualBinding)).toBe(false);
+    const receipt = {
+      userId: scope.owner,
+      ...originalManualWireRequest(manualBinding),
+      status: "completed" as const,
+    };
+    reopened.acknowledgeManual(manualBinding, receipt);
+    reopened.acknowledgeManual(manualBinding, receipt);
+    expect(reopened.manualRequests(scope)[0]).toMatchObject({
+      status: "completed",
+      reported: true,
+    });
+    expect(() =>
+      reopened.recordManualResult(manualBinding, {
+        success: true,
+        receipt: {
+          ...originalManualNativeRequest(manualBinding),
+          status: "rejected",
+        },
+      }),
+    ).toThrow("unconfirmed");
+    expect(() =>
+      reopened.recordManualResult(manualBinding, {
+        success: true,
+        receipt: {
+          ...originalManualNativeRequest(manualBinding),
+          operationId: "other",
+          status: "completed",
+        },
+      }),
+    ).toThrow("unconfirmed");
+  });
+});
+
+// @lat: [[cloud-workspace-tests#Original manual journal account isolation]]
+it("keeps A-B-A requests separate and refuses unknown results masquerading as success or reserved completion", async () => {
+  const directory = root();
+  for (const owner of ["alice", "bob", "alice"]) {
+    const context = { ...scope, owner },
+      binding = { ...manualBinding, owner };
+    const store = new NativeOriginalScheduleReplicaStore(directory, context);
+    await store.exclusive(context, async () => {
+      const existing = store.manualRequests(context);
+      if (owner === "bob") expect(existing).toEqual([]);
+      if (!existing.length) {
+        store.reserveManual(binding);
+        expect(() =>
+          store.recordManualResult(binding, {
+            success: true,
+            receipt: {
+              ...originalManualNativeRequest(binding),
+              status: "completed",
+            },
+          }),
+        ).toThrow("unconfirmed");
+        expect(store.beginManual(binding)).toBe(true);
+      } else expect(store.beginManual(binding)).toBe(false);
+      expect(() =>
+        store.recordManualResult(binding, {
+          success: false,
+          error: "unconfirmed",
+        }),
+      ).toThrow("unconfirmed");
+      expect(
+        store.recordManualResult(binding, {
+          success: true,
+          receipt: {
+            ...originalManualNativeRequest(binding),
+            status: "unknown",
+          },
+        }).status,
+      ).toBe("unknown");
+      expect(store.manualRequests(context)).toEqual([
+        { binding, status: "unknown", reported: false },
+      ]);
+      expect(() =>
+        store.reserveManual({ ...binding, owner: "foreign" }),
+      ).toThrow("identity changed");
+    });
+  }
 });

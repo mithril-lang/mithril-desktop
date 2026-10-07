@@ -16,6 +16,23 @@ import type {
   OriginalScheduleReplicaStore,
 } from "@mithril/workspace/original-schedule-file-replica";
 
+import {
+  validOriginalManualBinding,
+  validOriginalManualJournalEntry,
+  originalManualNativeRequest,
+  originalManualWireRequest,
+  type OriginalManualBinding,
+  type OriginalManualJournalEntry,
+} from "./original-schedule-manual-journal";
+import {
+  parseOriginalCronRunResult,
+  type OriginalCronRunResult,
+} from "./cron-source-run";
+import {
+  validOriginalManualResult,
+  type OriginalManualReceipt,
+} from "./original-schedule-manual";
+
 export interface OriginalSchedulePrivateDirectoryTarget {
   root: string;
   expectedManifest: string;
@@ -137,6 +154,9 @@ export class NativeOriginalScheduleReplicaStore
       );
       db.exec(
         "CREATE TABLE IF NOT EXISTS schedule_workdir_identities (root TEXT PRIMARY KEY, identity TEXT NOT NULL UNIQUE)",
+      );
+      db.exec(
+        "CREATE TABLE IF NOT EXISTS schedule_manual_journal (operation_id TEXT PRIMARY KEY, payload TEXT NOT NULL, digest TEXT NOT NULL)",
       );
       return db;
     } catch (error) {
@@ -366,6 +386,173 @@ export class NativeOriginalScheduleReplicaStore
         "INSERT INTO schedule_directory_targets VALUES(?,?,?,?,?)",
       ).run(write.operationId, key, request, payload, digest);
       return JSON.parse(payload) as OriginalSchedulePrivateDirectoryTarget;
+    } finally {
+      db.close();
+    }
+  }
+  private manualEntry(
+    db: Database.Database,
+    operationId: string,
+  ): OriginalManualJournalEntry | null {
+    const row = db
+      .prepare(
+        "SELECT payload,digest FROM schedule_manual_journal WHERE operation_id=?",
+      )
+      .get(operationId) as { payload: string; digest: string } | undefined;
+    if (!row) return null;
+    if (
+      Buffer.byteLength(row.payload) > 8192 ||
+      createHash("sha256").update(row.payload).digest("hex") !== row.digest
+    )
+      throw Error("Invalid retained manual request");
+    const value: unknown = JSON.parse(row.payload);
+    if (
+      !validOriginalManualJournalEntry(value) ||
+      value.binding.operationId !== operationId
+    )
+      throw Error("Invalid retained manual request");
+    this.assertScope(value.binding);
+    return value;
+  }
+  private writeManual(
+    db: Database.Database,
+    entry: OriginalManualJournalEntry,
+  ): void {
+    if (!validOriginalManualJournalEntry(entry))
+      throw Error("Invalid manual request");
+    this.assertScope(entry.binding);
+    const payload = JSON.stringify(entry);
+    db.prepare(
+      "INSERT INTO schedule_manual_journal VALUES(?,?,?) ON CONFLICT(operation_id) DO UPDATE SET payload=excluded.payload,digest=excluded.digest",
+    ).run(
+      entry.binding.operationId,
+      payload,
+      createHash("sha256").update(payload).digest("hex"),
+    );
+  }
+  /** Fresh API take and confirmed Native binding must precede reservation. This method grants no authority. */
+  reserveManual(binding: OriginalManualBinding): OriginalManualJournalEntry {
+    if (!validOriginalManualBinding(binding))
+      throw Error("Invalid manual binding");
+    this.assertScope(binding);
+    const db = this.journal();
+    try {
+      const old = this.manualEntry(db, binding.operationId);
+      if (old) {
+        if (
+          !Object.entries(old.binding).every(
+            ([key, value]) =>
+              value === binding[key as keyof OriginalManualBinding],
+          )
+        )
+          throw Error("Manual request identity conflict");
+        return old;
+      }
+      const entry: OriginalManualJournalEntry = {
+        binding: structuredClone(binding),
+        status: "reserved",
+        reported: false,
+      };
+      this.writeManual(db, entry);
+      return entry;
+    } finally {
+      db.close();
+    }
+  }
+  manualRequests(
+    scope: OriginalScheduleReplicaScope,
+  ): OriginalManualJournalEntry[] {
+    this.assertScope(scope);
+    const db = this.journal();
+    try {
+      const rows = db
+        .prepare(
+          "SELECT operation_id FROM schedule_manual_journal ORDER BY rowid LIMIT 10001",
+        )
+        .all() as { operation_id: string }[];
+      if (rows.length > 10000)
+        throw Error("Manual request journal requires review");
+      return rows.map((row) => this.manualEntry(db, row.operation_id)!);
+    } finally {
+      db.close();
+    }
+  }
+  private retainedManual(
+    db: Database.Database,
+    binding: OriginalManualBinding,
+  ): OriginalManualJournalEntry {
+    if (!validOriginalManualBinding(binding))
+      throw Error("Invalid manual binding");
+    this.assertScope(binding);
+    const entry = this.manualEntry(db, binding.operationId);
+    if (!entry) throw Error("Manual request reservation required");
+    if (
+      !Object.entries(entry.binding).every(
+        ([key, value]) => value === binding[key as keyof OriginalManualBinding],
+      )
+    )
+      throw Error("Manual request identity conflict");
+    return entry;
+  }
+  /** Commit unknown before external effects. A reopened unknown never grants dispatch again. */
+  beginManual(binding: OriginalManualBinding): boolean {
+    const db = this.journal();
+    try {
+      const entry = this.retainedManual(db, binding);
+      if (entry.status !== "reserved") return false;
+      this.writeManual(db, { ...entry, status: "unknown" });
+      return true;
+    } finally {
+      db.close();
+    }
+  }
+  recordManualResult(
+    binding: OriginalManualBinding,
+    result: OriginalCronRunResult,
+  ): OriginalManualJournalEntry {
+    const db = this.journal();
+    try {
+      const entry = this.retainedManual(db, binding);
+      const confirmed = parseOriginalCronRunResult(
+        JSON.stringify(result),
+        originalManualNativeRequest(binding),
+      );
+      if (
+        !confirmed.success ||
+        entry.status === "reserved" ||
+        (entry.status !== "unknown" &&
+          entry.status !== confirmed.receipt.status)
+      )
+        throw Error("Manual execution result unconfirmed");
+      const next = {
+        ...entry,
+        status: confirmed.receipt.status,
+        reported:
+          entry.status === confirmed.receipt.status ? entry.reported : false,
+      };
+      this.writeManual(db, next);
+      return next;
+    } finally {
+      db.close();
+    }
+  }
+  acknowledgeManual(
+    binding: OriginalManualBinding,
+    receipt: OriginalManualReceipt,
+  ): void {
+    const db = this.journal();
+    try {
+      const entry = this.retainedManual(db, binding);
+      if (
+        entry.status === "reserved" ||
+        !validOriginalManualResult(receipt, binding.owner, {
+          action: "complete",
+          ...originalManualWireRequest(binding),
+          status: entry.status,
+        })
+      )
+        throw Error("Manual report receipt unconfirmed");
+      this.writeManual(db, { ...entry, reported: true });
     } finally {
       db.close();
     }

@@ -450,3 +450,15 @@ Different owners, profiles and timezones have separate journals; wrong-identity 
 ## Original schedule replica storage isolation
 
 Redirected and publicly readable storage is refused without changing the redirect target.
+
+## Bound original schedule source roundtrip
+
+Real source files preserve BOM, CRLF and opaque numeric tokens through portable capture and Native rebind. Missing files stay absent, binding failures have no raw-source fallback, and retained receipts do not overwrite newer authored edits.
+
+## Bound original schedule identity and receipt guards
+
+Wrong owners, stale raw digests, failed token CAS and mismatched restore hashes are refused without acknowledging an unverified source.
+
+## Bound original schedule account invalidation
+
+An account change while binding is awaited prevents the old source from reaching the Native restore boundary.

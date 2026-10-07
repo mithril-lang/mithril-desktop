@@ -637,3 +637,11 @@ Its private R2 namespace is separate from Capability registration, and D1 stores
 The main process retains portable pending schedule source and its operation identity before network writes, using a private owner/profile/timezone journal.
 
 [[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore]] commits journal writes independently of its separate SQLite process lock. Abrupt process exit releases the OS-held lock without losing pending work; another window fails busy immediately and can retry its existing coordinator. Paths, permissions and identities are checked before access. This store does not capture, upload or restore Native scheduler files and is not yet mounted in the service lifecycle.
+
+## Bound original schedule source port (draft)
+
+A main-only adapter connects verified resource bindings with exact Native capture and original locked restoration, keeping portable source digests distinct from Native file CAS.
+
+[[src/main/original-schedule-native-port.ts#BoundOriginalScheduleNativePort]] requires explicit capture/restore resource binders. Shared raw-token patches retain source bytes elsewhere; failed binding has no raw-source upload fallback. Scope guards surround asynchronous binding and original writes, and only the exact bound source hash can be acknowledged. Restore binding must retain an operation-bound target before the original Agent write, allowing retained Agent receipts to acknowledge earlier work without overwriting later edits. Concrete resource/authority binding and service mounting remain required.
+
+The pinned workspace 0.6.21-schedules.4 archive was produced from Fund source `ba02898461e46b121b09703702b7e4b73cf5d31a`. It is complete (411 files) and has SHA256 `7ddc3e468a5837167055baab0587e7258d9244752cd29e70f4811f38c321d8da`; compiled source codec and replica exports were compared byte-for-byte with the completed producer build before installation. The earlier 0.6.21-schedules.2 archive remains unchanged.

@@ -600,3 +600,11 @@ Original schedule creation uses the Agent's existing parser without writing a na
 [[src/main/cronjobs.ts#prepareOriginalCronSource]] sends the captured owner, profile, operation, timezone and original input to `cron source-prepare` on stdin. The Agent shares its complete job builder with native creation, preserving recurring phrases, Cron expressions and relative or dated one-time schedules. [[src/main/cron-source-prepare.ts#parseOriginalCronPrepareResult]] admits only a response bound to that exact request and suppresses raw child diagnostics. This main-only port still requires a qualified Agent pin and a cloud adapter; it is not an installed synchronization result.
 
 Local qualification: 2,660 Desktop tests in 285 files passed using bundled Node 24 and an isolated provider environment; node/web types, full lint and lat check passed. An earlier Node 26 run failed 24 tests because of host Web Storage and provider-environment differences and is retained as a failed result. The shared parser adapter passed 206 tests; Agent Cron/atomic-source tests passed 1,460 with 13 platform skips. Actual Windows CI and execution ownership remain required before publication.
+
+### Original lifecycle preparation (draft)
+
+Pause and resume preparation use the original Agent policy while preserving authored data and overdue occurrences. The receipt is data only and grants no execution lease.
+
+[[src/main/cronjobs.ts#prepareOriginalCronTransition]] captures owner, profile, timezone, operation and original source before invoking the readonly command. [[src/main/cron-source-transition.ts#parseOriginalCronTransitionResult]] rejects stale identity, lost counters, altered unknown metadata and active claims. The shared source validator allows only the original ordered skill canonicalization. Workspace 0.6.17 supplies this codec to both consumers. Source preparation is not yet installed-runtime qualification or a complete synchronized scheduler.
+
+The vendored Workspace 0.6.17 archive SHA-256 is `23c34df802d8a327bf83de0901c2906ced94f79a3a3902e6a4db51d3ab5d1deb`. Its compiled exports include the original source, lifecycle adapter and complete-file codecs; the consumer imports those artifacts rather than copying UI or schedule semantics.

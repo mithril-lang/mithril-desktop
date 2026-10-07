@@ -23,6 +23,31 @@ const sourceObject = (value: unknown): value is Record<string, JsonValue> =>
   typeof value === "object" &&
   !Array.isArray(value);
 
+export function validOriginalCronScope(
+  request: Pick<
+    OriginalCronPrepareRequest,
+    "owner" | "profile" | "operationId" | "timeZone"
+  >,
+): boolean {
+  if (
+    !request ||
+    ![request.owner, request.profile, request.operationId].every(
+      (value) =>
+        typeof value === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(value),
+    ) ||
+    request.profile.length > 64 ||
+    typeof request.timeZone !== "string" ||
+    !request.timeZone
+  )
+    return false;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: request.timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function validOriginalCronPrepareRequest(
   request: OriginalCronPrepareRequest,
 ): boolean {
@@ -31,13 +56,7 @@ export function validOriginalCronPrepareRequest(
     !validJson(request) ||
     Object.keys(request).sort().join(",") !==
       "input,operationId,owner,profile,timeZone" ||
-    ![request.owner, request.profile, request.operationId].every(
-      (value) =>
-        typeof value === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(value),
-    ) ||
-    request.profile.length > 64 ||
-    typeof request.timeZone !== "string" ||
-    !request.timeZone ||
+    !validOriginalCronScope(request) ||
     !request.input ||
     typeof request.input !== "object" ||
     Array.isArray(request.input) ||

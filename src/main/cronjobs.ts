@@ -16,6 +16,12 @@ import {
   type OriginalCronPrepareRequest,
   type OriginalCronPrepareResult,
 } from "./cron-source-prepare";
+import {
+  validOriginalCronTransitionRequest,
+  parseOriginalCronTransitionResult,
+  type OriginalCronTransitionRequest,
+  type OriginalCronTransitionResult,
+} from "./cron-source-transition";
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
@@ -531,6 +537,24 @@ export async function prepareOriginalCronSource(
     JSON.stringify(captured),
   );
   return parseOriginalCronPrepareResult(result.output, captured);
+}
+
+/** Read-only original lifecycle bridge; no raw-source renderer IPC. */
+export async function prepareOriginalCronTransition(
+  request: OriginalCronTransitionRequest,
+): Promise<OriginalCronTransitionResult> {
+  if (isRemoteMode() || !validOriginalCronTransitionRequest(request))
+    return {
+      success: false,
+      error: "Original schedule transition unavailable",
+    };
+  const captured = structuredClone(request);
+  const result = await runCronCommand(
+    ["source-transition"],
+    captured.profile,
+    JSON.stringify(captured),
+  );
+  return parseOriginalCronTransitionResult(result.output, captured);
 }
 
 /** Local restore after resource/execution binding. No raw-source renderer IPC. */

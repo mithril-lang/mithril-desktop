@@ -192,3 +192,34 @@ it.skipIf(process.platform === "win32")(
     expect(readdirSync(target)).toEqual([]);
   },
 );
+
+// @lat: [[cloud-workspace-tests#Durable original schedule binding targets]]
+it("retains the bound target across restart and rejects reused operations without rebinding", async () => {
+  const directory = root();
+  const write = {
+    ...scope,
+    operationId: "binding",
+    expectedVersion: null,
+    sourceText:
+      '{"jobs":[{"id":"one","name":"one","prompt":"hello","schedule":{"kind":"cron","expr":"0 * * * *"}}]}',
+  };
+  const target = write.sourceText.replace("hello", "bound");
+  const first = new NativeOriginalScheduleReplicaStore(directory, scope);
+  await first.exclusive(scope, async () => {
+    expect(await first.retain(write, async () => target)).toBe(target);
+  });
+  const reopened = new NativeOriginalScheduleReplicaStore(directory, scope);
+  let calls = 0;
+  const bind = async (): Promise<string> => {
+    calls++;
+    return target.replace("bound", "newer");
+  };
+  await reopened.exclusive(scope, async () => {
+    expect(await reopened.retain(write, bind)).toBe(target);
+    await expect(
+      reopened.retain({ ...write, expectedVersion: "a".repeat(64) }, bind),
+    ).rejects.toThrow("operation conflict");
+  });
+  expect(calls).toBe(0);
+  await expect(reopened.retain(write, bind)).rejects.toThrow("lock required");
+});

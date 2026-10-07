@@ -645,3 +645,9 @@ A main-only adapter connects verified resource bindings with exact Native captur
 [[src/main/original-schedule-native-port.ts#BoundOriginalScheduleNativePort]] requires explicit capture/restore resource binders. Shared raw-token patches retain source bytes elsewhere; failed binding has no raw-source upload fallback. Scope guards surround asynchronous binding and original writes, and only the exact bound source hash can be acknowledged. Restore binding must retain an operation-bound target before the original Agent write, allowing retained Agent receipts to acknowledge earlier work without overwriting later edits. Concrete resource/authority binding and service mounting remain required.
 
 The pinned workspace 0.6.21-schedules.4 archive was produced from Fund source `ba02898461e46b121b09703702b7e4b73cf5d31a`. It is complete (411 files) and has SHA256 `7ddc3e468a5837167055baab0587e7258d9244752cd29e70f4811f38c321d8da`; compiled source codec and replica exports were compared byte-for-byte with the completed producer build before installation. The earlier 0.6.21-schedules.2 archive remains unchanged.
+
+### Durable original schedule binding targets (draft)
+
+The private replica journal retains an operation's exact bound Native source before restoration, so restarting never recomputes a different target for a retained Agent receipt.
+
+[[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#retain]] stores the exact portable request, Native target and SHA under the coordinator lock. Reused IDs with changed source, CAS or scope refuse; identical retries skip binding. [[src/main/original-schedule-native-port.ts#BoundOriginalScheduleNativePort]] requires this target store. Concrete resource resolution and lifecycle mounting remain incomplete.

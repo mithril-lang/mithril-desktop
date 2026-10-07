@@ -462,3 +462,7 @@ Wrong owners, stale raw digests, failed token CAS and mismatched restore hashes 
 ## Bound original schedule account invalidation
 
 An account change while binding is awaited prevents the old source from reaching the Native restore boundary.
+
+## Durable original schedule binding targets
+
+A real private SQLite journal preserves the exact bound target after restart, never calls the binder on receipt replay, and refuses changed operation CAS or writes outside the coordinator lock.

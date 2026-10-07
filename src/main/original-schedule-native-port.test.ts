@@ -14,6 +14,7 @@ import { join } from "path";
 import {
   BoundOriginalScheduleNativePort,
   type OriginalScheduleResourceBindings,
+  type OriginalScheduleBoundTargets,
 } from "./original-schedule-native-port";
 import { captureOriginalCronFile } from "./cron-source-files";
 import type { OriginalCronRestoreRequest } from "./cron-source-restore";
@@ -49,6 +50,25 @@ function bindings(): OriginalScheduleResourceBindings {
         replacementSourceText: '"/restored/script.py"',
       },
     ],
+  };
+}
+function targets(): OriginalScheduleBoundTargets {
+  const retained = new Map<string, { request: string; source: string }>();
+  return {
+    retain: async (
+      write: import("@mithril/workspace/original-schedule-file-replica").OriginalScheduleNativeWrite,
+      bind: () => Promise<string>,
+    ) => {
+      const request = JSON.stringify(write),
+        previous = retained.get(write.operationId);
+      if (previous) {
+        if (previous.request !== request) throw Error("operation conflict");
+        return previous.source;
+      }
+      const source = await bind();
+      retained.set(write.operationId, { request, source });
+      return source;
+    },
   };
 }
 function fixture(): string {
@@ -88,6 +108,7 @@ it("captures real complete source as portable bytes and restores exact bound sou
     { capture: (profile) => captureOriginalCronFile(root, profile), restore },
     bindings(),
     async () => undefined,
+    targets(),
   );
   const captured = await port.capture();
   expect(captured).toEqual({
@@ -143,6 +164,7 @@ it("refuses wrong identity, stale raw digests, bad resource CAS and mismatched r
     boundary,
     bindings(),
     async () => undefined,
+    targets(),
   );
   const write = {
     ...scope,
@@ -166,6 +188,7 @@ it("refuses wrong identity, stale raw digests, bad resource CAS and mismatched r
     },
     bindings(),
     async () => undefined,
+    targets(),
   );
   await expect(stale.capture()).rejects.toThrow("source changed");
   const wrong = bindings();
@@ -183,6 +206,7 @@ it("refuses wrong identity, stale raw digests, bad resource CAS and mismatched r
       boundary,
       wrong,
       async () => undefined,
+      targets(),
     ).capture(),
   ).rejects.toThrow("binding unavailable");
   expect(readFileSync(join(root, "cron", "jobs.json"), "utf8")).toBe(raw);
@@ -205,6 +229,7 @@ it("invalidates an account change while bindings are awaited and never passes th
     { capture: (profile) => captureOriginalCronFile(root, profile), restore },
     binder,
     guard,
+    targets(),
   );
   await expect(
     port.restore({
@@ -230,6 +255,7 @@ it("keeps missing storage absent and has no raw-source fallback when resource bi
     { capture, restore },
     binder,
     async () => undefined,
+    targets(),
   );
   expect(await port.capture()).toEqual({
     ...scope,
@@ -243,6 +269,7 @@ it("keeps missing storage absent and has no raw-source fallback when resource bi
     { capture: (profile) => captureOriginalCronFile(root, profile), restore },
     binder,
     async () => undefined,
+    targets(),
   );
   await expect(failed.capture()).rejects.toThrow(
     /^Original schedule resource binding unavailable$/,

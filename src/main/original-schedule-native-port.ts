@@ -29,6 +29,13 @@ export interface OriginalScheduleResourceBindings {
     write: OriginalScheduleNativeWrite,
   ): Promise<readonly OriginalScheduleBindingPatch[]>;
 }
+export interface OriginalScheduleBoundTargets {
+  /** Persist the exact target before the original write; replay returns that target without rebinding. */
+  retain(
+    write: OriginalScheduleNativeWrite,
+    bind: () => Promise<string>,
+  ): Promise<string>;
+}
 export interface OriginalScheduleNativeBoundary {
   capture(profile: string): OriginalCronFile | null;
   restore(
@@ -48,6 +55,7 @@ export class BoundOriginalScheduleNativePort implements OriginalScheduleNativePo
     private readonly boundary: OriginalScheduleNativeBoundary,
     private readonly bindings: OriginalScheduleResourceBindings,
     private readonly assertActive: () => Promise<void>,
+    private readonly targets: OriginalScheduleBoundTargets,
   ) {
     if (!validOriginalCronScope({ ...scope, operationId: "scope" }))
       throw Error("Invalid schedule replica identity");
@@ -119,14 +127,16 @@ export class BoundOriginalScheduleNativePort implements OriginalScheduleNativePo
     );
     let sourceText: string;
     try {
-      const patches = await this.bindings.restore(structuredClone(request));
-      await this.assertActive();
-      sourceText = patchOriginalScheduleBindingsText(
-        request.sourceText,
-        this.scope.profile,
-        this.scope.timeZone,
-        patches,
-      );
+      sourceText = await this.targets.retain(request, async () => {
+        const patches = await this.bindings.restore(structuredClone(request));
+        await this.assertActive();
+        return patchOriginalScheduleBindingsText(
+          request.sourceText,
+          this.scope.profile,
+          this.scope.timeZone,
+          patches,
+        );
+      });
     } catch {
       throw Error("Original schedule resource binding unavailable");
     }

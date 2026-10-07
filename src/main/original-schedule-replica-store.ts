@@ -2,7 +2,10 @@ import Database from "better-sqlite3";
 import { createHash } from "crypto";
 import { closeSync, lstatSync, mkdirSync, openSync, type Stats } from "fs";
 import { dirname, join, resolve } from "path";
+import type { OriginalScheduleBoundTargets } from "./original-schedule-native-port";
+import { validateOriginalScheduleText } from "@mithril/workspace/original-schedule-text";
 import type {
+  OriginalScheduleNativeWrite,
   OriginalScheduleReplicaJournal,
   OriginalScheduleReplicaScope,
   OriginalScheduleReplicaStore,
@@ -47,7 +50,9 @@ function privateFile(path: string): void {
  * windows/processes without retaining a transaction over the durable journal writes.
  * Process termination releases the OS lock, while pending operations remain committed.
  */
-export class NativeOriginalScheduleReplicaStore implements OriginalScheduleReplicaStore {
+export class NativeOriginalScheduleReplicaStore
+  implements OriginalScheduleReplicaStore, OriginalScheduleBoundTargets
+{
   private readonly scope: OriginalScheduleReplicaScope;
   private readonly journalPath: string;
   private readonly lockPath: string;
@@ -95,6 +100,9 @@ export class NativeOriginalScheduleReplicaStore implements OriginalScheduleRepli
       db.exec(
         "CREATE TABLE IF NOT EXISTS schedule_replica_journal (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL)",
       );
+      db.exec(
+        "CREATE TABLE IF NOT EXISTS schedule_bound_targets (operation_id TEXT PRIMARY KEY, request TEXT NOT NULL, source TEXT NOT NULL, digest TEXT NOT NULL)",
+      );
       return db;
     } catch (error) {
       db.close();
@@ -126,6 +134,61 @@ export class NativeOriginalScheduleReplicaStore implements OriginalScheduleRepli
       } finally {
         lock.close();
       }
+    }
+  }
+  async retain(
+    write: OriginalScheduleNativeWrite,
+    bind: () => Promise<string>,
+  ): Promise<string> {
+    this.assertScope(write);
+    if (!/^[A-Za-z0-9_-]{1,160}$/.test(write.operationId))
+      throw Error("Invalid schedule binding operation");
+    validateOriginalScheduleText(
+      write.sourceText,
+      write.profile,
+      write.timeZone,
+    );
+    const request = JSON.stringify([
+      write.owner,
+      write.profile,
+      write.timeZone,
+      write.operationId,
+      write.expectedVersion,
+      write.sourceText,
+    ]);
+    const db = this.journal();
+    try {
+      const row = db
+        .prepare(
+          "SELECT request, source, digest FROM schedule_bound_targets WHERE operation_id=?",
+        )
+        .get(write.operationId) as
+        | { request: string; source: string; digest: string }
+        | undefined;
+      if (row) {
+        if (
+          row.request !== request ||
+          createHash("sha256").update(row.source).digest("hex") !== row.digest
+        )
+          throw Error("Schedule binding operation conflict");
+        validateOriginalScheduleText(row.source, write.profile, write.timeZone);
+        return row.source;
+      }
+      const source = await bind();
+      this.assertScope(write);
+      if (!this.held) throw Error("Schedule replica lock required");
+      validateOriginalScheduleText(source, write.profile, write.timeZone);
+      const digest = createHash("sha256").update(source).digest("hex");
+      // The coordinator's cross-process lock covers binding and this durable commit.
+      db.prepare("INSERT INTO schedule_bound_targets VALUES(?,?,?,?)").run(
+        write.operationId,
+        request,
+        source,
+        digest,
+      );
+      return source;
+    } finally {
+      db.close();
     }
   }
   async read(

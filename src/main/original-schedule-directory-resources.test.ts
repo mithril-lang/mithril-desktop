@@ -1,3 +1,5 @@
+import { OriginalScheduleFileResourceBindings } from "./original-schedule-resource-bindings";
+import { NativeOriginalScheduleReplicaStore } from "./original-schedule-replica-store";
 import { OriginalScheduleWorkdirResources } from "./original-schedule-workdir-resources";
 import { OriginalScheduleScriptResources } from "./original-schedule-script-resources";
 import { captureOriginalCronFile } from "./cron-source-files";
@@ -551,4 +553,113 @@ it("refuses workdir conflicts, raw cloud paths and cross-job references without 
   ).rejects.toThrow("absolute");
   f.stop();
   await expect(binder.capture(source)).rejects.toThrow("Account changed");
+});
+
+// @lat: [[cloud-workspace-tests#Original schedule resource composition restart]]
+it("composes script and workdir restoration with durable baselines across a failed source write and restart", async () => {
+  const f = setup();
+  const sourceScripts = join(f.home, "source-scripts"),
+    targetScripts = join(f.home, "target-scripts");
+  mkdirSync(sourceScripts);
+  mkdirSync(targetScripts);
+  writeFileSync(
+    join(sourceScripts, "run.py"),
+    "raise Exception('never run')\n",
+  );
+  writeFileSync(join(targetScripts, "run.py"), "old script");
+  writeFileSync(join(f.remote, "data.bin"), Buffer.from([0, 255]));
+  writeFileSync(join(f.local, "data.bin"), "old data");
+  const scriptBaseline = await f.service.capture(targetScripts),
+    workBaseline = await f.service.capture(f.local);
+  const source = workdirFile(f.home, f.remote);
+  const runtime = { capture: async () => [], restore: async () => [] };
+  const journal = join(f.home, "replica-journal");
+  const store = new NativeOriginalScheduleReplicaStore(journal, f.scope);
+  const sender = new OriginalScheduleFileResourceBindings(
+    new OriginalScheduleScriptResources(
+      f.scope,
+      sourceScripts,
+      f.service,
+      f.guard,
+    ),
+    new OriginalScheduleWorkdirResources(f.scope, f.service, f.guard),
+    store,
+    runtime,
+    async () => scriptBaseline.pointer.manifest,
+    async () => ({
+      root: f.local,
+      expectedManifest: workBaseline.pointer.manifest,
+    }),
+    f.guard,
+  );
+  const portable = patchOriginalScheduleBindingsText(
+    source.sourceText,
+    f.scope.profile,
+    f.scope.timeZone,
+    await sender.capture(source),
+  );
+  let resolutions = 0;
+  const baseline = async (): Promise<string> => {
+    resolutions++;
+    return scriptBaseline.pointer.manifest;
+  };
+  const workTarget = async (): Promise<{
+    root: string;
+    expectedManifest: string;
+  }> => {
+    resolutions++;
+    return { root: f.local, expectedManifest: workBaseline.pointer.manifest };
+  };
+  const receive = (
+    journalStore: NativeOriginalScheduleReplicaStore,
+  ): OriginalScheduleFileResourceBindings =>
+    new OriginalScheduleFileResourceBindings(
+      new OriginalScheduleScriptResources(
+        f.scope,
+        targetScripts,
+        f.service,
+        f.guard,
+      ),
+      new OriginalScheduleWorkdirResources(f.scope, f.service, f.guard),
+      journalStore,
+      runtime,
+      baseline,
+      workTarget,
+      f.guard,
+    );
+  const write = {
+    ...f.scope,
+    operationId: "composed_restore",
+    expectedVersion: null,
+    sourceText: portable,
+  };
+  let firstPatches: Awaited<
+    ReturnType<OriginalScheduleFileResourceBindings["restore"]>
+  > = [];
+  await expect(
+    store.exclusive(f.scope, async () => {
+      firstPatches = await receive(store).restore(write);
+      throw Error("source write not acknowledged");
+    }),
+  ).rejects.toThrow("not acknowledged");
+  expect(readFileSync(join(targetScripts, "run.py"), "utf8")).toBe(
+    "raise Exception('never run')\n",
+  );
+  expect(readFileSync(join(f.local, "data.bin"))).toEqual(
+    Buffer.from([0, 255]),
+  );
+  expect(resolutions).toBe(2);
+  writeFileSync(join(targetScripts, "run.py"), "newer local script");
+  writeFileSync(join(f.local, "data.bin"), "newer local data");
+  const reopened = new NativeOriginalScheduleReplicaStore(journal, f.scope);
+  await reopened.exclusive(f.scope, async () =>
+    expect(await receive(reopened).restore(write)).toEqual(firstPatches),
+  );
+  expect(resolutions).toBe(2);
+  expect(readFileSync(join(targetScripts, "run.py"), "utf8")).toBe(
+    "newer local script",
+  );
+  expect(readFileSync(join(f.local, "data.bin"), "utf8")).toBe(
+    "newer local data",
+  );
 });

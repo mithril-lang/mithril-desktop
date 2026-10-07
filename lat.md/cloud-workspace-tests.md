@@ -498,3 +498,11 @@ Verify actual binary working-directory bytes survive portable source capture and
 ## Original schedule workdir conflict and scope
 
 Verify concurrent directory edits, raw cloud paths, foreign job references, relative source paths and stale owners fail without overwriting the local working directory.
+
+## Durable original schedule directory targets
+
+Verify a process stop before filesystem restoration leaves the exact private path and baseline durable, restarted resolution is not invoked, and changed manifests or operation CAS refuse under the required owner lock.
+
+## Original schedule resource composition restart
+
+Verify real script and workdir files restore together through the composed binding and SQLite journal, then a failed source write and restart preserve newer local file edits without recapturing baselines or rebinding destinations.

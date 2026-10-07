@@ -96,6 +96,28 @@ export class OriginalScheduleScriptResources {
     this.scriptsRoot = resolve(scriptsRoot);
   }
 
+  get root(): string {
+    return this.scriptsRoot;
+  }
+
+  manifestForRestore(write: OriginalScheduleNativeWrite): string | null {
+    if (
+      write.owner !== this.scope.owner ||
+      write.profile !== this.scope.profile ||
+      write.timeZone !== this.scope.timeZone ||
+      !validOriginalCronScope(write)
+    )
+      throw Error("Original script workspace changed");
+    const selected = tokens(write.sourceText, this.scope);
+    if (!selected.length) return null;
+    const refs = selected.map((token) =>
+      reference(JSON.parse(token.sourceText), this.scope.profile),
+    );
+    if (refs.some((ref) => ref.manifest !== refs[0].manifest))
+      throw Error("Original script snapshot conflict");
+    return refs[0].manifest;
+  }
+
   async capture(
     source: OriginalCronFile,
   ): Promise<readonly OriginalScheduleBindingPatch[]> {

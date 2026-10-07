@@ -223,3 +223,57 @@ it("retains the bound target across restart and rejects reused operations withou
   expect(calls).toBe(0);
   await expect(reopened.retain(write, bind)).rejects.toThrow("lock required");
 });
+
+// @lat: [[cloud-workspace-tests#Durable original schedule directory targets]]
+it("persists private directory baselines before writes and rejects changed operation or snapshot after restart", async () => {
+  const directory = root();
+  const write = {
+    ...scope,
+    operationId: "directory_bind",
+    expectedVersion: null,
+    sourceText:
+      '{"jobs":[{"id":"one","name":"one","prompt":"hello","schedule":{"kind":"cron","expr":"0 * * * *"}}]}',
+  };
+  const first = new NativeOriginalScheduleReplicaStore(directory, scope);
+  const slot = { kind: "workdir" as const, jobId: "one" };
+  const target = { root: directory, expectedManifest: "a".repeat(64) };
+  await expect(
+    first.exclusive(scope, async () => {
+      expect(
+        await first.retainDirectoryTarget(
+          write,
+          slot,
+          "b".repeat(64),
+          async () => target,
+        ),
+      ).toEqual(target);
+      throw Error("process stopped before restore");
+    }),
+  ).rejects.toThrow("stopped");
+  let calls = 0;
+  const bind = async (): Promise<typeof target> => {
+    calls++;
+    return { root: root(), expectedManifest: "c".repeat(64) };
+  };
+  const reopened = new NativeOriginalScheduleReplicaStore(directory, scope);
+  await reopened.exclusive(scope, async () => {
+    expect(
+      await reopened.retainDirectoryTarget(write, slot, "b".repeat(64), bind),
+    ).toEqual(target);
+    await expect(
+      reopened.retainDirectoryTarget(write, slot, "d".repeat(64), bind),
+    ).rejects.toThrow("operation conflict");
+    await expect(
+      reopened.retainDirectoryTarget(
+        { ...write, expectedVersion: "e".repeat(64) },
+        slot,
+        "b".repeat(64),
+        bind,
+      ),
+    ).rejects.toThrow("operation conflict");
+  });
+  expect(calls).toBe(0);
+  await expect(
+    reopened.retainDirectoryTarget(write, slot, "b".repeat(64), bind),
+  ).rejects.toThrow("lock required");
+});

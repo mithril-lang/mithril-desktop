@@ -685,3 +685,9 @@ Original workdir fields now bind to verified directory snapshots while retaining
 [[src/main/original-schedule-workdir-resources.ts#OriginalScheduleWorkdirResources]] captures authored absolute or home-relative working directories through the existing permitted-file resource transport. References bind profile, stable job ID and immutable manifest, without publishing the source device path. Restore resolves an operation-bound private target and baseline through its caller, then uses transactional directory CAS. Durable receipts preserve newer local edits on retry. Account guards surround storage and native restoration. Script semantics and unrelated raw source bytes remain unchanged.
 
 This stage adds no UI split or migration panel. It remains draft: private target lifecycle persistence, runtime/authority binding, complete coordinator mounting and actual cloud/installer qualification must compose these resources before automatic schedule synchronization is complete.
+
+## Original schedule resource composition (draft)
+
+Script and workdir resource stages now compose with mandatory runtime binding under the private replica journal lock, retaining directory targets before writes.
+
+[[src/main/original-schedule-resource-bindings.ts#OriginalScheduleFileResourceBindings]] implements the bound Native port's resource interface. Runtime binding remains mandatory and precedes resource restoration; it must not execute jobs. The main-only [[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#retainDirectoryTarget]] durably retains each operation's scripts or job-specific workdir destination and immutable comparison baseline before filesystem changes. Reused IDs with changed source, CAS or manifest refuse. Restart uses retained targets, never today's recaptured baseline. Machine paths remain private. Full execution-authority admission and lifecycle mounting remain required before production qualification.

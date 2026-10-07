@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { createHash } from "crypto";
 import { closeSync, lstatSync, mkdirSync, openSync, type Stats } from "fs";
-import { dirname, join, resolve } from "path";
+import { dirname, isAbsolute, join, resolve } from "path";
 import type { OriginalScheduleBoundTargets } from "./original-schedule-native-port";
 import { validateOriginalScheduleText } from "@mithril/workspace/original-schedule-text";
 import type {
@@ -10,6 +10,27 @@ import type {
   OriginalScheduleReplicaScope,
   OriginalScheduleReplicaStore,
 } from "@mithril/workspace/original-schedule-file-replica";
+
+export interface OriginalSchedulePrivateDirectoryTarget {
+  root: string;
+  expectedManifest: string;
+}
+
+function validDirectoryTarget(
+  value: unknown,
+): value is OriginalSchedulePrivateDirectoryTarget {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const target = value as OriginalSchedulePrivateDirectoryTarget;
+  return (
+    Object.keys(value).sort().join(",") === "expectedManifest,root" &&
+    typeof target.root === "string" &&
+    target.root.length <= 32768 &&
+    isAbsolute(target.root) &&
+    !target.root.includes("\0") &&
+    typeof target.expectedManifest === "string" &&
+    /^[a-f0-9]{64}$/.test(target.expectedManifest)
+  );
+}
 
 function statIfPresent(path: string): Stats | null {
   try {
@@ -103,6 +124,9 @@ export class NativeOriginalScheduleReplicaStore
       db.exec(
         "CREATE TABLE IF NOT EXISTS schedule_bound_targets (operation_id TEXT PRIMARY KEY, request TEXT NOT NULL, source TEXT NOT NULL, digest TEXT NOT NULL)",
       );
+      db.exec(
+        "CREATE TABLE IF NOT EXISTS schedule_directory_targets (operation_id TEXT NOT NULL, slot TEXT NOT NULL, request TEXT NOT NULL, payload TEXT NOT NULL, digest TEXT NOT NULL, PRIMARY KEY(operation_id,slot))",
+      );
       return db;
     } catch (error) {
       db.close();
@@ -187,6 +211,83 @@ export class NativeOriginalScheduleReplicaStore
         digest,
       );
       return source;
+    } finally {
+      db.close();
+    }
+  }
+  /** Commit path and immutable baseline before resource restoration. A retry must not
+   * capture today's local files as yesterday's baseline or choose another destination. */
+  async retainDirectoryTarget(
+    write: OriginalScheduleNativeWrite,
+    slot: { kind: "scripts" | "workdir"; jobId: string | null },
+    manifest: string,
+    bind: () => Promise<OriginalSchedulePrivateDirectoryTarget>,
+  ): Promise<OriginalSchedulePrivateDirectoryTarget> {
+    this.assertScope(write);
+    if (
+      !/^[A-Za-z0-9_-]{1,160}$/.test(write.operationId) ||
+      !/^[a-f0-9]{64}$/.test(manifest) ||
+      !slot ||
+      (slot.kind !== "scripts" && slot.kind !== "workdir") ||
+      (slot.kind === "scripts"
+        ? slot.jobId !== null
+        : typeof slot.jobId !== "string" ||
+          !slot.jobId ||
+          slot.jobId.length > 512)
+    )
+      throw Error("Invalid schedule directory binding");
+    validateOriginalScheduleText(
+      write.sourceText,
+      write.profile,
+      write.timeZone,
+    );
+    const key = JSON.stringify([slot.kind, slot.jobId]);
+    const request = createHash("sha256")
+      .update(
+        JSON.stringify([
+          write.owner,
+          write.profile,
+          write.timeZone,
+          write.operationId,
+          write.expectedVersion,
+          write.sourceText,
+          manifest,
+        ]),
+      )
+      .digest("hex");
+    const db = this.journal();
+    try {
+      const row = db
+        .prepare(
+          "SELECT request,payload,digest FROM schedule_directory_targets WHERE operation_id=? AND slot=?",
+        )
+        .get(write.operationId, key) as
+        | { request: string; payload: string; digest: string }
+        | undefined;
+      if (row) {
+        if (
+          row.request !== request ||
+          createHash("sha256").update(row.payload).digest("hex") !== row.digest
+        )
+          throw Error("Schedule directory binding operation conflict");
+        const target: unknown = JSON.parse(row.payload);
+        if (!validDirectoryTarget(target))
+          throw Error("Invalid retained schedule directory target");
+        checkPath(target.root);
+        return target;
+      }
+      const target = await bind();
+      this.assertScope(write);
+      if (!this.held) throw Error("Schedule replica lock required");
+      if (!validDirectoryTarget(target))
+        throw Error("Invalid schedule directory target");
+      checkPath(target.root);
+      const payload = JSON.stringify(target);
+      const digest = createHash("sha256").update(payload).digest("hex");
+      db.prepare(
+        "INSERT INTO schedule_directory_targets VALUES(?,?,?,?,?)",
+      ).run(write.operationId, key, request, payload, digest);
+      return JSON.parse(payload) as OriginalSchedulePrivateDirectoryTarget;
     } finally {
       db.close();
     }

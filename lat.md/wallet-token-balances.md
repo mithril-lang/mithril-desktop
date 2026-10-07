@@ -8,7 +8,7 @@ Profile wallets are stored per-profile in `wallets.json` alongside profile metad
 
 [[src/main/wallet-store.ts]] provides create, import, rename, delete, and list operations. Recovery phrases are encrypted via Electron `safeStorage` and stripped by [[src/main/wallet-store.ts#publicWallet]] before any data crosses IPC. The per-profile cap is 10 wallets ([[src/main/wallet-store.ts#MAX_WALLETS_PER_PROFILE]]).
 
-Wallet metadata types live in [[src/shared/wallets.ts]]: `ProfileWallet` (public shape), `WalletMutationResult` (one-time recovery phrase on create/import), and `ImportWalletInput`.
+Wallet metadata types are re-exported by [[src/shared/wallets.ts]] from the shared workspace package: `ProfileWallet` (public shape), `WalletMutationResult` (one-time recovery phrase on create/import), and `ImportWalletInput`.
 
 Local **creation/import is being retired** in favour of backend-provisioned wallets. The store's `createWallet`/`importWallet` and their IPC channels are retained for now, but the wallet pane no longer exposes a create/import UI.
 
@@ -39,3 +39,9 @@ Vitest test suites for wallet store and balance reads.
 - [[src/main/wallet-store.test.ts]] — wallet CRUD, rename/delete, encryption, dedup, caps, and import error distinction (invalid phrase vs. secure-storage failure)
 - [[src/main/wallet-balances.test.ts]] — formatTokenBalance edge cases and big-balance precision, `withTimeout`, getTokenBalances with mocked RPC including timeout handling
 - [[src/renderer/src/components/profile/ProfileWalletPane.test.tsx]] — balance-chip rendering: one symbol label per token, icon only for known tokens
+
+## Shared original wallet pane (draft)
+
+The original Wallet pane is provided by workspace 0.6.29-schedules.23 and consumed through the Desktop IPC adapter, preserving cards, balances, copying and deletion confirmation.
+
+Visible local/cloud origin badges are removed. Public DTOs share one definition; recovery phrases and encrypted wallet files remain behind the native store. Service-unavailable compatibility routes return an error instead of falsely reporting sign-out. Profile replacement retires pending list/sync results. Canonical wallet descriptor synchronization and the Web adapter remain unfinished; this extraction is not live parity or installed-update evidence.

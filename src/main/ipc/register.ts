@@ -3296,16 +3296,16 @@ export function registerIpcHandlers(context: IpcContext): void {
   const walletUnavailable =
     "Cloud wallet services are unavailable in this Mithril preview.";
   ipcMain.handle("wallet-sync", () => ({
-    status: "signed-out" as const,
+    status: "error" as const,
     wallets: [],
     error: walletUnavailable,
   }));
   ipcMain.handle("wallet-portfolio", () => ({
-    status: "signed-out" as const,
+    status: "error" as const,
     error: walletUnavailable,
   }));
   ipcMain.handle("wallet-provision", () => ({
-    status: "signed-out" as const,
+    status: "error" as const,
     error: walletUnavailable,
   }));
   ipcMain.handle("get-token-balances", (_event, address: string) =>

@@ -154,7 +154,7 @@ Legacy renderer state can still contain a run without a profile id during upgrad
 
 Profile wallets are local Base-network Ethereum wallets, capped per profile and kept separate from chat/provider credentials.
 
-[[src/renderer/src/components/profile/ProfileWalletPane.tsx#ProfileWalletPane]] lists public wallet metadata from `listWallets(profile)`, opens a create/import modal, and only displays a recovery phrase in the one-time success state after `createWallet` or `importWallet`. [[src/main/wallet-store.ts#createWallet]] generates a BIP-39 recovery phrase with Node crypto entropy, derives the Ethereum address with `ethers`, and stores public metadata plus an encrypted recovery phrase in `wallets.json` under the profile home. [[src/main/wallet-store.ts#importWallet]] validates an existing recovery phrase, rejects duplicate addresses in the same profile, and uses the same Base wallet metadata shape from [[src/shared/wallets.ts#ProfileWallet]].
+[[src/renderer/src/components/profile/ProfileWalletPane.tsx#ProfileWalletPane]] lists public wallet metadata from `listWallets(profile)`, opens a create/import modal, and only displays a recovery phrase in the one-time success state after `createWallet` or `importWallet`. [[src/main/wallet-store.ts#createWallet]] generates a BIP-39 recovery phrase with Node crypto entropy, derives the Ethereum address with `ethers`, and stores public metadata plus an encrypted recovery phrase in `wallets.json` under the profile home. [[src/main/wallet-store.ts#importWallet]] validates an existing recovery phrase, rejects duplicate addresses in the same profile, and uses the same Base wallet metadata shape from [[src/shared/wallets.ts]].
 
 ### Shared modal shell
 

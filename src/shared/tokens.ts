@@ -16,25 +16,10 @@ export interface KnownToken {
   decimals: number;
 }
 
-export interface TokenBalanceResult {
-  tokenId: string;
-  symbol: string;
-  /** Raw BigInt balance as a decimal string, e.g. "1000000000000000000". */
-  raw: string;
-  /** Compact formatted balance with K/M suffixes, e.g. "10.5K". */
-  formatted: string;
-  /** Full formatted balance without suffixes, e.g. "10500". Used for tooltips. */
-  formattedFull: string;
-  /** Present when the RPC call for this token failed. */
-  error?: string;
-}
-
-export interface TokenBalancesResponse {
-  address: string;
-  balances: TokenBalanceResult[];
-  /** Epoch ms when the balances were fetched. */
-  fetchedAt: number;
-}
+export type {
+  TokenBalanceResult,
+  TokenBalancesResponse,
+} from "@mithril/workspace/desktop-wallet-types";
 
 /** Live tokens on Base mainnet plus native ETH. */
 export const BASE_TOKENS: KnownToken[] = [

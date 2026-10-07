@@ -602,3 +602,35 @@ A Native peer writes the original source but loses its reply; reopening replays 
 ## Automatic original schedule concurrent device edits
 
 Independent edits on two devices produce a retained conflict, preserving the receiving device source and the accepted cloud revision rather than silently replacing authored data.
+
+## Original Schedules operation lane
+
+Original screen actions serialize behind the same synchronization lane, verify first-account source ownership and publish committed edits before the next action.
+
+## Original Schedules uncertain admission refusal
+
+Unconfirmed source synchronization, stale profile context or passive-device execution refuse before any original Native action.
+
+## Original Schedules committed write recovery
+
+A committed edit retains its success acknowledgement after network confirmation fails and releases the lane for later operations.
+
+## Original Schedules unified screen
+
+The actual original Desktop component renders its cards and pause controls on the normal route without a device dialog and reloads its inventory when the signed-in account changes.
+
+## Original Schedules mirror read recovery
+
+The owner-bound original inventory remains readable during synchronization outages or conflicts; this recovery does not admit edits or execution.
+
+## Original Schedules queued identity isolation
+
+An account switch during an in-flight operation invalidates both its result and queued actions, preventing a prior user's command from running in the new account.
+
+## Original Schedules concrete custody gate
+
+The real coordinator rejects stale profiles, passive or foreign custody and stopped identities while admitting only fresh owner-bound selected-device custody.
+
+## Original Schedules background lane coordination
+
+The lifecycle poll queues behind an in-flight original screen action, avoiding concurrent entry into the same replica journal lock.

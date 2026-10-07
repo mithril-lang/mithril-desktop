@@ -1,3 +1,4 @@
+import { runOriginalScheduleScreen } from "../original-schedule-replication-runtime";
 import { registerTaskAttachmentIPC } from "../task-attachment-ipc";
 import { registerCapabilityResourceIPC } from "../capability-resource-ipc";
 import {
@@ -3870,7 +3871,11 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle(
     "list-cron-jobs",
     (_event, includeDisabled?: boolean, profile?: string) =>
-      listCronJobs(includeDisabled, profile),
+      runOriginalScheduleScreen(
+        profile,
+        () => listCronJobs(includeDisabled, profile),
+        "read",
+      ),
   );
   ipcMain.handle(
     "create-cron-job",
@@ -3881,20 +3886,42 @@ export function registerIpcHandlers(context: IpcContext): void {
       name?: string,
       deliver?: string,
       profile?: string,
-    ) => createCronJob(schedule, prompt, name, deliver, profile),
+    ) =>
+      runOriginalScheduleScreen(
+        profile,
+        () => createCronJob(schedule, prompt, name, deliver, profile),
+        "edit",
+      ),
   );
   ipcMain.handle("remove-cron-job", (_event, jobId: string, profile?: string) =>
-    removeCronJob(jobId, profile),
+    runOriginalScheduleScreen(
+      profile,
+      () => removeCronJob(jobId, profile),
+      "edit",
+    ),
   );
   ipcMain.handle("pause-cron-job", (_event, jobId: string, profile?: string) =>
-    pauseCronJob(jobId, profile),
+    runOriginalScheduleScreen(
+      profile,
+      () => pauseCronJob(jobId, profile),
+      "edit",
+    ),
   );
   ipcMain.handle("resume-cron-job", (_event, jobId: string, profile?: string) =>
-    resumeCronJob(jobId, profile),
+    runOriginalScheduleScreen(
+      profile,
+      () => resumeCronJob(jobId, profile),
+      "edit",
+    ),
   );
   ipcMain.handle(
     "trigger-cron-job",
-    (_event, jobId: string, profile?: string) => triggerCronJob(jobId, profile),
+    (_event, jobId: string, profile?: string) =>
+      runOriginalScheduleScreen(
+        profile,
+        () => triggerCronJob(jobId, profile),
+        "execute",
+      ),
   );
 
   // Kanban

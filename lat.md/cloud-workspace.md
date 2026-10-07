@@ -766,3 +766,13 @@ The private SQLite journal also retains repository snapshots and pending source-
 The mounted coordinator now has real-file/SQLite roundtrip and lost-acknowledgement tests across two device roots, retaining authored inventories and concurrent script edits.
 
 The tests exercise the actual source/resource adapters, shared repository engine and durable journals against owner-scoped cloud and Native receipt peers. Preparation and binding are test ports, not a live Agent CLI, D1/R2 deployment or installed application. Full authority/Agent/cloud qualification, shared directory alias identity and the original Schedules consumer remain release requirements.
+
+## Original Schedules screen mirror (draft)
+
+Desktop now mounts the original shared Schedules component directly over its automatically synchronized original inventory, with no separate device dialog.
+
+[[src/renderer/src/screens/CloudWorkspace/CloudSchedules.tsx]] retains the original cards, creation form and lifecycle controls, remounting on account changes. The existing narrow Cron IPC operations call [[src/main/original-schedule-replication-runtime.ts#runOriginalScheduleScreen]] through the same serialized lane as background replication. Profile/account identity is captured before queuing and checked before/after actions; switching users cannot apply an old queued action to a new account.
+
+Before edits or manual execution, the original inventory must be confirmed synchronized and its required Agent policy prepared/bound. [[src/main/original-schedule-replication.ts#OriginalScheduleReplication#assertSelectedExecution]] additionally requires fresh selected-device custody for manual execution; the Agent still admits each occurrence separately. An owner-bound mirror remains readable during a sync outage/conflict, without allowing writes or execution through that recovery path. Committed edits retain their success acknowledgement after network confirmation fails and are retried by the durable background pipeline.
+
+This is the Desktop mirror consumer, not proof of the Web full-manifest consumer, remote execution forwarding, Agent-pin/plugin setup, shared workdir aliases or production/installer qualification. Those gates remain open. The old simple cloud-schedule list and separate device dialog are no longer mounted by Desktop's normal Schedules route.

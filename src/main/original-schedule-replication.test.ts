@@ -352,3 +352,36 @@ it("retains both independently edited inventories as a conflict instead of silen
   expect(readFileSync(join(b.home, "cron", "jobs.json"), "utf8")).toBe(local);
   expect([...peer.documents.values()].map((d) => d.revision)).toEqual([2]);
 }, 30000);
+
+// @lat: [[cloud-workspace-tests#Original Schedules concrete custody gate]]
+it("requires exact profile and fresh owner-bound selected custody at the concrete coordinator boundary", async () => {
+  const peer = cloud(),
+    passive = device(peer, false);
+  const engine = new OriginalScheduleReplication(passive.ports);
+  await expect(engine.assertScreenScope("other")).rejects.toThrow(
+    "profile changed",
+  );
+  await expect(engine.assertSelectedExecution()).rejects.toThrow(
+    "selected device",
+  );
+  passive.ports.custody = async () => ({
+    userId: "bob",
+    profile: "default",
+    selected: true,
+    revision: 1,
+  });
+  await expect(engine.assertSelectedExecution()).rejects.toThrow(
+    "selected device",
+  );
+  passive.ports.custody = async () => ({
+    userId: "alice",
+    profile: "default",
+    selected: true,
+    revision: 1,
+  });
+  await expect(engine.assertSelectedExecution()).resolves.toBeUndefined();
+  engine.stop();
+  await expect(engine.assertSelectedExecution()).rejects.toThrow(
+    "identity changed",
+  );
+});

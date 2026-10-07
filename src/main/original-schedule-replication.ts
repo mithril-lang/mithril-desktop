@@ -81,6 +81,32 @@ export class OriginalScheduleReplication {
     await this.ports.assertActive();
     if (this.stopped) throw Error("Schedule replica identity changed");
   }
+  // @lat: [[cloud-workspace#Original Schedules screen mirror (draft)]]
+  async assertScreenScope(profile?: string): Promise<void> {
+    await this.check();
+    if (profile !== undefined && profile !== this.ports.scope.profile)
+      throw Error("Schedule profile changed");
+  }
+  async assertSelectedExecution(): Promise<void> {
+    await this.check();
+    const command: OriginalScheduleCustodyCommand = {
+      action: "status",
+      profile: this.ports.scope.profile,
+    };
+    const authority = await this.ports.custody(command);
+    await this.check();
+    if (
+      !validOriginalScheduleCustodyReceipt(
+        authority,
+        this.ports.scope.owner,
+        command,
+      ) ||
+      !("selected" in authority) ||
+      !authority.selected ||
+      authority.revision < 1
+    )
+      throw Error("Run this schedule on its selected device");
+  }
   async sync(): Promise<OriginalScheduleReplicaResult> {
     if (this.running)
       return { status: "deferred", reason: "schedule-replica-busy" };

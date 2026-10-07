@@ -17,13 +17,12 @@ import {
 import ProfileAvatar from "../common/ProfileAvatar";
 import {
   DesktopProfileIdentity,
-  DesktopProfileNavigation,
+  DesktopProfileModal,
 } from "@mithril/workspace/desktop-profile";
 import { fileToAvatarDataUrl } from "../../utils/imageResize";
 import { useI18n } from "../useI18n";
 import Soul from "../../screens/Soul/Soul";
 import { DesktopProfileMemory } from "@mithril/workspace/desktop-memory";
-import { AppModal, AppModalTitle } from "../modal/AppModal";
 import ProfileWalletPane from "./ProfileWalletPane";
 import ProfileSyncPane from "./ProfileSyncPane";
 import { OrbLoader } from "../OrbLoader";
@@ -193,177 +192,144 @@ export default function ProfileModal({
   const agentName = profile?.name || id;
 
   return (
-    <AppModal
+    <DesktopProfileModal<ProfileSection>
       open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) onClose();
-      }}
-      onExitComplete={onExited}
-      className="profile-modal"
-      overlayClassName="profile-modal-overlay"
-      labelledBy="profile-modal-title"
+      onClose={onClose}
+      onExited={onExited}
+      title={agentName}
+      avatar={
+        profile ? (
+          <ProfileAvatar
+            name={profile.id}
+            color={profile.color}
+            avatar={profile.avatar}
+            size={28}
+          />
+        ) : undefined
+      }
+      label={t("agents.title")}
+      sections={
+        profile
+          ? PROFILE_SECTIONS.map((s) => ({
+              id: s.id,
+              label: t(s.labelKey),
+              Icon: s.Icon,
+            }))
+          : []
+      }
+      selected={section}
+      onSelect={setSection}
+      closeLabel={t("common.cancel")}
+      doneLabel={t("common.done")}
+      ready={Boolean(profile)}
+      loading={<OrbLoader state="searching" size={64} />}
+      X={X}
     >
-      <DesktopProfileNavigation<ProfileSection>
-        avatar={
-          profile ? (
-            <ProfileAvatar
-              name={profile.id}
-              color={profile.color}
-              avatar={profile.avatar}
-              size={28}
-            />
-          ) : undefined
-        }
-        title={
-          <AppModalTitle
-            id="profile-modal-title"
-            className="profile-modal-title"
-          >
-            {agentName}
-          </AppModalTitle>
-        }
-        label={t("agents.title")}
-        sections={
-          profile
-            ? PROFILE_SECTIONS.map((s) => ({
-                id: s.id,
-                label: t(s.labelKey),
-                Icon: s.Icon,
-              }))
-            : []
-        }
-        selected={section}
-        onSelect={setSection}
-      />
-
-      <div className="profile-modal-main">
-        <div className="profile-modal-topbar">
-          <button
-            type="button"
-            className="profile-modal-close"
-            onClick={onClose}
-            aria-label={t("common.cancel")}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {profile ? (
-          <div className="profile-modal-content">
-            {section === "profile" && (
-              <DesktopProfileIdentity
-                key={profile.id}
-                profile={profile}
-                api={window.hermesAPI}
-                t={t}
-                Avatar={ProfileAvatar}
-                Pencil={Pencil}
-                fileToAvatarDataUrl={fileToAvatarDataUrl}
-                onChanged={afterMutation}
-                onColorDraft={(color) =>
-                  setProfile((cur) => (cur ? { ...cur, color } : cur))
-                }
-                stats={
-                  <div className="profile-modal-stats">
-                    {profileChips.map(({ key, value, Icon, state }) => (
-                      <span
-                        className={`profile-modal-stat-value ${
-                          state ? `is-${state}` : ""
-                        }`}
-                        key={key}
-                      >
-                        <Icon size={14} className="profile-modal-stat-icon" />
-                        {value}
-                      </span>
-                    ))}
-                  </div>
-                }
-              />
-            )}
-
-            {section === "persona" && (
-              <div className="profile-modal-pane profile-modal-memory-pane">
-                <div className="memory-soul-tab">
-                  <Soul profile={profile.id} />
-                </div>
-              </div>
-            )}
-
-            {section === "agentMemory" && (
-              <DesktopProfileMemory
-                api={window.hermesAPI}
-                profile={profile.id}
-                t={t}
-                locale={locale}
-              />
-            )}
-
-            {section === "wallet" && <ProfileWalletPane profile={profile.id} />}
-
-            {section === "sync" && <ProfileSyncPane profile={profile.id} />}
-
-            {section === "advanced" && (
-              <div className="profile-modal-pane">
-                {profile.isDefault ? (
-                  <p className="profile-modal-danger-info">
-                    {t("agents.defaultNotDeletable")}
-                  </p>
-                ) : (
-                  <div className="profile-modal-danger">
-                    <span className="profile-modal-label profile-modal-danger-label">
-                      {t("agents.dangerZone")}
+      {profile && (
+        <>
+          {section === "profile" && (
+            <DesktopProfileIdentity
+              key={profile.id}
+              profile={profile}
+              api={window.hermesAPI}
+              t={t}
+              Avatar={ProfileAvatar}
+              Pencil={Pencil}
+              fileToAvatarDataUrl={fileToAvatarDataUrl}
+              onChanged={afterMutation}
+              onColorDraft={(color) =>
+                setProfile((cur) => (cur ? { ...cur, color } : cur))
+              }
+              stats={
+                <div className="profile-modal-stats">
+                  {profileChips.map(({ key, value, Icon, state }) => (
+                    <span
+                      className={`profile-modal-stat-value ${
+                        state ? `is-${state}` : ""
+                      }`}
+                      key={key}
+                    >
+                      <Icon size={14} className="profile-modal-stat-icon" />
+                      {value}
                     </span>
-                    <p className="profile-modal-danger-info">
-                      {t("agents.deleteProfileInfo")}
-                    </p>
-                    {confirmDelete ? (
-                      <div className="profile-modal-danger-confirm">
-                        <span>{t("agents.deleteProfileConfirm")}</span>
-                        <div className="profile-modal-image-actions">
-                          <button
-                            className="btn btn-danger btn-sm"
-                            onClick={handleDelete}
-                            disabled={deleting}
-                          >
-                            {t("agents.deleteProfile")}
-                          </button>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setConfirmDelete(false)}
-                          >
-                            {t("common.cancel")}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        className="btn btn-danger-ghost btn-sm"
-                        onClick={() => setConfirmDelete(true)}
-                        disabled={deleting}
-                      >
-                        <Trash size={13} />
-                        {t("agents.deleteProfile")}
-                      </button>
-                    )}
-                  </div>
-                )}
+                  ))}
+                </div>
+              }
+            />
+          )}
 
-                {error && <div className="agents-create-error">{error}</div>}
+          {section === "persona" && (
+            <div className="profile-modal-pane profile-modal-memory-pane">
+              <div className="memory-soul-tab">
+                <Soul profile={profile.id} />
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="profile-modal-loading">
-            <OrbLoader state="searching" size={64} />
-          </div>
-        )}
+            </div>
+          )}
 
-        <div className="profile-modal-footer">
-          <button className="btn btn-primary btn-sm" onClick={onClose}>
-            {t("common.done")}
-          </button>
-        </div>
-      </div>
-    </AppModal>
+          {section === "agentMemory" && (
+            <DesktopProfileMemory
+              api={window.hermesAPI}
+              profile={profile.id}
+              t={t}
+              locale={locale}
+            />
+          )}
+
+          {section === "wallet" && <ProfileWalletPane profile={profile.id} />}
+
+          {section === "sync" && <ProfileSyncPane profile={profile.id} />}
+
+          {section === "advanced" && (
+            <div className="profile-modal-pane">
+              {profile.isDefault ? (
+                <p className="profile-modal-danger-info">
+                  {t("agents.defaultNotDeletable")}
+                </p>
+              ) : (
+                <div className="profile-modal-danger">
+                  <span className="profile-modal-label profile-modal-danger-label">
+                    {t("agents.dangerZone")}
+                  </span>
+                  <p className="profile-modal-danger-info">
+                    {t("agents.deleteProfileInfo")}
+                  </p>
+                  {confirmDelete ? (
+                    <div className="profile-modal-danger-confirm">
+                      <span>{t("agents.deleteProfileConfirm")}</span>
+                      <div className="profile-modal-image-actions">
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={handleDelete}
+                          disabled={deleting}
+                        >
+                          {t("agents.deleteProfile")}
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setConfirmDelete(false)}
+                        >
+                          {t("common.cancel")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="btn btn-danger-ghost btn-sm"
+                      onClick={() => setConfirmDelete(true)}
+                      disabled={deleting}
+                    >
+                      <Trash size={13} />
+                      {t("agents.deleteProfile")}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {error && <div className="agents-create-error">{error}</div>}
+            </div>
+          )}
+        </>
+      )}
+    </DesktopProfileModal>
   );
 }

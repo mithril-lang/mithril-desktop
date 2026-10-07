@@ -1082,3 +1082,12 @@ Cloud workspace and chat use one encrypted installation account credential acros
 [[src/main/mithril-token-store.ts#readCloudAccountToken]] promotes only the selected legacy credential when the account record is absent. It never enumerates profiles. Sign-out persists a marker that blocks legacy fallback after restart; unreadable ciphertext also cannot select another account. API owner and existing scope validation, profile context fences and source custody remain mandatory. Explicit sign-in updates account and selected native provider records with ciphertext rollback on failure. Credential mutations serialize across profiles. Tests exercise both real CloudWorkspace instances, profile switches, stale contexts, sign-out and failed storage. Production, installer and installed upgrade qualification remain pending.
 
 Local validation: all 308 test files passed (2815 tests, one existing skip), full Desktop typecheck/build and changed-file lint passed. On this Node 26 host, tests ran with `NODE_OPTIONS=--no-experimental-webstorage` and ambient `OPENROUTER_API_KEY` unset to preserve browser/test isolation; CI remains pinned to Node 22.
+
+
+## Original profile dialog shared shell (draft)
+
+DesktopProfileModal from workspace 0.6.29-schedules.22 now owns the original Desktop dialog frame across Native and Web profile editing.
+
+Both consumers use the same modal, title, navigation, close control and Done footer. Native retains original pane adapters, icons and loader. Web opens the profile editor from the shared list and preserves owner-bound edits, Memory, Persona, Sync and conflict recovery inside the dialog. Shared tests cover actual modal open/close/reopen; the compiled Native package retains original name-edit, deletion and memory tests. Wallet, Advanced, full runtime parity, publication and installed qualification remain unfinished.
+
+The immutable archive contains 451 files with SHA256 `6b209c54bed7c554db095b97001e178f4281cb5bfdc178416df098cb37d49b58`. Producer, archive, Native vendor and installed bytes match; shared 17 tests and Native 13 tests, Web typecheck, Native full build/typecheck and changed-file lint pass.

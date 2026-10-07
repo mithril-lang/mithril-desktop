@@ -617,7 +617,11 @@ A committed edit retains its success acknowledgement after network confirmation 
 
 ## Original Schedules unified screen
 
-The actual original Desktop component renders its cards and pause controls on the normal route without a device dialog and reloads its inventory when the signed-in account changes.
+The actual original Desktop component combines colliding original/cloud IDs in one list, preserves cloud model and interval on pause, forwards original controls to Cron IPC, and reloads on account changes without a device dialog.
+
+## Unified Schedules late connection isolation
+
+An old account status reply resolving after the account event cannot construct or query a schedule adapter; only the replacement owner inventory is displayed.
 
 ## Original Schedules mirror read recovery
 

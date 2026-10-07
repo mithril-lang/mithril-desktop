@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { lstatSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { resourceExclusions, resourceExcluded } from "./resource-exclusions";
 import type { CapabilityResourceTransport } from "@mithril/workspace/capability-resources";
 import { originalScheduleResourceId } from "@mithril/workspace/original-schedule-resources";
 import type { OriginalScheduleReplicaScope } from "@mithril/workspace/original-schedule-file-replica";
@@ -28,15 +29,28 @@ export class OriginalScheduleDirectoryResources {
   private readonly resources: CapabilityResourceTransport;
   private readonly scope: Readonly<OriginalScheduleReplicaScope>;
   private readonly stateRoot: string;
+  private readonly privatePaths: readonly string[];
   constructor(
     scope: OriginalScheduleReplicaScope,
     transport: CapabilityResourceTransport,
     private readonly python: string,
     stateRoot: string,
     private readonly assertActive: () => Promise<void>,
+    privatePaths: readonly string[] = [],
   ) {
     if (!validOriginalCronScope({ ...scope, operationId: "scope" }))
       throw Error("Invalid schedule directory scope");
+    if (
+      !Array.isArray(privatePaths) ||
+      privatePaths.length > 100 ||
+      !privatePaths.every(
+        (path) => typeof path === "string" && isAbsolute(path),
+      )
+    )
+      throw Error("Invalid private resource roots");
+    this.privatePaths = Object.freeze(
+      privatePaths.map((path) => resolve(path)),
+    );
     this.scope = Object.freeze({ ...scope });
     this.resources = transport.forOwner(scope.owner);
     this.stateRoot = join(
@@ -56,6 +70,28 @@ export class OriginalScheduleDirectoryResources {
     );
   }
 
+  private exclusions(root: string): readonly string[] {
+    const base = resolve(root);
+    const paths: string[] = [];
+    for (const privatePath of this.privatePaths) {
+      if (!isAbsolute(privatePath))
+        throw Error("Invalid private resource root");
+      const reserved = resolve(privatePath);
+      const inside = relative(reserved, base);
+      if (
+        inside === "" ||
+        (!isAbsolute(inside) &&
+          inside !== ".." &&
+          !inside.startsWith(".." + sep))
+      )
+        throw Error("Schedule directory is private runtime state");
+      const path = relative(base, reserved);
+      if (!isAbsolute(path) && path !== ".." && !path.startsWith(".." + sep))
+        paths.push(path.split(sep).join("/"));
+    }
+    return resourceExclusions(paths);
+  }
+
   async capture(root: string): Promise<{
     pointer: OriginalScheduleDirectoryPointer;
     excluded: number;
@@ -64,6 +100,7 @@ export class OriginalScheduleDirectoryResources {
     await this.assertActive();
     const resourceId = await originalScheduleResourceId(this.scope.profile);
     await this.assertActive();
+    const exclusions = this.exclusions(root);
     const initial = lstatSync(root);
     if (!initial.isDirectory() || initial.isSymbolicLink())
       throw Error("Schedule directory source unavailable");
@@ -72,6 +109,7 @@ export class OriginalScheduleDirectoryResources {
       this.python,
       this.stateRoot,
       resourceId,
+      exclusions,
     );
     try {
       const current = lstatSync(root);
@@ -127,6 +165,7 @@ export class OriginalScheduleDirectoryResources {
     if (pointer.resourceId !== resourceId)
       throw Error("Schedule directory profile changed");
     await this.assertActive();
+    const exclusions = this.exclusions(root);
     // The caller retains the acknowledged baseline and operation ID in its private journal.
     // Download that immutable baseline rather than recapturing newer destination edits.
     const before = await downloadDirectoryResources(
@@ -145,6 +184,14 @@ export class OriginalScheduleDirectoryResources {
         this.assertActive,
       );
       try {
+        if (
+          [before, after].some((capture) =>
+            capture.manifest.files.some((file) =>
+              resourceExcluded(file.path, exclusions),
+            ),
+          )
+        )
+          throw Error("Schedule directory contains private runtime state");
         if (
           !Array.isArray(requiredFiles) ||
           requiredFiles.length > 20000 ||
@@ -167,9 +214,11 @@ export class OriginalScheduleDirectoryResources {
             this.scope.timeZone,
             expectedManifest,
             pointer.manifest,
+            ...(exclusions.length ? [exclusions] : []),
           ]),
           before,
           after,
+          exclusions,
         );
         await this.assertActive();
         return status;

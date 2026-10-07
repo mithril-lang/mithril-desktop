@@ -191,6 +191,19 @@ export class OriginalScheduleReplication {
         p.python,
         p.stateRoot,
         () => this.check(),
+        [
+          p.stateRoot,
+          ...[
+            "jobs.json",
+            ".jobs.lock",
+            "execution-policy-required.json",
+            "execution-bindings.json",
+            "executions.db",
+            "executions.db-wal",
+            "executions.db-shm",
+            "executions.db-journal",
+          ].map((name) => join(p.home, "cron", name)),
+        ],
       );
       const scripts = new OriginalScheduleScriptResources(
         p.scope,

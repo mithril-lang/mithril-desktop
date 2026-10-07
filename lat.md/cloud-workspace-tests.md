@@ -648,3 +648,11 @@ A receiving-device edit synchronizes back to the original shared root without al
 ## Original workdir alias preflight
 
 One portable folder identity cannot resolve to two private destination roots. The workdir stage rejects that conflict before replacing either folder's actual files.
+
+## Original workdir private runtime preservation
+
+Original authored scripts and outputs synchronize while each device retains its own Cron authority, locked source, ledger and restore receipts, even when the workdir contains that runtime.
+
+## Original workdir private manifest refusal
+
+Incoming manifests containing destination-private state are refused before replacing files. Capturing private synchronization storage itself cannot publish chunks or recurse into its staging area.

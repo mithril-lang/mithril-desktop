@@ -845,3 +845,116 @@ it("rejects one portable folder identity resolving to different roots before res
   expect(readFileSync(join(f.local, "data.txt"), "utf8")).toBe("first local");
   expect(readFileSync(join(other, "data.txt"), "utf8")).toBe("second local");
 });
+
+// @lat: [[cloud-workspace-tests#Original workdir private runtime preservation]]
+it("synchronizes original work files while preserving each device's private Cron authority and ledger", async () => {
+  const f = setup();
+  const privateNames = [
+    "jobs.json",
+    "execution-policy-required.json",
+    "execution-bindings.json",
+    "executions.db",
+    "executions.db-wal",
+    ".jobs.lock",
+  ];
+  const service = (root: string): OriginalScheduleDirectoryResources =>
+    new OriginalScheduleDirectoryResources(
+      f.scope,
+      f.store.transport,
+      "/usr/bin/python3",
+      join(f.home, "state"),
+      f.guard,
+      privateNames.map((name) => join(root, "cron", name)),
+    );
+  for (const [root, identity] of [
+    [f.local, "source"],
+    [f.remote, "destination"],
+  ]) {
+    mkdirSync(join(root!, "cron"));
+    for (const name of privateNames)
+      writeFileSync(join(root!, "cron", name), identity! + ":" + name);
+    writeFileSync(
+      join(root!, "cron", ".mithril-source-private.json"),
+      identity! + ":receipt",
+    );
+  }
+  const source = service(f.local),
+    target = service(f.remote);
+  const baseline = await target.capture(f.remote);
+  expect(baseline.paths).toEqual([]);
+  writeFileSync(join(f.local, "run.py"), "print('shared authored script')\n");
+  writeFileSync(join(f.local, "cron", "output.txt"), "shared output\n");
+  const current = await source.capture(f.local);
+  expect(current.paths).toEqual(["cron/output.txt", "run.py"]);
+  expect(
+    await target.restore(
+      current.pointer,
+      f.remote,
+      baseline.pointer.manifest,
+      "private-runtime-roundtrip",
+    ),
+  ).toBe("applied");
+  expect(readFileSync(join(f.remote, "run.py"), "utf8")).toBe(
+    "print('shared authored script')\n",
+  );
+  expect(readFileSync(join(f.remote, "cron", "output.txt"), "utf8")).toBe(
+    "shared output\n",
+  );
+  for (const name of privateNames)
+    expect(readFileSync(join(f.remote, "cron", name), "utf8")).toBe(
+      "destination:" + name,
+    );
+  expect(
+    readFileSync(
+      join(f.remote, "cron", ".mithril-source-private.json"),
+      "utf8",
+    ),
+  ).toBe("destination:receipt");
+  expect((await target.capture(f.remote)).pointer.manifest).toBe(
+    current.pointer.manifest,
+  );
+});
+
+// @lat: [[cloud-workspace-tests#Original workdir private manifest refusal]]
+it("refuses an incoming manifest containing destination runtime state and refuses captures within private storage", async () => {
+  const f = setup();
+  mkdirSync(join(f.local, "cron"));
+  mkdirSync(join(f.remote, "cron"));
+  writeFileSync(
+    join(f.local, "cron", "execution-bindings.json"),
+    "foreign authority",
+  );
+  writeFileSync(
+    join(f.remote, "cron", "execution-bindings.json"),
+    "destination authority",
+  );
+  writeFileSync(join(f.local, "authored.txt"), "incoming");
+  writeFileSync(join(f.remote, "authored.txt"), "original");
+  const target = new OriginalScheduleDirectoryResources(
+    f.scope,
+    f.store.transport,
+    "/usr/bin/python3",
+    join(f.home, "state"),
+    f.guard,
+    [join(f.remote, "cron", "execution-bindings.json"), join(f.home, "state")],
+  );
+  const before = await target.capture(f.remote);
+  const foreign = await f.service.capture(f.local);
+  await expect(
+    target.restore(
+      foreign.pointer,
+      f.remote,
+      before.pointer.manifest,
+      "refuse-runtime-manifest",
+    ),
+  ).rejects.toThrow("private runtime state");
+  expect(readFileSync(join(f.remote, "authored.txt"), "utf8")).toBe("original");
+  expect(
+    readFileSync(join(f.remote, "cron", "execution-bindings.json"), "utf8"),
+  ).toBe("destination authority");
+  const uploaded = f.store.uploads();
+  await expect(target.capture(join(f.home, "state"))).rejects.toThrow(
+    "private runtime state",
+  );
+  expect(f.store.uploads()).toBe(uploaded);
+});

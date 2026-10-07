@@ -1,3 +1,4 @@
+import { resourceExclusions, resourceExcluded } from "./resource-exclusions";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -111,10 +112,10 @@ try:
  def stamp(i):return (i.st_dev,i.st_ino,i.st_size,i.st_mtime_ns,i.st_ctime_ns,stat.S_IMODE(i.st_mode))
  def ignored(name):
   import re
-  return bool(re.match(r'^(\.git|\.git-credentials|\.npmrc|\.pypirc|\.netrc|\.hg|\.svn|node_modules|\.venv|venv|__pycache__|\.ssh|\.aws|\.azure|\.config|\.mithril-sync-trash)$',name,re.I) or re.match(r'^\.env(?:\.|$)',name,re.I) or re.match(r'^(id_rsa|id_ed25519|credentials|secrets?)(\.|$)',name,re.I) or re.search(r'\.(pem|key|p12|pfx)$',name,re.I) or name.startswith('.mithril-sync-'))
+  return bool(re.match(r'^(\.git|\.git-credentials|\.npmrc|\.pypirc|\.netrc|\.hg|\.svn|node_modules|\.venv|venv|__pycache__|\.ssh|\.aws|\.azure|\.config|\.mithril-sync-trash)$',name,re.I) or re.match(r'^\.env(?:\.|$)',name,re.I) or re.match(r'^(id_rsa|id_ed25519|credentials|secrets?)(\.|$)',name,re.I) or re.search(r'\.(pem|key|p12|pfx)$',name,re.I) or name.startswith(('.mithril-sync-','.mithril-source-')))
  def safe_path(path):
   parts=path.split('/')
-  if not parts or any(not x or x in ('.','..') or ignored(x) for x in parts):raise ValueError('unsafe')
+  if not parts or any(not x or x in ('.','..') or ignored(x) for x in parts) or any(path==x or path.startswith(x+'/') for x in p['excludedPaths']):raise ValueError('unsafe')
   return parts
  def file_value(name,dfd,backup=None):
   try:info=os.stat(name,dir_fd=dfd,follow_symlinks=False)
@@ -144,8 +145,8 @@ try:
    for name in names:
     info=os.stat(name,dir_fd=fd,follow_symlinks=False)
     if stat.S_ISLNK(info.st_mode):raise ValueError('unsafe')
-    if ignored(name):continue
     path=prefix+'/'+name if prefix else name
+    if ignored(name) or any(path==x or path.startswith(x+'/') for x in p['excludedPaths']):continue
     if stat.S_ISDIR(info.st_mode):
      child=os.open(name,flags,dir_fd=fd)
      try:walk(child,path)
@@ -320,6 +321,7 @@ function execute(
   fingerprint: string,
   before?: SkillResourceCapture,
   after?: SkillResourceCapture,
+  excludedPaths: readonly string[] = [],
 ): SkillApplyStatus {
   const execution = spawnSync(python, ["-I", "-c", TRANSACTION], {
     input: JSON.stringify({
@@ -330,6 +332,7 @@ function execute(
       recoverOnly: !before || !after,
       before: before?.manifest,
       after: after?.manifest,
+      excludedPaths,
     }),
     encoding: "utf8",
     timeout: 60000,
@@ -388,11 +391,16 @@ export function applySkillResources(
   fingerprint: string,
   before: SkillResourceCapture,
   after: SkillResourceCapture,
+  excludedPaths: readonly string[] = [],
 ): SkillApplyStatus {
+  const exclusions = resourceExclusions(excludedPaths);
   if (process.platform === "win32") return "deferred";
   for (const capture of [before, after]) {
     if (
       !validCapabilityResourceManifest(capture.manifest) ||
+      capture.manifest.files.some((file) =>
+        resourceExcluded(file.path, exclusions),
+      ) ||
       createHash("sha256")
         .update(capabilityResourceManifestBytes(capture.manifest))
         .digest("hex") !== capture.digest
@@ -424,5 +432,14 @@ export function applySkillResources(
   } finally {
     closeSync(cacheFd);
   }
-  return execute(root, python, state, operation, fingerprint, before, after);
+  return execute(
+    root,
+    python,
+    state,
+    operation,
+    fingerprint,
+    before,
+    after,
+    exclusions,
+  );
 }

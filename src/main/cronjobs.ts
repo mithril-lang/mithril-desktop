@@ -4,10 +4,10 @@ import {
   type OriginalCronFile,
 } from "./cron-source-files";
 import type { NativeScheduleDraft } from "@mithril/workspace/schedules";
-import { validJson } from "@mithril/workspace/repository";
 import {
   parseOriginalCronRestoreResult,
   type OriginalCronRestoreRequest,
+  validOriginalCronRestoreRequest,
   type OriginalCronRestoreResult,
 } from "./cron-source-restore";
 import {
@@ -566,29 +566,21 @@ export async function restoreOriginalCronSource(
       success: false,
       error: "Original remote schedule restoration unavailable",
     };
-  if (
-    ![request.owner, request.profile, request.operationId].every(
-      (value) =>
-        typeof value === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(value),
-    ) ||
-    request.profile.length > 64 ||
-    (request.expectedVersion !== null &&
-      !/^[a-f0-9]{64}$/.test(request.expectedVersion)) ||
-    !validJson(request.file)
-  )
+  if (!validOriginalCronRestoreRequest(request))
     return { success: false, error: "Invalid original schedule restoration" };
-  const input = JSON.stringify(request);
-  if (Buffer.byteLength(input) > 21 * 1024 * 1024)
+  const captured = structuredClone(request);
+  const input = JSON.stringify(captured);
+  if (Buffer.byteLength(input) > 80 * 1024 * 1024)
     return {
       success: false,
       error: "Schedule source exceeds synchronization capacity",
     };
   const result = await runCronCommand(
     ["source-restore"],
-    request.profile,
+    captured.profile,
     input,
   );
-  return parseOriginalCronRestoreResult(result.output, request);
+  return parseOriginalCronRestoreResult(result.output, captured);
 }
 
 /** Existing preview remains read-only; complete capture precedes its restricted projection. */

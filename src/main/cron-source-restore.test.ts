@@ -51,3 +51,58 @@ it("reports deferred execution separately and never exposes raw source errors", 
       error: "Schedule restoration unavailable",
     });
 });
+it("checks the exact restored source digest and rejects a receipt for different bytes", async () => {
+  const { createHash } = await import("crypto");
+  const sourceText =
+    '\uFEFF{"jobs":[],"opaqueCounter":9223372036854775807}\r\n';
+  const raw = {
+    owner: "alice",
+    profile: "default",
+    operationId: "raw",
+    expectedVersion: null,
+    sourceText,
+  };
+  const expected = {
+    owner: raw.owner,
+    profile: raw.profile,
+    operationId: raw.operationId,
+    version: createHash("sha256").update(sourceText).digest("hex"),
+  };
+  expect(
+    parseOriginalCronRestoreResult(
+      JSON.stringify({ success: true, receipt: expected }),
+      raw,
+    ),
+  ).toEqual({ success: true, receipt: expected });
+  expect(
+    parseOriginalCronRestoreResult(
+      JSON.stringify({
+        success: true,
+        receipt: { ...expected, version: "a".repeat(64) },
+      }),
+      raw,
+    ).success,
+  ).toBe(false);
+});
+it("admits exactly one bounded source representation without silently granting raw-source IPC", async () => {
+  const { validOriginalCronRestoreRequest } =
+    await import("./cron-source-restore");
+  const raw = {
+    owner: "alice",
+    profile: "default",
+    operationId: "raw",
+    expectedVersion: null,
+    sourceText: '\uFEFF{"jobs":[]}\r\n',
+  };
+  expect(validOriginalCronRestoreRequest(raw)).toBe(true);
+  expect(validOriginalCronRestoreRequest(request)).toBe(true);
+  for (const bad of [
+    { ...raw, file: { jobs: [] } },
+    { ...raw, sourceText: "\ud800" },
+    { ...raw, sourceText: "{}".repeat(11 * 1024 * 1024) },
+    { ...raw, sourceText: "{broken" },
+    { ...raw, owner: "other/path" },
+    { ...raw, extra: true },
+  ])
+    expect(validOriginalCronRestoreRequest(bad)).toBe(false);
+});

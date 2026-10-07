@@ -13,6 +13,8 @@ import { validJson, type JsonValue } from "@mithril/workspace/repository";
 export interface OriginalCronFile {
   profile: string;
   version: string;
+  /** Exact source for whole-file cloud publication; main-process only. */
+  sourceText: string;
   file: Record<string, JsonValue> | JsonValue[];
 }
 function checked(path: string): void {
@@ -104,6 +106,7 @@ export function captureOriginalCronFile(
     return {
       profile,
       version: createHash("sha256").update(bytes).digest("hex"),
+      sourceText: text,
       file: file as OriginalCronFile["file"],
     };
   } finally {

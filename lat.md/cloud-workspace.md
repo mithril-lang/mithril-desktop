@@ -610,3 +610,9 @@ Pause and resume preparation use the original Agent policy while preserving auth
 The vendored Workspace 0.6.17 archive SHA-256 is `0ab207a81b30afa505b6f8e7a17d1fba17e2e2b3a33611506d920eed187f16bc`. Its compiled exports include the original source, lifecycle adapter and complete-file codecs; the consumer imports those artifacts rather than copying UI or schedule semantics.
 
 The archive was generated in a task-specific directory from Fund source `0352e6577dd8d466245bb4faca1f0f5944a1e56c`, and all three original schedule JS/type exports were checked before installation. A generic temporary archive is not accepted as source provenance.
+
+## Exact original schedule source restoration (draft)
+
+The complete schedule capture now carries exact UTF-8 source text, and restoration can preserve those bytes through the original locked CLI path.
+
+[[src/main/cron-source-files.ts#captureOriginalCronFile]] retains BOM, CRLF, file formatting and opaque integer metadata in `sourceText`, alongside the parsed preview and byte digest. [[src/main/cron-source-restore.ts#validOriginalCronRestoreRequest]] admits exactly one bounded representation: the existing parsed file or exact source text. [[src/main/cron-source-restore.ts#parseOriginalCronRestoreResult]] verifies a text-mode receipt against the exact requested source SHA256. [[src/main/cronjobs.ts#restoreOriginalCronSource]] snapshots the request before awaiting the child. Raw source remains main-only; no upload, resource permission, execution ownership or renderer IPC is added.

@@ -135,3 +135,14 @@ it("refuses linked source files and directories before admitting an inventory", 
   symlinkSync(join(other, "cron"), join(root, "cron"), "dir");
   expect(() => captureOriginalCronFile(root, "default")).toThrow("Unsafe");
 });
+// @lat: [[cloud-workspace#Cloud workspace#Exact original schedule source restoration (draft)]]
+it("retains exact source text with large integers, BOM and CRLF rather than serializing the parsed projection", () => {
+  const root = fixture({ jobs: [] });
+  const sourceText =
+    '\uFEFF{\r\n "jobs": [], "opaqueCounter": 9223372036854775807\r\n}\r\n';
+  const path = join(root, "cron", "jobs.json");
+  writeFileSync(path, sourceText);
+  const first = captureOriginalCronFile(root, "default")!;
+  expect(first.sourceText).toBe(sourceText);
+  expect(Buffer.from(first.sourceText)).toEqual(readFileSync(path));
+});

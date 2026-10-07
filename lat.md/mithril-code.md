@@ -57,3 +57,5 @@ The tool checkpoint opens the existing shared Code source/GitHub editor. The Cod
 The main process advertises `mithril-language-v1` on validated Chat checkpoints. The owner API captures the offered tool inventory for the lifetime of the turn; cached legacy clients retain their JS/Python inventory. Preview.31 adds this explicit negotiation to the preview.30 integration. No renderer-supplied protocol override or token upgrade is admitted.
 
 Preview.32 pins the exact workspace 0.6.20 archive after merging the concurrent main changes. Web and native coding consumers share the accepted tool runner and source/GitHub editor; consumer transport and authority stay separate. Preview.30 and preview.31 remain unpublished drafts.
+
+Preview.33 pins workspace0.6.23: the shared Mithril compile control uses the existing action styling and retains the concurrent repository-refactor improvements. Code Web confines collapsed navigation CSS to its sidebar so editor filenames stay visible. The public Chat report confirms Web generation/edited compilation; native activation and live generation remain separate checks.

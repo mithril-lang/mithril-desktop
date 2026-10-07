@@ -868,7 +868,7 @@ Actual Agent A/B/A tests verify read-only completed inspection after original so
 
 ## Current-main shared schedules package
 
-Desktop now pins workspace `0.6.29-schedules.6`, packed from Fund `1098d029`, including current-main shared UI changes and the unified schedule adapter. Earlier archives remain immutable.
+Desktop now pins workspace `0.6.29-schedules.7`, packed from Fund `2cf4521e`, including current-main shared UI changes, the unified schedule adapter and individual browser settings pane support. Earlier archives remain immutable.
 
 The installer candidate is preview.37 because preview.36 already has published assets.
 
@@ -889,3 +889,11 @@ The original shared Memory editor keeps new input while a save or remote refresh
 Workspace `0.6.29-schedules.6` isolates Memory editors when the adapter/profile changes. Profile saves block duplicate submission, retain later typing and keep the acknowledged expected text. An older read cannot replace an acknowledged edit. Transport failures preserve drafts and do not report Saved. Producer renderer/file/note regressions passed 13 tests and browser screen tests passed four; App CI requires these regressions. Native credentials remain outside synchronized records. Production and installed-client checks remain separate.
 
 Consumer validation compared all 426 archive files with producer and installed bytes and checked the lock SHA512. Native build, 19 tests across Memory locking/reconciliation and shared cloud routes, and lat validation passed. The installer candidate remains preview.37; it has not been published or installed by this change.
+
+## Original settings pane consumer parity
+
+The Desktop consumer retains its original settings provider while using the same shared pane renderer as Web.
+
+Workspace `.7` permits individual consumer panes to fall back when undefined. Web Community now mounts the original component and original branding with browser link handling. Desktop keeps its complete native pane provider; the shared X icon is decorative so its button has one accessible name. Native runtime credentials and update actions do not move into browser authority.
+
+The new immutable archive SHA256 is `9093df699c3dfa6e89b5f82520eb4d9661cebbabe297f23dc11efc45726058c9`. All 426 files match producer and installed dependency bytes, and lock SHA512 matches the archive. Browser route/component regressions passed 13 tests. Native build and 72 regressions across original Settings/Data/Connection and Cloud Workspace passed; lat validation passed. CI, publication and installed application behavior remain separate evidence gates. Browser Connection/Data/About/Logs adapters remain incomplete.

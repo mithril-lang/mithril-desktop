@@ -995,3 +995,9 @@ Original Skill directories now contribute separate cloud resource pointers for e
 The background lifecycle replicates every present original profile owned by the captured account without changing the selected profile or adding execution consumers.
 
 The existing metadata inventory supplies profile roots and account bindings. Each engine retains the original profile/timezone journal, parser, source CAS, resources and custody admission. Directory identity, ancestor symlinks and source ownership are checked across asynchronous stages. A failed profile leaves the pass deferred while later profiles can synchronize; account changes abort the captured pass. Missing directories are never recreated. Custody transport accepts a main-only captured active account context for these owned sources while retaining exact receipt validation, existing execution grants and no mutation retries. The default caller still requires the selected profile. Manual consumption remains selected-profile only; full all-profile manual execution, production API/Agent publication and installed cross-device qualification remain unfinished.
+
+## Shared original profile editor package consumption (draft)
+
+Desktop now pins workspace `0.6.29-schedules.13`, including the same original identity component and revision-bound metadata editor available to Web.
+
+The immutable archive has 441 files and SHA256 `c1b50fe55cfdadc07278a97c80b50f59da5cc0868fe1c9d4ae7a0527211f38c4`. All producer/archive/installed files were compared byte-for-byte, and explicit compiled export targets were verified. The existing original ProfileModal continues to import its identity pane directly; native edits use the existing original metadata replication, rather than a second profile storage. The remaining original modal panes and full cloud-only creation remain unfinished. Package consumption does not prove main CI, a public installer or installed cross-device behavior.

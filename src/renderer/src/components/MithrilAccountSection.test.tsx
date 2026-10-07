@@ -49,5 +49,9 @@ describe("Mithril account card", () => {
     expect(connect).toHaveBeenCalledWith(`mf_${"a".repeat(43)}`, "alice");
     expect(input.value).toBe("");
     expect(screen.getByText("Balance: $1.50")).toBeTruthy();
+    expect(screen.getByText("Signed in")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Approve Chat and Workspace access" }),
+    ).toBeTruthy();
   });
 });

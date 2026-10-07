@@ -51,6 +51,10 @@ Account-change events and local profile changes clear the prior renderer owner a
 
 An explicit preview projects the actual selected bot instructions, user context, model preference, linked project titles and capability preferences. Known device-specific text is excluded and preview makes no cloud write or native mutation.
 
+## Agency contact template review
+
+The packaged shared renderer offers fourteen agency contacts and fills a reviewable draft. Selecting a contact makes no account write; the existing explicit Save action owns publication.
+
 ## Cloud sidebar identity
 
 Sidebar reads and writes use only fixed cloud routes, preserve operation IDs, reject nonportable input, and discard records from a different owner.
@@ -467,10 +471,6 @@ An account change while binding is awaited prevents the old source from reaching
 
 A real private SQLite journal preserves the exact bound target after restart, never calls the binder on receipt replay, and refuses changed operation CAS or writes outside the coordinator lock.
 
-## New Chat before sign-in
-
-The shared New Chat action navigates before cloud authentication or model discovery and creates no empty cloud session. A failed Native identity check displays readable sign-in guidance without sending a turn.
-
 ## Original schedule directory byte roundtrip
 
 Real temporary script/binary files roundtrip through owner-scoped resource storage and transactional restoration, retaining executable flags, excluding credentials and preserving newer edits when a receipt is replayed after restart.
@@ -526,3 +526,11 @@ Verify multiple original jobs sharing one directory restore it once, and a real 
 ## Original schedule shared workdir conflict preflight
 
 Verify jobs resolving to one native directory cannot request different cloud snapshots or local baselines; reject before any destination bytes change.
+
+## New Chat before sign-in
+
+Failed identity checks display readable sign-in guidance and no chat operation is sent. Shared tests cover opening without identity/models and retaining the new screen after an initial session link.
+
+## Signed-in scoped authorization recovery
+
+Chat distinguishes missing scoped permission from account expiry and transport errors. Its original shared welcome action offers permission approval or network retry; retries never start device sign-in or change stored credentials.

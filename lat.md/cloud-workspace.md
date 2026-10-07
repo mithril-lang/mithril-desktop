@@ -34,6 +34,13 @@ While the shared workspace is active and connected, read-only observation refres
 
 [[src/main/native-workspace.ts#NativeWorkspace#previewImport]] includes reviewed selected SOUL/USER content and model preference, linked working-folder titles and current toolset preferences. Only opaque IDs and portable authored fields enter the preview. Absolute folder paths, credentials and execution grants are excluded; selected import leaves native files unchanged.
 
+### Agency contact templates
+
+Workspace 0.6.25-agency.1 adds fourteen contact templates across eleven agency solutions to the original shared Bot profiles screen. Selecting a template fills a draft; explicit Save retains owner-scoped synchronization.
+
+Desktop preview.36 pins the tarball built from Fund main `ed3698c1990715cf147d35ae4b5a54c92961eb30`, SHA256 `eb8095215b95d9321e49c7b692e6bc3f4a6ffcfc4cfb912e81b292727764763f`. The Registry catalog is pinned to `99b65915095b2d765aa0a595cd24db5224694527`. Instructions distinguish local JSON evaluation from planned video, traffic, financial and maritime modules. Templates grant no credentials, official identity or executor authority. Native installer publication and configured bot replies require separate receipts.
+
+
 ## Canonical catalog
 
 [[src/main/cloud-workspace.ts#CloudWorkspace#catalog]] reads public release-pinned catalog metadata only through api.mithril.fund. Both clients receive the same Mithril and Hermes registry entries, category tabs and cards. No metadata action installs code or grants permissions.
@@ -703,3 +710,23 @@ Native process claims now become portable references and restore only from the r
 Jobs sharing a working directory restore one snapshot once. All private targets are resolved before filesystem writes, and aliases must agree on the source snapshot and native baseline.
 
 [[src/main/original-schedule-workdir-resources.ts#OriginalScheduleWorkdirResources]] groups normalized absolute targets in original source order. The first job's existing operation receipt owns the shared directory transaction, so restart reuses that receipt instead of recapturing newer local edits. Conflicting manifests or baselines fail before directory writes. This remains draft resource integration; global execution ownership and automatic lifecycle installation are still required.
+
+## New Chat and automatic synchronization
+
+New Chat opens the shared empty conversation before authentication or model discovery. The first submitted message creates its canonical cloud session; ordinary navigation never exposes device migration screens.
+
+The sidebar uses the same shared history and workspace across Web and Desktop. Background owner-scoped reconciliation in [[src/renderer/src/screens/CloudWorkspace/RepositoryReplication.tsx#RepositoryReplication]] continues without an import prompt. [[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx]] displays readable sign-in guidance on failed identity checks. Existing tokens remain scoped and never gain permissions automatically.
+
+The installer candidate pins immutable workspace `0.6.24-chat.4`, SHA256 `2e32c3e3bec3927eb22310bf2ec8fab60b6b0d79fd2272e67b8cab7caf0c04cf`, built from Fund `a47f138f`. It excludes the unfinished original schedule resource/replica draft and includes only the normal Chat/migration-navigation repair on current main.
+
+Preview.34 preserves the shared editor compile action approved in preview.33, and the Web URL history fix. The producer passed 228 workspace tests; Web consumer results are tracked independently.
+
+## Current-main original schedule integration candidate
+
+The complete-file schedule draft now includes current-main Desktop authentication and shared UI updates, using one new immutable Workspace artifact.
+
+Desktop main `6e345be0a557eda54f3ed53ad087f67ea903d1c8` is merged into this draft. Workspace `0.6.26-schedules.1` was built from Fund `80e5cf576bfc787ac893dde74ac980fdd61d04a8`; its archive SHA256 is `2d80acd6c7b6f041e26190b9c5cd97ed7f693015f431e6ea2fba42b56544daee`. All compiled producer bytes were compared with its 415 archive files before dependency installation. The package and lockfile pin this exact local vendor archive.
+
+Current-main Chat distinguishes authorization, account expiry and network retry. Its initial linked session is consumed once, retaining the shared New Chat fix. The original schedule source/resource/replica adapters stay in the same candidate. Dependency consumption does not mount the automatic schedule lifecycle or grant execution custody; those integrations, production qualification and a new installer release remain unfinished. Preview.36 is the inherited main manifest version, not evidence that this draft is installed or publicly released.
+
+Qualification passed 64 selected tests across 13 files covering original source/resources, retained replica state, Chat/reconnection and account controls. Main/renderer typechecks, affected renderer lint, packaging identity, the complete Electron build and lat check passed. All installed package files were compared byte-for-byte with the vendor archive, and the lockfile version/path were verified. These local checks do not prove cross-device production synchronization or installer behavior.

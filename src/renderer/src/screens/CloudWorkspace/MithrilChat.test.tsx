@@ -131,13 +131,19 @@ describe("Default shared Mithril Chat", () => {
 // @lat: [[cloud-workspace-tests#New Chat before sign-in]]
 it("shows failed identity checks and offers account setup without submitting a turn", async () => {
   vi.mocked(window.hermesAPI.cloudChat.status).mockRejectedValueOnce(
-    new Error("Access refused"),
+    new Error(
+      "Cloud connection requires explicit chat:read authorization. Existing tokens are never upgraded automatically.",
+    ),
   );
   const connect = vi.fn();
   render(<MithrilChat profile="default" onConnectAccount={connect} />);
-  await screen.findByText("Sign in to Mithril to continue chatting.");
-  expect(screen.queryByText("Access refused")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  await screen.findByText(
+    "You are signed in. Approve Chat and Workspace access with your passkey.",
+  );
+  expect(
+    screen.queryByText("Existing tokens are never upgraded automatically."),
+  ).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Approve access" }));
   expect(connect).toHaveBeenCalledOnce();
   expect(enable).not.toHaveBeenCalled();
   expect(apply).not.toHaveBeenCalled();
@@ -219,4 +225,18 @@ it("keeps source history readable when the model provider is unavailable", async
   fireEvent.click(await screen.findByText("Original source conversation"));
   expect(select).toHaveBeenCalledWith("original-pending");
   expect(apply).not.toHaveBeenCalled();
+});
+
+// @lat: [[cloud-workspace-tests#Signed-in scoped authorization recovery]]
+it("retries transient failures without asking for another sign-in", async () => {
+  vi.mocked(window.hermesAPI.cloudChat.status).mockRejectedValueOnce(
+    Error("Network unavailable"),
+  );
+  const connect = vi.fn();
+  render(<MithrilChat profile="default" onConnectAccount={connect} />);
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Retry connection" }),
+  );
+  await screen.findByRole("combobox", { name: /Mithril model/ });
+  expect(connect).not.toHaveBeenCalled();
 });

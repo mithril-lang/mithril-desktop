@@ -65,6 +65,22 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Desktop shared workspace", () => {
+  // @lat: [[cloud-workspace-tests#Cloud workspace tests#Agency contact template review]]
+  it("loads packaged agency contacts and reviews a draft without writing to the account", async () => {
+    render(<CloudWorkspace profile="default" initialView="bots" />);
+    await screen.findByText(/Cloud synced/);
+    const templates = screen.getAllByRole("button", {
+      name: /^Review template:/,
+    });
+    expect(templates).toHaveLength(14);
+    fireEvent.click(templates[0]);
+    expect(
+      screen.getByDisplayValue("Mithril｜地域刑事・初動捜査 相談"),
+    ).toBeInTheDocument();
+    expect(
+      window.hermesAPI.cloudWorkspace.applyOperations,
+    ).not.toHaveBeenCalled();
+  });
   // @lat: [[discover#Original Discover#Shared marketplace]]
   it("opens the original five-tab marketplace and table detail from main-owned API document ports", async () => {
     const api = window.hermesAPI.cloudWorkspace;

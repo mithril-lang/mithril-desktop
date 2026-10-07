@@ -26,6 +26,7 @@ export class WalletReplication {
       store: WalletRepositoryStore;
       transport: RepositoryTransport;
       capture(): ProfileWallet[];
+      restore(before: ProfileWallet, after: ProfileWallet): void;
       guard(): void;
     },
   ) {}
@@ -113,7 +114,31 @@ export class WalletReplication {
               cp.cloud = saved;
               store.checkpoint(cp);
             }
-          } else if (!equal(cp.source, source)) {
+          } else {
+            const remote = (await editor.list(store.profile)).find(
+              (row) => row.descriptor.wallet.id === source.wallet.id,
+            );
+            if (remote && equal(remote.descriptor, source)) {
+              // Recover interruption after file restoration but before checkpoint commit.
+              cp = { source, cloud: remote };
+              store.checkpoint(cp);
+              checkpoints.set(source.wallet.id, cp);
+              continue;
+            }
+            if (
+              remote &&
+              equal(cp.source, source) &&
+              !equal(remote.descriptor, cp.source)
+            ) {
+              this.guard();
+              this.ports.restore(source.wallet, remote.descriptor.wallet);
+              this.guard();
+              cp = { source: remote.descriptor, cloud: remote };
+              store.checkpoint(cp);
+              checkpoints.set(source.wallet.id, cp);
+              continue;
+            }
+            if (equal(cp.source, source)) continue;
             cp = { source, cloud: cp.cloud };
             store.checkpoint(cp);
             const saved = await editor.save(

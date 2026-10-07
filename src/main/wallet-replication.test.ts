@@ -23,6 +23,8 @@ function fixture(): {
   remove: () => void;
   lose: () => void;
   retire: () => void;
+  local: () => unknown;
+  interruptRestore: () => void;
 } {
   const directory = realpathSync(
     mkdtempSync(join(tmpdir(), "mithril-wallet-replica-")),
@@ -32,7 +34,8 @@ function fixture(): {
     receipts = new Map<string, RepositoryReceipt>(),
     calls: string[] = [];
   let lose = false,
-    active = true;
+    active = true,
+    interruptRestore = false;
   const guard = (): void => {
     if (!active) throw Error("Account changed");
   };
@@ -95,6 +98,16 @@ function fixture(): {
       store: store(),
       transport,
       capture: () => wallets,
+      restore: (before, after) => {
+        const index = wallets.findIndex((wallet) => wallet.id === before.id);
+        if (index < 0 || wallets[index].name !== before.name)
+          throw Error("Source conflict");
+        wallets[index] = { ...wallets[index], ...after };
+        if (interruptRestore) {
+          interruptRestore = false;
+          throw Error("Interrupted after restore");
+        }
+      },
       guard,
     });
   return {
@@ -114,6 +127,10 @@ function fixture(): {
     retire: () => {
       active = false;
     },
+    local: () => wallets,
+    interruptRestore: () => {
+      interruptRestore = true;
+    },
   };
 }
 // @lat: [[cloud-workspace-tests#Wallet original publication and deletion]]
@@ -132,6 +149,59 @@ it("publishes original public metadata, captures edits and tombstones deletion w
   f.remove();
   expect(await f.engine().sync()).toEqual([]);
   expect([...f.rows.values()][0].deleted).toBe(true);
+});
+
+// @lat: [[cloud-workspace-tests#Wallet remote metadata restoration]]
+it("restores remote metadata to the original source and then publishes a later native edit", async () => {
+  const f = fixture();
+  await f.engine().sync();
+  const [id, row] = [...f.rows.entries()][0];
+  f.rows.set(id, {
+    ...row,
+    revision: 2,
+    body: {
+      ...(row.body as object),
+      wallet: {
+        ...(row.body as { wallet: object }).wallet,
+        name: "Web rename",
+      },
+    },
+  });
+  await f.engine().sync();
+  expect(f.local()).toMatchObject([
+    { name: "Web rename", encryptedRecoveryPhrase: "private-ciphertext" },
+  ]);
+  expect(f.calls).toHaveLength(1);
+  f.changeName("Desktop rename");
+  await f.engine().sync();
+  expect(f.rows.get(id)).toMatchObject({
+    revision: 3,
+    body: { wallet: { name: "Desktop rename" } },
+  });
+});
+
+// @lat: [[cloud-workspace-tests#Wallet interrupted remote restoration]]
+it("recovers after original file restoration but before checkpoint acceptance without republishing the remote edit", async () => {
+  const f = fixture();
+  await f.engine().sync();
+  const [id, row] = [...f.rows.entries()][0];
+  f.rows.set(id, {
+    ...row,
+    revision: 2,
+    body: {
+      ...(row.body as object),
+      wallet: {
+        ...(row.body as { wallet: object }).wallet,
+        name: "Web rename",
+      },
+    },
+  });
+  f.interruptRestore();
+  await expect(f.engine().sync()).rejects.toThrow("Interrupted after restore");
+  await f.engine().sync();
+  expect(f.local()).toMatchObject([{ name: "Web rename" }]);
+  expect(f.calls).toHaveLength(1);
+  expect(f.rows.get(id)?.revision).toBe(2);
 });
 // @lat: [[cloud-workspace-tests#Wallet retained acceptance recovery]]
 it("recovers creation and update receipts after reopening the real SQLite journal", async () => {

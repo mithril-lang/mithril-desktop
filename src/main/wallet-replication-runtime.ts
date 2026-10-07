@@ -18,7 +18,7 @@ import { listWallets } from "./wallet-store";
 import { WalletRepositoryStore } from "./wallet-repository-store";
 import { WalletReplication } from "./wallet-replication";
 import { WorkspaceReplicationLoop } from "./original-schedule-replication-loop";
-import { captureWalletSource } from "./wallet-source";
+import { captureWalletSource, restoreWalletSource } from "./wallet-source";
 import type { WalletSyncResult } from "@mithril/workspace/desktop-wallet-types";
 let lane: Promise<void> = Promise.resolve();
 function serial<T>(operation: () => Promise<T>): Promise<T> {
@@ -84,6 +84,13 @@ function engine(
     },
     capture: () =>
       captureWalletSource(join(source.root, "wallets.json"), guard),
+    restore: (before, after) =>
+      restoreWalletSource(
+        join(source.root, "wallets.json"),
+        before,
+        after,
+        guard,
+      ),
   });
 }
 /** Same identity and data-only poller used by original schedules; no screen or migration toggle. */

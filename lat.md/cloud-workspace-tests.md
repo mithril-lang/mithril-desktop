@@ -1037,3 +1037,15 @@ A single original wallet file snapshot projects public fields only and refuses m
 ## Wallet source replacement fencing
 
 Dangling links, account retirement and source replacement after capture refuse publication so an unsafe source cannot erase the cloud wallet list.
+
+## Wallet remote metadata restoration
+
+A remote name edit restores the original working record without re-publication; a subsequent native edit uses the restored cloud revision.
+
+## Wallet interrupted remote restoration
+
+Interruption after the original record was restored but before its checkpoint committed recovers on restart without a duplicate cloud revision.
+
+## Wallet original custody preservation
+
+Cloud restoration changes only the wallet name, preserving exact native ciphertext and other records while refusing signing identity replacement and concurrent native edits.

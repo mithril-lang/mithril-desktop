@@ -4,11 +4,13 @@ import {
   rmSync,
   symlinkSync,
   writeFileSync,
+  readFileSync,
+  readdirSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
-import { captureWalletSource } from "./wallet-source";
+import { captureWalletSource, restoreWalletSource } from "./wallet-source";
 const directories: string[] = [];
 afterEach(() =>
   directories
@@ -70,6 +72,54 @@ it("projects one original snapshot and excludes ciphertext, refusing malformed o
   expect(() => captureWalletSource(f.path, () => {})).toThrow(
     "Invalid wallet source",
   );
+});
+
+// @lat: [[cloud-workspace-tests#Wallet original custody preservation]]
+it("restores only the name, preserving exact native ciphertext and other records while refusing identity changes and concurrent edits", () => {
+  const f = fixture();
+  f.save([f.wallet, { ...f.wallet, id: "other", name: "Other" }]);
+  const [before] = captureWalletSource(f.path, () => {});
+  restoreWalletSource(
+    f.path,
+    before,
+    { ...before, name: "Web rename" },
+    () => {},
+  );
+  expect(JSON.parse(readFileSync(f.path, "utf8")).wallets).toEqual([
+    { ...f.wallet, name: "Web rename" },
+    { ...f.wallet, id: "other", name: "Other" },
+  ]);
+  const exact = readFileSync(f.path);
+  expect(() =>
+    restoreWalletSource(
+      f.path,
+      { ...before, name: "Web rename" },
+      { ...before, address: "0x0000000000000000000000000000000000000001" },
+      () => {},
+    ),
+  ).toThrow("cannot replace native identity");
+  expect(() =>
+    restoreWalletSource(
+      f.path,
+      before,
+      { ...before, name: "Stale edit" },
+      () => {},
+    ),
+  ).toThrow("source conflict");
+  expect(readFileSync(f.path)).toEqual(exact);
+  let calls = 0;
+  expect(() =>
+    restoreWalletSource(
+      f.path,
+      { ...before, name: "Web rename" },
+      { ...before, name: "Late cloud" },
+      () => {
+        if (++calls === 3) f.save([{ ...f.wallet, name: "Native edit" }]);
+      },
+    ),
+  ).toThrow("source conflict");
+  expect(captureWalletSource(f.path, () => {})[0].name).toBe("Native edit");
+  expect(readdirSync(f.directory)).toEqual(["wallets.json"]);
 });
 // @lat: [[cloud-workspace-tests#Wallet source replacement fencing]]
 it("refuses dangling links and account or file replacement after reading instead of publishing an empty source", () => {

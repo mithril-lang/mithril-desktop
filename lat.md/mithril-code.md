@@ -59,3 +59,9 @@ The main process advertises `mithril-language-v1` on validated Chat checkpoints.
 Preview.32 pins the exact workspace 0.6.20 archive after merging the concurrent main changes. Web and native coding consumers share the accepted tool runner and source/GitHub editor; consumer transport and authority stay separate. Preview.30 and preview.31 remain unpublished drafts.
 
 Preview.33 pins workspace0.6.23: the shared Mithril compile control uses the existing action styling and retains the concurrent repository-refactor improvements. Code Web confines collapsed navigation CSS to its sidebar so editor filenames stay visible. The public Chat report confirms Web generation/edited compilation; native activation and live generation remain separate checks.
+
+## Browser code child tools
+
+The canonical Chat uses the shared v2 Browser tool broker. Credentials stay in main; isolated JS/Python can request only fixed server reads under the initiating account, turn and checkpoint lease.
+
+[[src/main/cloud-chat.ts#CloudChat]] validates child IDs, argument/output bounds and matching receipts, pins the protocol in main, and retains inference scope. [[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx#MithrilChat]] passes the shared broker to the opaque Kuro frame. API-only or native commands cannot be introduced through this child operation. App bridge assets and installed-client execution are separate release gates.

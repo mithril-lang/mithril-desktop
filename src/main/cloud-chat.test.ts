@@ -228,7 +228,7 @@ describe("Canonical Desktop chat transport", () => {
     expect(checkpoints).toHaveLength(1);
     expect(JSON.parse(String(checkpoints[0]?.[1]?.body))).toEqual({
       ...body,
-      toolProtocol: "mithril-language-v1",
+      toolProtocol: "mithril-browser-tools-v2",
     });
   });
   it("discards late prior-account data without disabling a newly enabled account", async () => {
@@ -255,5 +255,81 @@ describe("Canonical Desktop chat transport", () => {
     resolve(f.response({ schemaVersion: 1, userId: "a", sessions: [session] }));
     await expect(pending).rejects.toThrow("stale");
     expect((await f.auth.status()).enabled).toBe(true);
+  });
+});
+
+describe("owner-bound browser code children", () => {
+  it("allows only fixed read children under the initiating inference authorization and matches child receipts", async () => {
+    const f = fixture(["chat:read", "chat:write", "inference"]);
+    await f.auth.enable();
+    const body = {
+      action: "child",
+      turnId: "parent-turn",
+      executionToken: "a".repeat(64),
+      round: 0,
+      parentCallId: "parent-call",
+      childId: "child-call",
+      name: "tool_catalog",
+      args: {},
+    };
+    f.fetcher.mockImplementation(async (url: string) =>
+      url.endsWith("/v1/me")
+        ? f.response({
+            via: "api_token",
+            user: { id: "a" },
+            scopes: ["chat:read", "chat:write", "inference"],
+          })
+        : f.response({
+            schemaVersion: 1,
+            userId: "a",
+            phase: "child_result",
+            round: 0,
+            childResult: {
+              id: "child-call",
+              receipt: { isolation: "server-mithril-tools-v1" },
+              result: { categories: 20 },
+              files: {},
+            },
+          }),
+    );
+    const result = await f.client.browserStep("s1", body);
+    expect(result.childResult?.id).toBe("child-call");
+    const sent = f.fetcher.mock.calls.find((call) =>
+      call[0].endsWith("/browser"),
+    );
+    expect(JSON.parse(String(sent?.[1]?.body))).toEqual({
+      ...body,
+      toolProtocol: "mithril-browser-tools-v2",
+    });
+    for (const patch of [
+      { name: "terminal" },
+      { name: "memory_write" },
+      { parentCallId: "../path" },
+      { args: [] },
+      { args: { text: "x".repeat(16001) } },
+      { args: { text: "あ".repeat(6000) } },
+      { results: [] },
+    ])
+      await expect(
+        f.client.browserStep("s1", { ...body, ...patch }),
+      ).rejects.toThrow("child");
+    f.fetcher.mockImplementation(async (url: string) =>
+      url.endsWith("/v1/me")
+        ? f.response({
+            via: "api_token",
+            user: { id: "a" },
+            scopes: ["chat:read", "chat:write", "inference"],
+          })
+        : f.response({
+            schemaVersion: 1,
+            userId: "a",
+            phase: "child_result",
+            round: 0,
+            childResult: { id: "other", receipt: {}, result: [], files: {} },
+          }),
+    );
+    await expect(f.client.browserStep("s1", body)).rejects.toThrow(
+      "Invalid child tool response",
+    );
   });
 });

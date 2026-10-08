@@ -45,6 +45,7 @@ import {
 } from "electron";
 import { extname, join } from "path";
 import { assertCloudWorkspaceSender } from "../cloud-workspace-sender";
+import { endpointRuntime, mutateEndpoint } from "../endpoint/service";
 import { nativeWorkspace } from "../native-workspace-runtime";
 import {
   cloudWorkspace,
@@ -1525,6 +1526,50 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("cloud-workspace-security", (event) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.getSecurity();
+  });
+  ipcMain.handle("endpoint-status", async (event) => {
+    trustedWorkspaceSender(event);
+    return (await endpointRuntime()).status();
+  });
+  ipcMain.handle("endpoint-enabled", (event, enabled: unknown) => {
+    trustedWorkspaceSender(event);
+    if (typeof enabled !== "boolean") throw Error("Expected a boolean");
+    return mutateEndpoint((runtime) => runtime.setEnabled(enabled));
+  });
+  ipcMain.handle("endpoint-folder-add", (event) => {
+    trustedWorkspaceSender(event);
+    return mutateEndpoint(async (runtime) => {
+      const win = getMainWindow();
+      if (!win) throw Error("Main window unavailable");
+      const picked = await dialog.showOpenDialog(win, {
+        properties: ["openDirectory"],
+        title: "Select a folder to monitor locally",
+      });
+      if (picked.canceled || !picked.filePaths[0]) return runtime.status();
+      return runtime.addFolder(picked.filePaths[0]);
+    });
+  });
+  ipcMain.handle("endpoint-folder-remove", (event, folder: unknown) => {
+    trustedWorkspaceSender(event);
+    if (typeof folder !== "string") throw Error("Expected a selected folder");
+    return mutateEndpoint((runtime) => runtime.removeFolder(folder));
+  });
+  ipcMain.handle("endpoint-file-scan", (event) => {
+    trustedWorkspaceSender(event);
+    return mutateEndpoint(async (runtime) => {
+      const win = getMainWindow();
+      if (!win) throw Error("Main window unavailable");
+      const picked = await dialog.showOpenDialog(win, {
+        properties: ["openFile"],
+        title: "Select a file to scan locally",
+      });
+      if (picked.canceled || !picked.filePaths[0]) return runtime.status();
+      return runtime.scanFile(picked.filePaths[0]);
+    });
+  });
+  ipcMain.handle("endpoint-definitions-update", (event) => {
+    trustedWorkspaceSender(event);
+    return mutateEndpoint((runtime) => runtime.updateDefinitions());
   });
   ipcMain.handle("cloud-workspace-security-submit", (event, operation) => {
     trustedWorkspaceSender(event);

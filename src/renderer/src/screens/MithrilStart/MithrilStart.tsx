@@ -19,6 +19,7 @@ interface MithrilStartProps {
   profile?: string;
   /** Optional: continue into the shared API-backed workspace. */
   onOpenWorkspace: () => void;
+  onOpenProtection?: () => void;
 }
 
 export function issueText(code: string, ja: boolean): string {
@@ -99,6 +100,7 @@ function MithrilStart({
   initiallyConnected,
   profile,
   onOpenWorkspace,
+  onOpenProtection,
 }: MithrilStartProps): React.JSX.Element {
   const { locale } = useI18n();
   const ja = locale === "ja";
@@ -377,6 +379,18 @@ function MithrilStart({
         >
           {l("Open Mithril Console", "Mithril Console を開く")}
         </button>
+        {onOpenProtection && (
+          <button
+            type="button"
+            className="onboard-btn onboard-btn-glass"
+            onClick={onOpenProtection}
+          >
+            {l(
+              "Protect this device (no sign-in required)",
+              "この端末を保護（ログイン不要）",
+            )}
+          </button>
+        )}
       </OnboardHero>
     );
   }

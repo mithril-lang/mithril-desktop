@@ -1440,3 +1440,13 @@ Desktop candidate preview.60 requires a live Mithril account identity before mou
 The synchronization candidate retains current-main verified sign-in, entry sidebar styles, locale typography, device care and endpoint lifecycle while preserving the original schedule/history replication services.
 
 Both compiled sidebar and notice geometry checks run after one renderer build in CI. Cloud account gating remains unchanged; optional local endpoint protection still opens from the original start screen without admitting the cloud workspace. Candidate validation and public/installed synchronization remain distinct release gates.
+
+
+### Browser-first shared chat bootstrap (draft)
+
+Preview.61 uses shared Workspace .56 and avoids automatic remote compute inspection when ordinary Chat is using browser JS/Python tools. Explicit runtime inspection and sandbox authorization remain unchanged.
+
+The same canonical component is compiled by Web and Desktop. All 441 shared tests pass after a first full run hit the existing profile conflict lookup deadline under simultaneous Native load; the isolated nine-profile suite also passes. Full Native qualification and published API inventory protocols remain required before release. The current public health read exposes none of the four required inventory protocols, so this candidate must not replace the published installer yet.
+
+
+Candidate qualification: shared .56 matches all 465 producer/vendor/dependency files, Native types/build, packaging (707 runtime files) and compiled sidebar/notice geometry pass. Node 22 full tests reached 2,930 passes with three failures; provider-key isolation fixes one, while real attachment restoration cases still exceed their unchanged five-second deadlines even in a serial targeted rerun. These failures are unresolved release gates. Config-health fixtures now explicitly clear the tested host OpenRouter environment credential and restore it afterwards; no real credential is read or logged by that isolation change.

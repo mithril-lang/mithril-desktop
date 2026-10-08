@@ -463,3 +463,19 @@ Requests bound to a captured main context refuse same-owner profile, credential 
 ## Browser context switch before send
 
 The actual CloudChat and CloudWorkspace adapters send no Browser checkpoint when the captured context is retired and explicitly re-enabled before transport admission.
+
+## Mounted Browser acknowledgement retirement
+
+The actual mounted Cloud Chat and shared runner cannot start an acknowledged Browser turn after hidden, account, profile, initial-session or unmount retirement. IPC replies are fixtures; no real sandbox or installed execution is claimed.
+
+## Mounted Browser execution retirement
+
+An active shared runner is aborted when the actual Cloud Chat consumer retires. Retained child brokers and late executor results cannot send checkpoints; the fixture Kuro host is disposed when its pending call returns.
+
+## Mounted Browser current child completion
+
+A current mounted consumer sends one child, acknowledges the parent result and ends its runner. Retained child authority cannot send after normal completion; the real shared runner is used with fixture IPC and executor.
+
+## Mounted Browser selected conversation retirement
+
+Opening a new conversation through the actual shared Chat UI aborts its old runner and withdraws retained child authority. A late executor result sends no checkpoint to the old conversation.

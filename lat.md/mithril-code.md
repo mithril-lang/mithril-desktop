@@ -71,3 +71,9 @@ The canonical Chat uses the shared v2 Browser tool broker. Credentials stay in m
 Browser commands retain their captured main owner, profile, credential fingerprint and epoch through authentication. A changed context is refused before POST, even after explicit same-owner reconnection; post-response checks remain separate.
 
 [[src/main/cloud-workspace.ts#CloudWorkspace#authorizedRequest]] compares the caller's captured context after authenticated session discovery and before the fixed request. [[src/main/cloud-chat.ts#CloudChat#browserStep]] supplies that context for every Browser checkpoint, including child dispatch. This fence grants no human consent, adds no retry and does not connect Desktop to Web human grants.
+
+## Browser consumer retirement
+
+Cloud Chat retains a committed execution scope through IPC acknowledgement. Hidden, owner, epoch, profile, initial-session and unmount changes retire it; conversation selection also retires active runners and delayed acknowledgements.
+
+The main pre-dispatch identity fence remains independent. The renderer stops the shared runner and refuses new applies from retired scope; already-sent operations return their acknowledgement without starting local execution after retirement. Claimed IDs remain consumed. Abort withdraws future child authority; it does not prove an already-dispatched remote effect stopped. Native human grant integration and installed execution remain separate work.

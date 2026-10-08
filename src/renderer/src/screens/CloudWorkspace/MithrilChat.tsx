@@ -174,18 +174,40 @@ export default function MithrilChat({
       ),
     [profile],
   );
-  // Account changes revoke active work while keeping consumed operation IDs claimed.
-  useEffect(() => () => toolRunner.stop(), [toolRunner, accountId, epoch]);
+  // Retire both active execution and acknowledged work still awaiting IPC.
+  const toolAuthority = useMemo(
+    () => ({
+      current: false,
+      accountId,
+      epoch,
+      runner: toolRunner,
+      visible,
+      sessionId: initialSessionId ?? "",
+      revision: 0,
+    }),
+    [toolRunner, accountId, epoch, initialSessionId, visible],
+  );
+  useEffect(() => {
+    toolAuthority.current = toolAuthority.visible && !!toolAuthority.accountId;
+    return () => {
+      toolAuthority.current = false;
+      toolAuthority.runner.stop();
+    };
+  }, [toolAuthority]);
   const chatTransport = useMemo<SessionTransport>(
     () => ({
       ...window.hermesAPI.cloudChat,
       apply: async (id, operation) => {
+        if (!toolAuthority.current)
+          throw Error("Chat context retired; operation not dispatched");
+        const revision = toolAuthority.revision;
         const response = await window.hermesAPI.cloudChat.apply(id, operation);
-        toolRunner.start(id, operation, response);
+        if (toolAuthority.current && toolAuthority.revision === revision)
+          toolRunner.start(id, operation, response);
         return response;
       },
     }),
-    [toolRunner],
+    [toolRunner, toolAuthority],
   );
   return (
     <div>
@@ -221,6 +243,13 @@ export default function MithrilChat({
         onSidebarProjects={onSidebarProjects}
         key={`${profile}:${initialSessionId ?? ""}`}
         initialSessionId={initialSessionId}
+        onSessionSelected={(id) => {
+          if (toolAuthority.sessionId !== id) {
+            toolAuthority.sessionId = id;
+            toolAuthority.revision++;
+            toolRunner.stop();
+          }
+        }}
         autoConnect
         browserTools
         onOpenCodeProject={onOpenCodeProject}

@@ -2,6 +2,8 @@
 
 Desktop runtime values and downloaded bootstrap code cross explicit trust boundaries before rendering or execution.
 
+[[device-care]] adds bounded local virus scans and storage maintenance, with executor-enforced cleanup authority and measured coverage separate from runtime hardening.
+
 ## Verified Agent bootstraps
 
 Desktop verifies commit-pinned Mithril Agent bootstraps on Unix and Windows before executing the tested revision. Any download, checksum, or installer failure fails the operation even when older binaries exist.

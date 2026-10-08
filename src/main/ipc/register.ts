@@ -53,6 +53,7 @@ import {
 import { randomUUID } from "crypto";
 import { readdir, readFile, stat } from "fs/promises";
 import { getActiveProfileNameSync } from "../utils";
+import { registerDeviceCareIpc } from "../device-care/ipc";
 import type { Attachment } from "../../shared/attachments";
 import type { SessionModelOverride } from "../../shared/model-override";
 import type { SessionLocation } from "../../shared/session-location";
@@ -798,6 +799,7 @@ export function registerIpcHandlers(context: IpcContext): void {
     openExternalUrl,
   } = context;
   const mainWindow = getMainWindow();
+  registerDeviceCareIpc(getMainWindow);
   let agentInstallInProgress = false;
   let agentInstallAbort: AbortController | null = null;
 

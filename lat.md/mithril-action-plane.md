@@ -2,6 +2,8 @@
 
 Mithril Desktop projects bounded action authority from the Mithril Agent fork instead of treating an upstream command string as the complete approval contract.
 
+[[device-care#Current implementation]] enforces one-use local cleanup plans independently of the dormant Agent Action API, with native approval and private recovery on failure.
+
 The Desktop remains a projection and response surface. Server and Agent policy must independently enforce the approved plan, capability lease, expiry, budget, and receipt; renderer validation alone never grants authority.
 
 The canonical runtime boundary is the public `mithril-lang/mithril-agent` fork. Its gateway identifies itself as `mithril-agent`, but advertises no Action Contract until server-side enforcement exists. [[src/shared/agent-capabilities.ts#buildAgentCapabilitySnapshot]] requires both that distribution and `mithril.action/v1` before it marks an Action runtime trusted, so this first slice deliberately remains fail-closed.

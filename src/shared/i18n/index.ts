@@ -11,6 +11,8 @@ import {
 import type { AppLocale } from "./types";
 import commonEn from "./locales/en/common";
 import navigationEn from "./locales/en/navigation";
+import deviceCareEn from "./locales/en/device-care";
+import deviceCareJa from "./locales/ja/device-care";
 import discoverEn from "./locales/en/discover";
 import welcomeEn from "./locales/en/welcome";
 import setupEn from "./locales/en/setup";
@@ -274,6 +276,7 @@ export const resources = {
     translation: {
       common: commonEn,
       navigation: navigationEn,
+      deviceCare: deviceCareEn,
       discover: discoverEn,
       welcome: welcomeEn,
       setup: setupEn,
@@ -503,6 +506,7 @@ export const resources = {
     translation: {
       common: commonJa,
       navigation: navigationJa,
+      deviceCare: deviceCareJa,
       welcome: welcomeJa,
       setup: setupJa,
       chat: chatJa,

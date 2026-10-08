@@ -1,4 +1,13 @@
 export default {
+  indexReuse: "インデックスを再利用",
+  indexFolders: "フォルダー一覧",
+  indexFiles: "ファイルの計測値",
+  indexChecked: "メタデータを確認",
+  indexUpdated: "分析の更新日時",
+  indexNote:
+    "変更通知がないファイルは最大 60 秒前の計測値を再利用します。再起動後・期限切れ・監視できない範囲はメタデータを確認します。フォルダーの詳細分析では再計測し、cleanup 前は必ず実ファイルを再確認します。",
+  indexChanged:
+    "分析中に変更がありました。対象フォルダーを再計測してください。",
   folderTrail: "フォルダーの階層",
   upFolder: "親フォルダーへ",
   measured: "測定した範囲",

@@ -262,6 +262,24 @@ export default function StorageVisualization({
           {text("partialMap")}
         </p>
       )}
+      {report.index && (
+        <div className="diskspace-coverage" role="status">
+          <p>
+            {text("indexReuse")}: {report.index.reusedDirectories}{" "}
+            {text("indexFolders")}
+            {" · "}
+            {report.index.reusedFiles} {text("indexFiles")}
+            {" · "}
+            {text("indexChecked")}: {report.index.checkedFiles}
+          </p>
+          <p>{text("indexNote")}</p>
+          <p>
+            {text("indexUpdated")}:{" "}
+            {new Date(report.observedAt).toLocaleString()}
+          </p>
+          {report.index.changedDuringAnalysis && <p>{text("indexChanged")}</p>}
+        </div>
+      )}
       <nav className="diskspace-breadcrumb" aria-label={text("folderTrail")}>
         {ancestors.map((node) => (
           <button

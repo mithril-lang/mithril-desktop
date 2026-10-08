@@ -30,6 +30,7 @@ describe("device-care scoped storage executor", () => {
     service = new DeviceCareStorage(root, parent);
   });
   afterEach(async () => {
+    service.dispose();
     vi.useRealTimers();
     await rm(parent, { recursive: true, force: true });
   });

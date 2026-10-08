@@ -1,4 +1,13 @@
 export default {
+  indexReuse: "Index reused",
+  indexFolders: "folder listings",
+  indexFiles: "file measurements",
+  indexChecked: "Metadata checked",
+  indexUpdated: "Analysis updated",
+  indexNote:
+    "Unchanged watched files use measurements up to 60 seconds old. Restart, expired leases and unavailable watches require metadata checks. Detailed folder analysis forces a fresh measurement. Cleanup always revalidates files.",
+  indexChanged:
+    "Changes arrived during analysis; measure the affected folder again.",
   folderTrail: "Folder navigation",
   upFolder: "Parent folder",
   measured: "Measured scope",

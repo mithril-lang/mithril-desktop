@@ -369,6 +369,6 @@ export function registerDeviceCareIpc(
   app.on("before-quit", () => {
     monitor.stop();
     protection.cancel();
-    storage.cancel();
+    storage.dispose();
   });
 }

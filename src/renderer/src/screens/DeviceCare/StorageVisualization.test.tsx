@@ -42,6 +42,14 @@ it("keeps volume and partial folder measures distinct and exposes group details"
     await import("../../../../shared/i18n/locales/en/device-care");
   const report = {
     root: "/selected",
+    index: {
+      reusedDirectories: 1,
+      enumeratedDirectories: 0,
+      reusedFiles: 1,
+      checkedFiles: 1,
+      changedDuringAnalysis: true,
+      maxAgeSeconds: 60,
+    },
     observedAt: "2026-10-08T00:00:00Z",
     status: "partial" as const,
     capacity: 10000,
@@ -66,6 +74,8 @@ it("keeps volume and partial folder measures distinct and exposes group details"
   render(<StorageVisualization report={report} />);
   expect(screen.getByRole("img", { name: /80.0%/ })).toBeTruthy();
   expect(screen.getByText(en.partialMap)).toBeTruthy();
+  expect(screen.getByText(en.indexNote)).toBeTruthy();
+  expect(screen.getByText(en.indexChanged)).toBeTruthy();
   const group = screen.getAllByRole("button", { name: /projects/ })[0];
   fireEvent.click(group);
   expect(group.getAttribute("aria-pressed")).toBe("true");

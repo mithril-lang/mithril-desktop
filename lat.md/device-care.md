@@ -84,6 +84,26 @@ Each finding carries provider finding ID, engine/signature version where availab
 
 Storage analysis is read-only and produces explicit cleanup candidates; deletion always executes a separately reviewed and revalidated plan.
 
+## Incremental storage index
+
+[[src/main/device-care/storage-index.ts#StorageIndex]] reuses unchanged directory listings and short-lived file measurements while keeping cleanup on fresh native checks.
+
+The local 0600 atomic index persists names and directory identity/timestamps only, limited to 20,000 entries, 2,000 directories and 4 MiB. Restart can reuse a listing after fresh directory identity, realpath and timestamp checks but revalidates every child. Only single-link regular files under an uninterrupted native directory watcher may reuse in-memory metadata, for at most 60 seconds. Directories and hard links always receive fresh lstat. At most 256 watchers run while Desktop is open; unavailable/failed watches and expired leases fall back to child metadata checks. Watch notifications are hints, not a lossless change journal. The timed lease and explicit detailed analysis cover missed/coalesced events; no instant or whole-disk freshness is claimed.
+
+Dirty directories are enumerated again. Directory replacement recreates the inode-bound watcher; interrupted listings are not persisted. Changes during analysis mark coverage partial. Reports expose enumeration/reuse/metadata-check counts, cache age policy and update time. Detailed report-ID analysis forces fresh enumeration and file metadata. Temporary-media analysis bypasses the index and cleanup still revalidates native identity, ownership and digest. App exit releases watchers. No index content is uploaded.
+
+### Reuses unchanged files and refreshes changed folders
+
+Warm repeats avoid directory enumeration and unchanged file metadata reads; file-content changes refresh the dirty folder while preserving reuse for an unchanged sibling. Focused analysis forces a fresh measurement and cleanup bypasses the cache.
+
+### Restarts validate metadata and reject corrupt indexes
+
+Restart reuses only validated directory listings, never persisted file measurements. Private permissions and corrupt-index fallback preserve the read-only measurement boundary.
+
+### Falls back without monitoring and expires leases
+
+Unavailable watchers and expired leases always revalidate child metadata, even when directory modification times did not change.
+
 First scope: Desktop-owned disposable media/temp files and verified regenerable caches, plus user-selected folders for analysis. Show filesystem capacity, measured allocated bytes where supported, unavailable areas, and estimate limitations for shared blocks, hard links, sparse files, and snapshots. Existing [[src/main/media.ts#cleanupTempMediaFiles]] is an internal temp-file cleanup implementation, not whole-device maintenance; migrate its applicable user-visible behavior through the new service without changing its scope implicitly.
 
 | Candidate class                                                         | Default behavior                                                                            |
@@ -226,6 +246,6 @@ The accessible treemap preserves measured logical area, offers breadcrumbs and p
 
 ### Cause investigation and Registry workflow
 
-The inspector separates path-based hypotheses from verified growth. Registry's mithril-diskspace-management 1.1.0 audits metadata, compares complete same-scope observations and generates a review ledger.
+The inspector separates path-based hypotheses from verified growth. Registry's mithril-diskspace-management 1.2.0 audits metadata, reuses validated directory listings, compares fresh complete same-scope observations and generates a review ledger.
 
 Application data, sources, histories and recovery remain protected; only existing reviewed temporary-media cleanup executes here.

@@ -32,6 +32,14 @@ export interface StorageNode {
   files: number;
 }
 export interface StorageReport {
+  index?: {
+    reusedDirectories: number;
+    enumeratedDirectories: number;
+    reusedFiles: number;
+    checkedFiles: number;
+    changedDuringAnalysis: boolean;
+    maxAgeSeconds: number;
+  };
   tree?: StorageNode[];
   groups: StorageGroup[];
   root: string;

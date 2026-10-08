@@ -12,7 +12,8 @@ import {
 } from "fs/promises";
 import { basename, dirname, join, resolve, relative, sep } from "path";
 import { createHash, randomUUID } from "crypto";
-import type { Stats, Dir } from "fs";
+import type { Stats } from "fs";
+import { StorageIndex, type StorageCursor } from "./storage-index";
 import type {
   CleanupPlan,
   CleanupReceipt,
@@ -111,17 +112,31 @@ export class DeviceCareStorage {
   >();
   private busy = false;
   private cancelRequested = false;
+  private index: StorageIndex;
   constructor(
     private readonly tempRoot: string,
     private readonly stagingParent: string,
     private readonly entryLimit = LIMIT,
-  ) {}
+  ) {
+    this.index = new StorageIndex(
+      join(stagingParent, "device-care-storage-index.json"),
+    );
+  }
+
+  dispose(): void {
+    this.cancel();
+    this.index.dispose();
+  }
 
   cancel(): void {
     this.cancelRequested = true;
   }
 
-  async analyze(input: string, cleanupScope: boolean): Promise<StorageReport> {
+  async analyze(
+    input: string,
+    cleanupScope: boolean,
+    force = false,
+  ): Promise<StorageReport> {
     if (this.busy) throw new Error("Device care is busy");
     this.busy = true;
     this.cancelRequested = false;
@@ -174,6 +189,9 @@ export class DeviceCareStorage {
       }
       this.rootIdentity = identity(rootStat);
       this.cleanupRoot = report.cleanupScope ? root : null;
+      // Cleanup always observes fresh native metadata and digests.
+      const useIndex = !cleanupScope;
+      if (useIndex) await this.index.begin(force);
       const rootNode: StorageNode = {
         id: randomUUID(),
         parentId: null,
@@ -193,9 +211,9 @@ export class DeviceCareStorage {
         path: string;
         depth: number;
         node: StorageNode;
-        cursor?: Dir;
+        cursor?: StorageCursor;
       }[] = [{ path: root, depth: 0, node: rootNode }];
-      const openCursors = new Set<Dir>();
+      const openCursors = new Set<StorageCursor>();
       const seenFiles = new Set<string>();
       const groups = new Map<string, StorageGroup>();
       const start = Date.now();
@@ -219,7 +237,9 @@ export class DeviceCareStorage {
                 report.skipped++;
                 continue;
               }
-              entry.cursor = await opendir(entry.path);
+              entry.cursor = useIndex
+                ? await this.index.openDirectory(entry.path, current)
+                : await opendir(entry.path);
               openCursors.add(entry.cursor);
             }
             let exhausted = false;
@@ -242,7 +262,9 @@ export class DeviceCareStorage {
               const depth = entry.depth + 1;
               let stat: Stats;
               try {
-                stat = await lstat(filePath);
+                stat = useIndex
+                  ? await this.index.stat(filePath)
+                  : await lstat(filePath);
               } catch {
                 report.skipped++;
                 continue;
@@ -407,6 +429,11 @@ export class DeviceCareStorage {
         : report.skipped
           ? "partial"
           : "complete";
+      if (useIndex) {
+        report.index = await this.index.finish();
+        if (report.index.changedDuringAnalysis && report.status === "complete")
+          report.status = "partial";
+      }
       return report;
     } finally {
       this.busy = false;
@@ -425,7 +452,7 @@ export class DeviceCareStorage {
       (await realpath(selected.path)) !== selected.path
     )
       throw new Error("Folder changed; analyze again");
-    return this.analyze(selected.path, false);
+    return this.analyze(selected.path, false, true);
   }
 
   plan(ids: unknown): CleanupPlan {

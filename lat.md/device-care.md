@@ -197,3 +197,16 @@ Inspection requires explicit native scope, never overlaps jobs, reports busy int
 ### Confines vendor credentials
 
 Vendor reads use one fixed official regional GET, reject redirects and malformed responses, never follow arbitrary pagination links and refuse weak OS keyrings.
+
+## Disk space visualization
+Storage separates whole-volume capacity from bounded folder composition, with coverage labels and keyboard-accessible details.
+
+[[src/main/device-care/storage.ts#DeviceCareStorage]] retains top 12 groups plus Other, logical bytes and deduplicated allocated bytes within existing analysis bounds.
+
+[[src/renderer/src/screens/DeviceCare/StorageVisualization.tsx]] shows separate volume and scope charts. Home analysis is read-only; group selection grants no cleanup authority.
+
+### Preserves measured chart totals
+Folder groups retain file counts, logical bytes and allocated bytes across the Other bucket. Symlinks remain excluded.
+
+### Reports valid volume shares
+Volume shares reject invalid denominators and never use selected-folder totals as whole-volume occupancy.

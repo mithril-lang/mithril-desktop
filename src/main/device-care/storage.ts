@@ -1,7 +1,7 @@
 import { constants } from "fs";
 import {
   lstat,
-  readdir,
+  opendir,
   realpath,
   statfs,
   open,
@@ -10,7 +10,7 @@ import {
   rmdir,
   chmod,
 } from "fs/promises";
-import { basename, dirname, join, resolve } from "path";
+import { basename, dirname, join, resolve, relative, sep } from "path";
 import { createHash, randomUUID } from "crypto";
 import type { Stats } from "fs";
 import type {
@@ -18,6 +18,7 @@ import type {
   CleanupReceipt,
   StorageCandidate,
   StorageReport,
+  StorageGroup,
 } from "../../shared/device-care";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -134,6 +135,7 @@ export class DeviceCareStorage {
         skipped: 0,
         candidates: [],
         largest: [],
+        groups: [],
         cleanupScope,
         ...(await freeSpace(root)),
       };
@@ -166,6 +168,7 @@ export class DeviceCareStorage {
       this.cleanupRoot = report.cleanupScope ? root : null;
       const queue = [{ path: root, depth: 0 }];
       const seenFiles = new Set<string>();
+      const groups = new Map<string, StorageGroup>();
       const start = Date.now();
       let visited = 0;
       while (
@@ -191,18 +194,40 @@ export class DeviceCareStorage {
               report.skipped++;
               continue;
             }
-            const children = await readdir(entry.path);
-            const room = Math.max(0, LIMIT - visited - queue.length);
-            for (const child of children.slice(0, room))
+            const children = await opendir(entry.path);
+            for await (const child of children) {
+              if (
+                visited + queue.length >= LIMIT ||
+                Date.now() - start >= 15000 ||
+                this.cancelRequested
+              ) {
+                report.skipped++;
+                break;
+              }
               queue.push({
-                path: join(entry.path, child),
+                path: join(entry.path, child.name),
                 depth: entry.depth + 1,
               });
-            report.skipped += Math.max(0, children.length - room);
+            }
           } else if (stat.isFile()) {
             report.files++;
             const fileId = `${stat.dev}:${stat.ino}`;
             report.logicalBytes += stat.size;
+            const parts = relative(root, entry.path).split(sep);
+            const groupKey = parts.length === 1 ? "" : parts[0];
+            const group = groups.get(groupKey) || {
+              name: groupKey,
+              kind: groupKey ? ("folder" as const) : ("files" as const),
+              logicalBytes: 0,
+              allocatedBytes: 0,
+              files: 0,
+            };
+            group.logicalBytes += stat.size;
+            group.files++;
+            if (!seenFiles.has(fileId))
+              group.allocatedBytes +=
+                typeof stat.blocks === "number" ? stat.blocks * 512 : stat.size;
+            groups.set(groupKey, group);
             if (!seenFiles.has(fileId)) {
               report.allocatedBytes +=
                 typeof stat.blocks === "number" ? stat.blocks * 512 : stat.size;
@@ -248,6 +273,27 @@ export class DeviceCareStorage {
         } catch {
           report.skipped++;
         }
+      }
+      const ordered = [...groups.values()].sort(
+        (a, b) =>
+          b.logicalBytes - a.logicalBytes || a.name.localeCompare(b.name),
+      );
+      report.groups = ordered.slice(0, 12);
+      if (ordered.length > 12) {
+        const rest = ordered.slice(12);
+        report.groups.push({
+          name: "",
+          kind: "other",
+          logicalBytes: rest.reduce(
+            (sum, group) => sum + group.logicalBytes,
+            0,
+          ),
+          allocatedBytes: rest.reduce(
+            (sum, group) => sum + group.allocatedBytes,
+            0,
+          ),
+          files: rest.reduce((sum, group) => sum + group.files, 0),
+        });
       }
       if (queue.length) report.skipped += queue.length;
       report.status = this.cancelRequested

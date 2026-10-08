@@ -145,3 +145,84 @@
   padding: 8px;
   max-width: 100%;
 }
+
+.diskspace-volume {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.diskspace-volume svg {
+  width: 170px;
+  flex-shrink: 0;
+}
+.diskspace-ring-base,
+.diskspace-ring-used {
+  fill: none;
+  stroke-width: 12;
+}
+.diskspace-ring-base {
+  stroke: var(--bg-tertiary);
+}
+.diskspace-ring-used {
+  stroke: var(--accent);
+}
+.diskspace-volume text {
+  fill: var(--text-primary);
+  font-size: 16px;
+}
+.diskspace-volume .diskspace-ring-label {
+  font-size: 8px;
+}
+.diskspace-stack {
+  display: flex;
+  height: 20px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+}
+.diskspace-groups {
+  list-style: none;
+  padding: 0;
+}
+.diskspace-group {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: start;
+  margin-top: 6px;
+}
+.diskspace-group-name {
+  flex: 1;
+  text-align: left;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.diskspace-selected {
+  outline: 2px solid var(--accent);
+}
+.diskspace-swatch {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+.diskspace-color-0 {
+  background: #6b93dc;
+}
+.diskspace-color-1 {
+  background: #59aaa0;
+}
+.diskspace-color-2 {
+  background: #ba8acf;
+}
+.diskspace-color-3 {
+  background: #d19c61;
+}
+.diskspace-color-4 {
+  background: #cf8295;
+}
+.diskspace-color-5 {
+  background: #8394a6;
+}

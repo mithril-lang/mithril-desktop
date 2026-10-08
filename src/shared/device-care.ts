@@ -15,7 +15,15 @@ export interface StorageCandidate {
   modifiedAt: string;
 }
 
+export interface StorageGroup {
+  name: string;
+  kind: "folder" | "files" | "other";
+  logicalBytes: number;
+  allocatedBytes: number;
+  files: number;
+}
 export interface StorageReport {
+  groups: StorageGroup[];
   root: string;
   observedAt: string;
   status: "complete" | "partial" | "cancelled";
@@ -86,7 +94,7 @@ export interface DeviceCareAPI {
   vendorAlerts: () => Promise<VendorReport>;
   openConsumer: () => Promise<void>;
   status: () => Promise<ProtectionStatus>;
-  analyze: (scope: "temp" | "folder") => Promise<StorageReport | null>;
+  analyze: (scope: "temp" | "folder" | "home") => Promise<StorageReport | null>;
   cancelAnalysis: () => Promise<void>;
   plan: (ids: string[]) => Promise<CleanupPlan>;
   execute: (id: string, digest: string) => Promise<CleanupReceipt>;

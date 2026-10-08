@@ -20,13 +20,10 @@ import type {
   StorageReport,
 } from "../../../../shared/device-care";
 import "./device-care.css";
+import StorageVisualization from "./StorageVisualization";
 
-export function formatBytes(bytes: number | null): string {
-  if (bytes === null) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  const index = Math.min(4, Math.floor(Math.log(bytes) / Math.log(1024)));
-  return `${(bytes / 1024 ** index).toFixed(1)} ${["B", "KiB", "MiB", "GiB", "TiB"][index]}`;
-}
+import { formatBytes } from "./storage-format";
+export { formatBytes } from "./storage-format";
 
 export default function DeviceCare(): React.JSX.Element {
   const { t, locale } = useI18n();
@@ -132,7 +129,7 @@ export default function DeviceCare(): React.JSX.Element {
       setBusy(null);
     }
   };
-  const analyze = (scope: "temp" | "folder"): void => {
+  const analyze = (scope: "temp" | "folder" | "home"): void => {
     void perform("analysis", async () => {
       setPlan(null);
       setReceipt(null);
@@ -441,6 +438,13 @@ export default function DeviceCare(): React.JSX.Element {
         >
           {text("analyzeFolder")}
         </button>
+        <button
+          className="btn btn-secondary"
+          disabled={locked}
+          onClick={() => analyze("home")}
+        >
+          {text("analyzeHome")}
+        </button>
         {busy === "analysis" && (
           <button
             className="btn btn-secondary"
@@ -466,6 +470,7 @@ export default function DeviceCare(): React.JSX.Element {
             [text("files"), report.files],
             [text("skipped"), report.skipped],
           ])}
+          <StorageVisualization key={report.observedAt} report={report} />
           {report.cleanupScope && (
             <>
               <h3>{text("candidates")}</h3>

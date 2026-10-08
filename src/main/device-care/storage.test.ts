@@ -11,6 +11,7 @@ import {
   readFile,
   readdir,
   realpath,
+  link,
 } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -39,6 +40,38 @@ describe("device-care scoped storage executor", () => {
     return path;
   };
 
+  // @lat: [[device-care#Disk space visualization#Preserves measured chart totals]]
+  it("preserves top groups and Other totals with hard links and excluded symlinks", async () => {
+    for (let i = 0; i < 15; i++) {
+      const folder = join(root, `group-${i}`);
+      await mkdir(folder);
+      await writeFile(join(folder, "file"), "x".repeat(i + 1));
+    }
+    await link(join(root, "group-14", "file"), join(root, "hardlink"));
+    await symlink(parent, join(root, "outside"));
+    const report = await service.analyze(root, false);
+    expect(report.groups).toHaveLength(13);
+    expect(report.groups.at(-1)?.kind).toBe("other");
+    expect(report.groups.reduce((sum, g) => sum + g.files, 0)).toBe(16);
+    expect(report.groups.reduce((sum, g) => sum + g.logicalBytes, 0)).toBe(
+      report.logicalBytes,
+    );
+    expect(report.groups.reduce((sum, g) => sum + g.allocatedBytes, 0)).toBe(
+      report.allocatedBytes,
+    );
+    const stat = await lstat(join(root, "group-14", "file"));
+    const allFiles = await Promise.all(
+      Array.from({ length: 15 }, (_, i) =>
+        lstat(join(root, `group-${i}`, "file")),
+      ),
+    );
+    expect(report.allocatedBytes).toBe(
+      allFiles.reduce((sum, file) => sum + file.blocks * 512, 0),
+    );
+    expect(stat.nlink).toBe(2);
+    expect(report.status).toBe("partial");
+    expect(report.candidates).toEqual([]);
+  });
   // @lat: [[device-care#Implementation verification#Protects unselected data]]
   it("only proposes old direct generated media, and selected-folder analysis never grants cleanup", async () => {
     await fixture();

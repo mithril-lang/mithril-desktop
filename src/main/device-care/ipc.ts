@@ -125,10 +125,11 @@ export function registerDeviceCareIpc(
   });
   ipcMain.handle("device-care-analyze", async (event, scope: unknown) => {
     const window = owner(event);
-    if (scope !== "temp" && scope !== "folder")
+    if (scope !== "temp" && scope !== "folder" && scope !== "home")
       throw new Error("Invalid storage scope");
     return exclusive(async () => {
       let root = join(tmpdir(), "hermes-desktop-media");
+      if (scope === "home") root = await realpath(app.getPath("home"));
       if (scope === "folder") {
         const selected = await dialog.showOpenDialog(window, {
           title: ja() ? "容量を分析するフォルダー" : "Analyze folder storage",

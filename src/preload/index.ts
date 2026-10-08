@@ -221,7 +221,7 @@ const hermesAPI = {
     vendorAlerts: () => ipcRenderer.invoke("device-care-vendor-alerts"),
     openConsumer: () => ipcRenderer.invoke("device-care-open-consumer"),
     status: () => ipcRenderer.invoke("device-care-status"),
-    analyze: (scope: "temp" | "folder") =>
+    analyze: (scope: "temp" | "folder" | "home") =>
       ipcRenderer.invoke("device-care-analyze", scope),
     cancelAnalysis: () => ipcRenderer.invoke("device-care-cancel-analysis"),
     plan: (ids: string[]) => ipcRenderer.invoke("device-care-plan", ids),

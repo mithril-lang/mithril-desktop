@@ -1,4 +1,23 @@
 export default {
+  analyzeHome: "Analyze home folder (bounded, read-only)",
+  diskMap: "Disk space overview",
+  occupied: "Used or unavailable",
+  occupiedShort: "used / unavailable",
+  volumeNote:
+    "Whole-volume capacity. Folder analysis below is a separate, bounded measurement.",
+  folderMap: "Measured folder breakdown",
+  mapNote:
+    "Shares use measured file sizes in this scope, not the whole disk. Select a group for details.",
+  partialMap:
+    "Coverage is incomplete. Uninspected files are excluded from the chart.",
+  rootFiles: "Files directly in this folder",
+  otherGroups: "Other measured groups",
+  groupNote:
+    "Large groups are not automatically disposable. Use the folder picker to narrow the analysis. Only reviewed Desktop temporary files can be cleaned here.",
+  noMeasuredFiles: "No regular files measured in this scope.",
+  allocatedNote:
+    "Allocated bytes are estimates. Hard links count once; APFS clones, compression and snapshots may differ from actual free space.",
+
   vendor:
     "Vendor connections are measured separately from ClamAV. Local quarantine is Mithril custody, not Trend Micro quarantine.",
   monitorTitle: "ClamAV background inspection",

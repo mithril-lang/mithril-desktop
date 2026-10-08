@@ -28,7 +28,7 @@ A consequential or critical envelope never exposes session-wide or permanent aut
 
 The existing approval card shows structured Mithril action context before the raw command and keeps the established addressable response flow unchanged.
 
-[[src/renderer/src/screens/Chat/ApprovalCard.tsx#ApprovalCard]] displays risk, operation, target, evidence count, optional cost and expiry, and the exact plan digest. It does not execute an action, mint a lease, infer evidence, or write a receipt.
+[[src/renderer/src/screens/Chat/ApprovalCard.tsx#ApprovalCard]] adapts the canonical workspace approval card to Desktop translations. The shared card displays risk, operation, target, evidence count, optional cost and expiry, and the exact plan digest. It does not execute an action, mint a lease, infer evidence, or write a receipt.
 
 ### Shows normalized authority context
 

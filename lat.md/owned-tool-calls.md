@@ -10,11 +10,13 @@ Desktop's existing dashboard Chat hook exposes explicit tool calls on its attach
 
 Connection, profile, model/provider, session, cancellation and unmount retire call authority. A late response after dispatch becomes unknown; this does not attest that a handler stopped. Package, installed source, authenticated runtime and UI routing remain separate qualification gates.
 
+The existing approval card and bounded action projection are now canonical compiled workspace components reused by Web and Desktop. Desktop owns its translation/message adapter; Web owns cookie/peer transport and shows only the selected conversation. Queue acceptance remains distinct from an effect receipt.
+
 The compiled shared SDK captures peer approval IDs, immutable session/choices and cancellation. Consumed/cancelled IDs remain retired until connection change, and conflicting presentation withdraws the card. Pending custody is bounded to 32 requests and 256 captured IDs per connection.
 
 The dashboard client advertises server requests on gateway.ready and routes captured peer approval requests to the existing cards. User selection queues a response on the original peer ID; it is not an effect or delivery receipt. Cancel/retirement removes the card authority. Unsupported peer kinds explicitly return method-not-found; no automatic approval or credential entry occurs.
 
-Desktop now vendors agency.11. Its Cloud Browser runner and main adapter consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or replace server effect grants.
+Desktop now vendors agency.12. Its Cloud Browser runner and main adapter consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or replace server effect grants.
 
 ## Test specifications
 

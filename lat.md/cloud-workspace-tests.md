@@ -1214,3 +1214,7 @@ These are layout fixtures, not authenticated client journeys.
 ## Complete long transcript checkpoints
 
 Mapped and remote-only conversations read all contiguous pages beyond a thousand before title writeback or cache publication, while preserving owner/version/cursor checks and never executing a turn.
+
+## Chunked remote transcript storage
+
+Large owner-bound remote timelines retain every event and display item through chunk storage; prior caches remain readable and failed replacements roll back without losing the previously complete timeline.

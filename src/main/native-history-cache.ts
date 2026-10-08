@@ -179,6 +179,74 @@ export function deleteNativeHistoryCache(
     db.prepare(`DELETE FROM ${TABLE} WHERE session_id=?`).run(sessionId);
 }
 
+const REMOTE_CHUNKS = "mithril_remote_session_chunks";
+function digestRows(rows: unknown[]): string {
+  const hash = createHash("sha256");
+  hash.update("[");
+  rows.forEach((row, index) => {
+    if (index) hash.update(",");
+    hash.update(JSON.stringify(row));
+  });
+  return hash.update("]").digest("hex");
+}
+function readRemoteBody(
+  db: Database.Database,
+  owner: string,
+  sessionId: string,
+  body: string,
+): { session: ChatSession; events: ChatEvent[]; items: HistoryItem[] } {
+  const value = JSON.parse(body);
+  if (value.format !== undefined && value.format !== 2)
+    throw Error("Unknown remote history cache format");
+  if (value.format === 2) {
+    const rows = db
+      .prepare(
+        `SELECT kind,ordinal,body FROM ${REMOTE_CHUNKS} WHERE owner=? AND session_id=? ORDER BY kind,ordinal`,
+      )
+      .iterate(owner, sessionId) as Iterable<{
+      kind: string;
+      ordinal: number;
+      body: string;
+    }>;
+    const events: ChatEvent[] = [],
+      items: HistoryItem[] = [];
+    const next = { events: 0, items: 0 };
+    for (const row of rows) {
+      if (
+        !(row.kind === "events" || row.kind === "items") ||
+        row.ordinal !== next[row.kind]++
+      )
+        throw Error("Invalid remote history chunk order");
+      const chunk = JSON.parse(row.body);
+      if (!Array.isArray(chunk) || !chunk.length)
+        throw Error("Invalid remote history chunk");
+      for (const item of chunk)
+        (row.kind === "events" ? events : items).push(item);
+    }
+    if (
+      events.length !== value.eventCount ||
+      items.length !== value.itemCount ||
+      digestRows(events) !== value.eventDigest ||
+      digestRows(items) !== value.itemDigest
+    )
+      throw Error("Incomplete remote history chunks");
+    value.events = events;
+    value.items = items;
+  }
+  if (
+    !validateChatSession(value.session) ||
+    value.session.id !== sessionId ||
+    !Array.isArray(value.events) ||
+    !Array.isArray(value.items) ||
+    value.events.some(
+      (event: ChatEvent, index: number) =>
+        !validateChatEvent(event) || event.seq !== index + 1,
+    ) ||
+    (!value.session.deleted && value.events.length !== value.session.eventSeq)
+  )
+    throw Error("Invalid retained remote history");
+  return { session: value.session, events: value.events, items: value.items };
+}
 /** Remote-only sessions are materialized caches, never agent sessions/executions. */
 export function replaceRemoteSessionCache(
   db: Database.Database,
@@ -191,7 +259,6 @@ export function replaceRemoteSessionCache(
     !owner ||
     owner.length > 128 ||
     !validateChatSession(session) ||
-    events.length > 20000 ||
     events.some(
       (event, index) => !validateChatEvent(event) || event.seq !== index + 1,
     ) ||
@@ -200,37 +267,76 @@ export function replaceRemoteSessionCache(
     throw Error("Invalid remote session cache");
   db.transaction(() => {
     db.exec(
-      `CREATE TABLE IF NOT EXISTS ${REMOTE_TABLE}(owner TEXT NOT NULL,session_id TEXT NOT NULL,revision INTEGER NOT NULL,body TEXT NOT NULL,PRIMARY KEY(owner,session_id))`,
+      `CREATE TABLE IF NOT EXISTS ${REMOTE_TABLE}(owner TEXT NOT NULL,session_id TEXT NOT NULL,revision INTEGER NOT NULL,body TEXT NOT NULL,PRIMARY KEY(owner,session_id));CREATE TABLE IF NOT EXISTS ${REMOTE_CHUNKS}(owner TEXT NOT NULL,session_id TEXT NOT NULL,kind TEXT NOT NULL,ordinal INTEGER NOT NULL,body TEXT NOT NULL,PRIMARY KEY(owner,session_id,kind,ordinal))`,
     );
     const previous = db
       .prepare(
         `SELECT revision,body FROM ${REMOTE_TABLE} WHERE owner=? AND session_id=?`,
       )
       .get(owner, session.id) as { revision: number; body: string } | undefined;
-    const retained =
-      session.deleted && previous
-        ? (JSON.parse(previous.body) as {
-            events: ChatEvent[];
-            items: HistoryItem[];
-          })
-        : { events, items };
-    const serialized = JSON.stringify({
-      session,
-      events: retained.events,
-      items: retained.items,
-    });
-    if (Buffer.byteLength(serialized) > 50 * 1024 * 1024)
-      throw Error("Remote history exceeds supported cache bound");
     if (previous && previous.revision > session.revision)
       throw Error("Stale remote history reconstruction");
-    if (previous?.revision === session.revision && previous.body !== serialized)
-      throw Error("Inconsistent remote history revision");
+    const retained =
+      session.deleted && previous
+        ? readRemoteBody(db, owner, session.id, previous.body)
+        : { events, items };
+    const body = JSON.stringify({
+      format: 2,
+      session,
+      eventCount: retained.events.length,
+      itemCount: retained.items.length,
+      eventDigest: digestRows(retained.events),
+      itemDigest: digestRows(retained.items),
+    });
+    if (previous?.revision === session.revision) {
+      const old = readRemoteBody(db, owner, session.id, previous.body);
+      if (
+        JSON.stringify(old.session) !== JSON.stringify(session) ||
+        digestRows(old.events) !== digestRows(retained.events) ||
+        digestRows(old.items) !== digestRows(retained.items)
+      )
+        throw Error("Inconsistent remote history revision");
+    }
+    db.prepare(
+      `DELETE FROM ${REMOTE_CHUNKS} WHERE owner=? AND session_id=?`,
+    ).run(owner, session.id);
+    const insert = db.prepare(
+      `INSERT INTO ${REMOTE_CHUNKS}(owner,session_id,kind,ordinal,body) VALUES(?,?,?,?,?)`,
+    );
+    for (const [kind, values] of [
+      ["events", retained.events],
+      ["items", retained.items],
+    ] as const) {
+      let ordinal = 0,
+        bytes = 2;
+      let chunk: string[] = [];
+      const flush = (): void => {
+        if (chunk.length)
+          insert.run(
+            owner,
+            session.id,
+            kind,
+            ordinal++,
+            "[" + chunk.join(",") + "]",
+          );
+        chunk = [];
+        bytes = 2;
+      };
+      for (const value of values) {
+        const serialized = JSON.stringify(value),
+          size = Buffer.byteLength(serialized) + 1;
+        if (chunk.length && (bytes + size > 512 * 1024 || chunk.length >= 100))
+          flush();
+        chunk.push(serialized);
+        bytes += size;
+      }
+      flush();
+    }
     db.prepare(
       `INSERT INTO ${REMOTE_TABLE}(owner,session_id,revision,body) VALUES(?,?,?,?) ON CONFLICT(owner,session_id) DO UPDATE SET revision=excluded.revision,body=excluded.body`,
-    ).run(owner, session.id, session.revision, serialized);
+    ).run(owner, session.id, session.revision, body);
   }).immediate();
 }
-
 export function readRemoteSessionCache(
   db: Database.Database,
   sessionId: string,
@@ -243,23 +349,14 @@ export function readRemoteSessionCache(
       .get(REMOTE_TABLE)
   )
     return null;
-  const row = db
-    .prepare(`SELECT body FROM ${REMOTE_TABLE} WHERE owner=? AND session_id=?`)
-    .get(owner, sessionId) as { body: string } | undefined;
-  if (!row) return null;
-  const value = JSON.parse(row.body) as {
-    session: ChatSession;
-    events: ChatEvent[];
-    items: HistoryItem[];
-  };
-  if (
-    !validateChatSession(value.session) ||
-    value.session.id !== sessionId ||
-    !Array.isArray(value.events) ||
-    !Array.isArray(value.items)
-  )
-    throw Error("Invalid retained remote history");
-  return value;
+  return db.transaction(() => {
+    const row = db
+      .prepare(
+        `SELECT body FROM ${REMOTE_TABLE} WHERE owner=? AND session_id=?`,
+      )
+      .get(owner, sessionId) as { body: string } | undefined;
+    return row ? readRemoteBody(db, owner, sessionId, row.body) : null;
+  })();
 }
 
 export function remoteSessionCacheRevision(

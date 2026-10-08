@@ -594,7 +594,7 @@ it("archives over one thousand original sessions and replays a lost receipt with
 });
 
 // @lat: [[cloud-workspace-tests#Remote-only chat reconstruction]]
-it("reads bounded remote pages and refuses oversized histories before changing the retained cache", async () => {
+it("reads complete paged remote histories beyond the former byte ceiling", async () => {
   const f = fixture();
   f.ports.source = async () => [];
   const session: ChatSession = {
@@ -651,10 +651,10 @@ it("reads bounded remote pages and refuses oversized histories before changing t
       nextAfter: next < large.eventSeq ? next : null,
     };
   };
-  expect((await new NativeHistorySync(f.ports).run()).deferred[0]).toContain(
-    "byte bound",
-  );
-  expect(cache).not.toHaveBeenCalled();
+  expect((await new NativeHistorySync(f.ports).run()).reconstructed).toBe(1);
+  expect(cache).toHaveBeenCalledOnce();
+  expect(cache.mock.calls[0][1]).toHaveLength(3500);
+  expect(cache.mock.calls[0][1][3499].data.content).toBe(content);
   expect(f.executions()).toBe(0);
 });
 

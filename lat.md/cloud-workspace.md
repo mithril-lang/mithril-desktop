@@ -1273,3 +1273,13 @@ Each continuation must advance through contiguous events below the immutable ses
 Regression fixtures read 1,005 one-event pages on both mapped and remote-only paths, publish the complete remote-only inventory, update mapped title only after its complete checkpoint, reject false continuation at the final event, and never execute inference or tools. CI/publication and installed cross-device behavior remain separate evidence gates.
 
 Local qualification: all seven native history suites pass (76 tests), both TypeScript checks and the preview.41 build pass. The preceding preview.40 Native CI run 37709729661 completed successfully. None of these results establishes API publication, installer release or installed-device behavior.
+
+## Chunked complete remote history storage
+
+Remote-only display caches store complete events and materialized timeline items in owner-bound SQLite chunks rather than a single bounded JSON value.
+
+Native preview.42 removes the reconstruction's aggregate 20,000-event/50-MiB refusal and the corresponding cache ceiling. Chunks normally target at most 100 records/512 KiB; a single protocol-valid record remains indivisible. One immediate transaction replaces chunks and their count/hash manifest, preserving the previous complete cache on failure. Reads iterate chunks under one read transaction and validate order, counts, digests and contiguous events. Older single-body caches remain readable and convert on the next write; tombstones retain their previous complete timeline. Agent messages/execution tables remain untouched.
+
+The current renderer and transport ports still materialize complete arrays, so memory/disk availability is not unlimited. This changes aggregate persistence, not per-event protocol limits or attachment resources. Full account archive/export/import, profile resource closure, canonical publication and authenticated installed cross-device QA remain outstanding. Workspace `.40` stays pinned unchanged.
+
+Local qualification: all seven history suites pass (78 tests). The real SQLite cache regression retains 20,005 events and a combined timeline above 50 MiB, reads every record, checks chunk sizes, same-ID owner isolation, old-format conversion, same-revision rejection, missing/tampered chunk refusal and transactional rollback after simulated disk failure. Both typechecks and preview.42 build pass; installed/public behavior remains unproven.

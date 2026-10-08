@@ -1149,7 +1149,6 @@ export class NativeHistorySync {
           }
           const events: ChatEvent[] = [];
           let after = 0;
-          let eventBytes = 0;
           for (;;) {
             const snapshot = await this.ports.transport.events(
               session.id,
@@ -1178,12 +1177,7 @@ export class NativeHistorySync {
               )
                 throw Error("Invalid cloud history checkpoint");
               last = event.seq;
-              eventBytes += Buffer.byteLength(JSON.stringify(event));
-              if (eventBytes > 50 * 1024 * 1024)
-                throw Error("Cloud history exceeds supported byte bound");
               events.push(event);
-              if (events.length > 20000)
-                throw Error("Cloud history exceeds supported event bound");
             }
             if (!snapshot.hasMore) {
               if (last !== session.eventSeq)

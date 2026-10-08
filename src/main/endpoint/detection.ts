@@ -48,8 +48,10 @@ interface Contact {
 }
 export class ConnectionDetector {
   private previous = new Set<string>();
+  private initialized = false;
   private contacts: Contact[] = [];
   reset(): void {
+    this.initialized = false;
     this.previous.clear();
     this.contacts = [];
   }
@@ -71,10 +73,11 @@ export class ConnectionDetector {
         continue;
       const key = `${r.pid}|${r.process}|${r.local}|${r.remote}`;
       current.add(key);
-      if (!this.previous.has(key))
+      if (this.initialized && !this.previous.has(key))
         this.contacts.push({ time: now, host, pid: r.pid });
     }
     this.previous = current;
+    this.initialized = true;
     this.contacts = this.contacts
       .filter((c) => now - c.time <= pack.network.windowMs)
       .slice(-10000);

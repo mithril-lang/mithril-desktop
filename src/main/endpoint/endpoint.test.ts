@@ -185,6 +185,7 @@ describe("Bounded detection", () => {
   });
   it("detects fanout and timing only when new contacts were observed", () => {
     const detector = new ConnectionDetector();
+    detector.evaluate([], pack, 90000);
     const rows = Array.from({ length: 20 }, (_, i) => ({
       pid: 123,
       process: "sample",
@@ -192,12 +193,16 @@ describe("Bounded detection", () => {
       remote: `192.0.2.${i + 1}:443`,
       state: "ESTABLISHED",
     }));
+    const baseline = new ConnectionDetector();
+    expect(baseline.evaluate(rows, pack, 100000)).toEqual([]);
+    expect(baseline.evaluate(rows, pack, 110000)).toEqual([]);
     expect(
       detector
         .evaluate(rows, pack, 100000)
         .some((f) => f.rule === "connection-fanout"),
     ).toBe(true);
     const beacon = new ConnectionDetector();
+    beacon.evaluate([], pack, 90000);
     for (let i = 0; i < 4; i++) {
       expect(
         beacon.evaluate(

@@ -10,6 +10,9 @@ export interface ToolsetInfo {
   label: string;
   description: string;
   enabled: boolean;
+  platform?: string;
+  configured?: boolean;
+  tools?: string[];
 }
 
 const TOOLSET_DEFS: {

@@ -1,3 +1,7 @@
+import {
+  getSelectedToolsets,
+  setSelectedToolsetEnabled,
+} from "../tool-settings";
 import { registerTaskAttachmentIPC } from "../task-attachment-ipc";
 import { registerCapabilityResourceIPC } from "../capability-resource-ipc";
 import {
@@ -372,9 +376,7 @@ import {
 import { readSoul, writeSoul, resetSoul } from "../soul";
 import {
   getPlatformToolsets,
-  getToolsets,
   setMessagingPlatformToolsetEnabled,
-  setToolsetEnabled,
 } from "../tools";
 import {
   fetchRegistry,
@@ -447,9 +449,7 @@ import {
   sshReadSoul,
   sshWriteSoul,
   sshResetSoul,
-  sshGetToolsets,
   sshGetPlatformToolsets,
-  sshSetToolsetEnabled,
   sshSetMessagingPlatformToolsetEnabled,
   sshReadEnv,
   sshGetOAuthProviderStatuses,
@@ -3454,21 +3454,14 @@ export function registerIpcHandlers(context: IpcContext): void {
     },
   );
 
-  // Tools
-  ipcMain.handle("get-toolsets", (_event, profile?: string) => {
-    const conn = getConnectionConfig();
-    if (conn.mode === "ssh" && conn.ssh)
-      return sshGetToolsets(conn.ssh, profile);
-    return getToolsets(profile);
-  });
+  // Tools: selected connection/profile owns every read and write.
+  ipcMain.handle("get-toolsets", (_event, profile?: string) =>
+    getSelectedToolsets(profile),
+  );
   ipcMain.handle(
     "set-toolset-enabled",
-    (_event, key: string, enabled: boolean, profile?: string) => {
-      const conn = getConnectionConfig();
-      if (conn.mode === "ssh" && conn.ssh)
-        return sshSetToolsetEnabled(conn.ssh, key, enabled, profile);
-      return setToolsetEnabled(key, enabled, profile);
-    },
+    (_event, key: string, enabled: boolean, profile?: string) =>
+      setSelectedToolsetEnabled(key, enabled, profile),
   );
 
   // Skills. Remote (HTTP) mode routes to the dashboard's /api/skills* —

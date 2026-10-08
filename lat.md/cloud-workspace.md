@@ -1576,3 +1576,7 @@ Candidate preview.68 qualification passes seven real filesystem tests, main and 
 The original Settings Data pane now consumes the same review component as Web.
 
 [[src/main/cloud-workspace.ts#CloudWorkspace#executionHistory]] and [[src/main/cloud-workspace.ts#CloudWorkspace#reviewExecution]] expose fixed authenticated routes through trusted preload IPC. Pending review decisions are durably retained per owner/dataset/row/effect before sending. Lost acknowledgements retain the original decision ID and note across remount or restart. Confirmation records no-replay review, not completion/cancellation or new execution permission. Package schedules.62 is the canonical source; installed-client qualification is separate.
+
+## Shared Data archive package candidate
+
+Desktop consumes schedules.63 with the same original Data backup component and archive controller as Web. Main-process credential and file transport wiring remains pending; this package update does not establish native backup or installed behavior.

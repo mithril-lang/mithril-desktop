@@ -33,7 +33,7 @@ export default {
   },
   font: {
     label: "גופן",
-    manrope: "גופן ממשלתי (לפי שפה)",
+    manrope: "גופן ממשלתי (לפי אזור)",
     system: "מערכת",
     hint: "בחרו את גופן הממשק",
   },

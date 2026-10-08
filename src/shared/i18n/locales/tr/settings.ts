@@ -33,7 +33,7 @@ export default {
   },
   font: {
     label: "Yazı Tipi",
-    manrope: "Devlet yazı tipi (dile göre)",
+    manrope: "Devlet yazı tipi (bölgeye göre)",
     system: "Sistem",
     hint: "Arayüz yazı tipini seçin",
   },

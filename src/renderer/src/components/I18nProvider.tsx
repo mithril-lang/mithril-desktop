@@ -1,3 +1,4 @@
+import { applyVisitorLocale } from "@mithril/design-system/visitor-locale";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 import {
@@ -19,6 +20,10 @@ const STORAGE_KEY = "hermes-locale";
 function applyDocumentLocale(locale: AppLocale): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
+  applyVisitorLocale(
+    root,
+    navigator.languages?.length ? navigator.languages : [navigator.language],
+  );
   root.setAttribute("dir", getLocaleDirection(locale));
   root.setAttribute("lang", locale);
 }

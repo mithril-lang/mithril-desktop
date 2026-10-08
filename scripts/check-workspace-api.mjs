@@ -12,7 +12,8 @@ export async function checkWorkspaceApi(request = fetch) {
   if (
     !response.ok ||
     health?.ok !== true ||
-    health.sessionInventoryProtocol !== "chat-inventory-keyset-v1"
+    health.sessionInventoryProtocol !== "chat-inventory-keyset-v1" ||
+    health.sidebarInventoryProtocol !== "sidebar-inventory-keyset-v1"
   )
     throw Error(
       "Canonical paged Chat API must be published before this Desktop installer",

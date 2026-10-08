@@ -571,6 +571,27 @@ it("checks cloud sidebar owners and retains exact operation IDs on fixed routes"
   );
   await expect(client.getSidebar()).rejects.toThrow("owner/schema mismatch");
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Complete large canonical sidebar]]
+it("admits all large owner-checked sidebar placements using the canonical main-owned read", async () => {
+  await client.enable();
+  const fallback = fetcher.getMockImplementation()! as (
+    url: string,
+    init?: RequestInit,
+  ) => Promise<Response>;
+  const placements = Array.from({ length: 1205 }, (_, i) => ({
+    chatId: `chat-${i}`,
+    revision: 1,
+    pinned: true,
+    projectId: null,
+  }));
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.endsWith("/v1/workspace/sidebar")
+      ? reply({ schemaVersion: 1, userId: "a", placements })
+      : fallback(url, init),
+  );
+  expect((await client.getSidebar()).placements).toHaveLength(1205);
+});
 // @lat: [[cloud-workspace-tests#Cloud workspace tests#Cloud schedule boundaries]]
 it("uses fixed owner-checked schedule routes and refuses writes without chat and inference authority", async () => {
   const op = {

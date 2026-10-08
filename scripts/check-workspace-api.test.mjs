@@ -5,6 +5,7 @@ test("refuses old API and verifies the fixed no-token health route before instal
   for (const health of [
     { ok: true },
     { ok: true, sessionInventoryProtocol: "older" },
+    { ok: true, sessionInventoryProtocol: "chat-inventory-keyset-v1" },
   ])
     await assert.rejects(
       checkWorkspaceApi(async () => Response.json(health)),
@@ -27,6 +28,7 @@ test("refuses old API and verifies the fixed no-token health route before instal
     return Response.json({
       ok: true,
       sessionInventoryProtocol: "chat-inventory-keyset-v1",
+      sidebarInventoryProtocol: "sidebar-inventory-keyset-v1",
     });
   });
 });

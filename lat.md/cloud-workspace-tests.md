@@ -1193,3 +1193,7 @@ The original SQLite outbox returns all 1,205 retained deletions through stable k
 ## Large original deletion receipt replay
 
 The real history engine synchronizes 1,005 original physical deletions, replays a lost acknowledgement with its retained ID/base revision and mirrors only tombstones without reconstructing pending or deleted conversations.
+
+## Complete large canonical sidebar
+
+The main-owned canonical read admits 1,205 valid owner-scoped pin/project placements through the same shared validator as Web, retaining fixed routes and account validation.

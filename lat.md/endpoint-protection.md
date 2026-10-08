@@ -29,3 +29,5 @@ The source definitions are JSON data with literal byte markers and bounded numer
 ## Verification
 
 Tests exercise signatures, tampering, expiry, rollback, literal scanning, host fanout, beacon timing, sensor parsing, root confinement and native file monitoring. OS-specific fixture tests do not prove Windows/Linux installed-client behavior.
+
+On 2026-10-08 JST, `scripts/verify-endpoint-live.mjs` launched the built Electron app with an isolated userData/Hermes profile. Real preload/main IPC selected an inert fixture folder, detected the PHP marker, observed macOS sockets, verified the public signed v1 feed and stopped monitoring. The harness supplied fixture paths in place of native file-dialog interaction; it did not use an account or customer files. This is built-app macOS evidence, separate from notarized installers and Windows/Linux execution.

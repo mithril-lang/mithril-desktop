@@ -1401,3 +1401,13 @@ The shared client stages only pages from one session revision and event-sequence
 Mixed-page failures retain the prior complete history and queued operation identities. This prevents ordinary concurrent-read regression; equal-identity archive restoration still requires a monotonic dataset generation. API publication and actual signed installed synchronization remain separate gates.
 
 Preview.54 pins Workspace 0.6.29-schedules.49. All 465 producer/archive/installed files and exact lock identity match; archive SHA256 is `82b993d96d3b324893613797d11124774a6838dfe71b6132c21eb576b375518a`. Qualification passed 55 selected compiled-cache/cloud/chat/updater tests, full Electron typecheck/build, changed-file lint and `lat check`. No signed publication or installed replacement is claimed.
+
+### Chat restore epoch consumer (draft)
+
+Preview.55 pins shared Workspace 0.6.29-schedules.51. Canonical chat inventory and event reads use the owner epoch, clearing equal-identity restored cache and retaining old saved edits for review.
+
+Pending metadata stores its original epoch across IndexedDB reopen. API server write/receipt fencing and other data inventories still require integration; no production restore, signed release or installed replacement is claimed.
+
+All 465 producer/archive/installed bytes and exact lock identity match. Archive SHA256: `42d9e7b48e523a33cce92491a622a8426e6bf242471d362beb4c3781a1a865c1`.
+
+Local qualification passed 56 selected compiled-cache/cloud/chat/updater tests, full Electron typecheck/build, 689-file packaging identity, changed-file lint and `lat check`. Shared 425 cases and real D1 chat 16 cases passed in Fund; shared Chromium sidebar/Security/table QA passed. Signed installed behavior remains unverified.

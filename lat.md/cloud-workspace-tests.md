@@ -1277,3 +1277,7 @@ The compiled shared checkpoint preserves its old complete cache after a late net
 ## Packaged checkpoint boundary fencing
 
 The compiled shared client rejects session revision/event boundary changes between pages, preserves its previous complete history and accepts a coherent retry without executing writes.
+
+## Packaged chat restore epoch
+
+The actual compiled vendor clears histories at equal IDs/revisions when the restore epoch changes, preserves saved operation identity and refuses both receipt checks and dispatch across epochs.

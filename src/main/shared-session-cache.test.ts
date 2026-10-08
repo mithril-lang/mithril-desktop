@@ -148,3 +148,38 @@ it("keeps the previous complete history when session boundaries change between p
   await client.checkpoint("s1");
   expect(client.events.get("s1")).toEqual([event(1), event(2), event(3)]);
 });
+// @lat: [[cloud-workspace-tests#Packaged chat restore epoch]]
+it("retires equal-identity histories and saved writes after a restore epoch change", async () => {
+  let datasetGeneration = 0;
+  const transport: SessionTransport = {
+    list: async () => ({
+      schemaVersion: 1,
+      userId: "alice",
+      datasetGeneration,
+      sessions: [session("s1", 3, 1)],
+    }),
+    events: async () => {
+      throw Error("No checkpoint requested");
+    },
+    receipt: vi.fn(async () => {
+      throw Error("Must not acknowledge across epochs");
+    }),
+    apply: vi.fn(async () => {
+      throw Error("Must not execute across epochs");
+    }),
+  };
+  const client = new SessionSyncClient(transport);
+  await client.connect("alice");
+  client.events.set("s1", [event(1)]);
+  const pending = client.queue("s1", {
+    type: "rename",
+    data: { title: "Saved edit" },
+  });
+  datasetGeneration = 1;
+  await client.refresh();
+  expect(client.events.size).toBe(0);
+  expect(client.outbox).toEqual([pending]);
+  await expect(client.flush()).rejects.toThrow("review saved operation");
+  expect(transport.receipt).not.toHaveBeenCalled();
+  expect(transport.apply).not.toHaveBeenCalled();
+});

@@ -15,7 +15,39 @@ export interface StorageCandidate {
   modifiedAt: string;
 }
 
+export interface StorageGroup {
+  name: string;
+  kind: "folder" | "files" | "other";
+  logicalBytes: number;
+  allocatedBytes: number;
+  files: number;
+}
+export interface StorageNode {
+  id: string;
+  parentId: string | null;
+  name: string;
+  kind: "folder" | "file";
+  logicalBytes: number;
+  allocatedBytes: number;
+  files: number;
+}
 export interface StorageReport {
+  workflow?: {
+    name: "mithril-diskspace-management";
+    version: string;
+    state: "awaiting-selection" | "nothing-eligible";
+    cleanupScope: "desktop-generated-media";
+  };
+  index?: {
+    reusedDirectories: number;
+    enumeratedDirectories: number;
+    reusedFiles: number;
+    checkedFiles: number;
+    changedDuringAnalysis: boolean;
+    maxAgeSeconds: number;
+  };
+  tree?: StorageNode[];
+  groups: StorageGroup[];
   root: string;
   observedAt: string;
   status: "complete" | "partial" | "cancelled";
@@ -73,6 +105,10 @@ export interface DeviceCareHistoryEntry {
 }
 
 export interface DeviceCareAPI {
+  storageSkillStatus: (
+    profile?: string,
+  ) => Promise<{ name: string; version: string } | null>;
+  runStorageSkill: (profile?: string) => Promise<StorageReport>;
   monitorStatus: () => Promise<MonitorStatus>;
   startMonitor: () => Promise<MonitorStatus | null>;
   stopMonitor: () => Promise<MonitorStatus>;
@@ -86,7 +122,8 @@ export interface DeviceCareAPI {
   vendorAlerts: () => Promise<VendorReport>;
   openConsumer: () => Promise<void>;
   status: () => Promise<ProtectionStatus>;
-  analyze: (scope: "temp" | "folder") => Promise<StorageReport | null>;
+  analyze: (scope: "temp" | "folder" | "home") => Promise<StorageReport | null>;
+  analyzeNode: (id: string) => Promise<StorageReport>;
   cancelAnalysis: () => Promise<void>;
   plan: (ids: string[]) => Promise<CleanupPlan>;
   execute: (id: string, digest: string) => Promise<CleanupReceipt>;

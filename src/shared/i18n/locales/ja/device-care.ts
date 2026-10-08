@@ -1,4 +1,73 @@
 export default {
+  cleanupSkillTitle: "ディスク cleanup Skill",
+  cleanupSkillNote:
+    "選択中のプロフィールで Registry Skill を実行します。計測 → 候補選択 → レビュー → OS のゴミ箱 → 空き容量の再計測。未導入ならインストールし、移動前にはネイティブ確認を行います。",
+  cleanupSkillScope:
+    "実行できる cleanup は Desktop が生成した一時メディアです。他のフォルダーは計測とレビューに対応し、アプリ固有のキャッシュ整理は別の実行経路です。",
+  runCleanupSkill: "cleanup Skill を導入・実行",
+  openCleanupSkill: "cleanup Skill を開く",
+  cleanupSkillUnavailable:
+    "Desktop 対応の diskspace Skill を利用できません。Discover を更新し、最新版を導入してください。",
+  cleanupSkillEmpty:
+    "Skill の計測が完了しました。対象の一時ファイルはなく、移動していません。",
+  cleanupSkillReview:
+    "Skill が候補を計測しました。以下で対象を選び、レビュー用の計画を作成してください。",
+  indexReuse: "インデックスを再利用",
+  indexFolders: "フォルダー一覧",
+  indexFiles: "ファイルの計測値",
+  indexChecked: "メタデータを確認",
+  indexUpdated: "分析の更新日時",
+  indexNote:
+    "変更通知がないファイルは最大 60 秒前の計測値を再利用します。再起動後・期限切れ・監視できない範囲はメタデータを確認します。フォルダーの詳細分析では再計測し、cleanup 前は必ず実ファイルを再確認します。",
+  indexChanged:
+    "分析中に変更がありました。対象フォルダーを再計測してください。",
+  folderTrail: "フォルダーの階層",
+  upFolder: "親フォルダーへ",
+  measured: "測定した範囲",
+  partialShort: "一部のみ測定",
+  moreFolders:
+    "大きい順に48項目を表示。このフォルダーを詳細分析すると範囲を絞れます。",
+  inspectFolder: "このフォルダーを詳細分析",
+  causeTitle: "容量を占める原因の手掛かり",
+  causeNote:
+    "パス名からの推測です。原因の確定や削除の許可ではありません。完全な測定同士の比較で増加を確認します。",
+  registryWorkflow: "Registry · ストレージ管理",
+  registryWorkflowNote:
+    "容量を測る → 増加を比較 → 所有者と使用状況を確認 → 清掃対象を個別レビュー → 空き容量を再測定。",
+  mapNote:
+    "面積は測定したファイルサイズに比例します。フォルダーを開くと内訳へ進み、小さな項目も一覧で確認できます。",
+  groupNote:
+    "清掃には対象を確認した計画が必要です。ソース・会話・認証情報・モデル・復旧データは原則保持します。",
+  cause: {
+    protected:
+      "履歴・ソース・復旧データの可能性があります。保持し、所有アプリの保存期間やエクスポート設定を確認します。",
+    dependencies:
+      "依存パッケージや開発環境が蓄積している可能性。使用中のプロジェクトと再インストール方法を確認します。",
+    cache:
+      "アプリのキャッシュの可能性。所有アプリ・使用状況・公式の再生成方法を確認します。",
+    logs: "ログが蓄積している可能性。保存期間と書き込み元を確認してから、古いログをレビューします。",
+    models:
+      "ローカルモデルの重みの可能性。利用設定と再取得方法を確認してから、未使用の版をレビューします。",
+    downloads:
+      "ダウンロードやインストーラーの可能性。原本と復旧用コピーを確認し、対象を個別に選びます。",
+    unknown:
+      "名前だけでは原因を特定できません。大きいファイルと所有アプリを先に確認します。",
+  },
+
+  analyzeHome: "ホームフォルダーを分析（範囲限定・読み取り専用）",
+  diskMap: "ディスク容量の概要",
+  occupied: "使用済み・利用不可",
+  occupiedShort: "使用済み・利用不可",
+  volumeNote:
+    "ボリューム全体の値です。以下のフォルダー分析とは測定範囲が異なります。",
+  folderMap: "測定したフォルダーの内訳",
+  partialMap: "一部が未測定です。未検査のファイルはグラフに含まれません。",
+  rootFiles: "このフォルダー直下のファイル",
+  otherGroups: "その他の測定済みグループ",
+  noMeasuredFiles: "この範囲で通常ファイルは測定されていません。",
+  allocatedNote:
+    "割当済み容量は推定値です。ハードリンクは一度だけ数えます。APFS クローン、圧縮、スナップショットにより実際の空き容量と異なる場合があります。",
+
   vendor:
     "製品連携の状態は ClamAV と別に測定します。ローカル隔離は Mithril の保管機能で、Trend Micro の隔離機能とは別です。",
   monitorTitle: "ClamAV バックグラウンド検査",

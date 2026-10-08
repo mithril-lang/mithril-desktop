@@ -60,13 +60,13 @@ Runtime measurements separately use `unknown`, `running`, `complete`, `partial`,
 
 Desktop orchestrates supported security engines through bounded adapters rather than shipping an unverified detection engine or competing with an existing resident protector.
 
-| Adapter candidate | Intended scope | Implementation gate |
-| --- | --- | --- |
-| Windows OS protection | Read protection state and request supported on-demand scans | Verify official interfaces, supported OS editions, permissions, detection mapping, cancellation, and existing-provider coexistence |
-| macOS OS protection | Display only officially observable status; link to OS settings where necessary | Verify public interface availability; unavailable scan, quarantine, and resident-state APIs remain unsupported |
-| Linux / optional ClamAV | Explicit on-demand file scans where an installed engine is detected | Verify engine discovery, signature freshness, safe invocation, exit codes, license/distribution, and OS-specific coverage |
-| Trend Micro consumer product | Optional product-specific status or handoff | Verify exact product and license plus official integration availability; no consumer integration is assumed |
-| Trend Vision One | Optional tenant-scoped alert evidence | Verify tenant authorization, pagination, source age, endpoint-device identity mapping, and an installed Desktop adapter |
+| Adapter candidate            | Intended scope                                                                 | Implementation gate                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Windows OS protection        | Read protection state and request supported on-demand scans                    | Verify official interfaces, supported OS editions, permissions, detection mapping, cancellation, and existing-provider coexistence |
+| macOS OS protection          | Display only officially observable status; link to OS settings where necessary | Verify public interface availability; unavailable scan, quarantine, and resident-state APIs remain unsupported                     |
+| Linux / optional ClamAV      | Explicit on-demand file scans where an installed engine is detected            | Verify engine discovery, signature freshness, safe invocation, exit codes, license/distribution, and OS-specific coverage          |
+| Trend Micro consumer product | Optional product-specific status or handoff                                    | Verify exact product and license plus official integration availability; no consumer integration is assumed                        |
+| Trend Vision One             | Optional tenant-scoped alert evidence                                          | Verify tenant authorization, pagination, source age, endpoint-device identity mapping, and an installed Desktop adapter            |
 
 These are design candidates, not claims of current API support. Official provider documentation and actual OS/provider behavior must be checked during each implementation slice. Engine installation, commercial subscription, privileged helpers, and distribution licenses require separate product decisions before shipping.
 
@@ -84,16 +84,52 @@ Each finding carries provider finding ID, engine/signature version where availab
 
 Storage analysis is read-only and produces explicit cleanup candidates; deletion always executes a separately reviewed and revalidated plan.
 
+## Incremental storage index
+
+[[src/main/device-care/storage-index.ts#StorageIndex]] reuses unchanged directory listings and short-lived file measurements while keeping cleanup on fresh native checks.
+
+The local 0600 atomic index persists names and directory identity/timestamps only, limited to 20,000 entries, 2,000 directories and 4 MiB. Restart can reuse a listing after fresh directory identity, realpath and timestamp checks but revalidates every child. Only single-link regular files under an uninterrupted native directory watcher may reuse in-memory metadata, for at most 60 seconds. Directories and hard links always receive fresh lstat. At most 256 watchers run while Desktop is open; unavailable/failed watches and expired leases fall back to child metadata checks. Watch notifications are hints, not a lossless change journal. The timed lease and explicit detailed analysis cover missed/coalesced events; no instant or whole-disk freshness is claimed.
+
+Dirty directories are enumerated again. Directory replacement recreates the inode-bound watcher; interrupted listings are not persisted. Changes during analysis mark coverage partial. Reports expose enumeration/reuse/metadata-check counts, cache age policy and update time. Detailed report-ID analysis forces fresh enumeration and file metadata. Temporary-media analysis bypasses the index and cleanup still revalidates native identity, ownership and digest. App exit releases watchers. No index content is uploaded.
+
+### Reuses unchanged files and refreshes changed folders
+
+Warm repeats avoid directory enumeration and unchanged file metadata reads; file-content changes refresh the dirty folder while preserving reuse for an unchanged sibling. Focused analysis forces a fresh measurement and cleanup bypasses the cache.
+
+### Restarts validate metadata and reject corrupt indexes
+
+Restart reuses only validated directory listings, never persisted file measurements. Private permissions and corrupt-index fallback preserve the read-only measurement boundary.
+
+### Falls back without monitoring and expires leases
+
+Unavailable watchers and expired leases always revalidate child metadata, even when directory modification times did not change.
+
+## Desktop cleanup Skill
+
+The installed Registry diskspace Skill runs through a fixed native Device care workflow, with audit, exact candidate selection, review, Trash and free-space receipts.
+
+[[src/main/device-care/storage-skill.ts#installedStorageSkill]] validates the selected local profile, strict installed Skill path, bounded real adapter/definition files, canonical schema/scope and matching versions. The descriptor selects the existing Desktop-generated-media capability; it cannot add paths or execute downloaded shell scripts. [[src/main/device-care/ipc.ts#registerDeviceCareIpc]] admits only the main owner frame and serializes the fresh native audit with other jobs. The first report identifies Skill/version and distinguishes nothing eligible from awaiting selection; it never deletes automatically.
+
+The shared Skills screen remains canonical, with a native wrapper link to Device care. The Storage card installs the Registry Skill into the active profile when requested and starts its native workflow. Existing candidate controls create the exact single-use plan and native Cancel-by-default confirmation; the executor rechecks identity/content, moves to OS Trash, preserves recovery and reports actual available-space measurements. Arbitrary application caches are review-only until independently supported native adapters exist. No cloud Agent local-filesystem authority or shell fallback is introduced.
+
+### Validates installed adapter without expanding authority
+
+Native execution requires a real matching installed Skill/adapter in the selected valid profile. Missing, symlinked, mismatched or broader-scope descriptors cannot authorize cleanup.
+
+### Runs audit before native review
+
+The owner-frame runner measures only the fixed native temporary-media root, records Skill identity and returns an empty or selection-required result. It never invokes Trash or approval merely by starting the Skill.
+
 First scope: Desktop-owned disposable media/temp files and verified regenerable caches, plus user-selected folders for analysis. Show filesystem capacity, measured allocated bytes where supported, unavailable areas, and estimate limitations for shared blocks, hard links, sparse files, and snapshots. Existing [[src/main/media.ts#cleanupTempMediaFiles]] is an internal temp-file cleanup implementation, not whole-device maintenance; migrate its applicable user-visible behavior through the new service without changing its scope implicitly.
 
-| Candidate class | Default behavior |
-| --- | --- |
-| Desktop-owned disposable temp/cache | Eligible only after ownership, regeneration, age, and active-use checks |
-| User downloads and large files | Report for review; excluded from automatic cleanup |
-| Duplicate candidates | Report only; equal content does not establish that one copy is disposable |
-| System caches, app databases, other applications' data | Excluded until a dedicated verified adapter exists |
-| Trash, snapshots, backup archives | Display separately where measurable; emptying or deletion is a distinct irreversible action |
-| Credentials, chats, project source, model weights, evidence, quarantine | Protected by default; never classify as generic disposable cache |
+| Candidate class                                                         | Default behavior                                                                            |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Desktop-owned disposable temp/cache                                     | Eligible only after ownership, regeneration, age, and active-use checks                     |
+| User downloads and large files                                          | Report for review; excluded from automatic cleanup                                          |
+| Duplicate candidates                                                    | Report only; equal content does not establish that one copy is disposable                   |
+| System caches, app databases, other applications' data                  | Excluded until a dedicated verified adapter exists                                          |
+| Trash, snapshots, backup archives                                       | Display separately where measurable; emptying or deletion is a distinct irreversible action |
+| Credentials, chats, project source, model weights, evidence, quarantine | Protected by default; never classify as generic disposable cache                            |
 
 Store exclusions by canonical root and enforce them in the executor. Analysis must not traverse network/removable volumes unless selected. Active sessions, open media, active downloads, and files required by another job remain ineligible. A freshness lease prevents a scan plan from acting on changed content. Where checking active use cannot be made reliable, exclude the candidate instead of guessing.
 
@@ -197,3 +233,35 @@ Inspection requires explicit native scope, never overlaps jobs, reports busy int
 ### Confines vendor credentials
 
 Vendor reads use one fixed official regional GET, reject redirects and malformed responses, never follow arbitrary pagination links and refuse weak OS keyrings.
+
+## Disk space visualization
+
+Storage separates whole-volume capacity from bounded folder composition, with coverage labels and keyboard-accessible details.
+
+[[src/main/device-care/storage.ts#DeviceCareStorage]] retains top 12 groups plus Other, logical bytes and deduplicated allocated bytes within existing analysis bounds.
+
+[[src/renderer/src/screens/DeviceCare/StorageVisualization.tsx]] shows separate volume and scope charts. Home analysis is read-only; group selection grants no cleanup authority.
+
+### Preserves measured chart totals
+
+Folder groups retain file counts, logical bytes and allocated bytes across the Other bucket. Symlinks remain excluded.
+
+### Reports valid volume shares
+
+Volume shares reject invalid denominators and never use selected-folder totals as whole-volume occupancy.
+
+### Balances traversal and binds drilldown
+
+Directory cursors rotate in batches of 32 within entry/time/depth bounds. Huge directories cannot monopolize the scan.
+
+Renewed analysis uses a current report ID and revalidates directory identity; renderer paths and symlink replacements cannot expand scope.
+
+### Navigates proportional maps
+
+The accessible treemap preserves measured logical area, offers breadcrumbs and parent navigation, and exposes ranked files and a bounded focused analysis. Path-based cause hints preserve protected data and never mint cleanup authority.
+
+### Cause investigation and Registry workflow
+
+The inspector separates path-based hypotheses from verified growth. Registry's mithril-diskspace-management 1.3.0 adds the installed native Desktop cleanup adapter to metadata audits and fresh complete observation comparisons.
+
+Application data, sources, histories and recovery remain protected; only existing reviewed temporary-media cleanup executes here.

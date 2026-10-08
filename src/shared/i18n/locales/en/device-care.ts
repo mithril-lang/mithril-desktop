@@ -1,4 +1,74 @@
 export default {
+  cleanupSkillTitle: "Disk cleanup Skill",
+  cleanupSkillNote:
+    "Run the Registry Skill in the active profile: measure → select candidates → review → OS Trash → remeasure free space. Install the Skill if needed; cleanup always requires native confirmation.",
+  cleanupSkillScope:
+    "Executable cleanup covers Desktop-generated temporary media. Other folders support measurement and review; owner-native cache cleanup remains separate.",
+  runCleanupSkill: "Install / run cleanup Skill",
+  openCleanupSkill: "Open cleanup Skill",
+  cleanupSkillUnavailable:
+    "Desktop-enabled diskspace Skill is unavailable. Refresh Discover and install its latest version.",
+  cleanupSkillEmpty:
+    "Skill finished measuring. No eligible temporary files were found; nothing was moved.",
+  cleanupSkillReview:
+    "Skill measured cleanup candidates. Select exact items below to create a review plan.",
+  indexReuse: "Index reused",
+  indexFolders: "folder listings",
+  indexFiles: "file measurements",
+  indexChecked: "Metadata checked",
+  indexUpdated: "Analysis updated",
+  indexNote:
+    "Unchanged watched files use measurements up to 60 seconds old. Restart, expired leases and unavailable watches require metadata checks. Detailed folder analysis forces a fresh measurement. Cleanup always revalidates files.",
+  indexChanged:
+    "Changes arrived during analysis; measure the affected folder again.",
+  folderTrail: "Folder navigation",
+  upFolder: "Parent folder",
+  measured: "Measured scope",
+  partialShort: "Partial measurement",
+  moreFolders:
+    "Showing the largest 48 entries. Analyze this folder to narrow the scope.",
+  inspectFolder: "Analyze this folder in detail",
+  causeTitle: "What may be taking space",
+  causeNote:
+    "A path-based clue, not a verified cause or permission to delete. Compare complete measurements to confirm growth.",
+  registryWorkflow: "Registry · storage workflow",
+  registryWorkflowNote:
+    "Audit → compare growth → check owner and active use → review exact cleanup candidates → measure free space again.",
+  mapNote:
+    "Tile area represents measured file size. Open a folder to explore its children; tiny items remain in the list.",
+  groupNote:
+    "Cleanup requires a reviewed plan. Source, chats, credentials, models and recovery data are preserved by default.",
+  cause: {
+    protected:
+      "History, source or recovery data may be present. Preserve it; use the owning application’s retention/export controls.",
+    dependencies:
+      "Dependencies or development environments may have accumulated. Verify active projects and a reproducible reinstall before proposing cleanup.",
+    cache:
+      "Possible application cache. Verify its owner, active use and documented regeneration method.",
+    logs: "Possible log accumulation. Check retention and the writing process before reviewing archived logs.",
+    models:
+      "Possible local model weights. Verify configured models and a recoverable download before reviewing unused versions.",
+    downloads:
+      "Possible downloads or installer archives. Verify the original and recovery copy before selecting exact items.",
+    unknown:
+      "The name does not establish a cause. Inspect the largest files and their owning application first.",
+  },
+
+  analyzeHome: "Analyze home folder (bounded, read-only)",
+  diskMap: "Disk space overview",
+  occupied: "Used or unavailable",
+  occupiedShort: "used / unavailable",
+  volumeNote:
+    "Whole-volume capacity. Folder analysis below is a separate, bounded measurement.",
+  folderMap: "Measured folder breakdown",
+  partialMap:
+    "Coverage is incomplete. Uninspected files are excluded from the chart.",
+  rootFiles: "Files directly in this folder",
+  otherGroups: "Other measured groups",
+  noMeasuredFiles: "No regular files measured in this scope.",
+  allocatedNote:
+    "Allocated bytes are estimates. Hard links count once; APFS clones, compression and snapshots may differ from actual free space.",
+
   vendor:
     "Vendor connections are measured separately from ClamAV. Local quarantine is Mithril custody, not Trend Micro quarantine.",
   monitorTitle: "ClamAV background inspection",

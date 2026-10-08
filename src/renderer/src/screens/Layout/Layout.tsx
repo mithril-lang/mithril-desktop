@@ -985,7 +985,7 @@ function Layout({
 
           {visitedViews.has("device-care") && (
             <div style={paneStyle("device-care")}>
-              <DeviceCare />
+              <DeviceCare profile={activeProfile} />
             </div>
           )}
 
@@ -1007,7 +1007,10 @@ function Layout({
               {remoteMode ? (
                 <RemoteNotice feature="Skills" />
               ) : (
-                <Skills profile={activeProfile} />
+                <Skills
+                  profile={activeProfile}
+                  onOpenCleanupSkill={() => goTo("device-care")}
+                />
               )}
             </div>
           )}

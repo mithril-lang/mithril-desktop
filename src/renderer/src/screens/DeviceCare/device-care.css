@@ -145,3 +145,261 @@
   padding: 8px;
   max-width: 100%;
 }
+
+.diskspace-volume {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.diskspace-volume svg {
+  width: 170px;
+  flex-shrink: 0;
+}
+.diskspace-ring-base,
+.diskspace-ring-used {
+  fill: none;
+  stroke-width: 12;
+}
+.diskspace-ring-base {
+  stroke: var(--bg-tertiary);
+}
+.diskspace-ring-used {
+  stroke: var(--accent);
+}
+.diskspace-volume text {
+  fill: var(--text-primary);
+  font-size: 16px;
+}
+.diskspace-volume .diskspace-ring-label {
+  font-size: 8px;
+}
+.diskspace-stack {
+  display: flex;
+  height: 20px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+}
+.diskspace-groups {
+  list-style: none;
+  padding: 0;
+}
+.diskspace-group {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: start;
+  margin-top: 6px;
+}
+.diskspace-group-name {
+  flex: 1;
+  text-align: left;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.diskspace-selected {
+  outline: 2px solid var(--accent);
+}
+.diskspace-swatch {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+.diskspace-color-0 {
+  background: #6b93dc;
+}
+.diskspace-color-1 {
+  background: #59aaa0;
+}
+.diskspace-color-2 {
+  background: #ba8acf;
+}
+.diskspace-color-3 {
+  background: #d19c61;
+}
+.diskspace-color-4 {
+  background: #cf8295;
+}
+.diskspace-color-5 {
+  background: #8394a6;
+}
+
+.diskspace-hero {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: linear-gradient(125deg, var(--bg-tertiary), var(--bg-secondary));
+}
+.diskspace-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.device-care-card .diskspace-free {
+  font-size: 30px;
+  margin: 6px 0;
+}
+.diskspace-free small {
+  font-size: 13px;
+  font-weight: 400;
+}
+.diskspace-map-heading,
+.diskspace-map-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.diskspace-badge {
+  font-size: 11px;
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.diskspace-coverage {
+  border-left: 3px solid #d19c61;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  font-size: 12px;
+}
+.diskspace-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 10px 0;
+}
+.diskspace-breadcrumb button {
+  font-size: 12px;
+}
+.diskspace-explorer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.38fr);
+  gap: 18px;
+  align-items: start;
+}
+.diskspace-map {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.45;
+  min-height: 240px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+}
+.diskspace-tile {
+  position: absolute;
+  padding: 10px;
+  border: 2px solid var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 5px;
+  overflow: hidden;
+  text-align: left;
+  color: #10202f;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.diskspace-tile span {
+  font-size: 12px;
+  font-weight: 650;
+  max-width: 100%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.diskspace-tile svg {
+  display: inline;
+  vertical-align: middle;
+}
+.diskspace-tile strong {
+  font-size: 17px;
+  white-space: nowrap;
+}
+.diskspace-tile:hover,
+.diskspace-tile:focus-visible {
+  filter: brightness(1.13);
+  z-index: 1;
+  outline: 2px solid var(--text-primary);
+  outline-offset: -3px;
+}
+.diskspace-tile:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.diskspace-map-footer {
+  padding: 10px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.diskspace-inspector {
+  padding: 18px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+  position: sticky;
+  top: 12px;
+  overflow-wrap: anywhere;
+}
+.diskspace-inspector h3 {
+  margin: 8px 0;
+}
+.diskspace-inspector-size {
+  display: block;
+  font-size: 28px;
+}
+.diskspace-inspector p,
+.diskspace-inspector small {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.diskspace-cause,
+.diskspace-registry {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.diskspace-largest {
+  padding-left: 20px;
+  font-size: 12px;
+}
+.diskspace-largest li {
+  margin: 8px 0;
+}
+.diskspace-largest button {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 3px;
+  width: 100%;
+  color: var(--text-primary);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.diskspace-largest span {
+  overflow-wrap: anywhere;
+}
+.diskspace-registry code {
+  font-size: 10px;
+}
+@media (max-width: 1000px) {
+  .diskspace-explorer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .diskspace-inspector {
+    position: static;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .diskspace-tile {
+    transition: none;
+  }
+}

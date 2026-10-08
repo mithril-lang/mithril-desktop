@@ -20,15 +20,17 @@ import type {
   StorageReport,
 } from "../../../../shared/device-care";
 import "./device-care.css";
+import StorageVisualization from "./StorageVisualization";
+import type { RegistryCatalog } from "../../../../shared/registry";
 
-export function formatBytes(bytes: number | null): string {
-  if (bytes === null) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  const index = Math.min(4, Math.floor(Math.log(bytes) / Math.log(1024)));
-  return `${(bytes / 1024 ** index).toFixed(1)} ${["B", "KiB", "MiB", "GiB", "TiB"][index]}`;
-}
+import { formatBytes } from "./storage-format";
+export { formatBytes } from "./storage-format";
 
-export default function DeviceCare(): React.JSX.Element {
+export default function DeviceCare({
+  profile = "default",
+}: {
+  profile?: string;
+}): React.JSX.Element {
   const { t, locale } = useI18n();
   const text = (key: string): string => t(`deviceCare.${key}`);
   const [tab, setTab] = useState<
@@ -132,7 +134,7 @@ export default function DeviceCare(): React.JSX.Element {
       setBusy(null);
     }
   };
-  const analyze = (scope: "temp" | "folder"): void => {
+  const analyze = (scope: "temp" | "folder" | "home"): void => {
     void perform("analysis", async () => {
       setPlan(null);
       setReceipt(null);
@@ -142,6 +144,35 @@ export default function DeviceCare(): React.JSX.Element {
         setReport(next);
         setTab("storage");
       }
+      await refresh();
+    });
+  };
+  const runStorageSkill = (): void => {
+    void perform("analysis", async () => {
+      setPlan(null);
+      setReceipt(null);
+      setSelected([]);
+      if (!(await api.storageSkillStatus(profile))) {
+        const catalog = (await window.hermesAPI.fetchRegistry(
+          true,
+        )) as RegistryCatalog;
+        const skill = catalog.skills.find(
+          (entry) =>
+            entry.id === "mithril-diskspace-management" &&
+            entry.registry === "mithril",
+        );
+        if (!skill) throw Error(text("cleanupSkillUnavailable"));
+        const installed = await window.hermesAPI.installRegistryItem(
+          "skills",
+          skill,
+          profile,
+        );
+        if (!installed.success)
+          throw Error(installed.error || text("cleanupSkillUnavailable"));
+      }
+      const next = await api.runStorageSkill(profile);
+      setReport(next);
+      setTab("storage");
       await refresh();
     });
   };
@@ -426,6 +457,21 @@ export default function DeviceCare(): React.JSX.Element {
         {text("storage")}
       </h2>
       <p>{text("cleanupNote")}</p>
+      <div className="device-care-result">
+        <h3>{text("cleanupSkillTitle")}</h3>
+        <p>{text("cleanupSkillNote")}</p>
+        <p>{text("cleanupSkillScope")}</p>
+        <code>mithril-diskspace-management</code>
+        <div className="device-care-actions">
+          <button
+            className="btn btn-primary"
+            disabled={locked}
+            onClick={runStorageSkill}
+          >
+            {text("runCleanupSkill")}
+          </button>
+        </div>
+      </div>
       <div className="device-care-actions">
         <button
           className="btn btn-primary"
@@ -440,6 +486,13 @@ export default function DeviceCare(): React.JSX.Element {
           onClick={() => analyze("folder")}
         >
           {text("analyzeFolder")}
+        </button>
+        <button
+          className="btn btn-secondary"
+          disabled={locked}
+          onClick={() => analyze("home")}
+        >
+          {text("analyzeHome")}
         </button>
         {busy === "analysis" && (
           <button
@@ -458,14 +511,34 @@ export default function DeviceCare(): React.JSX.Element {
           <p>
             {text(`state.${report.status}`)} · {date(report.observedAt)}
           </p>
-          {facts([
-            [text("capacity"), formatBytes(report.capacity)],
-            [text("free"), formatBytes(report.freeBytes)],
-            [text("logical"), formatBytes(report.logicalBytes)],
-            [text("allocated"), formatBytes(report.allocatedBytes)],
-            [text("files"), report.files],
-            [text("skipped"), report.skipped],
-          ])}
+          {report.workflow && (
+            <div role="status">
+              <strong>
+                {report.workflow.name} · {report.workflow.version}
+              </strong>
+              <p>
+                {text(
+                  report.workflow.state === "nothing-eligible"
+                    ? "cleanupSkillEmpty"
+                    : "cleanupSkillReview",
+                )}
+              </p>
+            </div>
+          )}
+          <StorageVisualization
+            key={report.observedAt}
+            report={report}
+            disabled={locked}
+            onAnalyzeNode={(id) => {
+              void perform("analysis", async () => {
+                setPlan(null);
+                setReceipt(null);
+                setSelected([]);
+                setReport(await api.analyzeNode(id));
+                await refresh();
+              });
+            }}
+          />
           {report.cleanupScope && (
             <>
               <h3>{text("candidates")}</h3>
@@ -512,16 +585,6 @@ export default function DeviceCare(): React.JSX.Element {
               )}
             </>
           )}
-          <details>
-            <summary>{text("largest")}</summary>
-            <ul>
-              {report.largest.map((item) => (
-                <li key={item.name} className="device-care-path">
-                  {item.name} · {formatBytes(item.bytes)}
-                </li>
-              ))}
-            </ul>
-          </details>
         </div>
       ) : (
         <p className="device-care-note">{text("noAnalysis")}</p>

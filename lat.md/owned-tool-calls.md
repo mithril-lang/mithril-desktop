@@ -10,9 +10,11 @@ Desktop's existing dashboard Chat hook exposes explicit tool calls on its attach
 
 Connection, profile, model/provider, session, cancellation and unmount retire call authority. A late response after dispatch becomes unknown; this does not attest that a handler stopped. Package, installed source, authenticated runtime and UI routing remain separate qualification gates.
 
+The compiled shared SDK captures peer approval IDs, immutable session/choices and cancellation. Consumed/cancelled IDs remain retired until connection change, and conflicting presentation withdraws the card. Pending custody is bounded to 32 requests and 256 captured IDs per connection.
+
 The dashboard client advertises server requests on gateway.ready and routes captured peer approval requests to the existing cards. User selection queues a response on the original peer ID; it is not an effect or delivery receipt. Cancel/retirement removes the card authority. Unsupported peer kinds explicitly return method-not-found; no automatic approval or credential entry occurs.
 
-Desktop now vendors agency.10. Its Cloud Browser runner and main adapter consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or replace server effect grants.
+Desktop now vendors agency.11. Its Cloud Browser runner and main adapter consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or replace server effect grants.
 
 ## Test specifications
 
@@ -42,3 +44,7 @@ The mounted hook returns only an explicit allowed human choice to the original p
 ### Mounted peer cancellation isolation
 
 A matching cancellation retires only its original approval. Foreign-session cancellation cannot disable the next owned card or grant its action.
+
+### Shared approval retirement
+
+Compiled shared approval custody suppresses identical duplicate requests and withdraws conflicting presentation. Answered or cancelled peer IDs cannot recreate actionable cards on the same connection.

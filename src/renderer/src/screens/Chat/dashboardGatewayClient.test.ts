@@ -221,3 +221,43 @@ it("ignores retired socket messages and close while the new socket has an outsta
   client.close();
   expect(vi.getTimerCount()).toBe(0);
 });
+
+// @lat: [[owned-tool-calls#Test specifications#Shared approval retirement]]
+it("uses compiled shared approval custody to retire repeated and conflicting peer IDs", async () => {
+  const onEvent = vi.fn();
+  const client = new DashboardGatewayClient({ onEvent });
+  const opening = client.connect("ws://localhost/api/ws");
+  const socket = FakeWebSocket.last!;
+  const send = vi.fn();
+  Object.assign(socket, { send });
+  socket.readyState = FakeWebSocket.OPEN;
+  socket.emit("open");
+  await opening;
+  const request = {
+    id: "srq-000000000001",
+    method: "approval",
+    params: {
+      session_id: "owned",
+      request_id: "queue",
+      command: "first",
+      choices: ["once", "deny"],
+    },
+  };
+  const receive = (value: unknown): void =>
+    socket.emit("message", { data: JSON.stringify(value) });
+  receive(request);
+  receive(request);
+  expect(onEvent).toHaveBeenCalledTimes(1);
+  receive({ ...request, params: { ...request.params, command: "changed" } });
+  expect(onEvent).toHaveBeenLastCalledWith(
+    expect.objectContaining({ type: "approval.cancel", session_id: "owned" }),
+  );
+  expect(client.answerApproval(request.id, "owned", "once")).toBe(false);
+  receive(request);
+  expect(JSON.parse(send.mock.calls.at(-1)![0])).toMatchObject({
+    error: { code: -32602 },
+  });
+  expect(onEvent).toHaveBeenCalledTimes(2);
+  client.close();
+  expect(vi.getTimerCount()).toBe(0);
+});

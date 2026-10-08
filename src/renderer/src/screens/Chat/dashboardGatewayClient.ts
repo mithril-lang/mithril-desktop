@@ -1,3 +1,5 @@
+import { OwnedGatewayApprovals } from "@mithril/workspace/owned-gateway-approvals";
+
 export interface DashboardRpcEvent<T = unknown> {
   payload?: T;
   session_id?: string;
@@ -96,10 +98,7 @@ export class DashboardGatewayClient {
   private pending = new Map<number | string, PendingRequest>();
   private socket: WebSocket | null = null;
   private capabilitySent = false;
-  private approvals = new Map<
-    string,
-    { sessionId: string; requestId: string; choices: Set<string> }
-  >();
+  private approvals = new OwnedGatewayApprovals();
   private readonly requestTimeoutMs: number;
   private readonly connectTimeoutMs: number;
 
@@ -245,60 +244,16 @@ export class DashboardGatewayClient {
       return;
     }
 
-    if (
-      isRecord(message) &&
-      typeof message.id === "string" &&
-      /^srq-[a-f0-9]{12}$/.test(message.id) &&
-      typeof message.method === "string"
-    ) {
-      const params = isRecord(message.params) ? message.params : {};
-      if (message.method !== "approval" || !this.options.onEvent) {
-        this.socket?.send(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: message.id,
-            error: { code: -32601, message: "Unsupported client request" },
-          }),
-        );
-        return;
+    const peer = this.approvals.receive(message, !!this.options.onEvent);
+    if (peer) {
+      if (peer.reply) {
+        try {
+          this.socket?.send(JSON.stringify(peer.reply));
+        } catch {
+          this.close();
+        }
       }
-      if (
-        typeof params.session_id !== "string" ||
-        !/^[A-Za-z0-9_-]{1,200}$/.test(params.session_id) ||
-        typeof params.request_id !== "string" ||
-        !params.request_id.trim() ||
-        params.request_id.length > 256 ||
-        !Array.isArray(params.choices) ||
-        !params.choices.length ||
-        params.choices.length > 4 ||
-        params.choices.some(
-          (choice) =>
-            !["once", "session", "always", "deny"].includes(String(choice)),
-        ) ||
-        new Set(params.choices).size !== params.choices.length ||
-        new TextEncoder().encode(JSON.stringify(message)).length > 128000 ||
-        this.approvals.size >= 32
-      ) {
-        this.socket?.send(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: message.id,
-            error: { code: -32602, message: "Invalid approval request" },
-          }),
-        );
-        return;
-      }
-      if (this.approvals.has(message.id)) return;
-      this.approvals.set(message.id, {
-        sessionId: params.session_id,
-        requestId: params.request_id,
-        choices: new Set(params.choices as string[]),
-      });
-      this.options.onEvent({
-        type: "approval.request",
-        session_id: params.session_id,
-        payload: { ...params, server_request_id: message.id },
-      });
+      if (peer.event) this.options.onEvent?.(peer.event);
       return;
     }
     const normalized = normalizeDashboardNotification(message);
@@ -316,16 +271,8 @@ export class DashboardGatewayClient {
       const params =
         isRecord(message) && isRecord(message.params) ? message.params : {};
       const payload = isRecord(params.payload) ? params.payload : params;
-      const id = String(payload.id ?? "");
-      const approval = this.approvals.get(id);
-      if (approval) {
-        this.approvals.delete(id);
-        this.options.onEvent?.({
-          type: "approval.cancel",
-          session_id: approval.sessionId,
-          payload: { request_id: approval.requestId, server_request_id: id },
-        });
-      }
+      const cancelled = this.approvals.cancel(payload.id);
+      if (cancelled) this.options.onEvent?.(cancelled);
       return;
     }
     if (normalized) this.options.onEvent?.(normalized);
@@ -333,19 +280,11 @@ export class DashboardGatewayClient {
 
   /** Queue a human choice on its original peer request; this is not an effect receipt. */
   answerApproval(id: string, sessionId: string, choice: string): boolean {
-    const approval = this.approvals.get(id);
-    if (
-      !this.connected ||
-      !approval ||
-      approval.sessionId !== sessionId ||
-      !approval.choices.has(choice)
-    )
-      return false;
-    this.approvals.delete(id);
+    if (!this.connected) return false;
+    const reply = this.approvals.choose(id, sessionId, choice);
+    if (!reply) return false;
     try {
-      this.socket!.send(
-        JSON.stringify({ jsonrpc: "2.0", id, result: { choice } }),
-      );
+      this.socket!.send(JSON.stringify(reply));
       return true;
     } catch {
       return false;

@@ -1,4 +1,5 @@
 import type { AppLocale } from "../shared/i18n/types";
+import type { DeviceCareAPI } from "../shared/device-care";
 import type { Attachment } from "../shared/attachments";
 import type { SessionModelOverride } from "../shared/model-override";
 import type { DesktopSessionContinuationItem } from "../shared/session-continuation";
@@ -271,6 +272,8 @@ interface KanbanCreateTaskInput {
 }
 
 interface HermesAPI {
+  deviceCare: DeviceCareAPI;
+  endpoint: import("../shared/endpoint-protection").EndpointAPI;
   // Installation
   checkInstall: () => Promise<InstallStatus>;
   verifyInstall: () => Promise<boolean>;

@@ -62,6 +62,9 @@ jobs:
           path: artifacts/layout-visual/
           if-no-files-found: error
 
+      - name: Verify compiled sidebar layout
+        run: node --test scripts/sidebar-visual.test.mjs
+
   verify-store-automation:
     runs-on: ubuntu-latest
     env:

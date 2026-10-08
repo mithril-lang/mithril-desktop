@@ -2,6 +2,8 @@
 
 The Electron main process keeps the entrypoint small and separates app lifecycle from IPC registration.
 
+[[device-care#Current implementation]] owns typed protection/storage IPC and validates main-window callers before local job execution.
+
 ## Entrypoint
 
 `src/main/index.ts` performs only pre-ready setup and delegates startup.

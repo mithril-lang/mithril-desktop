@@ -44,7 +44,7 @@ export default {
   },
   font: {
     label: "الخط",
-    manrope: "Manrope",
+    manrope: "خط الحكومة (حسب المنطقة)",
     system: "النظام",
     hint: "اختر خط الواجهة",
   },

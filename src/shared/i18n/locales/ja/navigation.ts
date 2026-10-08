@@ -1,4 +1,5 @@
 export default {
+  deviceCare: "端末の保護とメンテナンス",
   chat: "チャット",
   newChat: "新しいチャット",
   sessions: "セッション",

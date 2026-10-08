@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { AppLocale } from "../shared/i18n/types";
+import type { DeviceCareAPI } from "../shared/device-care";
 import type { Attachment } from "../shared/attachments";
 import type { SessionModelOverride } from "../shared/model-override";
 import type { DesktopSessionContinuationItem } from "../shared/session-continuation";
@@ -202,6 +203,48 @@ function historyFilesForOwner(owner: string): CloudChatAPI["historyFiles"] {
 }
 
 const hermesAPI = {
+  deviceCare: {
+    monitorStatus: () => ipcRenderer.invoke("device-care-monitor-status"),
+    startMonitor: () => ipcRenderer.invoke("device-care-start-monitor"),
+    stopMonitor: () => ipcRenderer.invoke("device-care-stop-monitor"),
+    reviewQuarantine: () => ipcRenderer.invoke("device-care-review-quarantine"),
+    quarantine: (id: string) =>
+      ipcRenderer.invoke("device-care-quarantine", id),
+    quarantineEntries: () =>
+      ipcRenderer.invoke("device-care-quarantine-entries"),
+    restoreQuarantine: (id: string) =>
+      ipcRenderer.invoke("device-care-restore-quarantine", id),
+    vendorStatus: () => ipcRenderer.invoke("device-care-vendor-status"),
+    configureVendor: (region: string, token: string) =>
+      ipcRenderer.invoke("device-care-configure-vendor", region, token),
+    disconnectVendor: () => ipcRenderer.invoke("device-care-disconnect-vendor"),
+    vendorAlerts: () => ipcRenderer.invoke("device-care-vendor-alerts"),
+    openConsumer: () => ipcRenderer.invoke("device-care-open-consumer"),
+    status: () => ipcRenderer.invoke("device-care-status"),
+    analyze: (scope: "temp" | "folder") =>
+      ipcRenderer.invoke("device-care-analyze", scope),
+    cancelAnalysis: () => ipcRenderer.invoke("device-care-cancel-analysis"),
+    plan: (ids: string[]) => ipcRenderer.invoke("device-care-plan", ids),
+    execute: (id: string, digest: string) =>
+      ipcRenderer.invoke("device-care-execute", id, digest),
+    startScan: () => ipcRenderer.invoke("device-care-start-scan"),
+    scanJob: () => ipcRenderer.invoke("device-care-scan-job"),
+    cancelScan: () => ipcRenderer.invoke("device-care-cancel-scan"),
+    history: () => ipcRenderer.invoke("device-care-history"),
+    clearHistory: () => ipcRenderer.invoke("device-care-clear-history"),
+    recovery: () => ipcRenderer.invoke("device-care-recovery"),
+  } satisfies DeviceCareAPI,
+
+  endpoint: {
+    status: () => ipcRenderer.invoke("endpoint-status"),
+    setEnabled: (enabled: boolean) =>
+      ipcRenderer.invoke("endpoint-enabled", enabled),
+    chooseFolder: () => ipcRenderer.invoke("endpoint-folder-add"),
+    removeFolder: (folder: string) =>
+      ipcRenderer.invoke("endpoint-folder-remove", folder),
+    scanFile: () => ipcRenderer.invoke("endpoint-file-scan"),
+    updateDefinitions: () => ipcRenderer.invoke("endpoint-definitions-update"),
+  } satisfies import("../shared/endpoint-protection").EndpointAPI,
   // Installation
   checkInstall: (): Promise<{
     installed: boolean;

@@ -32,6 +32,7 @@ import { setGatewayPromptParent } from "../gatewayPrompt";
 import { showChatContextMenu } from "./context-menu";
 import { buildMenu } from "./menu";
 import { setupUpdater } from "./updater";
+import { endpointRuntime, stopEndpoint } from "../endpoint/service";
 
 const APP_NAME = process.env.HERMES_DESKTOP_APP_NAME?.trim() || "Mithril";
 const OPEN_DEVTOOLS_ON_START =
@@ -63,6 +64,9 @@ export function startMainProcess(): void {
 
   let stopOriginalSchedules: (() => void) | null = null;
   app.whenReady().then(() => {
+    void endpointRuntime().catch(() =>
+      console.error("Endpoint monitor initialization failed"),
+    );
     electronApp.setAppUserModelId("fund.mithril.desktop");
 
     // Long-running services (former launchd KeepAlive agents) from
@@ -132,6 +136,7 @@ export function startMainProcess(): void {
 
   app.on("before-quit", () => {
     stopOriginalSchedules?.();
+    stopEndpoint();
     stopHealthPolling();
     // Only the watch loop stops: supervised services are detached and keep
     // running; the next Desktop adopts them from their pid files.

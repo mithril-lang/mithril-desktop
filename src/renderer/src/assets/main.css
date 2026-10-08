@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "@mithril/design-system/chat.css";
 @import "@mithril/workspace/desktop-profile.css";
+@import "@mithril/design-system/desktop.css";
+@import "@mithril/workspace/desktop-sidebar.css";
 
 /* ========================================================================
    Mithril Desktop — Clean Design System
@@ -512,9 +514,7 @@
   --radius-lg: 14px;
   --radius-xl: 20px;
   --transition: 150ms ease;
-  --font-sans:
-    "Cairo", "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
+  --font-sans: var(--font-locale, "Noto Sans"), Arial, sans-serif;
   --font-mono:
     "SF Mono", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace;
   /* Amounts and money figures (bank teller totals, token balances). */
@@ -2532,7 +2532,6 @@ body:has(.shell-vibrant),
 }
 
 /* ── Profile avatar (shared: nav, active bar, manage page) ── */
-
 
 /* Sidebar footer with theme switcher */
 .sidebar-footer {
@@ -15394,26 +15393,95 @@ body:has(.shell-vibrant),
 }
 
 /* Native-only window dragging stays in the Desktop adapter. */
-.active-sessions-bar { -webkit-app-region:drag; z-index:1001; }
+.active-sessions-bar {
+  -webkit-app-region: drag;
+  z-index: 1001;
+}
 
 /* Electron drag regions belong to the native adapter. */
-.active-session-chip, .active-session-new { -webkit-app-region: no-drag; }
+.active-session-chip,
+.active-session-new {
+  -webkit-app-region: no-drag;
+}
 
 /* Cloud history shares its Desktop/Web component; device history stays explicit. */
-.sidebar-cloud-history { flex:1; min-height:0; overflow:hidden; }
-.sidebar-chat-section { flex:0 0 auto; max-height:180px; overflow:auto; }
-.sidebar-collapsed .workspace-sidebar-history,.sidebar-collapsed .workspace-session-sidebar .sidebar-new-chat span:last-child { display:none; }
-.sidebar-collapsed .workspace-session-sidebar .sidebar-new-chat { justify-content:center; }
+.sidebar-cloud-history {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.sidebar-chat-section {
+  flex: 0 0 auto;
+  max-height: 180px;
+  overflow: auto;
+}
+.sidebar-collapsed .workspace-sidebar-history,
+.sidebar-collapsed
+  .workspace-session-sidebar
+  .sidebar-new-chat
+  span:last-child {
+  display: none;
+}
+.sidebar-collapsed .workspace-session-sidebar .sidebar-new-chat {
+  justify-content: center;
+}
 
 /* The API workspace owns navigation; device history is a contextual panel. */
-.device-history-button { width:100%; border:0; padding:12px 16px; background:transparent; color:var(--text-secondary); text-align:left; cursor:pointer; }
-.device-history-button:hover { color:var(--text-primary); }
-.device-history-backdrop { position:fixed; inset:0; z-index:1000; background:#0008; display:flex; align-items:center; justify-content:center; padding:24px; }
-.device-history-dialog { position:fixed; z-index:1001; top:50%; left:50%; transform:translate(-50%, -50%); background:var(--bg-primary, #202020); color:var(--text-primary, #eee); border:1px solid #8885; border-radius:16px; padding:20px; width:min(520px, 100%); max-height:80vh; overflow:auto; box-shadow:0 24px 80px #0006; }
-.device-history-close { float:right; background:transparent; color:inherit; border:1px solid #8885; border-radius:8px; padding:6px 12px; cursor:pointer; }
-.device-history-dialog .sidebar-chat-scroll { max-height:60vh; overflow:auto; }
+.device-history-button {
+  width: 100%;
+  border: 0;
+  padding: 12px 16px;
+  background: transparent;
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+.device-history-button:hover {
+  color: var(--text-primary);
+}
+.device-history-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #0008;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.device-history-dialog {
+  position: fixed;
+  z-index: 1001;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-primary, #202020);
+  color: var(--text-primary, #eee);
+  border: 1px solid #8885;
+  border-radius: 16px;
+  padding: 20px;
+  width: min(520px, 100%);
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 24px 80px #0006;
+}
+.device-history-close {
+  float: right;
+  background: transparent;
+  color: inherit;
+  border: 1px solid #8885;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.device-history-dialog .sidebar-chat-scroll {
+  max-height: 60vh;
+  overflow: auto;
+}
 
-.device-schedules-dialog { width:min(1000px, calc(100vw - 48px)); }
+.device-schedules-dialog {
+  width: min(1000px, calc(100vw - 48px));
+}
 
 .repository-sync-notice {
   position: relative;

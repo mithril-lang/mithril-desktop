@@ -1,0 +1,48 @@
+name: Publish Endpoint Definitions
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 3 * * *"
+  push:
+    branches: [main]
+    paths:
+      - resources/endpoint/definitions.json
+      - resources/endpoint/trust.json
+      - scripts/publish-endpoint-definitions.mjs
+      - .github/workflows/endpoint-definitions.yml
+permissions:
+  contents: write
+concurrency:
+  group: endpoint-definitions
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: source
+      - uses: actions/checkout@v4
+        with:
+          ref: endpoint-definitions
+          path: feed
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Sign and publish immutable definition pack
+        working-directory: source
+        env:
+          ENDPOINT_DEFINITIONS_SIGNING_KEY: ${{ secrets.ENDPOINT_DEFINITIONS_SIGNING_KEY }}
+        run: node scripts/publish-endpoint-definitions.mjs ../feed
+      - name: Commit feed freshness
+        working-directory: feed
+        run: |
+          set -euo pipefail
+          git config user.name "mithril-endpoint-publisher"
+          git config user.email "endpoint-publisher@mithril.fund"
+          git add v1
+          if ! git diff --cached --quiet; then
+            git commit -m "Refresh signed endpoint definitions"
+            git push origin HEAD:endpoint-definitions
+          fi

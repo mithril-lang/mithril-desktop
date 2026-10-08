@@ -19,6 +19,7 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[office-cron-presence]] — cron activity and safe gateway restart timing in the Office.
 - [[mithril-migration]] — ownership, service compatibility, and release conditions for moving the old desktop fork into Mithril Fund.
 - [[mithril-action-plane]] — the versioned action envelope and bounded Desktop approval projection for the Mithril Agent fork.
+- [[device-care]] — endpoint protection and disk maintenance, bounded local jobs, cleanup authority and measured evidence.
 - [[desktop-security]] — verified Unix bootstrap execution and safe rendering of runtime provider names.
 - [[agent-capabilities]] — capability-based compatibility between the independent desktop and system-installed Hermes Agent, including bounded runtime evidence and update gating.
 - [[connections]] — the versioned main-process connection registry, stable active connection identity, and lossless migration from the legacy singleton configuration.
@@ -51,3 +52,6 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[canonical-chat]] — default Mithril API-only D1 sessions, explicit native import and native runtime boundaries.
 
 - [[mithril-code]] — profile-scoped System One coding through the Hermes plugin CLI, source review and real execution receipts.
+
+- [[language-typography]] — government-adopted default fonts, language switching and offline script fallbacks.
+- [[endpoint-protection]] — local endpoint monitoring, bounded detection and signed definition delivery.

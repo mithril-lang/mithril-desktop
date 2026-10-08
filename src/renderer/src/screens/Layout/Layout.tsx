@@ -1,5 +1,7 @@
 import { useWorkspaceSettingsRoute } from "../CloudWorkspace/useWorkspaceSettingsRoute";
 import Code from "../Code/Code";
+import DeviceCare from "../DeviceCare/DeviceCare";
+import { ShieldCheck } from "lucide-react";
 import { Code2 } from "lucide-react";
 import CloudSecurity from "../CloudWorkspace/CloudSecurity";
 import Agents from "../Agents/Agents";
@@ -73,6 +75,7 @@ type View =
   | "skills"
   | "memory"
   | "tools"
+  | "device-care"
   | "security"
   | "schedules"
   | "kanban"
@@ -89,6 +92,7 @@ const PINNED_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   // longer a top-level nav item.
   { view: "security", icon: KeyRound, labelKey: "navigation.security" },
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
+  { view: "device-care", icon: ShieldCheck, labelKey: "navigation.deviceCare" },
 ];
 
 const FOOTER_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
@@ -976,6 +980,12 @@ function Layout({
                 active={view === "office"}
                 onOpenChat={() => goTo("mithril-chat")}
               />
+            </div>
+          )}
+
+          {visitedViews.has("device-care") && (
+            <div style={paneStyle("device-care")}>
+              <DeviceCare />
             </div>
           )}
 

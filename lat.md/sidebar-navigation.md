@@ -207,3 +207,9 @@ Settings boolean preferences use one accessible controlled switch with consisten
 Fresh chat session ids are provisional until a turn produces output or completes successfully, so provider errors do not create visible recent-session rows.
 
 The main-process transports still send a generated `X-Hermes-Session-Id` on fresh requests to avoid gateway fingerprint collisions, but [[src/main/hermes.ts#sendMessageViaApi]] and the runs transport announce that id to the renderer only after visible output, tool/reasoning activity, or successful completion. Resumed sessions are announced immediately because the renderer already knows they are existing conversations. This keeps [[src/renderer/src/screens/Chat/hooks/useChatIPC.ts#useChatIPC]] from binding a failed first turn to a new sidebar entry.
+
+## Shared sidebar stylesheet admission
+
+The renderer entry stylesheet imports the original shared sidebar CSS directly. This keeps Pinned, Projects and Chats styled when native sidebar wrappers are absent from the active cloud layout.
+
+The compiled-CSS browser regression in scripts/sidebar-visual.test.mjs renders the real shared component with pinned and project rows, checking horizontal alignment, truncation, disclosure keyboard control and reachable footer at narrow and wide sizes.

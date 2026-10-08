@@ -86,6 +86,32 @@ describe("I18nProvider", () => {
     expect(await screen.findByText("Bienvenido a Mithril")).toBeInTheDocument();
   });
 
+  it("retains the visitor country when the display language changes", async () => {
+    Object.defineProperty(navigator, "languages", {
+      configurable: true,
+      value: ["en-GB"],
+    });
+    await act(async () => {
+      render(
+        <I18nProvider>
+          <LocaleSwitcherProbe />
+        </I18nProvider>,
+      );
+    });
+    expect(document.documentElement.dataset.fontCountry).toBe("GB");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Switch to Spanish" }),
+      );
+    });
+    expect(document.documentElement.lang).toBe("es");
+    expect(document.documentElement.dataset.fontCountry).toBe("GB");
+    Object.defineProperty(navigator, "languages", {
+      configurable: true,
+      value: ["en-US"],
+    });
+  });
+
   it("does not overwrite the main-process locale with the startup fallback", async () => {
     let resolveMainLocale: (locale: AppLocale) => void = () => {};
     getLocale.mockReturnValue(

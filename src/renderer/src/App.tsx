@@ -151,10 +151,10 @@ function App(): React.JSX.Element {
       accountCheck.current++;
       setAuthenticated(false);
       setMithrilConnected(false);
-      void openWorkspace();
+      if (screen !== "endpoint") void openWorkspace();
     };
     const check = (): void => {
-      if (checking || screen === "splash") return;
+      if (checking || screen === "splash" || screen === "endpoint") return;
       checking = true;
       void openWorkspace().finally(() => {
         checking = false;
@@ -216,12 +216,18 @@ function App(): React.JSX.Element {
   }
 
   function renderScreen(): React.JSX.Element {
-    if (screen !== "splash" && screen !== "mithril" && !authenticated)
+    if (
+      screen !== "splash" &&
+      screen !== "mithril" &&
+      screen !== "endpoint" &&
+      !authenticated
+    )
       return (
         <MithrilStart
           initiallyConnected={false}
           profile={setupProfile}
           onOpenWorkspace={() => void openWorkspace()}
+          onOpenProtection={() => setScreen("endpoint")}
         />
       );
     switch (screen) {

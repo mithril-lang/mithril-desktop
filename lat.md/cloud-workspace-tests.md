@@ -1211,6 +1211,8 @@ Real Chromium checks built Desktop styles at narrow/normal widths in both themes
 
 These are layout fixtures, not authenticated client journeys.
 
+The Refresh ledger action must also pass real pointer hit testing, receive a click without forced interaction, and remain keyboard focusable beneath the notice. Screenshot geometry alone does not establish that a visible control can be used.
+
 ## Complete long transcript checkpoints
 
 Mapped and remote-only conversations read all contiguous pages beyond a thousand before title writeback or cache publication, while preserving owner/version/cursor checks and never executing a turn.

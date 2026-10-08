@@ -65,6 +65,37 @@ test("compiled Desktop CSS keeps long synchronization notices above content", as
             false,
             "notice must wrap within a narrow window",
           );
+          const refresh = page.getByRole("button", { name: "Refresh ledger" });
+          assert.equal(
+            await refresh.evaluate((button) => {
+              const bounds = button.getBoundingClientRect();
+              const target = document.elementFromPoint(
+                bounds.x + bounds.width / 2,
+                bounds.y + bounds.height / 2,
+              );
+              return target === button || button.contains(target);
+            }),
+            true,
+            "a visible action must not be covered by a notice or another layer",
+          );
+          await refresh.evaluate((button) => {
+            button.addEventListener("click", () => {
+              button.dataset.activations = String(
+                Number(button.dataset.activations || 0) + 1,
+              );
+            });
+          });
+          await refresh.click({ timeout: 2000 });
+          assert.equal(await refresh.getAttribute("data-activations"), "1");
+          await refresh.focus();
+          await page.keyboard.press("Enter");
+          assert.equal(await refresh.getAttribute("data-activations"), "2");
+          assert.equal(
+            await refresh.evaluate(
+              (button) => document.activeElement === button,
+            ),
+            true,
+          );
         } finally {
           await page.screenshot({
             path: `artifacts/layout-visual/notice-${width}-${theme}.png`,

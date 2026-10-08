@@ -46,7 +46,7 @@ export default {
   },
   font: {
     label: "Font",
-    manrope: "Manrope",
+    manrope: "Government font (language)",
     gsans: "G Sans",
     hint: "Choose the interface font",
   },

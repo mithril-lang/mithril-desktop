@@ -640,8 +640,8 @@ export const THEME_STORAGE_KEY = "hermes-theme";
 // ── Font ────────────────────────────────────────────────
 
 // Each option maps to a full font-family stack assigned to `--font-sans`.
-// "manrope" is the bundled default; the rest fall back to OS-installed
-// families with a sane sans-serif chain so something always renders.
+// The legacy "manrope" preference id now follows the shared locale font.
+// Explicit alternative choices retain their existing stacks.
 export {
   FONT_OPTIONS,
   type FontOption,

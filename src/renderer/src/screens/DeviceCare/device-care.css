@@ -1,0 +1,126 @@
+.device-care-page {
+  overflow: auto;
+  padding: 32px;
+  color: var(--text-primary);
+}
+.device-care-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+.device-care-header h1 {
+  font-size: 24px;
+  margin: 0 0 8px;
+}
+.device-care-page p,
+.device-care-header small {
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+.device-care-tabs,
+.device-care-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+.device-care-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  margin: 20px 0;
+}
+.device-care-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  margin: 0 0 16px;
+}
+.device-care-card h3 {
+  font-size: 15px;
+  margin: 18px 0 10px;
+}
+.device-care-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.device-care-facts dt {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.device-care-facts dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.device-care-result {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-top: 20px;
+}
+.device-care-path,
+.device-care-result pre {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.device-care-result pre {
+  max-height: 260px;
+  overflow: auto;
+  background: var(--bg-primary);
+  padding: 16px;
+}
+.device-care-note {
+  font-size: 13px;
+}
+.device-care-candidates {
+  max-height: 300px;
+  overflow: auto;
+  margin-bottom: 16px;
+}
+.device-care-candidates label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.device-care-candidates span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.device-care-candidates small {
+  display: block;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.device-care-history {
+  padding: 0;
+  list-style: none;
+}
+.device-care-history li {
+  display: grid;
+  gap: 8px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.device-care-error {
+  border: 1px solid var(--border-bright);
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  padding: 16px;
+}
+@media (max-width: 700px) {
+  .device-care-page {
+    padding: 16px;
+  }
+  .device-care-header {
+    flex-direction: column;
+  }
+}

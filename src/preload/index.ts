@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { AppLocale } from "../shared/i18n/types";
+import type { DeviceCareAPI } from "../shared/device-care";
 import type { Attachment } from "../shared/attachments";
 import type { SessionModelOverride } from "../shared/model-override";
 import type { DesktopSessionContinuationItem } from "../shared/session-continuation";
@@ -202,6 +203,22 @@ function historyFilesForOwner(owner: string): CloudChatAPI["historyFiles"] {
 }
 
 const hermesAPI = {
+  deviceCare: {
+    status: () => ipcRenderer.invoke("device-care-status"),
+    analyze: (scope: "temp" | "folder") =>
+      ipcRenderer.invoke("device-care-analyze", scope),
+    cancelAnalysis: () => ipcRenderer.invoke("device-care-cancel-analysis"),
+    plan: (ids: string[]) => ipcRenderer.invoke("device-care-plan", ids),
+    execute: (id: string, digest: string) =>
+      ipcRenderer.invoke("device-care-execute", id, digest),
+    startScan: () => ipcRenderer.invoke("device-care-start-scan"),
+    scanJob: () => ipcRenderer.invoke("device-care-scan-job"),
+    cancelScan: () => ipcRenderer.invoke("device-care-cancel-scan"),
+    history: () => ipcRenderer.invoke("device-care-history"),
+    clearHistory: () => ipcRenderer.invoke("device-care-clear-history"),
+    recovery: () => ipcRenderer.invoke("device-care-recovery"),
+  } satisfies DeviceCareAPI,
+
   // Installation
   checkInstall: (): Promise<{
     installed: boolean;

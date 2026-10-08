@@ -1,4 +1,5 @@
 export default {
+  deviceCare: "Device care",
   chat: "Chat",
   newChat: "New Chat",
   sessions: "Sessions",

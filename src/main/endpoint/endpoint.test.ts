@@ -11,6 +11,7 @@ import {
   realpath,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import bundled from "../../../resources/endpoint/definitions.json";
 import {
@@ -150,6 +151,16 @@ describe("Signed definition admission", () => {
   });
 });
 describe("Bounded detection", () => {
+  it.skipIf(process.platform === "win32")(
+    "refuses a named pipe without waiting for a writer",
+    async () => {
+      const dir = await scratch();
+      const file = join(dir, "pipe");
+      execFileSync("/usr/bin/mkfifo", [file]);
+      const runtime = new EndpointRuntime(join(dir, "state"));
+      await expect(runtime.scanFile(file)).rejects.toThrow("regular files");
+    },
+  );
   it("counts distinct changed paths per folder, ignoring duplicate notifications and other roots", () => {
     const detector = new FileChangeDetector();
     for (let i = 0; i < 500; i++)

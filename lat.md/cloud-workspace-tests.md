@@ -1248,3 +1248,8 @@ A 1,205-session compression chain archives/restores through bounded SQL batches 
 ## Complete packaged shared timeline
 
 The actual vendored Workspace export preserves 20,006 contiguous events, first and last messages, stable identities and tombstones. A missing late event is refused instead of displaying an incomplete conversation.
+
+
+## Packaged acknowledged journal cleanup
+
+The actual compiled vendored pending store restores 1,205 edits and deletes only acknowledged keys, retaining an interleaved unacknowledged edit and another owner before the final drain.

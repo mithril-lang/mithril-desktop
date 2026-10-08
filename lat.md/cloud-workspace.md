@@ -1347,3 +1347,12 @@ Preview.48 pins Workspace 0.6.29-schedules.42, removing the shared transcript pr
 Web and Desktop must project every already-validated event, including tombstones and stable original identities. A missing or malformed late event still refuses publication of an incomplete timeline. The original chunked storage and per-request bounds are unchanged. This candidate also includes current-main shared Browser web-tool state; compatible API publication remains required before an installer. Source/package tests are distinct from installed upgrade and live cross-device proof.
 
 Workspace .42 archive SHA256 is `f809a5a742b11d4273acc0bf029d4e28f8484c5d052e387ec7beab4b5b2c392f`. All 463 producer, tarball and installed package files were compared byte-for-byte before the consumer test. This is dependency verification, not an installed app update.
+
+
+### Acknowledged journal cleanup (draft)
+
+Preview.49 pins Workspace 0.6.29-schedules.43, using transaction-local paged primary-key reads to group only acknowledged adjacent stored keys for deletion.
+
+Unacknowledged keys break a range; other-owner and concurrent-window edits stay durable. Database version 1 remains compatible with earlier clients. Sidebar replacement refuses receipt collisions and identical receipts avoid index rewrites. The original 1,205-entry tests keep their complete fixtures and original deadlines. Native consumer testing uses the actual compiled packaged store. This is source/package proof, not installed synchronization or upgrade.
+
+Workspace .43 SHA256 is `b3472d11ab98207c3f0584f4bc49b01115751c57e24f7e08d4a08b92f12a19e5`; all 465 producer/archive/installed dependency files match. API publication and actual installed update remain release gates.

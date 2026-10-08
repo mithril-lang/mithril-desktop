@@ -667,6 +667,9 @@ export class CloudWorkspace {
     const { value } = await this.authorizedRequest("/v1/schedules");
     const snapshot = value as ScheduleSnapshot;
     if (
+      (snapshot.datasetGeneration !== undefined &&
+        (!Number.isSafeInteger(snapshot.datasetGeneration) ||
+          snapshot.datasetGeneration < 0)) ||
       !Array.isArray(snapshot.schedules) ||
       snapshot.schedules.length > 100 ||
       !snapshot.schedules.every(validCloudSchedule)
@@ -768,6 +771,7 @@ export class CloudWorkspace {
     const result = value as ScheduleResult;
     if (
       result.operationId !== operation.operationId ||
+      (result.datasetGeneration ?? 0) !== (operation.datasetGeneration ?? 0) ||
       !["accepted", "conflict"].includes(result.status) ||
       (result.schedule !== null && !validCloudSchedule(result.schedule))
     )

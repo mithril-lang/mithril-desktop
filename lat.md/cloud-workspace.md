@@ -1458,3 +1458,11 @@ Preview.62 consumes the fresh Workspace .57 package after merging current Deskto
 All 469 producer/archive/installed dependency files match. Archive SHA256 is `ed3a80d7a34f89e2a7bcc903235aa193dd755d66e853f53772985148975b8c3f`. Existing .56 remains immutable. A clean lockfile installation supplies this consumer; no installed user data, credentials or application bundle was changed.
 
 Fund qualification passed 448 shared tests, 11 release-gate tests and Workspace/API types after building shared exports. The full API recheck has an archive export timeout at its unchanged 30-second deadline; complete runtime qualification remains a release gate. Source integration and package equality do not prove API/D1 publication, complete restore writer fencing/execution custody, signed installer availability or authenticated cross-device behavior.
+
+### Schedule edit restore generation consumer (draft)
+
+Preview.63 pins Workspace schedules.58, sharing captured schedule generation and unchanged operation retries across Web and the original Desktop Schedules screen.
+
+Main IPC rejects invalid snapshot generations and receipts from a different generation. Installer preflight requires `cloud-schedules-dataset-v1` before publication. The shared adapter requires review after an identical-row restore and never reassigns an unconfirmed operation to the new generation. Original source/runtime execution remains separately fenced; complete managed-bot/dispatch generation, hot restore custody and retained-object lifecycle are still required.
+
+Fund 4a817098 passed 449 shared tests, eight real-D1 Schedule cases including the HTTP 409 refusal and an admission/commit restore race, shared/API types, changed-file lint and 11 App release gates. The preceding exact integrated commit 35f4461c passed signed gad API CI with 572 tests, one existing skip and 34 release tests. A new receipt is required for the generation change. No production schema, published installer or installed cross-device behavior is claimed by this candidate.

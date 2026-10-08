@@ -637,6 +637,40 @@ it("uses fixed owner-checked schedule routes and refuses writes without chat and
         String(url).endsWith("/v1/schedules") && init?.method === "POST",
     ),
   ).toBe(true);
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: "a" },
+        scopes: [
+          "workspace:read",
+          "workspace:write",
+          "chat:write",
+          "inference",
+        ],
+      });
+    if (init?.method === "POST")
+      return reply({
+        schemaVersion: 1,
+        userId: "a",
+        operationId: op.operationId,
+        datasetGeneration: 2,
+        status: "accepted",
+        schedule: null,
+      });
+    return reply({
+      schemaVersion: 1,
+      userId: "a",
+      datasetGeneration: -1,
+      schedules: [],
+    });
+  });
+  await expect(client.getSchedules()).rejects.toThrow(
+    "Schedule snapshot rejected",
+  );
+  await expect(
+    client.applySchedule({ ...op, datasetGeneration: 1 }),
+  ).rejects.toThrow("Schedule receipt rejected");
   fetcher.mockImplementation(async (url: string) =>
     url.endsWith("/v1/me")
       ? reply({

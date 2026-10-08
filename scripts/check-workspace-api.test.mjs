@@ -48,6 +48,22 @@ test("refuses old API and verifies the fixed no-token health route before instal
       sidebarInventoryProtocol: "sidebar-inventory-keyset-v1",
       workspaceInventoryProtocol: "workspace-inventory-keyset-v1",
       repositoryInventoryProtocol: "repository-inventory-counted-v1",
+      schedulesDatasetProtocol: "cloud-schedules-dataset-v1",
     });
   });
+});
+
+test("refuses an otherwise compatible API without schedule restore-generation admission", async () => {
+  await assert.rejects(
+    checkWorkspaceApi(async () =>
+      Response.json({
+        ok: true,
+        sessionInventoryProtocol: "chat-inventory-keyset-v1",
+        sidebarInventoryProtocol: "sidebar-inventory-keyset-v1",
+        workspaceInventoryProtocol: "workspace-inventory-keyset-v1",
+        repositoryInventoryProtocol: "repository-inventory-counted-v1",
+      }),
+    ),
+    /must be published/,
+  );
 });

@@ -1238,3 +1238,7 @@ Corrupt local cache bytes are re-fetched and atomically replaced only after cano
 ## Attachment cache path integrity
 
 Attachment identities are validated before filesystem access. Symlinked storage is rejected, while original text/image representation and provenance sizes are retained.
+
+## Complete compression lineage synchronization
+
+A 1,205-session compression chain archives/restores through bounded SQL batches with complete read-back. Unexpected membership changes roll back the operation while messages, project links and unrelated conversations remain intact.

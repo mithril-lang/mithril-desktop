@@ -1329,3 +1329,13 @@ Valid cached files avoid network access. Missing or digest/size-corrupt working-
 Real-byte tests restore fifty-four MiB, verify all file contents and owner paths, reopen without network, retain original text/image representation, recover corrupted cache bytes and reject corrupt transport bytes, retired results and symlinked storage. Individual file/protocol limits, materialized image/text memory and full account archive/export/import remain separate work. No production R2 write or installed restoration is inferred from these tests.
 
 Local qualification: eight original-history/attachment suites pass 84 tests. Changed-file lint, full Desktop typecheck/build, four compiled-CSS layout cases and `lat check` pass. The fixed-route public API preflight still refuses the unpublished canonical Workspace inventory protocol; preview.46 has no GitHub release. No production R2/D1 write or installed replacement occurred.
+
+## Complete original compression archive lineage
+
+Preview.47 removes the thousand-session refusal from original compression-lineage archive/restore writeback.
+
+The original ancestor/descendant traversal and exact captured anchor archive flag remain. A SQLite iterator captures every lineage row, and hundred-ID update batches avoid the SQLite variable-count ceiling. One immediate transaction protects capture, updates and complete read-back. Read-back recomputes lineage membership as well as every retained field; a trigger-created or altered member rolls the entire operation back. Original messages, project associations and unrelated conversations retain their original data. Arrays still hold lineage metadata for exact comparison; memory/SQLite capacity is not unlimited.
+
+A real SQLite fixture archives and restores 1,205 compressed sessions from their middle member, verifies every original row plus retained evidence/project links, and proves rollback when a trigger inserts unexpected lineage membership. This source qualification is distinct from production and installed synchronization. Full canonical archive/export/import and original attachment/protocol limits remain separate work.
+
+Local qualification: eight history/attachment suites pass 85 tests, changed-file lint and full Desktop types/build pass, and `lat check` passes after shortening the test-spec overview. Workspace `.41` stays immutable. No production write, installer publication or installed replacement occurred; the canonical API publication and full account archive gates remain outstanding.

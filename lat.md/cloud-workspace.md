@@ -1293,3 +1293,15 @@ Fund's candidate API removes the shared thousand-record admission ceiling and as
 The local fixed-route compatibility test refuses the former API even when Chat/Sidebar protocols are present. The current public endpoint still fails the compatibility gate, so no installer publication or installed replacement is inferred.
 
 Local qualification: Fund's 19 Workspace/repository API tests pass using local D1, including controlled concurrent-read rejection and 1,302 portable records plus optional file manifests. API types and dry-run build pass. Both release compatibility tests pass; preview.43 Desktop types/build and `lat check` pass. Native preview.42 CI run 37710630739 succeeded. This draft gate update does not establish production readiness or an installed upgrade.
+
+## Complete durable portable metadata journal
+
+Workspace `.41` restores all owner-bound saved metadata operations through bounded IndexedDB keyset reads, preserving original receipt IDs without a thousand-operation ceiling.
+
+Storage rejects changed ID reuse, duplicate batches and replacement collisions before committing; explicit conflict replacement requires the saved predecessor. Startup validates the complete inventory. Replays avoid rewriting already durable records, retain saved fingerprints and refuse in-memory identity changes before network dispatch. Revision merging and restored-ID lookup use maps/sets while preserving existing ordering and stale-revision rules. Account retirement, fifty-operation API batches, conflict review and exclusion of inference/tools remain.
+
+Real IndexedDB fixtures retain 1,205 edits across reopen and recover a lost acknowledgement through exact-ID replay without duplicate revisions or foreign-owner cleanup. Native preview.44 pins the new immutable workspace archive; publication and installed behavior are separate gates. Full canonical account archive/export/import remains outstanding.
+
+Local qualification: all 399 shared Workspace tests pass with one worker and unchanged fixture deadlines; the two-worker run under concurrent packaging hit timing deadlines, so that earlier run is not green evidence. All 463 archive files match producer and installed Native dependency, and lock integrity is verified; SHA256 `31de9955705ab48c077a10ce7e1c97ffbed60f11eb1b0659d00cce22e8491d68`. Desktop types/build, 20 chat/updater tests, four compiled-CSS layout cases, eight shared-sidebar browser cases and `lat check` pass. Preview.43 CI run 37711282177 passed. The live canonical API compatibility gate still refuses installer publication.
+
+The installed client remains preview.35, the public Mac update feed advertises preview.36, and the local updater log ends with the October 7 preview.35 startup check. These reads do not prove an installed upgrade. UI checks cover sidebar and notification fixtures; authenticated end-to-end page navigation, sign-in recovery, new chat and actual installed update remain release qualification work.

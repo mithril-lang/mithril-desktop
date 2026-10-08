@@ -148,7 +148,10 @@ function openWithFileKey(record: Record<string, unknown>): string | null {
 export function mithrilStorageProtection(
   profile?: string,
 ): MithrilStorageProtection {
-  const path = tokenPath(profile);
+  return storageProtectionAt(tokenPath(profile));
+}
+
+function storageProtectionAt(path: string): MithrilStorageProtection {
   if (existsSync(path)) {
     try {
       const { version } = JSON.parse(readFileSync(path, "utf8")) as {
@@ -164,7 +167,10 @@ export function mithrilStorageProtection(
 }
 
 export function readMithrilToken(profile?: string): string | null {
-  const path = tokenPath(profile);
+  return readTokenAt(tokenPath(profile));
+}
+
+function readTokenAt(path: string): string | null {
   if (!existsSync(path)) return null;
   try {
     const data = JSON.parse(readFileSync(path, "utf8")) as {
@@ -188,12 +194,15 @@ export function writeMithrilToken(
   profile: string | undefined,
   token: string,
 ): void {
+  writeTokenAt(tokenPath(profile), token);
+}
+
+function writeTokenAt(path: string, token: string): void {
   if (!token) throw new Error("Secure token storage is unavailable.");
   const useKeychain = mithrilKeychainAvailable();
   if (!useKeychain && !installSecretUsable()) {
     throw new Error("Secure token storage is unavailable.");
   }
-  const path = tokenPath(profile);
   const previous = existsSync(path) ? readFileSync(path, "utf8") : null;
   try {
     safeWriteFile(
@@ -214,7 +223,7 @@ export function writeMithrilToken(
     } catch {
       /* non-POSIX filesystem */
     }
-    if (readMithrilToken(profile) !== token) {
+    if (readTokenAt(path) !== token) {
       throw new Error("The keychain could not read the stored token.");
     }
   } catch (error) {
@@ -228,4 +237,66 @@ export function writeMithrilToken(
 export function clearMithrilToken(profile?: string): void {
   const path = tokenPath(profile);
   if (existsSync(path)) unlinkSync(path);
+}
+
+/** Account identity belongs to the installation, not the selected agent. */
+export const MITHRIL_ACCOUNT_TOKEN_FILE = "mithril-account-token.json";
+const accountTokenPath = (): string =>
+  join(app.getPath("userData"), MITHRIL_ACCOUNT_TOKEN_FILE);
+
+export function writeCloudAccountToken(token: string): void {
+  writeTokenAt(accountTokenPath(), token);
+}
+
+/** Upgrade only the currently selected legacy credential; never scan profiles.
+ * An existing record (including sign-out or unreadable ciphertext) blocks fallback.
+ * CloudWorkspace still validates owner and existing scopes against /v1/me.
+ */
+export function readCloudAccountToken(profile?: string): string | null {
+  const path = accountTokenPath();
+  if (existsSync(path)) return readTokenAt(path);
+  const legacy = readMithrilToken(profile);
+  if (!legacy) return null;
+  writeCloudAccountToken(legacy);
+  return readTokenAt(path);
+}
+
+export function clearCloudAccountToken(): void {
+  // Persist sign-out across restart and profile switches without deleting the
+  // legacy source records or allowing them to silently sign the user back in.
+  const path = accountTokenPath();
+  safeWriteFile(path, JSON.stringify({ version: 3, signedOut: true }));
+  try {
+    chmodSync(path, 0o600);
+  } catch {
+    /* non-POSIX filesystem */
+  }
+}
+
+export function cloudAccountStorageProtection(): MithrilStorageProtection {
+  return storageProtectionAt(accountTokenPath());
+}
+
+/** Explicit sign-in updates the account and the selected native provider together.
+ * Restore exact prior ciphertext if either read-back fails.
+ */
+export function writeMithrilAccountCredentials(
+  profile: string | undefined,
+  token: string,
+): void {
+  const paths = [tokenPath(profile), accountTokenPath()];
+  const prior = paths.map((path) =>
+    existsSync(path) ? readFileSync(path, "utf8") : null,
+  );
+  try {
+    writeMithrilToken(profile, token);
+    writeCloudAccountToken(token);
+  } catch (error) {
+    paths.forEach((path, index) => {
+      if (prior[index] === null) {
+        if (existsSync(path)) unlinkSync(path);
+      } else safeWriteFile(path, prior[index]!);
+    });
+    throw error;
+  }
 }

@@ -4,6 +4,57 @@ import type { RepositoryEdit } from "@mithril/workspace/repository";
 import type { WorkspaceOperation } from "@mithril/workspace/protocol";
 
 const tokenA = `mf_${"a".repeat(43)}`;
+
+// @lat: [[cloud-workspace-tests#Canonical wallet fixed API transport]]
+it("uses the shared Web balance validator on a fixed authenticated API route and rejects malformed results", async () => {
+  const original = fetcher.getMockImplementation()! as (
+    url: string,
+  ) => Promise<Response>;
+  const id = "wallet-" + "a".repeat(64);
+  let malformed = false;
+  fetcher.mockImplementation(async (url: string) => {
+    if (url.endsWith(`/wallets/${id}/balances`))
+      return reply(
+        malformed
+          ? { address: "invalid" }
+          : {
+              address: "0x1234567890abcdef1234567890abcdef12345678",
+              fetchedAt: 1,
+              balances: [
+                {
+                  tokenId: "eth",
+                  symbol: "ETH",
+                  raw: "",
+                  formatted: "—",
+                  formattedFull: "—",
+                  error: "Unavailable",
+                },
+              ],
+            },
+      );
+    return original(url);
+  });
+  await client.enable();
+  expect((await client.walletBalances(id)).balances[0].error).toBe(
+    "Unavailable",
+  );
+  expect(
+    fetcher.mock.calls.some(
+      (call) =>
+        call[0] ===
+        `https://api.mithril.fund/v1/workspace/wallets/${id}/balances`,
+    ),
+  ).toBe(true);
+  malformed = true;
+  await expect(client.walletBalances(id)).rejects.toThrow(
+    "Invalid wallet balances",
+  );
+  const count = fetcher.mock.calls.length;
+  await expect(client.walletBalances("../other")).rejects.toThrow(
+    "Invalid wallet identity",
+  );
+  expect(fetcher.mock.calls).toHaveLength(count);
+});
 const tokenB = `mf_${"b".repeat(43)}`;
 const operation: WorkspaceOperation = {
   operationId: "op1",
@@ -255,6 +306,24 @@ describe("Desktop cloud workspace boundary", () => {
     expect(await client.getSnapshot()).toMatchObject({ userId: "a" });
   });
 
+  // @lat: [[cloud-workspace-tests#Cloud workspace tests#Saved metadata owner fencing]]
+  it("binds saved metadata to the renderer owner and refuses changed-owner replay before POST", async () => {
+    await client.enable();
+    fetcher.mockClear();
+    await expect(
+      client.applyOperations([operation], "other-owner"),
+    ).rejects.toThrow("owner changed");
+    expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST")).toBe(
+      false,
+    );
+    fetcher.mockClear();
+    await client.applyOperations([operation], "a");
+    const post = fetcher.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(post?.[1].headers).toMatchObject({
+      "x-mithril-workspace-owner": "a",
+    });
+  });
+
   // @lat: [[cloud-workspace-tests#Cloud workspace tests#Narrow data and fixed transport]]
   it("rejects config and secrets before network, sends only the explicit operation to a fixed API", async () => {
     await client.enable();
@@ -502,6 +571,27 @@ it("checks cloud sidebar owners and retains exact operation IDs on fixed routes"
   );
   await expect(client.getSidebar()).rejects.toThrow("owner/schema mismatch");
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Complete large canonical sidebar]]
+it("admits all large owner-checked sidebar placements using the canonical main-owned read", async () => {
+  await client.enable();
+  const fallback = fetcher.getMockImplementation()! as (
+    url: string,
+    init?: RequestInit,
+  ) => Promise<Response>;
+  const placements = Array.from({ length: 1205 }, (_, i) => ({
+    chatId: `chat-${i}`,
+    revision: 1,
+    pinned: true,
+    projectId: null,
+  }));
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.endsWith("/v1/workspace/sidebar")
+      ? reply({ schemaVersion: 1, userId: "a", placements })
+      : fallback(url, init),
+  );
+  expect((await client.getSidebar()).placements).toHaveLength(1205);
+});
 // @lat: [[cloud-workspace-tests#Cloud workspace tests#Cloud schedule boundaries]]
 it("uses fixed owner-checked schedule routes and refuses writes without chat and inference authority", async () => {
   const op = {
@@ -547,6 +637,40 @@ it("uses fixed owner-checked schedule routes and refuses writes without chat and
         String(url).endsWith("/v1/schedules") && init?.method === "POST",
     ),
   ).toBe(true);
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: "a" },
+        scopes: [
+          "workspace:read",
+          "workspace:write",
+          "chat:write",
+          "inference",
+        ],
+      });
+    if (init?.method === "POST")
+      return reply({
+        schemaVersion: 1,
+        userId: "a",
+        operationId: op.operationId,
+        datasetGeneration: 2,
+        status: "accepted",
+        schedule: null,
+      });
+    return reply({
+      schemaVersion: 1,
+      userId: "a",
+      datasetGeneration: -1,
+      schedules: [],
+    });
+  });
+  await expect(client.getSchedules()).rejects.toThrow(
+    "Schedule snapshot rejected",
+  );
+  await expect(
+    client.applySchedule({ ...op, datasetGeneration: 1 }),
+  ).rejects.toThrow("Schedule receipt rejected");
   fetcher.mockImplementation(async (url: string) =>
     url.endsWith("/v1/me")
       ? reply({
@@ -916,4 +1040,302 @@ it("preserves both migration revisions on the fixed native API transport and rej
     }),
   ).rejects.toThrow("Invalid repository edit");
   expect(fetcher.mock.calls).toHaveLength(count);
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Original schedule resource transport]]
+it("keeps original schedule source resources in the main-process owner-bound API transport", async () => {
+  const { digestBytes } = await import("@mithril/workspace/files");
+  const { originalScheduleResourceId } =
+    await import("@mithril/workspace/original-schedule-resources");
+  const bytes = new Uint8Array(new TextEncoder().encode("[]\r\n")),
+    digest = await digestBytes(bytes);
+  const id = await originalScheduleResourceId("default");
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  let release: ((response: Response) => void) | undefined;
+  let delayed = false;
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: token === tokenB ? "b" : "a" },
+        scopes: ["workspace:read", "workspace:write"],
+      });
+    calls.push({ url, init });
+    if (delayed)
+      return new Promise<Response>((resolve) => {
+        release = resolve;
+      });
+    if (init?.method === "HEAD")
+      return new Response(null, {
+        headers: {
+          "content-length": String(bytes.length),
+          "x-mithril-resource-digest": digest,
+        },
+      });
+    return init?.method === "POST"
+      ? Response.json({ digest, size: bytes.length })
+      : new Response(bytes.slice());
+  });
+  await client.enable();
+  const resources = client.scheduleResources.forOwner("a");
+  expect(await resources.putChunk(id, bytes)).toBe(digest);
+  expect(await resources.hasChunk!(id, digest, bytes.length)).toBe(true);
+  expect(await resources.getChunk(id, digest)).toEqual(bytes);
+  expect(calls[0].url).toBe(
+    `https://api.mithril.fund/v1/workspace/resources/schedule/${id}/chunks`,
+  );
+  expect(new Headers(calls[0].init?.headers).get("authorization")).toBe(
+    `Bearer ${tokenA}`,
+  );
+  expect(
+    new Headers(calls[0].init?.headers).get("x-mithril-workspace-owner"),
+  ).toBe("a");
+  expect(calls[0].init).toMatchObject({
+    credentials: "omit",
+    redirect: "error",
+  });
+  await expect(
+    client.scheduleResources.forOwner("b").getChunk(id, digest),
+  ).rejects.toThrow("owner changed");
+  await expect(
+    resources.getChunk("capability-default", digest),
+  ).rejects.toThrow("route");
+  await expect(
+    client.authorizedBinaryRequest(
+      "/v1/workspace/resources/schedule/other/chunks",
+    ),
+  ).rejects.toThrow("schedule resource route");
+  expect(calls).toHaveLength(3);
+  delayed = true;
+  const pending = resources.getChunk(id, digest);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  client.reset();
+  token = tokenB;
+  release!(new Response(bytes.slice()));
+  await expect(pending).rejects.toThrow("Account changed");
+});
+it("does not upgrade inference or read-only credentials to write original schedule resources", async () => {
+  const { originalScheduleResourceId } =
+    await import("@mithril/workspace/original-schedule-resources");
+  await client.enable();
+  fetcher.mockImplementation(async (url: string) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: "a" },
+        scopes: ["workspace:read"],
+      });
+    throw Error("Storage must not be requested");
+  });
+  await expect(
+    client.scheduleResources
+      .forOwner("a")
+      .putChunk(
+        await originalScheduleResourceId("default"),
+        new Uint8Array([1]),
+      ),
+  ).rejects.toThrow("write scope");
+  expect(fetcher.mock.calls.every((call) => call[0].endsWith("/v1/me"))).toBe(
+    true,
+  );
+});
+
+// @lat: [[cloud-workspace-tests#Automatic schedule native context guard]]
+it("invalidates native background work on token, profile, actor or lifecycle changes without a new network request", async () => {
+  await client.enable();
+  const context = await client.nativeContext(true);
+  const requests = fetcher.mock.calls.length;
+  client.assertNativeContext(context);
+  expect(fetcher.mock.calls).toHaveLength(requests);
+  token = tokenB;
+  expect(() => client.assertNativeContext(context)).toThrow(
+    "stale native context",
+  );
+  token = tokenA;
+  profile = "other";
+  expect(() => client.assertNativeContext(context)).toThrow(
+    "stale native context",
+  );
+  profile = "default";
+  expect(() =>
+    client.assertNativeContext({ ...context, actor: "foreign" }),
+  ).toThrow("stale native context");
+  client.reset();
+  expect(() => client.assertNativeContext(context)).toThrow(
+    "stale native context",
+  );
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Original profile metadata resource transport]]
+it("binds original profile resources to main-process API identity without credential expansion", async () => {
+  const { profileResourceId } =
+    await import("@mithril/workspace/profile-resources");
+  const { digestBytes } = await import("@mithril/workspace/files");
+  const bytes = new Uint8Array(new TextEncoder().encode('{"name":"original"}')),
+    digest = await digestBytes(bytes),
+    id = await profileResourceId("default");
+  let release: ((response: Response) => void) | undefined;
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        user: { id: token === tokenB ? "b" : "a" },
+        scopes: ["workspace:read", "workspace:write"],
+      });
+    calls.push({ url, init });
+    return new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+  });
+  await client.enable();
+  await expect(
+    client.authorizedBinaryRequest(
+      "/v1/workspace/resources/profile/other/chunks",
+    ),
+  ).rejects.toThrow("profile resource route");
+  await expect(
+    client.profileResources.forOwner("b").getChunk(id, digest),
+  ).rejects.toThrow("owner changed");
+  const pending = client.profileResources.forOwner("a").getChunk(id, digest);
+  await vi.waitFor(() => expect(release).toBeDefined());
+  expect(calls[0].url).toBe(
+    `https://api.mithril.fund/v1/workspace/resources/profile/${id}/chunks/${digest}`,
+  );
+  expect(
+    new Headers(calls[0].init?.headers).get("x-mithril-workspace-owner"),
+  ).toBe("a");
+  expect(calls[0].init).toMatchObject({
+    credentials: "omit",
+    redirect: "error",
+  });
+  client.reset();
+  token = tokenB;
+  release!(new Response(bytes.slice()));
+  await expect(pending).rejects.toThrow("Account changed");
+  await client.enable();
+  fetcher.mockImplementation(async () =>
+    reply({ via: "api_token", user: { id: "b" }, scopes: ["workspace:read"] }),
+  );
+  await expect(
+    client.profileResources.forOwner("b").putChunk(id, bytes),
+  ).rejects.toThrow("write scope");
+});
+
+// @lat: [[cloud-workspace-tests#Execution history review boundary]]
+it("uses fixed owner-scoped history routes and rejects forged review identities before transport", async () => {
+  const original = fetcher.getMockImplementation()! as (
+    url: string,
+    init: RequestInit,
+  ) => Promise<Response>;
+  const decision = {
+    decisionId: "decision",
+    rowId: 7,
+    effectId: "effect",
+    datasetGeneration: 2,
+    note: "Checked",
+    reviewedNoReplay: true as const,
+  };
+  const entry = {
+    rowId: 7,
+    operationId: "restore",
+    context: "baseline",
+    section: "original_schedule_occurrences",
+    effectId: "effect",
+    profile: "default",
+    jobId: "one",
+    sourceId: null,
+    reviewed: false,
+  };
+  let foreign = false;
+  fetcher.mockImplementation(async (url: string, init: RequestInit) => {
+    if (url.includes("/v1/workspace/execution-history?"))
+      return reply({
+        schemaVersion: 1,
+        userId: "a",
+        datasetGeneration: 2,
+        entries: [entry],
+        nextAfter: null,
+      });
+    if (url.endsWith("/v1/workspace/execution-history/review")) {
+      expect(JSON.parse(String(init.body))).toEqual(decision);
+      expect(new Headers(init.headers).get("authorization")).toBe(
+        "Bearer " + tokenA,
+      );
+      return reply({
+        schemaVersion: 1,
+        userId: foreign ? "other" : "a",
+        ...decision,
+        status: "reviewed_no_replay",
+        reviewedAt: 1,
+      });
+    }
+    return original(url, init);
+  });
+  await client.enable();
+  expect((await client.executionHistory()).entries[0]).toEqual(entry);
+  expect(await client.reviewExecution(decision)).toMatchObject({
+    status: "reviewed_no_replay",
+  });
+  const count = fetcher.mock.calls.length;
+  await expect(client.executionHistory(-1)).rejects.toThrow("cursor");
+  await expect(
+    client.reviewExecution({ ...decision, reviewedNoReplay: false } as never),
+  ).rejects.toThrow("Invalid");
+  expect(fetcher.mock.calls.length).toBe(count);
+  foreign = true;
+  await expect(client.reviewExecution(decision)).rejects.toThrow(
+    "owner/schema",
+  );
+});
+it("archive requests use fixed main-only credentials and require separate chat scopes", async () => {
+  let chat = false;
+  fetcher.mockImplementation(async (url: string) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        scopes: [
+          "workspace:read",
+          "workspace:write",
+          ...(chat ? ["chat:read", "chat:write"] : []),
+        ],
+        user: { id: "a" },
+      });
+    return new Response("{}");
+  });
+  await client.enable();
+  await expect(
+    client.archiveRequest("/v1/workspace/archive/backups", { method: "POST" }),
+  ).rejects.toThrow("chat scope");
+  expect(
+    fetcher.mock.calls.some(([url]) => String(url).includes("/archive/")),
+  ).toBe(false);
+  chat = true;
+  client.reset();
+  await client.enable();
+  await client.archiveRequest("/v1/workspace/archive/backups", {
+    method: "POST",
+    body: "{}",
+  });
+  const request = fetcher.mock.calls.find(([url]) =>
+    String(url).endsWith("/archive/backups"),
+  )!;
+  const init = request[1] as RequestInit;
+  expect(new Headers(init.headers).get("authorization")).toBe(
+    `Bearer ${tokenA}`,
+  );
+  expect(init.redirect).toBe("error");
+  expect(init.credentials).toBe("omit");
+  expect(init.cache).toBe("no-store");
+  await expect(
+    client.archiveRequest(
+      "https://foreign.invalid/v1/workspace/archive/backups",
+      { method: "POST" },
+    ),
+  ).rejects.toThrow("Unsupported");
+  await expect(
+    client.archiveRequest("/v1/workspace/archive/backups", {
+      method: "DELETE",
+    }),
+  ).rejects.toThrow("Unsupported");
 });

@@ -38,6 +38,7 @@ type Identity = {
   epoch: number;
 };
 interface Link {
+  datasetGeneration?: number;
   projectId: string;
   root: string;
   enabled: boolean;
@@ -48,7 +49,10 @@ interface Link {
 }
 interface Dependencies {
   context(): Promise<Identity>;
-  snapshot(): Promise<{ records: WorkspaceRecord[] }>;
+  snapshot(): Promise<{
+    records: WorkspaceRecord[];
+    datasetGeneration?: number;
+  }>;
   apply(op: WorkspaceOperation): Promise<{ status: string }>;
   files: ProjectFileTransport;
   stateDir: string;
@@ -79,6 +83,9 @@ export class ProjectFolderSync {
           (l) =>
             typeof l.root !== "string" ||
             !isAbsolute(l.root) ||
+            (l.datasetGeneration !== undefined &&
+              (!Number.isSafeInteger(l.datasetGeneration) ||
+                l.datasetGeneration < 0)) ||
             !Array.isArray(l.base),
         )
       )
@@ -120,6 +127,11 @@ export class ProjectFolderSync {
       throw new Error("Account changed; synchronization stopped");
     if (generation !== this.permissionGeneration)
       throw new Error("Folder synchronization permission changed; stopped");
+  }
+  private async dataset(expected: number): Promise<void> {
+    const current = (await this.deps.snapshot()).datasetGeneration ?? 0;
+    if (!Number.isSafeInteger(current) || current < 0 || current !== expected)
+      throw new Error("Workspace restored; folder changes retained for review");
   }
   private async safePath(
     root: string,
@@ -231,7 +243,11 @@ export class ProjectFolderSync {
     excluded: number;
   }> {
     const identity = await this.deps.context();
-    const project = (await this.deps.snapshot()).records.find(
+    const snapshot = await this.deps.snapshot();
+    const datasetGeneration = snapshot.datasetGeneration ?? 0;
+    if (!Number.isSafeInteger(datasetGeneration) || datasetGeneration < 0)
+      throw new Error("Invalid workspace generation");
+    const project = snapshot.records.find(
       (r) => r.kind === "project" && r.id === projectId && !r.deleted,
     );
     if (!project) throw new Error("Project not found");
@@ -244,7 +260,13 @@ export class ProjectFolderSync {
     this.tickets.clear();
     this.tickets.set(ticket, {
       identity,
-      link: { projectId, root: resolve(root), enabled: true, base: [] },
+      link: {
+        projectId,
+        root: resolve(root),
+        enabled: true,
+        base: [],
+        datasetGeneration,
+      },
     });
     return {
       ticket,
@@ -372,6 +394,7 @@ export class ProjectFolderSync {
       if (current?.digest !== old?.digest)
         throw new Error("Local file changed during download");
       await this.guard(identity, generation);
+      await this.dataset(link.datasetGeneration ?? 0);
       await this.safePath(link.root, file.path);
       await rename(temp, target);
     } finally {
@@ -388,7 +411,15 @@ export class ProjectFolderSync {
       for (const link of links.filter((l) => l.enabled)) {
         try {
           await this.guard(identity, generation);
+          const initial = await this.deps.snapshot();
+          const datasetGeneration = initial.datasetGeneration ?? 0;
+          if (!Number.isSafeInteger(datasetGeneration) || datasetGeneration < 0)
+            throw new Error("Invalid workspace generation");
           if (link.pending) {
+            if ((link.pending.datasetGeneration ?? 0) !== datasetGeneration)
+              throw new Error(
+                "Workspace restored; saved file operation retained for review",
+              );
             await this.guard(identity, generation);
             const result = await this.deps.apply(link.pending);
             await this.guard(identity, generation);
@@ -407,9 +438,7 @@ export class ProjectFolderSync {
           const snapshot = await this.deps.snapshot(),
             pointer = snapshot.records.find(
               (r) =>
-                r.kind === "file_set" &&
-                r.data.projectId === link.projectId &&
-                !r.deleted,
+                r.kind === "file_set" && r.data.projectId === link.projectId,
             );
           if (
             !snapshot.records.some(
@@ -418,13 +447,29 @@ export class ProjectFolderSync {
             )
           )
             throw new Error("Project removed; folder sync paused");
-          const remote: FileManifest = pointer
-            ? await (
-                this.deps.files.forOwner?.(identity.userId) ?? this.deps.files
-              ).getManifest(link.projectId, String(pointer.data.manifest))
-            : { version: 1, projectId: link.projectId, files: [] };
+          const remote: FileManifest =
+            pointer && !pointer.deleted
+              ? await (
+                  this.deps.files.forOwner?.(identity.userId) ?? this.deps.files
+                ).getManifest(link.projectId, String(pointer.data.manifest))
+              : { version: 1, projectId: link.projectId, files: [] };
           const local = (await this.scan(link.root)).files,
             merged = mergeFiles(link.base, local, remote.files);
+          const identityOf = (files: ProjectFile[]): string =>
+            JSON.stringify(
+              files
+                .map((f) => [f.path, f.digest])
+                .sort((a, b) => a[0].localeCompare(b[0])),
+            );
+          if (
+            (link.datasetGeneration ?? 0) !== datasetGeneration &&
+            identityOf(local) !== identityOf(link.base)
+          )
+            throw new Error(
+              "Workspace restored; folder changes retained for review",
+            );
+          link.datasetGeneration = datasetGeneration;
+          await this.dataset(datasetGeneration);
           if (merged.conflicts.length)
             throw new Error(
               "Concurrent edits: " + merged.conflicts.slice(0, 5).join(", "),
@@ -452,6 +497,7 @@ export class ProjectFolderSync {
             if (current?.digest !== old.digest)
               throw new Error("Local file changed before removal");
             await this.guard(identity, generation);
+            await this.dataset(datasetGeneration);
             const source = await this.safePath(link.root, old.path),
               trash = await this.safePath(
                 link.root,
@@ -473,14 +519,20 @@ export class ProjectFolderSync {
           };
           const digest = await digestBytes(manifestBytes(manifest));
           await this.guard(identity, generation);
-          if (digest !== pointer?.data.manifest)
+          await this.dataset(datasetGeneration);
+          // A remote tombstone is acknowledged as empty without resurrecting it.
+          const publish = pointer?.deleted
+            ? merged.files.length > 0
+            : digest !== pointer?.data.manifest;
+          if (publish)
             await (
               this.deps.files.forOwner?.(identity.userId) ?? this.deps.files
             ).putManifest(manifest);
           await this.guard(identity, generation);
-          if (digest !== pointer?.data.manifest) {
+          if (publish) {
             link.pending = {
               operationId: randomUUID(),
+              datasetGeneration,
               id: await fileSetId(link.projectId),
               kind: "file_set",
               baseRevision: pointer?.revision ?? 0,

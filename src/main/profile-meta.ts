@@ -1,5 +1,7 @@
-import { join } from "path";
-import { promises as fs } from "fs";
+import {
+  patchProfileMetadataFile,
+  readProfileMetadataFile,
+} from "./profile-meta-files";
 import { profileHome, isValidProfileName, PROFILE_NAME_ERROR } from "./utils";
 
 export { PROFILE_COLORS, defaultColorForName } from "../shared/profileColors";
@@ -19,20 +21,18 @@ export interface ProfileMeta {
   avatar?: string;
 }
 
-const META_FILE = "profile-meta.json";
-
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 // Avatars are downscaled client-side; cap the stored data URL defensively.
 const MAX_AVATAR_BYTES = 1_500_000;
 
-function metaPath(name: string): string {
-  return join(profileHome(name), META_FILE);
-}
-
 export async function readProfileMeta(name: string): Promise<ProfileMeta> {
   try {
-    const raw = await fs.readFile(metaPath(name), "utf-8");
-    const parsed = JSON.parse(raw) as ProfileMeta;
+    const bytes = readProfileMetadataFile(profileHome(name));
+    if (!bytes) return {};
+    const raw = bytes.toString("utf8");
+    const parsed = JSON.parse(
+      raw.startsWith("\uFEFF") ? raw.slice(1) : raw,
+    ) as ProfileMeta;
     if (!parsed || typeof parsed !== "object") return {};
     const meta: ProfileMeta = {};
     if (typeof parsed.color === "string" && HEX_COLOR.test(parsed.color)) {
@@ -59,14 +59,7 @@ async function writeProfileMeta(
   patch: Partial<ProfileMeta>,
 ): Promise<void> {
   if (!isValidProfileName(name)) throw new Error(PROFILE_NAME_ERROR);
-  const current = await readProfileMeta(name);
-  const next: ProfileMeta = { ...current, ...patch };
-  // Drop keys explicitly cleared with undefined.
-  for (const k of Object.keys(next) as (keyof ProfileMeta)[]) {
-    if (next[k] === undefined) delete next[k];
-  }
-  await fs.mkdir(profileHome(name), { recursive: true });
-  await fs.writeFile(metaPath(name), JSON.stringify(next, null, 2), "utf-8");
+  patchProfileMetadataFile(profileHome(name), patch);
 }
 
 export async function setProfileColor(

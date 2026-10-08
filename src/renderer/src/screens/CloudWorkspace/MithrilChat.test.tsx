@@ -100,6 +100,12 @@ describe("Default shared Mithril Chat", () => {
       </>,
     );
     await screen.findByText("API project");
+    fireEvent.click(screen.getByLabelText("Chat settings"));
+    expect(screen.queryByLabelText("Local chat history migration")).toBeNull();
+    expect(screen.queryByText("Import local chat history")).toBeNull();
+    expect(
+      window.hermesAPI.nativeSessionImport.importNativeSessions,
+    ).not.toHaveBeenCalled();
     expect(window.hermesAPI.cloudWorkspace.enable).toHaveBeenCalled();
     expect(
       window.hermesAPI.cloudWorkspace.applyOperations,

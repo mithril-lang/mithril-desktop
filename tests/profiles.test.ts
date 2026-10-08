@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { join } from "path";
 import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "fs";
@@ -12,8 +13,13 @@ const { TEST_HOME } = vi.hoisted(() => {
   const path = require("path");
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const os = require("os");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require("fs");
   return {
-    TEST_HOME: path.join(os.tmpdir(), `hermes-profiles-test-${Date.now()}`),
+    TEST_HOME: path.join(
+      fs.realpathSync(os.tmpdir()),
+      `hermes-profiles-test-${Date.now()}`,
+    ),
   };
 });
 

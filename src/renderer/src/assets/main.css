@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@mithril/design-system/chat.css";
+@import "@mithril/workspace/desktop-profile.css";
 @import "@mithril/design-system/desktop.css";
 @import "@mithril/workspace/desktop-sidebar.css";
 
@@ -513,8 +514,7 @@
   --radius-lg: 14px;
   --radius-xl: 20px;
   --transition: 150ms ease;
-  --font-sans:
-    var(--font-locale, "Noto Sans"), Arial, sans-serif;
+  --font-sans: var(--font-locale, "Noto Sans"), Arial, sans-serif;
   --font-mono:
     "SF Mono", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace;
   /* Amounts and money figures (bank teller totals, token balances). */
@@ -2532,25 +2532,6 @@ body:has(.shell-vibrant),
 }
 
 /* ── Profile avatar (shared: nav, active bar, manage page) ── */
-.profile-avatar {
-  flex-shrink: 0;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  line-height: 1;
-}
-.profile-avatar-img {
-  object-fit: cover;
-}
-.profile-avatar-letter {
-  color: #fff;
-  font-weight: 700;
-}
-.profile-avatar-logo {
-  background: var(--bg-elevated);
-}
 
 /* Sidebar footer with theme switcher */
 .sidebar-footer {
@@ -9679,113 +9660,6 @@ body:has(.shell-vibrant),
   white-space: nowrap;
 }
 
-.agents-create-clone {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.agents-create-clone input[type="checkbox"] {
-  accent-color: var(--accent);
-}
-
-.agents-create-error {
-  font-size: 13px;
-  color: var(--error);
-}
-
-/* Profiles list — a table-style layout with a shared column grid so the
-   header and every row align. The active row is marked by a left green bar. */
-.agents-table {
-  /* Keep all rows in the page's scrollable content instead of clipping them. */
-  flex-shrink: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  background: var(--bg-secondary);
-}
-
-.agents-table-head,
-.agents-row {
-  display: grid;
-  grid-template-columns:
-    minmax(220px, 1.8fr) minmax(140px, 1fr) minmax(150px, 1fr)
-    auto;
-  align-items: center;
-  gap: 16px;
-  padding: 14px 20px;
-}
-
-.agents-table-head {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
-}
-
-.agents-row {
-  position: relative;
-  cursor: pointer;
-  font-family: var(--font-sans);
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-  transition: background var(--transition);
-}
-
-.agents-row:last-child {
-  border-bottom: none;
-}
-
-.agents-row:hover {
-  background: var(--bg-tertiary);
-}
-
-/* Active profile: a green bar flush to the left edge plus a subtle wash. */
-.agents-row.active {
-  background: var(--success-bg);
-}
-
-.agents-row.active::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--success);
-}
-
-.agents-cell-actions {
-  justify-self: end;
-}
-
-/* Edit button — opens the profile modal. */
-.agents-row-edit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition);
-}
-.agents-row-edit:hover {
-  color: var(--text-primary);
-  border-color: var(--border-bright);
-  background: var(--bg-tertiary);
-}
-
 /* Shared animated modal primitive. Radix handles portal/focus, Motion handles
    mount/unmount transitions, and feature modals provide their own layout. */
 .app-modal-overlay {
@@ -9805,425 +9679,6 @@ body:has(.shell-vibrant),
 
 /* Appearance modal */
 /* ── Global profile modal (80vw × 80vh) ─────────────────────────────── */
-.profile-modal-overlay {
-  padding: 24px;
-  /* Lighter scrim so the frosted glass reads as translucent, not a flat panel. */
-  background: rgba(0, 0, 0, 0.4);
-}
-
-.profile-modal {
-  display: flex;
-  flex-direction: row;
-  width: 80vw;
-  height: 80vh;
-  max-width: 1100px;
-  max-height: 820px;
-  /* Frosted glass — same material language as the pickers: translucent tint +
-     blur, lifted on a soft ambient shadow instead of a hard border. */
-  background: color-mix(in srgb, var(--bg-secondary) 97%, transparent);
-  backdrop-filter: blur(30px) saturate(1.5);
-  -webkit-backdrop-filter: blur(30px) saturate(1.5);
-  border: 0.5px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 24px 60px -16px rgba(0, 0, 0, 0.6),
-    0 8px 24px -12px rgba(0, 0, 0, 0.45);
-  overflow: hidden;
-}
-
-.profile-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 22px;
-  flex-shrink: 0;
-}
-
-/* Full-height left sidebar: avatar/name head + nav, spanning top to bottom. */
-.profile-modal-sidebar {
-  flex-shrink: 0;
-  width: 200px;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  /* The distinct rail shade lives here now, so it reaches both edges. */
-  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
-}
-.profile-modal-sidebar-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 18px 16px 12px;
-  min-width: 0;
-  flex-shrink: 0;
-}
-.profile-modal-main {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.profile-modal-topbar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 12px 18px 0;
-  flex-shrink: 0;
-}
-
-.profile-modal-header-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.profile-modal-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.profile-modal-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 6px;
-  border-radius: var(--radius-sm);
-}
-
-.profile-modal-close:hover {
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
-}
-
-/* Two-column body: identity/appearance left, detail/settings right. Scrolls
-   so the large canvas has room to grow for future profile features. */
-/* Body splits into a left section-nav rail and a scrollable content pane. */
-.profile-modal-layout {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-
-.profile-modal-nav {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 4px 12px 16px;
-  overflow-y: auto;
-}
-
-.profile-modal-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background var(--transition),
-    color var(--transition);
-}
-
-.profile-modal-nav-item:hover {
-  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
-  color: var(--text-primary);
-}
-
-.profile-modal-nav-item.active {
-  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.profile-modal-content {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 28px 32px;
-}
-
-.profile-modal-pane {
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-
-.profile-modal-identity {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.profile-modal-identity-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-
-.profile-modal-avatar-wrap {
-  position: relative;
-  display: inline-flex;
-  flex-shrink: 0;
-}
-
-.profile-modal-avatar-dot {
-  position: absolute;
-  bottom: 4px;
-  right: 4px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--success);
-  border: 3px solid var(--bg-secondary);
-}
-
-.profile-modal-name-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  flex-wrap: wrap;
-}
-
-.profile-modal-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.profile-modal-name-edit {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  gap: 6px;
-  padding: 3px 6px;
-  margin-left: -6px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  cursor: text;
-}
-
-.profile-modal-name-edit svg {
-  flex-shrink: 0;
-  color: var(--text-muted);
-  opacity: 0;
-}
-
-.profile-modal-name-edit:hover,
-.profile-modal-name-edit:focus-visible {
-  background: var(--bg-tertiary);
-  border-color: var(--border);
-  outline: none;
-}
-
-.profile-modal-name-edit:hover svg,
-.profile-modal-name-edit:focus-visible svg {
-  color: var(--text-secondary);
-  opacity: 1;
-}
-
-.profile-modal-name-input {
-  width: min(360px, 52vw);
-  height: 36px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--bg-secondary) 90%, #000);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
-  color: var(--text-primary);
-  font: inherit;
-  font-weight: 700;
-  transition:
-    box-shadow var(--transition),
-    border-color var(--transition);
-}
-
-.profile-modal-name-input:focus {
-  outline: none;
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.28),
-    0 0 0 3px var(--accent-subtle);
-}
-
-.profile-modal-tag {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--bg-tertiary);
-  padding: 1px 8px;
-  border-radius: 10px;
-}
-
-.profile-modal-image-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.profile-modal-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.profile-modal-stat-value {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
-  padding: 6px 12px;
-  border-radius: var(--radius-md);
-}
-
-.profile-modal-stat-icon {
-  flex-shrink: 0;
-  color: currentColor;
-}
-
-.profile-modal-stat-value.is-on {
-  color: var(--success);
-}
-
-.profile-modal-stat-value.is-off {
-  color: var(--text-muted);
-}
-
-.profile-modal-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.profile-modal-memory-pane {
-  min-height: 100%;
-}
-
-.profile-modal-memory-pane .memory-soul-tab,
-.profile-modal-memory-pane .memory-soul-tab .soul-container {
-  min-height: 0;
-}
-
-.profile-modal-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.profile-modal-swatches {
-  display: grid;
-  grid-template-columns: repeat(11, 1fr);
-  gap: 10px;
-  max-width: 460px;
-}
-
-.profile-modal-swatch {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  padding: 0;
-}
-
-.profile-modal-swatch.active {
-  border-color: var(--text-primary);
-}
-
-.profile-modal-danger {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.profile-modal-danger-label {
-  color: var(--error);
-}
-
-.profile-modal-danger-info {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text-secondary);
-  max-width: 520px;
-}
-
-.profile-modal-danger-confirm {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-}
-
-.profile-modal-danger .btn-danger-ghost {
-  width: auto;
-  align-self: flex-start;
-}
-
-.profile-modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding: 14px 22px;
-  flex-shrink: 0;
-}
-
-.profile-modal-loading {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 200px;
-}
-
-/* Placeholder pane for not-yet-built sections (e.g. Wallet). */
-.profile-modal-coming-soon {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 280px;
-  color: var(--text-muted);
-  text-align: center;
-}
-
-.profile-modal-coming-soon-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.profile-modal-coming-soon-text {
-  font-size: 13px;
-}
-
 /* ── Settings modal ─────────────────────────────────────────────────────
    Global settings modal: grouped left nav + a single active pane on the
    right. Built on the same AppModal shell as the profile modal. */
@@ -10814,81 +10269,6 @@ body:has(.shell-vibrant),
   text-align: center;
 }
 
-/* Sync tab (per-profile cloud-sync controls). */
-.profile-sync-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.profile-sync-heading {
-  color: var(--text-primary);
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.profile-sync-subtitle {
-  margin-top: 4px;
-  color: var(--text-muted);
-  font-size: 13px;
-  max-width: 460px;
-}
-
-.profile-sync-body {
-  margin-top: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.profile-sync-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
-
-.profile-sync-label {
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.profile-sync-value {
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.profile-sync-linked {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--success);
-}
-
-.profile-sync-note {
-  margin-top: 20px;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.profile-sync-note-warn {
-  color: var(--danger, #ef4444);
-}
-
-.profile-sync-warnings {
-  margin: 4px 0 0;
-  padding-left: 18px;
-  color: var(--text-muted);
-  font-size: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .profile-wallet-list {
   display: grid;
   gap: 12px;
@@ -11316,164 +10696,6 @@ body:has(.shell-vibrant),
 }
 .btn-danger-ghost:hover {
   border-color: var(--error);
-}
-
-/* Profile cell — avatar plus name and a "provider · skills" subline. */
-.agents-cell-profile {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.agents-row-info {
-  min-width: 0;
-}
-
-.agents-row-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agents-row-sub {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.agents-cell-model {
-  min-width: 0;
-}
-
-/* Model shown as a monospace chip; empty state stays plain muted text. */
-.agents-model-chip {
-  display: inline-block;
-  max-width: 100%;
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
-.agents-model-empty {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.agents-cell-status {
-  display: flex;
-  align-items: center;
-}
-
-/* Gateway status as a rounded pill: green when running, muted when off. */
-.agents-status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 11px;
-  border-radius: 999px;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-.agents-status-pill.on {
-  background: var(--success-bg);
-  color: var(--success);
-}
-
-.agents-status-pill.off {
-  background: var(--bg-elevated);
-  color: var(--text-muted);
-}
-
-/* While the gateway spins up after a switch: a small spinner + "Starting…". */
-.agents-status-pill.starting {
-  background: var(--success-bg);
-  color: var(--success);
-}
-
-.agents-status-spinner {
-  width: 10px;
-  height: 10px;
-  border: 1.5px solid color-mix(in srgb, var(--success) 35%, transparent);
-  border-top-color: var(--success);
-  border-radius: 50%;
-  flex-shrink: 0;
-  animation: spin 0.7s linear infinite;
-}
-
-.agents-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: currentColor;
-}
-
-.agents-cell-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* ── New-profile modal ── */
-.agents-create-modal {
-  z-index: 301;
-  height: fit-content;
-  width: min(460px, calc(100vw - 32px));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-bright);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
-}
-
-.agents-create-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--border);
-}
-
-.agents-create-modal-title {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.agents-create-modal-body {
-  display: grid;
-  gap: 16px;
-  padding: 20px;
-}
-
-.agents-create-field {
-  display: grid;
-  gap: 8px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.agents-create-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 4px;
 }
 
 /* ========================================================================
@@ -16171,34 +15393,103 @@ body:has(.shell-vibrant),
 }
 
 /* Native-only window dragging stays in the Desktop adapter. */
-.active-sessions-bar { -webkit-app-region:drag; z-index:1001; }
+.active-sessions-bar {
+  -webkit-app-region: drag;
+  z-index: 1001;
+}
 
 /* Electron drag regions belong to the native adapter. */
-.active-session-chip, .active-session-new { -webkit-app-region: no-drag; }
+.active-session-chip,
+.active-session-new {
+  -webkit-app-region: no-drag;
+}
 
 /* Cloud history shares its Desktop/Web component; device history stays explicit. */
-.sidebar-cloud-history { flex:1; min-height:0; overflow:hidden; }
-.sidebar-chat-section { flex:0 0 auto; max-height:180px; overflow:auto; }
-.sidebar-collapsed .workspace-sidebar-history,.sidebar-collapsed .workspace-session-sidebar .sidebar-new-chat span:last-child { display:none; }
-.sidebar-collapsed .workspace-session-sidebar .sidebar-new-chat { justify-content:center; }
+.sidebar-cloud-history {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.sidebar-chat-section {
+  flex: 0 0 auto;
+  max-height: 180px;
+  overflow: auto;
+}
+.sidebar-collapsed .workspace-sidebar-history,
+.sidebar-collapsed
+  .workspace-session-sidebar
+  .sidebar-new-chat
+  span:last-child {
+  display: none;
+}
+.sidebar-collapsed .workspace-session-sidebar .sidebar-new-chat {
+  justify-content: center;
+}
 
 /* The API workspace owns navigation; device history is a contextual panel. */
-.device-history-button { width:100%; border:0; padding:12px 16px; background:transparent; color:var(--text-secondary); text-align:left; cursor:pointer; }
-.device-history-button:hover { color:var(--text-primary); }
-.device-history-backdrop { position:fixed; inset:0; z-index:1000; background:#0008; display:flex; align-items:center; justify-content:center; padding:24px; }
-.device-history-dialog { position:fixed; z-index:1001; top:50%; left:50%; transform:translate(-50%, -50%); background:var(--bg-primary, #202020); color:var(--text-primary, #eee); border:1px solid #8885; border-radius:16px; padding:20px; width:min(520px, 100%); max-height:80vh; overflow:auto; box-shadow:0 24px 80px #0006; }
-.device-history-close { float:right; background:transparent; color:inherit; border:1px solid #8885; border-radius:8px; padding:6px 12px; cursor:pointer; }
-.device-history-dialog .sidebar-chat-scroll { max-height:60vh; overflow:auto; }
+.device-history-button {
+  width: 100%;
+  border: 0;
+  padding: 12px 16px;
+  background: transparent;
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+.device-history-button:hover {
+  color: var(--text-primary);
+}
+.device-history-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #0008;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.device-history-dialog {
+  position: fixed;
+  z-index: 1001;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-primary, #202020);
+  color: var(--text-primary, #eee);
+  border: 1px solid #8885;
+  border-radius: 16px;
+  padding: 20px;
+  width: min(520px, 100%);
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 24px 80px #0006;
+}
+.device-history-close {
+  float: right;
+  background: transparent;
+  color: inherit;
+  border: 1px solid #8885;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.device-history-dialog .sidebar-chat-scroll {
+  max-height: 60vh;
+  overflow: auto;
+}
 
-.device-schedules-dialog { width:min(1000px, calc(100vw - 48px)); }
+.device-schedules-dialog {
+  width: min(1000px, calc(100vw - 48px));
+}
 
 .repository-sync-notice {
-  position: fixed;
+  position: relative;
   z-index: 30;
-  top: 64px;
-  right: 24px;
-  max-width: min(480px, calc(100vw - 48px));
-  max-height: 60vh;
+  flex: 0 0 auto;
+  margin: 8px 24px;
+  max-width: calc(100% - 48px);
+  max-height: 30vh;
   overflow: auto;
   padding: 12px 16px;
   border: 1px solid var(--border-color);

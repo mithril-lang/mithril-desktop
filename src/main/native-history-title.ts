@@ -84,34 +84,39 @@ export function applyCloudSessionArchive(
       | undefined;
     if (!row || row.archived !== Number(expected))
       throw Error("Native archive changed; synchronization deferred");
-    const lineage = lineageColumns[0]
-      ? (db
-          .prepare(
-            `WITH RECURSIVE ancestors(id) AS (
-          SELECT ? UNION SELECT parent.id FROM ancestors a JOIN sessions child ON child.id=a.id JOIN sessions parent ON parent.id=child.parent_session_id WHERE parent.end_reason='compression'
-        ), descendants(id) AS (
-          SELECT ? UNION SELECT child.id FROM descendants d JOIN sessions parent ON parent.id=d.id JOIN sessions child ON child.parent_session_id=parent.id WHERE parent.end_reason='compression'
-        ), lineage(id) AS (SELECT id FROM ancestors UNION SELECT id FROM descendants)
-        SELECT s.* FROM sessions s WHERE s.id IN (SELECT id FROM lineage) ORDER BY s.id`,
-          )
-          .all(id, id) as Record<string, unknown>[])
-      : [row];
-    if (
-      lineage.length > 1000 ||
-      lineage.some((item) => item.archived !== 0 && item.archived !== 1)
-    )
+    const lineageQuery = db.prepare(
+      lineageColumns[0]
+        ? `WITH RECURSIVE ancestors(id) AS (
+      SELECT ? UNION SELECT parent.id FROM ancestors a JOIN sessions child ON child.id=a.id JOIN sessions parent ON parent.id=child.parent_session_id WHERE parent.end_reason='compression'
+    ), descendants(id) AS (
+      SELECT ? UNION SELECT child.id FROM descendants d JOIN sessions parent ON parent.id=d.id JOIN sessions child ON child.parent_session_id=parent.id WHERE parent.end_reason='compression'
+    ), lineage(id) AS (SELECT id FROM ancestors UNION SELECT id FROM descendants)
+    SELECT s.* FROM sessions s WHERE s.id IN (SELECT id FROM lineage) ORDER BY s.id`
+        : "SELECT * FROM sessions WHERE id=? ORDER BY id",
+    );
+    const readLineage = (): Record<string, unknown>[] =>
+      Array.from(
+        lineageQuery.iterate(
+          ...(lineageColumns[0] ? [id, id] : [id]),
+        ) as Iterable<Record<string, unknown>>,
+      );
+    const lineage = readLineage();
+    if (lineage.some((item) => item.archived !== 0 && item.archived !== 1))
       throw Error("Unsupported native archive lineage");
-    const ids = lineage.map((item) => String(item.id)),
-      parameters = ids.map(() => "?").join(",");
-    if (
-      db
-        .prepare(`UPDATE sessions SET archived=? WHERE id IN (${parameters})`)
-        .run(Number(archived), ...ids).changes !== lineage.length
-    )
-      throw Error("Native archive changed; synchronization deferred");
-    const saved = db
-      .prepare(`SELECT * FROM sessions WHERE id IN (${parameters}) ORDER BY id`)
-      .all(...ids);
+    for (let offset = 0; offset < lineage.length; offset += 100) {
+      const ids = lineage
+        .slice(offset, offset + 100)
+        .map((item) => String(item.id));
+      const parameters = ids.map(() => "?").join(",");
+      if (
+        db
+          .prepare(`UPDATE sessions SET archived=? WHERE id IN (${parameters})`)
+          .run(Number(archived), ...ids).changes !== ids.length
+      )
+        throw Error("Native archive changed; synchronization deferred");
+    }
+    // Recompute membership as well as every retained field after all batches.
+    const saved = readLineage();
     if (
       !isDeepStrictEqual(
         saved,
@@ -119,6 +124,6 @@ export function applyCloudSessionArchive(
       )
     )
       throw Error("Native archive readback mismatch; source retained");
-  })();
+  }).immediate();
   return archived;
 }

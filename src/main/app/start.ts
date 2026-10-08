@@ -1,3 +1,6 @@
+import { startAllProfileHistoryReplication } from "../native-history-all-profiles-runtime";
+import { startWalletReplication } from "../wallet-replication-runtime";
+import { startOriginalScheduleReplication } from "../original-schedule-replication-runtime";
 import { applyResponseHeaders } from "./response-headers";
 import {
   migrateAllMithrilEnvKeys,
@@ -59,6 +62,7 @@ export function startMainProcess(): void {
 
   setupUpdater({ getMainWindow: () => mainWindow });
 
+  let stopOriginalSchedules: (() => void) | null = null;
   app.whenReady().then(() => {
     void endpointRuntime().catch(() =>
       console.error("Endpoint monitor initialization failed"),
@@ -85,6 +89,12 @@ export function startMainProcess(): void {
     } catch (e) {
       console.error("[mithril] secure env setup failed:", e);
     }
+
+    stopOriginalSchedules = startOriginalScheduleReplication();
+    const stopHistory = startAllProfileHistoryReplication();
+    app.once("before-quit", stopHistory);
+    const stopWallets = startWalletReplication();
+    app.once("before-quit", stopWallets);
 
     app.on("browser-window-created", (_, window) => {
       optimizer.watchWindowShortcuts(window);
@@ -125,6 +135,7 @@ export function startMainProcess(): void {
   });
 
   app.on("before-quit", () => {
+    stopOriginalSchedules?.();
     stopEndpoint();
     stopHealthPolling();
     // Only the watch loop stops: supervised services are detached and keep

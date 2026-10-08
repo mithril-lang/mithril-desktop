@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { expect, it } from "vitest";
 import {
   materializeHistoryItem,
+  nativeHistoryVersion,
   setNativeHistoryCacheOwner,
   clearNativeHistoryCacheOwners,
   mergeNativeHistoryCache,
@@ -150,5 +151,274 @@ it("retains remote metadata, raw events and original timeline across deletion wi
   expect(readRemoteSessionCache(db, "browser")).toBeNull();
   clearNativeHistoryCacheOwners();
   expect(readRemoteSessionCache(db, "browser")).toBeNull();
+  db.close();
+});
+
+// @lat: [[cloud-workspace-tests#Chunked remote transcript storage]]
+it("stores a transcript beyond the former event and byte bounds in complete owner-bound chunks", () => {
+  const db = new Database(":memory:");
+  const session: ChatSession = {
+    id: "large-browser",
+    title: "Full work",
+    model: "mock",
+    revision: 1,
+    eventSeq: 20005,
+    deleted: false,
+    activeTurn: null,
+  };
+  const events: ChatEvent[] = Array.from(
+    { length: session.eventSeq },
+    (_, index) => ({
+      seq: index + 1,
+      type: "user",
+      turnId: null,
+      createdAt: index + 1,
+      data: { content: index < 600 ? "証".repeat(16000) : `Message ${index}` },
+    }),
+  );
+  const items: HistoryItem[] = events.map((event) => ({
+    kind: "user",
+    id: event.seq,
+    timestamp: event.createdAt,
+    content: event.data.content,
+  }));
+  expect(Buffer.byteLength(JSON.stringify({ events, items }))).toBeGreaterThan(
+    50 * 1024 * 1024,
+  );
+  replaceRemoteSessionCache(db, "alice", session, events, items);
+  setNativeHistoryCacheOwner(db.name, "alice");
+  expect(readRemoteSessionCache(db, session.id)).toEqual({
+    session,
+    events,
+    items,
+  });
+  const sizes = db
+    .prepare(
+      "SELECT MAX(length(CAST(body AS BLOB))) AS largest, COUNT(*) AS count FROM mithril_remote_session_chunks",
+    )
+    .get() as { largest: number; count: number };
+  expect(sizes.largest).toBeLessThanOrEqual(512 * 1024);
+  expect(sizes.count).toBeGreaterThan(400);
+  setNativeHistoryCacheOwner(db.name, "bob");
+  expect(readRemoteSessionCache(db, session.id)).toBeNull();
+  clearNativeHistoryCacheOwners();
+  db.close();
+});
+
+it("migrates the prior cache on write and rolls back a failed chunk replacement without losing history", () => {
+  const db = new Database(":memory:");
+  const session: ChatSession = {
+    id: "legacy-browser",
+    title: "Existing work",
+    model: "mock",
+    revision: 2,
+    eventSeq: 1,
+    deleted: false,
+    activeTurn: null,
+  };
+  const events: ChatEvent[] = [
+    {
+      seq: 1,
+      type: "user",
+      turnId: null,
+      createdAt: 1,
+      data: { content: "Preserve" },
+    },
+  ];
+  const items: HistoryItem[] = [
+    { kind: "user", id: 1, timestamp: 1, content: "Preserve" },
+  ];
+  db.exec(
+    "CREATE TABLE mithril_remote_session_cache(owner TEXT NOT NULL,session_id TEXT NOT NULL,revision INTEGER NOT NULL,body TEXT NOT NULL,PRIMARY KEY(owner,session_id))",
+  );
+  db.prepare("INSERT INTO mithril_remote_session_cache VALUES(?,?,?,?)").run(
+    "alice",
+    session.id,
+    session.revision,
+    JSON.stringify({ session, events, items }),
+  );
+  setNativeHistoryCacheOwner(db.name, "alice");
+  expect(readRemoteSessionCache(db, session.id)).toEqual({
+    session,
+    events,
+    items,
+  });
+  replaceRemoteSessionCache(db, "alice", session, events, items);
+  expect(readRemoteSessionCache(db, session.id)).toEqual({
+    session,
+    events,
+    items,
+  });
+  db.exec(
+    "CREATE TRIGGER fail_remote_chunk BEFORE INSERT ON mithril_remote_session_chunks BEGIN SELECT RAISE(ABORT,'disk write failed'); END",
+  );
+  expect(() =>
+    replaceRemoteSessionCache(
+      db,
+      "alice",
+      { ...session, revision: 3, title: "New title" },
+      events,
+      items,
+    ),
+  ).toThrow("disk write failed");
+  expect(readRemoteSessionCache(db, session.id)).toEqual({
+    session,
+    events,
+    items,
+  });
+  db.exec("DROP TRIGGER fail_remote_chunk");
+  expect(() =>
+    replaceRemoteSessionCache(db, "alice", session, events, [
+      { ...items[0], timestamp: 2 },
+    ]),
+  ).toThrow("Inconsistent");
+  expect(readRemoteSessionCache(db, session.id)).toEqual({
+    session,
+    events,
+    items,
+  });
+  const chunk = db
+    .prepare(
+      "SELECT body FROM mithril_remote_session_chunks WHERE owner='alice' AND kind='items'",
+    )
+    .get() as { body: string };
+  db.prepare(
+    "UPDATE mithril_remote_session_chunks SET body=? WHERE owner='alice' AND kind='items'",
+  ).run(JSON.stringify([{ ...items[0], timestamp: 9 }]));
+  expect(() => readRemoteSessionCache(db, session.id)).toThrow("Incomplete");
+  db.prepare(
+    "UPDATE mithril_remote_session_chunks SET body=? WHERE owner='alice' AND kind='items'",
+  ).run(chunk.body);
+  replaceRemoteSessionCache(db, "bob", session, events, [
+    { ...items[0], timestamp: 8 },
+  ]);
+  setNativeHistoryCacheOwner(db.name, "bob");
+  expect(readRemoteSessionCache(db, session.id)?.items[0].timestamp).toBe(8);
+  setNativeHistoryCacheOwner(db.name, "alice");
+  expect(readRemoteSessionCache(db, session.id)?.items[0].timestamp).toBe(1);
+  db.prepare(
+    "DELETE FROM mithril_remote_session_chunks WHERE kind='items'",
+  ).run();
+  expect(() => readRemoteSessionCache(db, session.id)).toThrow("Incomplete");
+  clearNativeHistoryCacheOwners();
+  db.close();
+});
+
+// @lat: [[cloud-workspace-tests#Complete mapped chat cache]]
+it("chunks the full mapped timeline, isolates owners and retains the old cache on failed replacement", () => {
+  const db = new Database(":memory:");
+  const original: HistoryItem[] = Array.from({ length: 20005 }, (_, index) => ({
+    kind: "user",
+    id: index + 1,
+    timestamp: index,
+    content: "Original",
+  }));
+  const rows = original.map((item) => ({
+    source: {
+      id: `user_${item.id}`,
+      kind: "user" as const,
+      timestamp: item.timestamp,
+      content: "Cloud " + "x".repeat(2700),
+    },
+    item: { ...item, content: "Cloud " + "x".repeat(2700) },
+  }));
+  replaceNativeHistoryCache(
+    db,
+    "chat",
+    "alice",
+    original,
+    () => original,
+    rows,
+  );
+  setNativeHistoryCacheOwner(db.name, "alice");
+  const chunks = db
+    .prepare(
+      "SELECT body FROM mithril_history_cache_chunks WHERE owner='alice' ORDER BY ordinal",
+    )
+    .all() as { body: string }[];
+  expect(chunks.length).toBeGreaterThan(200);
+  expect(
+    chunks.reduce((bytes, row) => bytes + Buffer.byteLength(row.body), 0),
+  ).toBeGreaterThan(50 * 1024 * 1024);
+  for (const chunk of chunks) {
+    expect(Buffer.byteLength(chunk.body)).toBeLessThanOrEqual(512 * 1024);
+    expect(JSON.parse(chunk.body).length).toBeLessThanOrEqual(100);
+  }
+  expect(mergeNativeHistoryCache(db, "chat", original)).toEqual(
+    rows.map((row) => row.item),
+  );
+  replaceNativeHistoryCache(db, "chat", "bob", [], () => [], []);
+  expect(mergeNativeHistoryCache(db, "chat", original)).toEqual(
+    rows.map((row) => row.item),
+  );
+  setNativeHistoryCacheOwner(db.name, "bob");
+  expect(mergeNativeHistoryCache(db, "chat", original)).toEqual(original);
+  setNativeHistoryCacheOwner(db.name, "alice");
+  db.exec(
+    "CREATE TRIGGER fail_cache BEFORE INSERT ON mithril_history_cache_chunks WHEN NEW.owner='alice' BEGIN SELECT RAISE(ABORT,'disk failure'); END",
+  );
+  expect(() =>
+    replaceNativeHistoryCache(
+      db,
+      "chat",
+      "alice",
+      original,
+      () => original,
+      rows.slice(0, 1),
+    ),
+  ).toThrow("disk failure");
+  expect(mergeNativeHistoryCache(db, "chat", original)).toEqual(
+    rows.map((row) => row.item),
+  );
+  db.exec(
+    "DELETE FROM mithril_history_cache_chunks WHERE owner='alice' AND ordinal=1",
+  );
+  expect(() => mergeNativeHistoryCache(db, "chat", original)).toThrow(
+    "chunk order",
+  );
+  clearNativeHistoryCacheOwners();
+  db.close();
+});
+
+// @lat: [[cloud-workspace-tests#Complete mapped chat cache]]
+it("reads retained legacy overlays and converts them without modifying source history", () => {
+  const db = new Database(":memory:");
+  const original: Extract<HistoryItem, { kind: "user" }>[] = [
+    { kind: "user", id: 1, timestamp: 1, content: "Original" },
+  ];
+  const legacy = [
+    {
+      sourceId: "user_1",
+      base: nativeHistoryVersion(original),
+      item: { ...original[0], content: "Legacy cloud" },
+    },
+  ];
+  db.exec(
+    "CREATE TABLE mithril_history_cache(session_id TEXT PRIMARY KEY,owner TEXT,items TEXT)",
+  );
+  db.prepare("INSERT INTO mithril_history_cache VALUES(?,?,?)").run(
+    "chat",
+    "alice",
+    JSON.stringify(legacy),
+  );
+  setNativeHistoryCacheOwner(db.name, "alice");
+  expect(mergeNativeHistoryCache(db, "chat", original)).toEqual([
+    legacy[0].item,
+  ]);
+  replaceNativeHistoryCache(db, "chat", "alice", original, () => original, [
+    {
+      source: { id: "user_1", kind: "user", timestamp: 1, content: "Updated" },
+      item: { ...original[0], content: "Updated" },
+    },
+  ]);
+  expect(mergeNativeHistoryCache(db, "chat", original)[0]).toEqual({
+    ...original[0],
+    content: "Updated",
+  });
+  expect(db.prepare("SELECT items FROM mithril_history_cache").get()).toEqual({
+    items: JSON.stringify(legacy),
+  });
+  expect(original[0].content).toBe("Original");
+  clearNativeHistoryCacheOwners();
   db.close();
 });

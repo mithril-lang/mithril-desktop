@@ -1,5 +1,43 @@
+import {
+  bindOriginalScheduleAgent,
+  prepareOriginalScheduleAgent,
+  validOriginalScheduleAgentPreparation,
+  type OriginalScheduleAgentPreparation,
+  validOriginalScheduleAgentBinding,
+  type OriginalScheduleAgentBinding,
+} from "./original-schedule-agent-binding";
 import { projectLocalSchedules } from "./local-schedule-preview";
+import {
+  captureOriginalCronFile,
+  type OriginalCronFile,
+} from "./cron-source-files";
 import type { NativeScheduleDraft } from "@mithril/workspace/schedules";
+import {
+  parseOriginalCronRestoreResult,
+  type OriginalCronRestoreRequest,
+  validOriginalCronRestoreRequest,
+  type OriginalCronRestoreResult,
+} from "./cron-source-restore";
+import {
+  validOriginalCronPrepareRequest,
+  parseOriginalCronPrepareResult,
+  type OriginalCronPrepareRequest,
+  type OriginalCronPrepareResult,
+} from "./cron-source-prepare";
+import {
+  validOriginalCronTransitionRequest,
+  parseOriginalCronTransitionResult,
+  type OriginalCronTransitionRequest,
+  type OriginalCronTransitionResult,
+} from "./cron-source-transition";
+import {
+  callOriginalCronRun,
+  callOriginalCronInspect,
+  validOriginalCronRunRequest,
+  type OriginalCronRunRequest,
+  type OriginalCronRunResult,
+  type OriginalCronInspectResult,
+} from "./cron-source-run";
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
@@ -328,20 +366,21 @@ export async function listCronJobs(
 function runCronCommand(
   args: string[],
   profile?: string,
+  nativeInput?: string,
 ): Promise<{ success: boolean; output: string; error?: string }> {
   const cliArgs = hermesCliArgs();
-  if (profile && profile !== "default") {
+  if (profile && (profile !== "default" || nativeInput !== undefined)) {
     cliArgs.push("-p", profile);
   }
   cliArgs.push("cron", ...args);
 
   return new Promise((resolve) => {
-    execFile(
+    const child = execFile(
       HERMES_PYTHON,
       cliArgs,
       {
         cwd: join(HERMES_HOME, "hermes-agent"),
-        timeout: 15000,
+        timeout: nativeInput === undefined ? 15000 : 40000,
         // keychain-held keys the agent can no longer read from .env
         env: { ...process.env, ...secureSpawnEnv(profile) },
         ...HIDDEN_SUBPROCESS_OPTIONS,
@@ -358,6 +397,11 @@ function runCronCommand(
         }
       },
     );
+    // Native source bodies stay on stdin, never in process arguments or logs.
+    if (nativeInput !== undefined) {
+      child.stdin?.on("error", () => {});
+      child.stdin?.end(nativeInput);
+    }
   });
 }
 
@@ -483,15 +527,125 @@ export async function triggerCronJob(
 }
 
 /** Explicit local-only projection: no SSH, external delivery or script is read into the cloud draft. */
+export function readOriginalCronSource(
+  profile: string,
+): OriginalCronFile | null {
+  if (isRemoteMode())
+    throw Error("Original remote schedule source unavailable");
+  return captureOriginalCronFile(profileHome(profile), profile);
+}
+
+/** Prepare through the original profile's parser without saving or executing.
+ * This main-process port does not expose raw source through renderer IPC.
+ */
+export async function prepareOriginalCronSource(
+  request: OriginalCronPrepareRequest,
+): Promise<OriginalCronPrepareResult> {
+  if (isRemoteMode() || !validOriginalCronPrepareRequest(request))
+    return {
+      success: false,
+      error: "Original schedule preparation unavailable",
+    };
+  const captured = structuredClone(request);
+  const result = await runCronCommand(
+    ["source-prepare"],
+    captured.profile,
+    JSON.stringify(captured),
+  );
+  return parseOriginalCronPrepareResult(result.output, captured);
+}
+
+/** Read-only original lifecycle bridge; no raw-source renderer IPC. */
+export async function prepareOriginalCronTransition(
+  request: OriginalCronTransitionRequest,
+): Promise<OriginalCronTransitionResult> {
+  if (isRemoteMode() || !validOriginalCronTransitionRequest(request))
+    return {
+      success: false,
+      error: "Original schedule transition unavailable",
+    };
+  const captured = structuredClone(request);
+  const result = await runCronCommand(
+    ["source-transition"],
+    captured.profile,
+    JSON.stringify(captured),
+  );
+  return parseOriginalCronTransitionResult(result.output, captured);
+}
+
+/** Exact-source main-only execution after selected-device custody validation. */
+export async function runOriginalCronSource(
+  request: OriginalCronRunRequest,
+  assertActive: () => Promise<void>,
+): Promise<OriginalCronRunResult> {
+  if (isRemoteMode() || !validOriginalCronRunRequest(request))
+    return { success: false, error: "Original schedule execution unavailable" };
+  return callOriginalCronRun(
+    request,
+    {
+      executable: HERMES_PYTHON,
+      cliArgs: hermesCliArgs(),
+      cwd: join(HERMES_HOME, "hermes-agent"),
+      env: { ...process.env, ...secureSpawnEnv(request.profile) },
+    },
+    assertActive,
+  );
+}
+
+/** Main-only read-only retained-result recovery; no renderer IPC. */
+export async function inspectOriginalCronSource(
+  request: OriginalCronRunRequest,
+  assertActive: () => Promise<void>,
+): Promise<OriginalCronInspectResult> {
+  if (isRemoteMode() || !validOriginalCronRunRequest(request))
+    return {
+      success: false,
+      error: "Original schedule inspection unavailable",
+    };
+  return callOriginalCronInspect(
+    request,
+    {
+      executable: HERMES_PYTHON,
+      cliArgs: hermesCliArgs(),
+      cwd: join(HERMES_HOME, "hermes-agent"),
+      env: { ...process.env, ...secureSpawnEnv(request.profile) },
+    },
+    assertActive,
+  );
+}
+
+/** Local restore after resource/execution binding. No raw-source renderer IPC. */
+export async function restoreOriginalCronSource(
+  request: OriginalCronRestoreRequest,
+): Promise<OriginalCronRestoreResult> {
+  if (isRemoteMode())
+    return {
+      success: false,
+      error: "Original remote schedule restoration unavailable",
+    };
+  if (!validOriginalCronRestoreRequest(request))
+    return { success: false, error: "Invalid original schedule restoration" };
+  const captured = structuredClone(request);
+  const input = JSON.stringify(captured);
+  if (Buffer.byteLength(input) > 80 * 1024 * 1024)
+    return {
+      success: false,
+      error: "Schedule source exceeds synchronization capacity",
+    };
+  const result = await runCronCommand(
+    ["source-restore"],
+    captured.profile,
+    input,
+  );
+  return parseOriginalCronRestoreResult(result.output, captured);
+}
+
+/** Existing preview remains read-only; complete capture precedes its restricted projection. */
 export async function previewLocalSchedules(
   profile: string,
 ): Promise<NativeScheduleDraft[]> {
-  const raw = JSON.parse(
-    await readFile(jobsFilePath(profile), "utf8").catch((error) => {
-      if (error.code === "ENOENT") return "[]";
-      throw error;
-    }),
-  ) as unknown;
+  const raw =
+    captureOriginalCronFile(profileHome(profile), profile)?.file ?? [];
   const rows = Array.isArray(raw)
     ? raw
     : raw && typeof raw === "object" && "jobs" in raw
@@ -504,5 +658,43 @@ export async function previewLocalSchedules(
       .filter((value) => value && typeof value === "object")
       .map((value) => normalizeJob(value as Record<string, unknown>))
       .filter((job): job is CronJob => !!job),
+  );
+}
+
+/** Main lifecycle producer after exact source/resource publication; never renderer IPC. */
+export async function bindOriginalCronExecution(
+  request: OriginalScheduleAgentBinding,
+  assertActive: () => Promise<void>,
+): Promise<{ bindingDigest: string }> {
+  if (isRemoteMode() || !validOriginalScheduleAgentBinding(request))
+    throw Error("Original schedule binding unavailable");
+  return bindOriginalScheduleAgent(
+    request,
+    {
+      executable: HERMES_PYTHON,
+      cliArgs: hermesCliArgs(),
+      cwd: join(HERMES_HOME, "hermes-agent"),
+      env: { ...process.env, ...secureSpawnEnv(request.profile) },
+    },
+    assertActive,
+  );
+}
+
+/** Guard original source before the automatic coordinator writes authored enabled/state data. */
+export async function prepareOriginalCronExecution(
+  request: OriginalScheduleAgentPreparation,
+  assertActive: () => Promise<void>,
+): Promise<{ bindingDigest: string }> {
+  if (isRemoteMode() || !validOriginalScheduleAgentPreparation(request))
+    throw Error("Original schedule binding unavailable");
+  return prepareOriginalScheduleAgent(
+    request,
+    {
+      executable: HERMES_PYTHON,
+      cliArgs: hermesCliArgs(),
+      cwd: join(HERMES_HOME, "hermes-agent"),
+      env: { ...process.env, ...secureSpawnEnv(request.profile) },
+    },
+    assertActive,
   );
 }

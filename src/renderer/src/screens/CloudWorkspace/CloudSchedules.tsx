@@ -1,73 +1,95 @@
-import * as Dialog from "@radix-ui/react-dialog";
-import { useCallback, useEffect, useState } from "react";
-import { CloudSchedules as SharedSchedules } from "@mithril/workspace/schedules-react";
-import "@mithril/workspace/styles.css";
-import LegacySchedules from "../Schedules/Schedules";
-// @lat: [[cloud-workspace#Cloud workspace#Cloud schedules]]
+import { useEffect, useState } from "react";
+import OriginalSchedules from "@mithril/workspace/desktop-schedules";
+import { UnifiedSchedulesAPI } from "@mithril/workspace/unified-schedules-api";
+import "@mithril/workspace/desktop-styles.css";
+
+// @lat: [[cloud-workspace#Original Schedules screen mirror (draft)]]
 export default function CloudSchedules({
   profile,
   locale = "en",
-  onOpenSession,
 }: {
   profile: string;
   locale?: string;
   onOpenSession?: (id: string) => void;
 }): React.JSX.Element {
   const [epoch, setEpoch] = useState(0);
-  const [legacyOpen, setLegacyOpen] = useState(false);
   useEffect(
     () =>
       window.hermesAPI.onCloudWorkspaceAccountChanged(() =>
-        setEpoch((v) => v + 1),
+        setEpoch((value) => value + 1),
       ),
     [],
   );
-  const beforeConnect = useCallback(async () => {
-    await window.hermesAPI.cloudWorkspace.enable();
-  }, []);
-  const models = useCallback(async () => {
-    await window.hermesAPI.cloudChat.enable();
-    return window.hermesAPI.cloudChat.models();
-  }, []);
   return (
-    <>
-      <SharedSchedules
-        key={`${profile}:${epoch}`}
-        transport={window.hermesAPI.cloudWorkspace.schedules}
-        beforeConnect={beforeConnect}
-        locale={locale}
-        loadModels={models}
-        previewNative={() => window.hermesAPI.cloudWorkspace.previewSchedules()}
-        onOpenSession={onOpenSession}
-      />
-      <Dialog.Root open={legacyOpen} onOpenChange={setLegacyOpen}>
-        <Dialog.Trigger asChild>
-          <button type="button" className="device-history-button">
-            {locale.startsWith("ja")
-              ? "端末のスケジュールを開く"
-              : "Schedules on this device"}
-          </button>
-        </Dialog.Trigger>
-        <Dialog.Portal>
-          <Dialog.Overlay className="device-history-backdrop" />
-          <Dialog.Content
-            className="device-history-dialog device-schedules-dialog"
-            aria-describedby={undefined}
-          >
-            <Dialog.Close asChild>
-              <button type="button" className="device-history-close">
-                {locale.startsWith("ja") ? "閉じる" : "Close"}
-              </button>
-            </Dialog.Close>
-            <Dialog.Title>
-              {locale.startsWith("ja")
-                ? "端末のスケジュール"
-                : "Schedules on this device"}
-            </Dialog.Title>
-            <LegacySchedules profile={profile} />
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-    </>
+    <ScheduleConnection
+      key={`${profile}:${epoch}`}
+      profile={profile}
+      locale={locale}
+    />
+  );
+}
+
+function ScheduleConnection({
+  profile,
+  locale,
+}: {
+  profile: string;
+  locale: string;
+}): React.JSX.Element {
+  const [api, setAPI] = useState<UnifiedSchedulesAPI | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    // Invalidate immediately, before React commits the replacement screen.
+    const unsubscribe = window.hermesAPI.onCloudWorkspaceAccountChanged(() => {
+      active = false;
+    });
+    const cloud = window.hermesAPI.cloudWorkspace;
+    void cloud
+      .status()
+      .then((status) => {
+        if (!active) return;
+        if (!status.userId) throw Error("Schedule connection unavailable");
+        const owner = status.userId;
+        setAPI(
+          new UnifiedSchedulesAPI({
+            owner,
+            profile,
+            original: window.hermesAPI,
+            cloud: cloud.schedules,
+            operationId: () => crypto.randomUUID(),
+            check: async () => {
+              if (!active) throw Error("Schedule connection changed");
+              const current = await cloud.status();
+              if (!active || current.userId !== owner)
+                throw Error("Schedule connection changed");
+            },
+          }),
+        );
+        setFailed(false);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [profile, attempt]);
+  if (api)
+    return <OriginalSchedules api={api} profile={profile} locale={locale} />;
+  return (
+    <div role="status">
+      {failed ? (
+        <button onClick={() => setAttempt((value) => value + 1)}>
+          {locale === "ja" ? "再接続" : "Reconnect"}
+        </button>
+      ) : locale === "ja" ? (
+        "接続中…"
+      ) : (
+        "Connecting…"
+      )}
+    </div>
   );
 }

@@ -8,6 +8,21 @@ export interface CloudWorkspaceStatus {
 }
 
 export interface CloudWorkspaceAPI extends WorkspaceTransport {
+  archive: {
+    pending(
+      owner: string,
+    ): Promise<
+      import("@mithril/workspace/archive-client").RestoreIntent | null
+    >;
+    exportAndSave(owner: string): Promise<void>;
+    chooseAndPrepare(
+      owner: string,
+    ): Promise<
+      import("@mithril/workspace/archive-client").RestoreIntent | null
+    >;
+    commit(owner: string, confirmed: boolean): Promise<void>;
+  };
+  executionReview: import("@mithril/workspace/execution-review").ExecutionReviewTransport;
   replica: import("@mithril/workspace/replica-sync").ReplicaTransport;
   capabilitySnapshot: import("@mithril/workspace/capability-data").CapabilitySeed;
   memorySnapshot: import("@mithril/workspace/memory-files").MemorySeed;
@@ -92,18 +107,21 @@ export interface CloudChatAPI extends SessionTransport {
     reconstructed?: number;
     conflicts: string[];
     titleConflicts?: Array<{
+      profile?: string;
       sessionId: string;
       native: string;
       cloud: string;
       cloudRevision: number;
     }>;
     modelConflicts?: Array<{
+      profile?: string;
       sessionId: string;
       native: string;
       cloud: string;
       cloudRevision: number;
     }>;
     visibilityConflicts?: Array<{
+      profile?: string;
       sessionId: string;
       native: string;
       cloud: string;

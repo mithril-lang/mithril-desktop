@@ -78,6 +78,38 @@ function installApi(): void {
 }
 
 describe("ProfileWalletPane balance chips", () => {
+  // @lat: [[cloud-workspace-tests#Original wallet canonical deletion display]]
+  it("hides a deleted canonical card without deleting a retained native key through the actual shared adapter", async () => {
+    installApi();
+    vi.mocked(window.hermesAPI.syncWallets).mockResolvedValue({
+      status: "ok",
+      authoritative: true,
+      wallets: [],
+    });
+    const view = render(<ProfileWalletPane profile="default" />);
+    await view.findByText("agents.walletManagedEmpty");
+    expect(view.queryByText("Primary")).toBeNull();
+    expect(window.hermesAPI.listWallets).toHaveBeenCalledTimes(1);
+  });
+  // @lat: [[cloud-workspace-tests#Original wallet card refresh after synchronization]]
+  it("uses the compiled shared pane to refresh a restored original name after synchronization", async () => {
+    installApi();
+    vi.mocked(window.hermesAPI.listWallets)
+      .mockResolvedValueOnce([WALLET])
+      .mockResolvedValue([{ ...WALLET, name: "Renamed on Web" }]);
+    vi.mocked(window.hermesAPI.syncWallets).mockResolvedValue({
+      status: "ok",
+      wallets: [],
+    });
+    const view = render(<ProfileWalletPane profile="default" />);
+    await view.findByText("Renamed on Web");
+    expect(view.queryByText("Primary")).toBeNull();
+    expect(window.hermesAPI.listWallets).toHaveBeenCalledTimes(2);
+    expect(window.hermesAPI.getTokenBalances).toHaveBeenCalledWith(
+      WALLET.address,
+      "default",
+    );
+  });
   it("renders the symbol label exactly once per token and the icon only when known", async () => {
     installApi();
     const view = render(<ProfileWalletPane profile="default" />);

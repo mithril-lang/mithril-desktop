@@ -1,12 +1,16 @@
+import { NativeAccountArchive } from "../cloud-archive";
+import {
+  synchronizeAllProfileHistories,
+  resolveOwnedProfileHistory,
+} from "../native-history-all-profiles-runtime";
+import {
+  synchronizeWallets,
+  canonicalWalletBalances,
+} from "../wallet-replication-runtime";
+import { runOriginalScheduleScreen } from "../original-schedule-replication-runtime";
 import { registerTaskAttachmentIPC } from "../task-attachment-ipc";
 import { registerCapabilityResourceIPC } from "../capability-resource-ipc";
-import {
-  synchronizeNativeHistory,
-  resolveNativeHistoryTitle,
-  resolveNativeHistoryModel,
-  resolveNativeHistoryVisibility,
-  nativeHistoryInventory,
-} from "../native-history-runtime";
+import { nativeHistoryInventory } from "../native-history-runtime";
 import {
   nativeRepositorySeed,
   nativeMemorySnapshot,
@@ -360,7 +364,6 @@ import {
   removeCustomProvider,
   upsertCustomProvider,
 } from "../providers-store";
-import { getTokenBalances } from "../wallet-balances";
 import type { ImportWalletInput } from "../../shared/wallets";
 import {
   readMemory,
@@ -1317,19 +1320,19 @@ export function registerIpcHandlers(context: IpcContext): void {
   });
   ipcMain.handle("cloud-chat-native-title-resolve", (event, request) => {
     trustedWorkspaceSender(event);
-    return resolveNativeHistoryTitle(request);
+    return resolveOwnedProfileHistory(request, "title");
   });
   ipcMain.handle("cloud-chat-native-model-resolve", (event, request) => {
     trustedWorkspaceSender(event);
-    return resolveNativeHistoryModel(request);
+    return resolveOwnedProfileHistory(request, "model");
   });
   ipcMain.handle("cloud-chat-native-visibility-resolve", (event, request) => {
     trustedWorkspaceSender(event);
-    return resolveNativeHistoryVisibility(request);
+    return resolveOwnedProfileHistory(request, "visibility");
   });
   ipcMain.handle("cloud-chat-native-history-sync", (event) => {
     trustedWorkspaceSender(event);
-    return synchronizeNativeHistory();
+    return synchronizeAllProfileHistories();
   });
   ipcMain.handle("cloud-chat-list", (event) => {
     trustedWorkspaceSender(event);
@@ -1500,6 +1503,57 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudWorkspace.discoverDocuments.fetchRegistryDetail(kind, item);
   });
+  const archive = new NativeAccountArchive({
+    workspace: cloudWorkspace,
+    directory: join(app.getPath("userData"), "account-archives"),
+    chooseSave: async () => {
+      const win = getMainWindow();
+      if (!win) throw Error("Main window unavailable");
+      const result = await dialog.showSaveDialog(win, {
+        title: "Save workspace backup",
+        defaultPath: "mithril-workspace.tar",
+        filters: [{ name: "Mithril backup", extensions: ["tar"] }],
+      });
+      return result.canceled ? null : (result.filePath ?? null);
+    },
+    chooseOpen: async () => {
+      const win = getMainWindow();
+      if (!win) throw Error("Main window unavailable");
+      const result = await dialog.showOpenDialog(win, {
+        title: "Choose workspace backup",
+        properties: ["openFile"],
+        filters: [{ name: "Mithril backup", extensions: ["tar"] }],
+      });
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
+  });
+  ipcMain.handle("cloud-workspace-archive-pending", (event, owner) => {
+    trustedWorkspaceSender(event);
+    return archive.pending(owner);
+  });
+  ipcMain.handle("cloud-workspace-archive-export", (event, owner) => {
+    trustedWorkspaceSender(event);
+    return archive.exportAndSave(owner);
+  });
+  ipcMain.handle("cloud-workspace-archive-prepare", (event, owner) => {
+    trustedWorkspaceSender(event);
+    return archive.chooseAndPrepare(owner);
+  });
+  ipcMain.handle(
+    "cloud-workspace-archive-commit",
+    (event, owner, confirmed) => {
+      trustedWorkspaceSender(event);
+      return archive.commit(owner, confirmed);
+    },
+  );
+  ipcMain.handle("cloud-workspace-execution-history", (event, after) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.executionHistory(after);
+  });
+  ipcMain.handle("cloud-workspace-execution-review", (event, decision) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.reviewExecution(decision);
+  });
   ipcMain.handle("cloud-workspace-status", (event) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.status();
@@ -1595,10 +1649,13 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudWorkspace.getSnapshot();
   });
-  ipcMain.handle("cloud-workspace-operations", (event, operations) => {
-    trustedWorkspaceSender(event);
-    return cloudWorkspace.applyOperations(operations);
-  });
+  ipcMain.handle(
+    "cloud-workspace-operations",
+    (event, operations, expectedOwner) => {
+      trustedWorkspaceSender(event);
+      return cloudWorkspace.applyOperations(operations, expectedOwner);
+    },
+  );
   ipcMain.handle("cloud-workspace-history", (event, id, offset) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.history(id, offset);
@@ -3352,21 +3409,24 @@ export function registerIpcHandlers(context: IpcContext): void {
   );
   const walletUnavailable =
     "Cloud wallet services are unavailable in this Mithril preview.";
-  ipcMain.handle("wallet-sync", () => ({
-    status: "signed-out" as const,
-    wallets: [],
-    error: walletUnavailable,
-  }));
+  ipcMain.handle("wallet-sync", (_event, profile: string) =>
+    synchronizeWallets(profile),
+  );
   ipcMain.handle("wallet-portfolio", () => ({
-    status: "signed-out" as const,
+    status: "error" as const,
     error: walletUnavailable,
   }));
   ipcMain.handle("wallet-provision", () => ({
-    status: "signed-out" as const,
+    status: "error" as const,
     error: walletUnavailable,
   }));
-  ipcMain.handle("get-token-balances", (_event, address: string) =>
-    getTokenBalances(address),
+  ipcMain.handle(
+    "get-token-balances",
+    (_event, address: string, profile?: string) =>
+      canonicalWalletBalances(
+        profile || getActiveProfileNameSync() || "default",
+        address,
+      ),
   );
 
   // Memory
@@ -3928,7 +3988,11 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle(
     "list-cron-jobs",
     (_event, includeDisabled?: boolean, profile?: string) =>
-      listCronJobs(includeDisabled, profile),
+      runOriginalScheduleScreen(
+        profile,
+        () => listCronJobs(includeDisabled, profile),
+        "read",
+      ),
   );
   ipcMain.handle(
     "create-cron-job",
@@ -3939,20 +4003,42 @@ export function registerIpcHandlers(context: IpcContext): void {
       name?: string,
       deliver?: string,
       profile?: string,
-    ) => createCronJob(schedule, prompt, name, deliver, profile),
+    ) =>
+      runOriginalScheduleScreen(
+        profile,
+        () => createCronJob(schedule, prompt, name, deliver, profile),
+        "edit",
+      ),
   );
   ipcMain.handle("remove-cron-job", (_event, jobId: string, profile?: string) =>
-    removeCronJob(jobId, profile),
+    runOriginalScheduleScreen(
+      profile,
+      () => removeCronJob(jobId, profile),
+      "edit",
+    ),
   );
   ipcMain.handle("pause-cron-job", (_event, jobId: string, profile?: string) =>
-    pauseCronJob(jobId, profile),
+    runOriginalScheduleScreen(
+      profile,
+      () => pauseCronJob(jobId, profile),
+      "edit",
+    ),
   );
   ipcMain.handle("resume-cron-job", (_event, jobId: string, profile?: string) =>
-    resumeCronJob(jobId, profile),
+    runOriginalScheduleScreen(
+      profile,
+      () => resumeCronJob(jobId, profile),
+      "edit",
+    ),
   );
   ipcMain.handle(
     "trigger-cron-job",
-    (_event, jobId: string, profile?: string) => triggerCronJob(jobId, profile),
+    (_event, jobId: string, profile?: string) =>
+      runOriginalScheduleScreen(
+        profile,
+        () => triggerCronJob(jobId, profile),
+        "execute",
+      ),
   );
 
   // Kanban

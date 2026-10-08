@@ -5,6 +5,13 @@ import { APP_LOCALES, sharedI18n } from "../../../../shared/i18n";
 import { I18nContext } from "../I18nContext";
 import DataPane from "./DataPane";
 
+vi.stubGlobal("hermesAPI", {
+  cloudWorkspace: {
+    status: async () => ({ userId: null, enabled: false }),
+    executionReview: { list: vi.fn(), review: vi.fn() },
+  },
+});
+
 const settings = vi.hoisted(() => ({
   backingUp: false,
   backupResult: null,
@@ -26,16 +33,10 @@ const settings = vi.hoisted(() => ({
 
 vi.mock("./SettingsDataContext", () => ({ useSettings: () => settings }));
 
-describe.each(APP_LOCALES)("DataPane migration banner (%s)", (locale) => {
+describe.each(APP_LOCALES)("Cloud original DataPane (%s)", (locale) => {
   // @lat: [[sidebar-navigation#Settings modal#Migration path rendering]]
-  it.each([
-    "/home/alice/.openclaw",
-    "C:\\Users\\Alice & Bob\\.openclaw",
-    '/home/<img src=x onerror="alert(1)">/.openclaw',
-    "/home/O'Brien & &#60;img&#62;/.openclaw",
-    "/home/  two spaces  /$t(settings.migrationDetected)/.openclaw",
-  ])("preserves the exact path as text: %s", (path) => {
-    settings.openclawPath = path;
+  it("uses shared cloud controls without displaying legacy paths or migration actions", () => {
+    settings.openclawPath = '/home/<img src=x onerror="alert(1)">/.openclaw';
     const i18n = sharedI18n.cloneInstance({
       lng: locale,
       initImmediate: false,
@@ -47,11 +48,12 @@ describe.each(APP_LOCALES)("DataPane migration banner (%s)", (locale) => {
         </I18nContext.Provider>
       </I18nextProvider>,
     );
-
-    const description = container.querySelector(".settings-migration-desc");
-    const code = description?.querySelector("code");
-    expect(code?.textContent).toBe(path);
-    expect(code?.childElementCount).toBe(0);
-    expect(description?.querySelectorAll("*")).toHaveLength(1);
+    expect(container.querySelector(".settings-migration-desc")).toBeNull();
+    expect(container.textContent).not.toContain(settings.openclawPath);
+    const buttons = Array.from(
+      container.querySelectorAll(".settings-hermes-actions button"),
+    ) as HTMLButtonElement[];
+    expect(buttons).toHaveLength(2);
+    expect(buttons.every((button) => button.disabled)).toBe(true);
   });
 });

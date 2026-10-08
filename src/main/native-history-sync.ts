@@ -90,6 +90,12 @@ export interface NativeHistoryPorts {
   transport: SessionTransport;
   read(owner: string, profile: string): NativeHistoryJournal;
   write(owner: string, profile: string, journal: NativeHistoryJournal): void;
+  writeEntry?(
+    owner: string,
+    profile: string,
+    sessionId: string,
+    entry: NativeHistoryJournal["entries"][string],
+  ): void;
 }
 const fingerprint = (item: ArchivedHistoryItem): string =>
   createHash("sha256")
@@ -214,14 +220,9 @@ export class NativeHistorySync {
       typeof state !== "object" ||
       !state.entries ||
       typeof state.entries !== "object" ||
-      Array.isArray(state.entries) ||
-      Object.keys(state.entries).length > 1000
+      Array.isArray(state.entries)
     )
       throw Error("Invalid history journal");
-    const persist = async (): Promise<void> => {
-      await check();
-      this.ports.write(identity.userId, identity.profile, state);
-    };
     let source: NativeHistorySource[];
     let sourceFailure: string | null = null;
     try {
@@ -236,18 +237,12 @@ export class NativeHistorySync {
           : "Native source unavailable; source retained";
     }
     await check();
-    if (
-      source.length > 1000 ||
-      new Set(source.map((s) => s.id)).size !== source.length
-    )
-      throw Error(
-        "Native history exceeds supported session bound; source retained",
-      );
+    if (new Set(source.map((s) => s.id)).size !== source.length)
+      throw Error("Duplicate native history source; source retained");
     const list = await this.ports.transport.list();
     await check();
     if (list.userId !== identity.userId) throw Error("History owner mismatch");
     if (
-      list.sessions.length > 1000 ||
       list.sessions.some((session) => !validateChatSession(session)) ||
       new Set(list.sessions.map((session) => session.id)).size !==
         list.sessions.length
@@ -267,6 +262,17 @@ export class NativeHistorySync {
     for (const native of source) {
       const sid = nativeCloudSessionId(identity.profile, native.id);
       const journal = (state.entries[sid] ??= { hashes: {}, pending: null });
+      const persist = async (): Promise<void> => {
+        await check();
+        if (this.ports.writeEntry)
+          this.ports.writeEntry(
+            identity.userId,
+            identity.profile,
+            sid,
+            journal,
+          );
+        else this.ports.write(identity.userId, identity.profile, state);
+      };
       if (
         !journal ||
         typeof journal.hashes !== "object" ||
@@ -629,9 +635,7 @@ export class NativeHistorySync {
         const history = [] as { type: string; data: Record<string, string> }[];
         let after = 0;
         let checkpointIdentity: string | undefined;
-        for (let page = 0; ; page++) {
-          if (page >= 1000)
-            throw Error("Native history exceeds supported page bound");
+        for (;;) {
           const checkpoint = await this.ports.transport.events(sid, after);
           await check();
           if (
@@ -670,7 +674,8 @@ export class NativeHistorySync {
           if (
             checkpoint.nextAfter === null ||
             checkpoint.nextAfter !== last ||
-            last <= after
+            last <= after ||
+            last >= remote.eventSeq
           )
             throw Error("Invalid history checkpoint cursor");
           after = checkpoint.nextAfter;
@@ -906,7 +911,6 @@ export class NativeHistorySync {
         const items = await native.items(sid);
         await check();
         if (
-          items.length > 20000 ||
           !items.every(validArchivedHistoryItem) ||
           new Set(items.map((item) => item.id)).size !== items.length
         )
@@ -955,14 +959,17 @@ export class NativeHistorySync {
           for (const item of cache) journal.hashes[item.id] = fingerprint(item);
         }
         await persist();
-        while (changed.length) {
+        let changedIndex = 0;
+        while (changedIndex < changed.length) {
           const batch: ArchivedHistoryItem[] = [];
-          while (changed.length && batch.length < 100) {
+          while (changedIndex < changed.length && batch.length < 100) {
             if (
-              Buffer.byteLength(JSON.stringify([...batch, changed[0]])) > 800000
+              Buffer.byteLength(
+                JSON.stringify([...batch, changed[changedIndex]]),
+              ) > 800000
             )
               break;
-            batch.push(changed.shift()!);
+            batch.push(changed[changedIndex++]!);
           }
           if (!batch.length)
             throw Error(
@@ -1022,7 +1029,6 @@ export class NativeHistorySync {
       const intents = await this.ports.deletions.list(identity);
       await check();
       if (
-        intents.length > 1000 ||
         new Set(intents.map((intent) => intent.sessionId)).size !==
           intents.length ||
         new Set(intents.map((intent) => intent.operationId)).size !==
@@ -1145,10 +1151,7 @@ export class NativeHistorySync {
           }
           const events: ChatEvent[] = [];
           let after = 0;
-          let eventBytes = 0;
-          for (let page = 0; ; page++) {
-            if (page >= 1000)
-              throw Error("Cloud history exceeds supported page bound");
+          for (;;) {
             const snapshot = await this.ports.transport.events(
               session.id,
               after,
@@ -1176,19 +1179,18 @@ export class NativeHistorySync {
               )
                 throw Error("Invalid cloud history checkpoint");
               last = event.seq;
-              eventBytes += Buffer.byteLength(JSON.stringify(event));
-              if (eventBytes > 50 * 1024 * 1024)
-                throw Error("Cloud history exceeds supported byte bound");
               events.push(event);
-              if (events.length > 20000)
-                throw Error("Cloud history exceeds supported event bound");
             }
             if (!snapshot.hasMore) {
               if (last !== session.eventSeq)
                 throw Error("Incomplete cloud history checkpoint");
               break;
             }
-            if (snapshot.nextAfter !== last || last <= after)
+            if (
+              snapshot.nextAfter !== last ||
+              last <= after ||
+              last >= session.eventSeq
+            )
               throw Error("Invalid cloud history cursor");
             after = last;
           }

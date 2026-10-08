@@ -164,3 +164,79 @@ it("matches original Agent archiving across compression lineage and preserves se
     db.close();
   }
 });
+
+// @lat: [[cloud-workspace-tests#Complete compression lineage synchronization]]
+it("archives and restores a complete large compression lineage through bounded SQL batches", () => {
+  const db = new Database(":memory:");
+  db.exec(
+    "CREATE TABLE sessions(id TEXT PRIMARY KEY,parent_session_id TEXT,end_reason TEXT,archived INTEGER,title TEXT);CREATE INDEX parents ON sessions(parent_session_id);CREATE TABLE messages(session_id TEXT,content TEXT);CREATE TABLE desktop_session_context_folders(session_id TEXT,folder_path TEXT)",
+  );
+  const original: Record<string, unknown>[] = [];
+  const count = 1205,
+    id = (index: number): string => "chat_" + String(index).padStart(4, "0");
+  db.transaction(() => {
+    const insert = db.prepare("INSERT INTO sessions VALUES(?,?,?,?,?)");
+    for (let index = 0; index < count; index++) {
+      const row = {
+        id: id(index),
+        parent_session_id: index ? id(index - 1) : null,
+        end_reason: index < count - 1 ? "compression" : null,
+        archived: 0,
+        title: "Original " + index,
+      };
+      insert.run(
+        row.id,
+        row.parent_session_id,
+        row.end_reason,
+        row.archived,
+        row.title,
+      );
+      original.push(row);
+    }
+    insert.run("unrelated", null, null, 0, "Other conversation");
+    db.prepare("INSERT INTO messages VALUES(?,?)").run(
+      id(600),
+      "Retained evidence",
+    );
+    db.prepare("INSERT INTO desktop_session_context_folders VALUES(?,?)").run(
+      id(600),
+      "/original/project",
+    );
+  })();
+  applyCloudSessionArchive(db, id(600), false, true);
+  expect(
+    db
+      .prepare("SELECT * FROM sessions WHERE id != 'unrelated' ORDER BY id")
+      .all(),
+  ).toEqual(original.map((row) => ({ ...row, archived: 1 })));
+  applyCloudSessionArchive(db, id(600), true, false);
+  expect(
+    db
+      .prepare("SELECT * FROM sessions WHERE id != 'unrelated' ORDER BY id")
+      .all(),
+  ).toEqual(original);
+  expect(
+    db
+      .prepare("SELECT archived,title FROM sessions WHERE id='unrelated'")
+      .get(),
+  ).toEqual({ archived: 0, title: "Other conversation" });
+  expect(db.prepare("SELECT * FROM messages").get()).toEqual({
+    session_id: id(600),
+    content: "Retained evidence",
+  });
+  expect(
+    db.prepare("SELECT * FROM desktop_session_context_folders").get(),
+  ).toEqual({ session_id: id(600), folder_path: "/original/project" });
+  db.exec(
+    `CREATE TRIGGER add_lineage AFTER UPDATE OF archived ON sessions WHEN NEW.id='${id(600)}' BEGIN INSERT INTO sessions VALUES('unexpected','${id(600)}',NULL,1,'Unexpected'); END`,
+  );
+  expect(() => applyCloudSessionArchive(db, id(600), false, true)).toThrow(
+    "readback mismatch",
+  );
+  expect(
+    db
+      .prepare("SELECT * FROM sessions WHERE id != 'unrelated' ORDER BY id")
+      .all(),
+  ).toEqual(original);
+  db.close();
+});

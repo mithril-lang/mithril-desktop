@@ -5,23 +5,25 @@ import {
   mithrilAccount,
 } from "./mithril-account";
 import {
+  clearCloudAccountToken,
   clearMithrilToken,
-  readMithrilToken,
-  writeMithrilToken,
+  readCloudAccountToken,
+  writeMithrilAccountCredentials,
 } from "./mithril-token-store";
 
 vi.mock("./mithril-token-store", () => ({
+  clearCloudAccountToken: vi.fn(),
   clearMithrilToken: vi.fn(),
-  mithrilStorageProtection: vi.fn(() => "reduced"),
-  readMithrilToken: vi.fn(),
-  writeMithrilToken: vi.fn(),
+  cloudAccountStorageProtection: vi.fn(() => "reduced"),
+  readCloudAccountToken: vi.fn(),
+  writeMithrilAccountCredentials: vi.fn(),
 }));
 
 const token = `mf_${"a".repeat(43)}`;
 const reply = (status: number, body: unknown): Response =>
   ({ status, json: async () => body }) as Response;
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => vi.resetAllMocks());
 
 describe("native Mithril account", () => {
   // @lat: [[mithril-migration#Mithril desktop migration#Native Mithril account#Connect and storage]]
@@ -49,7 +51,10 @@ describe("native Mithril account", () => {
       protection: "reduced",
       account: { userId: "u1", balanceMicroUsd: 100_000 },
     });
-    expect(writeMithrilToken).toHaveBeenCalledWith("profile-a", token);
+    expect(writeMithrilAccountCredentials).toHaveBeenCalledWith(
+      "profile-a",
+      token,
+    );
     expect(
       await connectMithrilAccount(
         "kc_pat_legacy",
@@ -57,12 +62,12 @@ describe("native Mithril account", () => {
         fetcher as typeof fetch,
       ),
     ).toEqual({ status: "refused", error: "invalid_mithril_token" });
-    expect(writeMithrilToken).toHaveBeenCalledTimes(1);
+    expect(writeMithrilAccountCredentials).toHaveBeenCalledTimes(1);
   });
 
   // @lat: [[mithril-migration#Mithril desktop migration#Native Mithril account#Unavailable keychain]]
   it("fails closed when the OS cannot store the token securely", async () => {
-    vi.mocked(writeMithrilToken).mockImplementation(() => {
+    vi.mocked(writeMithrilAccountCredentials).mockImplementation(() => {
       throw new Error("keychain unavailable");
     });
     const fetcher = vi.fn().mockResolvedValue(
@@ -79,7 +84,7 @@ describe("native Mithril account", () => {
 
   // @lat: [[mithril-migration#Mithril desktop migration#Native Mithril account#Revocation on read]]
   it("rechecks a stored token and does not call a revoked token live", async () => {
-    vi.mocked(readMithrilToken).mockReturnValue(token);
+    vi.mocked(readCloudAccountToken).mockReturnValue(token);
     const fetcher = vi
       .fn()
       .mockResolvedValue(reply(401, { error: { code: "unauthenticated" } }));
@@ -91,6 +96,7 @@ describe("native Mithril account", () => {
       error: "unauthenticated",
     });
     expect(disconnectMithrilAccount("profile-a")).toEqual({ success: true });
+    expect(clearCloudAccountToken).toHaveBeenCalledWith();
     expect(clearMithrilToken).toHaveBeenCalledWith("profile-a");
   });
 });

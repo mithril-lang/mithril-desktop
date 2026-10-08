@@ -1,3 +1,4 @@
+import { retryableConnection } from "@mithril/workspace/sync";
 /** Scoped authorization is distinct from account sign-in and network recovery. */
 export function connectionNotice(
   error: unknown,
@@ -30,6 +31,6 @@ export function connectionNotice(
       ? "接続できません。もう一度お試しください。"
       : "Connection unavailable. Try again.",
     action: ja ? "再試行" : "Retry connection",
-    retry: true,
+    retry: retryableConnection(error),
   };
 }

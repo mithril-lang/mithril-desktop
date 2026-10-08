@@ -1,4 +1,14 @@
 import {
+  validExecutionDecision,
+  validExecutionHistory,
+  validExecutionReceipt,
+  type ExecutionReviewDecision,
+  type ExecutionHistoryPage,
+  type ExecutionReviewReceipt,
+} from "@mithril/workspace/execution-review";
+import { createProfileResourceTransport } from "@mithril/workspace/profile-resources";
+import { createOriginalScheduleResourceTransport } from "@mithril/workspace/original-schedule-resources";
+import {
   createTaskAttachmentTransport,
   type TaskAttachmentTransport,
 } from "@mithril/workspace/task-attachments";
@@ -13,6 +23,7 @@ import {
 } from "@mithril/workspace/registry-bundle";
 import {
   repositoryCollections,
+  createRepositoryTransport,
   validRepositoryEdit,
   validRepositoryPage,
   validRepositoryReceipt,
@@ -20,6 +31,7 @@ import {
   type RepositoryCollection,
   type RepositoryEdit,
 } from "@mithril/workspace/repository";
+import type { TokenBalancesResponse } from "@mithril/workspace/desktop-wallet-types";
 import {
   validSecuritySnapshot,
   validSecuritySubmit,
@@ -55,9 +67,25 @@ import {
   type WorkspaceOperationsResponse,
   type WorkspaceOperation,
   type WorkspaceSnapshot,
+  type WorkspaceHistory,
 } from "@mithril/workspace/protocol";
 import type { CloudWorkspaceStatus } from "../shared/workspace";
 import { createHash } from "crypto";
+import {
+  ORIGINAL_SCHEDULE_CUSTODY_BYTES,
+  validOriginalScheduleCustodyCommand,
+  validOriginalScheduleCustodyReceipt,
+  type OriginalScheduleCustodyCommand,
+  type OriginalScheduleCustodyReceipt,
+} from "./original-schedule-custody";
+
+import {
+  ORIGINAL_MANUAL_BYTES,
+  validOriginalManualCommand,
+  validOriginalManualResult,
+  type OriginalManualCommand,
+  type OriginalManualResult,
+} from "./original-schedule-manual";
 
 interface Dependencies {
   token(): string | null;
@@ -98,9 +126,17 @@ export class CloudWorkspace {
   readonly taskAttachments: TaskAttachmentTransport;
   readonly files: ProjectFileTransport;
   readonly capabilityResources: CapabilityResourceTransport;
+  readonly scheduleResources: CapabilityResourceTransport;
+  readonly profileResources: CapabilityResourceTransport;
   constructor(private deps: Dependencies) {
+    this.profileResources = createProfileResourceTransport((path, init) =>
+      this.authorizedBinaryRequest(path, init),
+    );
     this.taskAttachments = createTaskAttachmentTransport((path, init) =>
       this.authorizedBinaryRequest(path, init),
+    );
+    this.scheduleResources = createOriginalScheduleResourceTransport(
+      (path, init) => this.authorizedBinaryRequest(path, init),
     );
     this.capabilityResources = createCapabilityResourceTransport((path, init) =>
       this.authorizedBinaryRequest(path, init),
@@ -109,19 +145,85 @@ export class CloudWorkspace {
       this.authorizedBinaryRequest(path, init),
     );
   }
+  /** Fixed archive transport used only by main-process backup controls. */
+  async archiveRequest(path: string, init?: RequestInit): Promise<Response> {
+    const url = new URL(path, "https://api.mithril.fund");
+    const route = url.pathname;
+    const method = init?.method ?? "GET";
+    const id = "[a-zA-Z0-9_-]{1,128}";
+    const admitted =
+      (method === "POST" && route === "/v1/workspace/archive/backups") ||
+      (method === "GET" &&
+        new RegExp(`^/v1/workspace/archive/backups/${id}/download$`).test(
+          route,
+        )) ||
+      (method === "PUT" &&
+        new RegExp(`^/v1/workspace/archive/restores/${id}/entry$`).test(
+          route,
+        )) ||
+      (method === "POST" &&
+        new RegExp(
+          `^/v1/workspace/archive/restores/${id}/(?:complete-upload|prepare|commit)$`,
+        ).test(route));
+    if (
+      !admitted ||
+      !path.startsWith("/v1/workspace/archive/") ||
+      url.origin !== "https://api.mithril.fund"
+    )
+      throw Error("Unsupported archive route");
+    const session = await this.session();
+    const context = await this.nativeContext(method !== "GET");
+    if (
+      !session.scopes.includes(
+        method === "GET" || route.endsWith("/backups")
+          ? "chat:read"
+          : "chat:write",
+      )
+    )
+      throw Error("Archive chat scope required");
+    this.assertNativeContext(context);
+    if (
+      context.actor !== createHash("sha256").update(session.token).digest("hex")
+    )
+      throw Error("Archive identity changed");
+    const headers = new Headers(init?.headers);
+    headers.set("authorization", `Bearer ${session.token}`);
+    headers.set("x-mithril-workspace-owner", session.userId);
+    const response = await this.deps.fetch("https://api.mithril.fund" + path, {
+      ...init,
+      headers,
+      credentials: "omit",
+      redirect: "error",
+      cache: "no-store",
+      signal: AbortSignal.timeout(120000),
+    });
+    try {
+      this.assertNativeContext(context);
+    } catch (error) {
+      await response.body?.cancel().catch(() => {});
+      throw error;
+    }
+    if (response.status === 401 || response.status === 403) {
+      await response.body?.cancel().catch(() => {});
+      this.reset(false);
+      throw Error("Archive access refused");
+    }
+    return response;
+  }
+
   /** Owner/generation-checked bytes for fixed file routes; credentials stay in main. */
   async authorizedBinaryRequest(
     path: string,
     init?: RequestInit,
   ): Promise<Response> {
     if (
-      !/^\/v1\/(?:workspace\/files(?:\/|$)|workspace\/resources\/(?:capability|task)\/[a-zA-Z0-9_-]{1,128}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
+      !/^\/v1\/(?:workspace\/files(?:\/|$)|workspace\/resources\/(?:capability|task|schedule|profile)\/[a-zA-Z0-9_-]{1,128}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$|chat\/sessions\/[a-zA-Z0-9_-]{1,128}\/attachments\/chunks(?:\/[a-f0-9]{64})?$)/.test(
         path,
       ) ||
       (!["GET", "POST"].includes(init?.method ?? "GET") &&
         !(
           init?.method === "HEAD" &&
-          /^\/v1\/workspace\/resources\/(?:capability|task)\/[a-zA-Z0-9_-]{1,128}\/chunks\/[a-f0-9]{64}$/.test(
+          /^\/v1\/workspace\/resources\/(?:capability|task|schedule|profile)\/[a-zA-Z0-9_-]{1,128}\/chunks\/[a-f0-9]{64}$/.test(
             path,
           )
         ))
@@ -134,6 +236,20 @@ export class CloudWorkspace {
       )
     )
       throw Error("Unsupported task attachment route");
+    if (
+      /^\/v1\/workspace\/resources\/schedule\//.test(path) &&
+      !/^\/v1\/workspace\/resources\/schedule\/schedule-source-[a-f0-9]{64}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$/.test(
+        path,
+      )
+    )
+      throw Error("Unsupported schedule resource route");
+    if (
+      /^\/v1\/workspace\/resources\/profile\//.test(path) &&
+      !/^\/v1\/workspace\/resources\/profile\/profile-metadata-[a-f0-9]{64}\/(?:chunks|manifests)(?:\/[a-f0-9]{64})?$/.test(
+        path,
+      )
+    )
+      throw Error("Unsupported profile resource route");
     const session = await this.session(),
       generation = this.generation;
     if (
@@ -287,12 +403,36 @@ export class CloudWorkspace {
     };
   }
 
+  /** Cheap main-only guard between I/O stages; reauthentication stays at operation boundaries. */
+  assertNativeContext(context: {
+    userId: string;
+    profile: string;
+    epoch: number;
+    actor: string;
+  }): void {
+    const identity = this.identity;
+    if (
+      !this.enabled ||
+      !identity ||
+      context.epoch !== this.generation ||
+      context.userId !== identity.userId ||
+      context.profile !== identity.profile ||
+      identity.token !== this.deps.token() ||
+      identity.profile !== this.deps.profile() ||
+      context.actor !==
+        createHash("sha256").update(identity.token).digest("hex")
+    )
+      throw Error("Workspace account changed; stale native context discarded");
+  }
+
   private async request(
     path: string,
     token: string,
     profile: string,
     body?: unknown,
     timeoutMs = 15000,
+    responseLimit?: number,
+    expectedOwner?: string,
   ): Promise<unknown> {
     const generation = this.generation;
     if (token !== this.deps.token() || profile !== this.deps.profile()) {
@@ -306,6 +446,9 @@ export class CloudWorkspace {
         headers: {
           authorization: `Bearer ${token}`,
           accept: "application/json",
+          ...(expectedOwner === undefined
+            ? {}
+            : { "x-mithril-workspace-owner": expectedOwner }),
           ...(body === undefined ? {} : { "content-type": "application/json" }),
         },
         credentials: "omit",
@@ -332,7 +475,40 @@ export class CloudWorkspace {
     }
     if (!response.ok)
       throw new Error(`Workspace request failed (${response.status})`);
-    const value: unknown = await response.json().catch(() => null);
+    let value: unknown;
+    if (responseLimit !== undefined) {
+      if (Number(response.headers.get("content-length") ?? 0) > responseLimit) {
+        await response.body?.cancel().catch(() => {});
+        throw Error("Schedule execution receipt unconfirmed");
+      }
+      const reader = response.body?.getReader();
+      const parts: Uint8Array[] = [];
+      let size = 0;
+      try {
+        if (reader)
+          for (;;) {
+            const { done, value: part } = await reader.read();
+            if (done) break;
+            size += part.length;
+            if (size > responseLimit)
+              throw Error("Schedule execution receipt unconfirmed");
+            parts.push(part);
+          }
+        const bytes = new Uint8Array(size);
+        let offset = 0;
+        for (const part of parts) {
+          bytes.set(part, offset);
+          offset += part.length;
+        }
+        value = JSON.parse(
+          new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+        );
+      } catch {
+        throw Error("Schedule execution receipt unconfirmed");
+      } finally {
+        await reader?.cancel().catch(() => {});
+      }
+    } else value = await response.json().catch(() => null);
     if (generation !== this.generation) {
       throw new Error("Workspace account changed; stale response discarded");
     }
@@ -453,6 +629,22 @@ export class CloudWorkspace {
       throw Error("Invalid repository page");
     return value;
   }
+
+  /** Public balances use the same fixed route and validator as the Web consumer. */
+  async walletBalances(id: string): Promise<TokenBalancesResponse> {
+    if (!/^wallet-[a-f0-9]{64}$/.test(id))
+      throw Error("Invalid wallet identity");
+    const session = await this.session();
+    const transport = createRepositoryTransport(async (path) => {
+      if (path !== `/v1/workspace/wallets/${id}/balances`)
+        throw Error("Invalid wallet route");
+      const value = await this.request(path, session.token, session.profile);
+      return new Response(JSON.stringify(value), {
+        headers: { "content-type": "application/json" },
+      });
+    });
+    return transport.walletBalances!(id);
+  }
   async repositoryHistory(
     collection: RepositoryCollection,
     id: string,
@@ -523,6 +715,29 @@ export class CloudWorkspace {
   }
 
   // @lat: [[cloud-workspace#Cloud workspace#Security diagnostics]]
+  async executionHistory(after = 0): Promise<ExecutionHistoryPage> {
+    if (!Number.isSafeInteger(after) || after < 0)
+      throw Error("Invalid history cursor");
+    const { value, userId } = await this.authorizedRequest(
+      "/v1/workspace/execution-history?after=" + after,
+    );
+    if (!validExecutionHistory(value, userId, after))
+      throw Error("Execution history identity changed");
+    return value;
+  }
+  async reviewExecution(
+    decision: ExecutionReviewDecision,
+  ): Promise<ExecutionReviewReceipt> {
+    if (!validExecutionDecision(decision))
+      throw Error("Invalid execution review");
+    const { value, userId } = await this.authorizedRequest(
+      "/v1/workspace/execution-history/review",
+      decision,
+    );
+    if (!validExecutionReceipt(value, userId, decision))
+      throw Error("Review receipt identity changed");
+    return value;
+  }
   async getSecurity(): Promise<SecuritySnapshot> {
     const { value } = await this.authorizedRequest(
       "/v1/security",
@@ -549,12 +764,100 @@ export class CloudWorkspace {
     const { value } = await this.authorizedRequest("/v1/schedules");
     const snapshot = value as ScheduleSnapshot;
     if (
+      (snapshot.datasetGeneration !== undefined &&
+        (!Number.isSafeInteger(snapshot.datasetGeneration) ||
+          snapshot.datasetGeneration < 0)) ||
       !Array.isArray(snapshot.schedules) ||
       snapshot.schedules.length > 100 ||
       !snapshot.schedules.every(validCloudSchedule)
     )
       throw Error("Schedule snapshot rejected");
     return snapshot;
+  }
+  /** Main-only original schedule custody. No renderer IPC, scope upgrade or mutation retry. */
+  // @lat: [[cloud-workspace#Original schedule main execution transport (draft)]]
+  async originalScheduleCustody(
+    command: OriginalScheduleCustodyCommand,
+    context?: Parameters<CloudWorkspace["assertNativeContext"]>[0],
+  ): Promise<OriginalScheduleCustodyReceipt> {
+    if (
+      !validOriginalScheduleCustodyCommand(command) ||
+      (!context && command.profile !== this.deps.profile())
+    )
+      throw Error("Invalid original schedule execution command");
+    if (context) this.assertNativeContext(context);
+    const request = structuredClone(command);
+    if (
+      new TextEncoder().encode(JSON.stringify(request)).length >
+      ORIGINAL_SCHEDULE_CUSTODY_BYTES
+    )
+      throw Error("Invalid original schedule execution command");
+    const session = await this.session();
+    if (context) this.assertNativeContext(context);
+    if (
+      context
+        ? session.userId !== context.userId
+        : session.profile !== request.profile
+    )
+      throw Error("Workspace account changed; schedule request discarded");
+    if (
+      !["workspace:write", "chat:write", "inference"].every((scope) =>
+        session.scopes.includes(scope),
+      )
+    )
+      throw Error("Original schedule execution authorization required");
+    const value = await this.request(
+      "/v1/schedules/original/execution",
+      session.token,
+      session.profile,
+      request,
+      15000,
+      ORIGINAL_SCHEDULE_CUSTODY_BYTES,
+    );
+    if (context) this.assertNativeContext(context);
+    if (!validOriginalScheduleCustodyReceipt(value, session.userId, request))
+      throw Error("Schedule execution receipt unconfirmed");
+    return value;
+  }
+  /** Main-only manual consumer; never retries a lost take or invents an executor. */
+  // @lat: [[cloud-workspace#Original manual main consumer transport (draft)]]
+  async originalScheduleManual(
+    command: OriginalManualCommand,
+    context?: Parameters<CloudWorkspace["assertNativeContext"]>[0],
+  ): Promise<OriginalManualResult> {
+    if (
+      !validOriginalManualCommand(command) ||
+      (!context && command.profile !== this.deps.profile())
+    )
+      throw Error("Invalid original manual execution command");
+    if (context) this.assertNativeContext(context);
+    const input = structuredClone(command);
+    const session = await this.session();
+    if (context) this.assertNativeContext(context);
+    if (
+      context
+        ? session.userId !== context.userId
+        : session.profile !== input.profile
+    )
+      throw Error("Workspace account changed; schedule request discarded");
+    if (
+      !["workspace:write", "chat:write", "inference"].every((scope) =>
+        session.scopes.includes(scope),
+      )
+    )
+      throw Error("Original schedule execution authorization required");
+    const value = await this.request(
+      "/v1/schedules/original/manual",
+      session.token,
+      session.profile,
+      input,
+      15000,
+      ORIGINAL_MANUAL_BYTES,
+    );
+    if (context) this.assertNativeContext(context);
+    if (!validOriginalManualResult(value, session.userId, input))
+      throw Error("Schedule execution receipt unconfirmed");
+    return value;
   }
   async applySchedule(operation: ScheduleEdit): Promise<ScheduleResult> {
     if (!validScheduleEdit(operation)) throw Error("Invalid schedule edit");
@@ -565,6 +868,7 @@ export class CloudWorkspace {
     const result = value as ScheduleResult;
     if (
       result.operationId !== operation.operationId ||
+      (result.datasetGeneration ?? 0) !== (operation.datasetGeneration ?? 0) ||
       !["accepted", "conflict"].includes(result.status) ||
       (result.schedule !== null && !validCloudSchedule(result.schedule))
     )
@@ -631,6 +935,7 @@ export class CloudWorkspace {
 
   async applyOperations(
     operations: WorkspaceOperation[],
+    expectedOwner?: string,
   ): Promise<WorkspaceOperationsResponse> {
     if (
       !Array.isArray(operations) ||
@@ -642,6 +947,8 @@ export class CloudWorkspace {
       throw new Error("Unsupported workspace operations");
     const session = await this.session();
     const generation = this.generation;
+    if (expectedOwner !== undefined && expectedOwner !== session.userId)
+      throw new Error("Workspace owner changed; saved changes were not sent");
     if (!session.scopes.includes(this.deps.writeScope ?? "workspace:write"))
       throw new Error(
         "Editing requires explicit workspace:write authorization",
@@ -651,6 +958,9 @@ export class CloudWorkspace {
       session.token,
       session.profile,
       { schemaVersion: 1, operations },
+      15000,
+      undefined,
+      session.userId,
     )) as WorkspaceOperationsResponse;
     this.checkOwner(response, session.userId, generation);
     if (
@@ -676,16 +986,7 @@ export class CloudWorkspace {
     return response;
   }
 
-  async history(
-    id: string,
-    offset = 0,
-  ): Promise<{
-    schemaVersion: 1;
-    userId: string;
-    records: WorkspaceRecord[];
-    hasMore: boolean;
-    nextOffset: number | null;
-  }> {
+  async history(id: string, offset = 0): Promise<WorkspaceHistory> {
     if (!validId(id)) throw new Error("Invalid workspace record ID");
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000)
       throw new Error("Invalid workspace history offset");
@@ -695,16 +996,18 @@ export class CloudWorkspace {
       `/v1/workspace/history/${encodeURIComponent(id)}?offset=${offset}`,
       session.token,
       session.profile,
-    )) as {
-      schemaVersion: 1;
-      userId: string;
-      records: WorkspaceRecord[];
-      hasMore: boolean;
-      nextOffset: number | null;
-    };
+    )) as WorkspaceHistory;
     this.checkOwner(response, session.userId, generation);
     if (
       !response ||
+      (response.datasetGeneration !== undefined &&
+        (!Number.isSafeInteger(response.datasetGeneration) ||
+          response.datasetGeneration < 0)) ||
+      ((response.boundaryRevision !== undefined ||
+        response.total !== undefined) &&
+        ![response.boundaryRevision, response.total].every(
+          (value) => Number.isSafeInteger(value) && value! >= 0,
+        )) ||
       !Array.isArray(response.records) ||
       !response.records.every(
         (record) => validRecord(record) && record.id === id,

@@ -58,7 +58,7 @@ it("returns deterministic IDs only for the checked owner without capturing or ad
       },
     ],
   });
-  expect(mocks.list).toHaveBeenCalledWith(1001, 0, "default");
+  expect(mocks.list).toHaveBeenCalledWith(100, 0, "default");
   expect(mocks.context.mock.calls.every((args) => args.length === 0)).toBe(
     true,
   );
@@ -95,5 +95,20 @@ it("refuses a truncated inventory instead of hiding the rest of the original his
       title: "Original",
     })),
   );
-  await expect(nativeHistoryInventory()).rejects.toThrow("supported bound");
+  await expect(nativeHistoryInventory()).rejects.toThrow("inventory page");
+});
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Complete large original source inventory]]
+it("reads all original histories beyond one thousand within the source transaction", async () => {
+  const rows = Array.from({ length: 1205 }, (_, i) => ({
+    id: String(i),
+    title: "Original",
+  }));
+  mocks.list.mockImplementation((limit: number, offset: number) =>
+    rows.slice(offset, offset + limit),
+  );
+  expect((await nativeHistoryInventory()).rows).toHaveLength(1205);
+  expect(mocks.list).toHaveBeenCalledTimes(13);
+  expect(mocks.messages).not.toHaveBeenCalled();
+  expect(mocks.bind).not.toHaveBeenCalled();
 });

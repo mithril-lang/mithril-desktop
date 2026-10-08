@@ -105,6 +105,9 @@ function fixture(): {
     write: (_owner, _profile, value) => {
       state = structuredClone(value);
     },
+    writeEntry: (_owner, _profile, sid, entry) => {
+      state.entries[sid] = structuredClone(entry);
+    },
     transport: {
       list: async () => ({
         schemaVersion: 1,
@@ -373,12 +376,24 @@ describe("automatic rich native history archival", () => {
   // @lat: [[cloud-workspace-tests#Continuous rich chat history]]
   it("requires a durable journal before submitting any operation", async () => {
     const f = fixture();
+    delete f.ports.writeEntry;
     f.ports.write = () => {
       throw Error("Disk unavailable");
     };
     const result = await new NativeHistorySync(f.ports).run();
     expect(result.deferred[0]).toContain("Disk unavailable");
     expect(f.sessions.size).toBe(0);
+  });
+  // @lat: [[cloud-workspace-tests#Cloud workspace tests#Incremental journal failure fences dispatch]]
+  it("does not dispatch when the incremental durability boundary fails", async () => {
+    const f = fixture();
+    f.ports.writeEntry = () => {
+      throw Error("Entry disk unavailable");
+    };
+    const result = await new NativeHistorySync(f.ports).run();
+    expect(result.deferred[0]).toContain("Entry disk unavailable");
+    expect(f.sessions.size).toBe(0);
+    expect(f.executions()).toBe(0);
   });
   // @lat: [[cloud-workspace-tests#Cloud history working cache]]
   it("pulls cloud-only edits to the working cache without echoing stale native data", async () => {
@@ -554,8 +569,32 @@ it("keeps cloud reconstruction available when original device storage is unavail
   expect(f.executions()).toBe(0);
 });
 
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Large original profile archival replay]]
+it("archives over one thousand original sessions and replays a lost receipt without duplicating history", async () => {
+  const f = fixture();
+  f.ports.source = async () =>
+    Array.from({ length: 1005 }, (_, i) => ({
+      id: `source-${i}`,
+      title: `Original ${i}`,
+      model: "mock",
+      items: async () => [structuredClone(f.items[0])],
+    }));
+  f.lose();
+  await new NativeHistorySync(f.ports).run();
+  await new NativeHistorySync(f.ports).run();
+  expect(f.sessions.size).toBe(1005);
+  expect(Object.keys(f.state().entries)).toHaveLength(1005);
+  expect([...f.events.values()].every((events) => events.length === 1)).toBe(
+    true,
+  );
+  expect(
+    Object.values(f.state().entries).every((entry) => entry.pending === null),
+  ).toBe(true);
+  expect(f.executions()).toBe(0);
+});
+
 // @lat: [[cloud-workspace-tests#Remote-only chat reconstruction]]
-it("reads bounded remote pages and refuses oversized histories before changing the retained cache", async () => {
+it("reads complete paged remote histories beyond the former byte ceiling", async () => {
   const f = fixture();
   f.ports.source = async () => [];
   const session: ChatSession = {
@@ -612,10 +651,10 @@ it("reads bounded remote pages and refuses oversized histories before changing t
       nextAfter: next < large.eventSeq ? next : null,
     };
   };
-  expect((await new NativeHistorySync(f.ports).run()).deferred[0]).toContain(
-    "byte bound",
-  );
-  expect(cache).not.toHaveBeenCalled();
+  expect((await new NativeHistorySync(f.ports).run()).reconstructed).toBe(1);
+  expect(cache).toHaveBeenCalledOnce();
+  expect(cache.mock.calls[0][1]).toHaveLength(3500);
+  expect(cache.mock.calls[0][1][3499].data.content).toBe(content);
   expect(f.executions()).toBe(0);
 });
 
@@ -1243,6 +1282,68 @@ function deletedSourceFixture(): ReturnType<typeof fixture> & {
     },
   };
 }
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Large original deletion receipt replay]]
+it("synchronizes over one thousand physical deletions with retained receipts after a lost acknowledgement", async () => {
+  const f = deletedSourceFixture();
+  try {
+    const sources = Array.from({ length: 1005 }, (_, i) => ({
+      sourceId: `removed-${i}`,
+      sessionId: nativeCloudSessionId("default", `removed-${i}`),
+    }));
+    f.db.transaction(() => {
+      const insert = f.db.prepare("INSERT INTO sessions VALUES(?)");
+      for (const source of sources) insert.run(source.sourceId);
+    })();
+    bindNativeHistorySources(f.db, "alice", "default", sources);
+    f.db.transaction(() => {
+      for (const source of sources) {
+        recordNativeHistoryDeletion(f.db, source.sourceId);
+        f.db.prepare("DELETE FROM sessions WHERE id=?").run(source.sourceId);
+      }
+    })();
+    f.ports.source = async () => [];
+    for (const source of sources)
+      f.sessions.set(source.sessionId, {
+        id: source.sessionId,
+        title: "Retained",
+        model: "mock",
+        revision: 1,
+        eventSeq: 0,
+        deleted: false,
+        activeTurn: null,
+      });
+    const cache = vi.fn();
+    f.ports.cacheRemote = cache;
+    f.lose();
+    expect((await new NativeHistorySync(f.ports).run()).deferred).toHaveLength(
+      1,
+    );
+    const pending = nativeHistoryDeletions(f.db, "alice", "default");
+    expect(pending).toHaveLength(1);
+    expect(pending[0].baseRevision).toBe(1);
+    expect(
+      cache.mock.calls.some(([session]) => session.id === pending[0].sessionId),
+    ).toBe(false);
+    expect((await new NativeHistorySync(f.ports).run()).deferred).toEqual([]);
+    expect(nativeHistoryDeletions(f.db, "alice", "default")).toEqual([]);
+    expect(
+      [...f.sessions.values()].every(
+        (session) => session.deleted && session.revision === 2,
+      ),
+    ).toBe(true);
+    expect([...f.events.values()].every((events) => events.length === 1)).toBe(
+      true,
+    );
+    expect(
+      cache.mock.calls.every(
+        ([session, events]) => session.deleted && events.length === 0,
+      ),
+    ).toBe(true);
+    expect(f.executions()).toBe(0);
+  } finally {
+    f.db.close();
+  }
+});
 // @lat: [[cloud-workspace-tests#Original deletion receipt synchronization]]
 it("recovers a physical source deletion with the same receipt and prevents remote cache resurrection", async () => {
   const f = deletedSourceFixture(),
@@ -1444,3 +1545,160 @@ it("retains another owner's deletion intent while reconstructing only the curren
     f.db.close();
   }
 });
+
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Large multi-profile cloud history inventory]]
+it("archives the current native source when other cloud profiles exceed one thousand sessions", async () => {
+  const f = fixture();
+  for (let i = 0; i < 1205; i++)
+    f.sessions.set(`other-${i}`, {
+      id: `other-${i}`,
+      title: "Other retained chat",
+      model: "mock",
+      revision: 1,
+      eventSeq: 0,
+      deleted: false,
+      activeTurn: null,
+    });
+  const result = await new NativeHistorySync(f.ports).run();
+  expect(result.synced).toBe(f.items.length);
+  expect(f.sessions).toHaveProperty("size", 1206);
+  expect(f.executions()).toBe(0);
+});
+
+// @lat: [[cloud-workspace-tests#Complete long transcript checkpoints]]
+it("reads complete mapped and remote-only transcripts beyond a thousand pages without executing work", async () => {
+  for (const mapped of [true, false]) {
+    const f = fixture();
+    const sync = new NativeHistorySync(f.ports);
+    if (mapped) await sync.run();
+    else f.ports.source = async () => [];
+    const sid = mapped
+      ? nativeCloudSessionId("default", "original")
+      : "browser-long-chat";
+    const original = f.sessions.get(sid);
+    const remote: ChatSession = {
+      id: sid,
+      title: "Complete cloud title",
+      model: "mock",
+      revision: (original?.revision ?? 0) + 1,
+      eventSeq: 1005,
+      deleted: false,
+      activeTurn: null,
+    };
+    const events: ChatEvent[] = Array.from(
+      { length: remote.eventSeq },
+      (_, index) => ({
+        seq: index + 1,
+        type: "user",
+        turnId: "archived-turn",
+        data: { content: `Retained message ${index}` },
+        createdAt: index + 1,
+      }),
+    );
+    f.sessions.set(sid, remote);
+    f.events.set(sid, events);
+    const read = vi.fn(async (_id: string, after = 0) => ({
+      schemaVersion: 1 as const,
+      userId: "alice",
+      session: remote,
+      events: events.slice(after, after + 1),
+      hasMore: after + 1 < remote.eventSeq,
+      nextAfter: after + 1 < remote.eventSeq ? after + 1 : null,
+    }));
+    f.ports.transport.events = read;
+    const cache = vi.fn();
+    f.ports.cacheRemote = cache;
+    const result = await sync.run();
+    expect(read).toHaveBeenCalledTimes(1005);
+    expect(read).toHaveBeenLastCalledWith(sid, 1004);
+    expect(result.deferred.some((value) => value.includes("page bound"))).toBe(
+      false,
+    );
+    if (mapped) expect(f.currentTitle()).toBe(remote.title);
+    else {
+      expect(result.deferred).toEqual([]);
+      expect(cache).toHaveBeenCalledExactlyOnceWith(
+        remote,
+        events,
+        expect.objectContaining({ userId: "alice" }),
+      );
+    }
+    expect(f.executions()).toBe(0);
+  }
+});
+
+it("rejects continuation at the declared final event before publishing mapped or remote-only history", async () => {
+  for (const mapped of [true, false]) {
+    const f = fixture(),
+      sync = new NativeHistorySync(f.ports);
+    if (mapped) await sync.run();
+    else f.ports.source = async () => [];
+    const sid = mapped
+      ? nativeCloudSessionId("default", "original")
+      : "browser-invalid-chat";
+    const remote: ChatSession = {
+      id: sid,
+      title: "Unverified cloud title",
+      model: "mock",
+      revision: 3,
+      eventSeq: 1,
+      deleted: false,
+      activeTurn: null,
+    };
+    f.sessions.set(sid, remote);
+    const read = vi.fn(async () => ({
+      schemaVersion: 1 as const,
+      userId: "alice",
+      session: remote,
+      events: [
+        {
+          seq: 1,
+          type: "user" as const,
+          turnId: null,
+          data: { content: "Final event" },
+          createdAt: 1,
+        },
+      ],
+      hasMore: true,
+      nextAfter: 1,
+    }));
+    f.ports.transport.events = read;
+    const cache = vi.fn();
+    f.ports.cacheRemote = cache;
+    const result = await sync.run();
+    expect(result.deferred.some((value) => value.includes("cursor"))).toBe(
+      true,
+    );
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(cache).not.toHaveBeenCalled();
+    expect(f.currentTitle()).toBe("Original chat");
+    expect(f.executions()).toBe(0);
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Complete mapped chat synchronization]]
+it("synchronizes every original item above the former transcript ceiling without executing a turn", async () => {
+  const f = fixture();
+  f.items.splice(
+    0,
+    f.items.length,
+    ...Array.from({ length: 20005 }, (_, index) => ({
+      id: `user_${index}`,
+      kind: "user" as const,
+      content: `Original ${index}`,
+      timestamp: index,
+    })),
+  );
+  const result = await new NativeHistorySync(f.ports).run();
+  expect(result.deferred).toEqual([]);
+  expect(result.conflicts).toEqual([]);
+  expect(result.synced).toBe(20005);
+  const sid = nativeCloudSessionId("default", "original");
+  const archived = f.events
+    .get(sid)!
+    .filter((event) => event.type === "history_item")
+    .map((event) => JSON.parse(event.data.payload));
+  expect(archived).toEqual(f.items);
+  expect(Object.keys(f.state().entries[sid].hashes)).toHaveLength(20005);
+  expect(f.executions()).toBe(0);
+}, 30000);

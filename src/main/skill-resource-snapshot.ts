@@ -1,3 +1,4 @@
+import { resourceExclusions } from "./resource-exclusions";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -44,7 +45,7 @@ try:
  def stamp(info):return (info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns,info.st_ctime_ns,stat.S_IMODE(info.st_mode))
  def ignored(name):
   import re
-  return bool(re.match(r'^(\.git|\.git-credentials|\.npmrc|\.pypirc|\.netrc|\.hg|\.svn|node_modules|\.venv|venv|__pycache__|\.ssh|\.aws|\.azure|\.config|\.mithril-sync-trash)$',name,re.I) or re.match(r'^\.env(?:\.|$)',name,re.I) or re.match(r'^(id_rsa|id_ed25519|credentials|secrets?)(\.|$)',name,re.I) or re.search(r'\.(pem|key|p12|pfx)$',name,re.I) or name.startswith('.mithril-sync-'))
+  return bool(re.match(r'^(\.git|\.git-credentials|\.npmrc|\.pypirc|\.netrc|\.hg|\.svn|node_modules|\.venv|venv|__pycache__|\.ssh|\.aws|\.azure|\.config|\.mithril-sync-trash)$',name,re.I) or re.match(r'^\.env(?:\.|$)',name,re.I) or re.match(r'^(id_rsa|id_ed25519|credentials|secrets?)(\.|$)',name,re.I) or re.search(r'\.(pem|key|p12|pfx)$',name,re.I) or name.startswith(('.mithril-sync-','.mithril-source-')))
  files=[];total=0;excluded=0;observed={}
  def walk(dfd,prefix,stage,read):
   global total,excluded
@@ -52,10 +53,10 @@ try:
   for name in names:
    info=os.stat(name,dir_fd=dfd,follow_symlinks=False)
    if stat.S_ISLNK(info.st_mode):raise ValueError('unsafe')
-   if ignored(name):
+   path=prefix+'/'+name if prefix else name
+   if ignored(name) or any(path==x or path.startswith(x+'/') for x in p['excludedPaths']):
     if read:excluded+=1
     continue
-   path=prefix+'/'+name if prefix else name
    if len(path)>1024:raise ValueError('unsupported')
    entries[path]=stamp(info)
    if stat.S_ISDIR(info.st_mode):
@@ -131,7 +132,9 @@ export function captureSkillResources(
   python: string,
   stateRoot: string,
   capabilityId: string,
+  excludedPaths: readonly string[] = [],
 ): SkillResourceCapture {
+  const exclusions = resourceExclusions(excludedPaths);
   checked(stateRoot);
   mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
   checked(stateRoot);
@@ -143,6 +146,7 @@ export function captureSkillResources(
         root: resolve(root),
         stage: resolve(stage),
         capabilityId,
+        excludedPaths: exclusions,
       }),
       encoding: "utf8",
       timeout: 60000,
@@ -294,25 +298,49 @@ export async function downloadSkillResources(
 ): Promise<SkillResourceCapture> {
   if (!validSkillResourcePointer(pointer))
     throw new Error("Invalid Skill resource pointer");
-  await guard();
-  const manifest = await transport.getManifest(
+  return downloadDirectoryResources(
     pointer.capabilityId,
     pointer.manifest,
+    transport,
+    stateRoot,
+    guard,
   );
+}
+
+/** Main-process data download shared by Skills and original schedule directory bindings. */
+export async function downloadDirectoryResources(
+  resourceId: string,
+  manifestDigest: string,
+  transport: CapabilityResourceTransport,
+  stateRoot: string,
+  guard: () => Promise<void>,
+): Promise<SkillResourceCapture> {
+  if (
+    !validCapabilityResourceManifest({
+      version: 1,
+      capabilityId: resourceId,
+      files: [],
+    }) ||
+    typeof manifestDigest !== "string" ||
+    !/^[a-f0-9]{64}$/.test(manifestDigest)
+  )
+    throw new Error("Invalid directory resource pointer");
+  await guard();
+  const manifest = await transport.getManifest(resourceId, manifestDigest);
   await guard();
   if (
     !validCapabilityResourceManifest(manifest) ||
-    manifest.capabilityId !== pointer.capabilityId ||
+    manifest.capabilityId !== resourceId ||
     createHash("sha256")
       .update(capabilityResourceManifestBytes(manifest))
-      .digest("hex") !== pointer.manifest
+      .digest("hex") !== manifestDigest
   )
     throw new Error("Skill resource manifest integrity mismatch");
   checked(stateRoot);
   mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
   checked(stateRoot);
   const stage = mkdtempSync(join(stateRoot, ".mithril-sync-skill-download-"));
-  const capture = stagedResources(stage, manifest, pointer.manifest, 0);
+  const capture = stagedResources(stage, manifest, manifestDigest, 0);
   try {
     const downloaded = new Set<string>();
     for (const file of manifest.files) {
@@ -325,7 +353,7 @@ export async function downloadSkillResources(
         const digest = file.chunks[index];
         await guard();
         if (!downloaded.has(digest)) {
-          const bytes = await transport.getChunk(pointer.capabilityId, digest);
+          const bytes = await transport.getChunk(resourceId, digest);
           await guard();
           if (
             bytes.length > CHUNK_BYTES ||

@@ -33,10 +33,13 @@ function writeEnv(content: string): void {
 }
 
 beforeEach(() => {
+  // A host credential must not make the deliberately empty fixture healthy.
+  vi.stubEnv("OPENROUTER_API_KEY", "");
   mkdirSync(TEST_DIR, { recursive: true });
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   delete process.env.HERMES_HOME;
   vi.resetModules();
   rmSync(TEST_DIR, { recursive: true, force: true });

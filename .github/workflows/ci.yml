@@ -36,17 +36,34 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test installer API compatibility gate
+        run: node --test scripts/check-workspace-api.test.mjs
+
       - name: Test
         run: npm test
 
       - name: Lint
         run: npm run lint
 
-      - name: Install browser for sidebar layout checks
-        run: npx playwright install --with-deps chromium --only-shell
+      - name: Build the packaged renderer for visual QA
+        run: npm run build
+
+      - name: Install Chromium for layout QA
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify compiled Desktop notice layout
+        run: node --test scripts/layout-visual.test.mjs
+
+      - name: Retain Desktop layout screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-layout-${{ github.sha }}
+          path: artifacts/layout-visual/
+          if-no-files-found: error
 
       - name: Verify compiled sidebar layout
-        run: npm run build && node --test scripts/sidebar-visual.test.mjs
+        run: node --test scripts/sidebar-visual.test.mjs
 
   verify-store-automation:
     runs-on: ubuntu-latest

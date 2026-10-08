@@ -1,4 +1,6 @@
 export default {
+  profileLoadFailed: "プロフィールを読み込めませんでした。再試行してください。",
+  profileUnavailable: "このプロフィールは現在利用できません。",
   title: "プロファイル",
   subtitle:
     "各プロファイルは独立した Hermes ワークスペースで、固有の設定・メモリ・スキルを持ちます",

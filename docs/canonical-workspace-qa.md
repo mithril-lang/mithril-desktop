@@ -33,3 +33,8 @@ Both existing desktop.json writer paths compare the original document under a sh
 The actual native runner remains blocked by current Mac process containment, not a missing paid-QA budget. See [guarded native runner conditions](guarded-native-runner-conditions.md) for concrete upstream/runtime and proof requirements. Web Kanban plugin REST exists, but authenticated atomic revisions/schema and sandbox global-board durability are not verified; this candidate does not enable those writes.
 
 Phase4 final local validation: Desktop2438 pass with only the previously reproduced local Node26 config-health baseline failure; types, lint, lat, production build and packaging pass. Web706, shared35, API runtime9 and actual dual-adapter5 pass. Independent Desktop25 and RuntimePanel8 pass with no remaining material review finding. Vendor0.3.1 and installed dist match exactly.
+
+
+2026-10-09 candidate: original Settings Data uses the same execution-review UI/controller as Web. IPC exposes fixed, validated owner-scoped history/review routes; the secure-store bearer remains in main. Durable decisions retain ID, generation, effect and note after a lost acknowledgement. Original outcomes remain unknown; a review never starts work. Actual authenticated installed UI and production API/D1 qualification remain pending.
+
+Preview.69 consumes shared schedules.62. All473 producer/archive/installed dependency files match; SHA256 `e3be2735d76d6b7fcff6194beee9835b304ccdb3898e21075114bd80876fc3fa`. Native main/Data90 tests, node/renderer types, build, packaging711 runtime files, affected lint and lat pass. The actual installed /Applications app remains a separate gate; this candidate is not released or installed.

@@ -844,12 +844,28 @@ interface HermesAPI {
     profile: string | undefined,
     id: string,
   ) => Promise<{ success: boolean; error?: string }>;
-  getTokenBalances: (address: string) => Promise<TokenBalancesResponse>;
+  getTokenBalances: (
+    address: string,
+    profile?: string,
+  ) => Promise<TokenBalancesResponse>;
 
   // Memory
   readMemory: (profile?: string) => Promise<{
-    memory: { content: string; exists: boolean; lastModified: number | null };
-    user: { content: string; exists: boolean; lastModified: number | null };
+    memory: {
+      content: string;
+      exists: boolean;
+      lastModified: number | null;
+      entries: { index: number; content: string }[];
+      charCount: number;
+      charLimit: number;
+    };
+    user: {
+      content: string;
+      exists: boolean;
+      lastModified: number | null;
+      charCount: number;
+      charLimit: number;
+    };
     stats: { totalSessions: number; totalMessages: number };
   }>;
 

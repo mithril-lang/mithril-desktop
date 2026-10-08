@@ -432,6 +432,109 @@ Automatic scoped reads never start authorization. An explicit reconnect after mi
 
 A network failure retries the original transport and never opens an account prompt. No data mutation or permission grant occurs merely from reading or retrying the workspace.
 
+
+## Original schedule resource transport
+
+The original source transport uses only schedule-source resource IDs and the fixed Mithril API.
+
+Credentials and owner headers stay in main; wrong-owner responses, account changes and missing write scopes refuse access before storing bytes. It does not register a Capability, grant execution or automatically publish Native data.
+
+## Original schedule main execution receipts
+
+Real HTTP A/B/A requests preserve the original occurrence identity and accept only exact current-owner receipts. Foreign, extra, oversized, redirected and lost receipts cannot confirm an execution; mutations never retry.
+
+## Original schedule main execution identity fence
+
+Existing execution grants are required before custody requests. Caller-supplied identities, invalid instants and transitions are refused, and account/profile changes during response streaming discard stale receipts.
+
+## Durable original schedule replica journal
+
+A committed pending operation retains exact source bytes and identity after external failure and store reopening. Files remain private.
+
+## Original schedule replica process lock
+
+Concurrent instances and separate processes cannot reconcile the same scope at once. Abrupt process termination releases the OS lock without deleting committed pending work.
+
+## Original schedule replica identity isolation
+
+Different owners, profiles and timezones have separate journals; wrong-identity writes and reads are refused.
+
+## Original schedule replica storage isolation
+
+Redirected and publicly readable storage is refused without changing the redirect target.
+
+## Bound original schedule source roundtrip
+
+Real source files preserve BOM, CRLF and opaque numeric tokens through portable capture and Native rebind. Missing files stay absent, binding failures have no raw-source fallback, and retained receipts do not overwrite newer authored edits.
+
+## Bound original schedule identity and receipt guards
+
+Wrong owners, stale raw digests, failed token CAS and mismatched restore hashes are refused without acknowledging an unverified source.
+
+## Bound original schedule account invalidation
+
+An account change while binding is awaited prevents the old source from reaching the Native restore boundary.
+
+## Durable original schedule binding targets
+
+A real private SQLite journal preserves the exact bound target after restart, never calls the binder on receipt replay, and refuses changed operation CAS or writes outside the coordinator lock.
+
+## Original schedule directory byte roundtrip
+
+Real temporary script/binary files roundtrip through owner-scoped resource storage and transactional restoration, retaining executable flags, excluding credentials and preserving newer edits when a receipt is replayed after restart.
+
+## Original schedule directory isolation
+
+Foreign owners/profiles, symlink sources and invalidated accounts cannot restore schedule directory files; destination bytes remain intact.
+
+## Original schedule directory integrity
+
+Tampered downloaded chunk bytes are rejected before any destination mutation, retaining original files for recovery.
+
+## Original schedule script binding roundtrip
+
+Real script and monitor files are published, rebound and restored while complete original source retains BOM, CRLF and opaque integers; retrying an acknowledged directory operation preserves newer local edits.
+
+## Original schedule script binding refusal
+
+Escaped paths, excluded or missing scripts, raw remote paths and foreign directory scopes refuse before schedule restoration; portable references must match the verified resource manifest.
+
+## Original schedule workdir roundtrip
+
+Verify actual binary working-directory bytes survive portable source capture and native restoration, raw numeric metadata stays exact, credentials are excluded, and acknowledged retries preserve newer local edits.
+
+## Original schedule workdir conflict and scope
+
+Verify concurrent directory edits, raw cloud paths, foreign job references, relative source paths and stale owners fail without overwriting the local working directory.
+
+## Durable original schedule directory targets
+
+Verify a process stop before filesystem restoration leaves the exact private path and baseline durable, restarted resolution is not invoked, and changed manifests or operation CAS refuse under the required owner lock.
+
+## Original schedule resource composition restart
+
+Verify real script and workdir files restore together through the composed binding and SQLite journal, then a failed source write and restart preserve newer local file edits without recapturing baselines or rebinding destinations.
+
+## Original schedule private runtime claim roundtrip
+
+Verify portable source contains no originating PID or process nonce, destination claim tokens retain opaque integers exactly, and execution admission receives the complete source digest and stable job identities.
+
+## Original schedule runtime claim admission refusal
+
+Verify raw and foreign cloud claims, changed native CAS and unavailable execution authority refuse before native capture or any restoration can occur.
+
+## Original schedule runtime absent native claims
+
+Verify new native inventories receive null runtime claims while preserving original schedule data and account changes refuse further binding work.
+
+## Original schedule shared workdir restart
+
+Verify multiple original jobs sharing one directory restore it once, and a real restored receipt after process restart retains newer local edits even when the source write previously failed.
+
+## Original schedule shared workdir conflict preflight
+
+Verify jobs resolving to one native directory cannot request different cloud snapshots or local baselines; reject before any destination bytes change.
+
 ## New Chat before sign-in
 
 Failed identity checks display readable sign-in guidance and no chat operation is sent. Shared tests cover opening without identity/models and retaining the new screen after an initial session link.
@@ -440,6 +543,791 @@ Failed identity checks display readable sign-in guidance and no chat operation i
 
 Chat distinguishes missing scoped permission from account expiry and transport errors. Its original shared welcome action offers permission approval or network retry; retries never start device sign-in or change stored credentials.
 
+## Original schedule Agent binding bridge
+
+Real child processes receive exact anchors and restoration generations on stdin for A/B/A profiles; account checks surround persistence receipts, and changed accounts cannot accept a receipt.
+
+## Original schedule Agent binding refusal
+
+Foreign identities, unsafe generations, extra fields, oversized output and lost acknowledgements cannot confirm persistence or leak child stderr. Invalid anchors never reach the account guard or child invocation.
+
+## Original schedule Agent preparation
+
+Absent and existing sources use the owned Agent bootstrap through bounded stdin without manually enabling its CLI. Foreign, damaged or lost receipts cannot confirm preparation, and no executor is selected.
+
+## Automatic schedule exact source admission
+
+Both passive restoration and local capture require a fresh authority revision and an exact source digest, including BOM and line-ending bytes; changed or missing source refuses.
+
+## Automatic schedule authority refusal
+
+Absent or changed authority, foreign owner/profile, timezone mismatch and stale identity refuse before source admission.
+
+## Automatic schedule account race
+
+Account changes during custody or source I/O invalidate the result before runtime/resource binding can continue.
+
+## Automatic schedule lifecycle polling
+
+A single lifecycle poller starts without a screen, ignores duplicate starts and stops polling and subscriptions during shutdown.
+
+## Automatic schedule stale lifecycle cancellation
+
+An engine created during an identity switch is discarded before synchronization and the current identity resumes immediately.
+
+## Automatic schedule interrupted lifecycle recovery
+
+Identity changes stop in-flight work without concurrent runs; temporary failures retry on the next poll while retained state remains available.
+
+## Automatic schedule repository outbox durability
+
+A real private SQLite journal preserves pending source-manifest operations across failure and reopening, retains acknowledged documents and refuses unlocked or foreign access.
+
+## Automatic schedule native context guard
+
+Background work validates the retained account/token/profile/generation without network calls and refuses stale or forged context after identity changes.
+
+## Automatic original schedule device roundtrip
+
+The actual coordinator and SQLite journals publish real script/workdir files and restore them on a fresh passive device, retaining original BOM, CRLF and opaque integers before reopening without a second source write.
+
+## Automatic original schedule lost cloud acknowledgement
+
+A cloud peer commits a source manifest then loses its reply; reopening the durable outbox reuses its exact operation and retains one cloud revision and the original Native bytes.
+
+## Automatic original schedule lost native acknowledgement
+
+A Native peer writes the original source but loses its reply; reopening replays the retained receipt and preserves subsequent real script edits before publishing their new snapshot.
+
+## Automatic original schedule concurrent device edits
+
+Independent edits on two devices produce a retained conflict, preserving the receiving device source and the accepted cloud revision rather than silently replacing authored data.
+
+## Original Schedules operation lane
+
+Original screen actions serialize behind the same synchronization lane, verify first-account source ownership and publish committed edits before the next action.
+
+## Original Schedules uncertain admission refusal
+
+Unconfirmed source synchronization, stale profile context or passive-device execution refuse before any original Native action.
+
+## Original Schedules committed write recovery
+
+A committed edit retains its success acknowledgement after network confirmation fails and releases the lane for later operations.
+
+## Original Schedules unified screen
+
+The actual original Desktop component combines colliding original/cloud IDs in one list, preserves cloud model and interval on pause, forwards original controls to Cron IPC, and reloads on account changes without a device dialog.
+
+## Unified Schedules late connection isolation
+
+An old account status reply resolving after the account event cannot construct or query a schedule adapter; only the replacement owner inventory is displayed.
+
+## Original Schedules mirror read recovery
+
+The owner-bound original inventory remains readable during synchronization outages or conflicts; this recovery does not admit edits or execution.
+
+## Original Schedules queued identity isolation
+
+An account switch during an in-flight operation invalidates both its result and queued actions, preventing a prior user's command from running in the new account.
+
+## Original Schedules concrete custody gate
+
+The real coordinator rejects stale profiles, passive or foreign custody and stopped identities while admitting only fresh owner-bound selected-device custody.
+
+## Original Schedules background lane coordination
+
+The lifecycle poll queues behind an in-flight original screen action, avoiding concurrent entry into the same replica journal lock.
+
+## Original workdir identity durability
+
+Opaque working-directory identities remain stable across SQLite journal restart, require the existing cross-process lock, isolate owners and refuse rebinding an identity to another private root.
+
+## Automatic shared workdir device synchronization
+
+The actual coordinator preserves shared folders on a fresh passive device, keeps identical independent folders separate and retains identity across restart.
+
+A receiving-device edit synchronizes back to the original shared root without altering the independent folder; reopening does not republish unchanged source.
+
+## Original workdir alias preflight
+
+One portable folder identity cannot resolve to two private destination roots. The workdir stage rejects that conflict before replacing either folder's actual files.
+
+## Original workdir private runtime preservation
+
+Original authored scripts and outputs synchronize while each device retains its own Cron authority, locked source, ledger and restore receipts, even when the workdir contains that runtime.
+
+## Original workdir private manifest refusal
+
+Incoming manifests containing destination-private state are refused before replacing files. Capturing private synchronization storage itself cannot publish chunks or recurse into its staging area.
+
+## Empty original profile background registration
+
+A fresh profile with no jobs source registers its account-bound timezone through the actual coordinator without creating or restoring jobs. Reopening does not publish another profile revision.
+
+## Empty original profile acknowledgement recovery
+
+A committed profile registration whose reply is lost reuses its retained outbox identity after reopening, with one cloud revision and no native source write.
+
+## Simultaneous empty original profile devices
+
+Two fresh devices use independent private journals and converge on one confirmed profile row without creating jobs. Reopening the passive device does not retain or republish a redundant registration.
+
+## Original parser mailbox background roundtrip
+
+An independent client submits a confirmed request that the actual coordinator processes on a passive device. The result retains raw integer text and reopening does not parse again or create a native jobs source.
+
+An original scheduled resume receipt remains available even when the subsequent execution-policy admission fails; no authored source is restored.
+
+## Original parser mailbox runtime scope
+
+The runtime forwards exact preparation and transition requests to the original Cron ports. Foreign owner requests and a timezone change during parsing cannot return an accepted result.
+
+## Original manual execution receipt boundary
+
+The real child-process transport accepts only the exact request's finite status receipt. Foreign, oversize, extra-field, lost and malformed replies or an account change never report completion or leak child output.
+
+## Original manual execution actual Agent qualification
+
+The Native port executes harmless scripts through the actual Agent in isolated A→B→A homes. Replays retain the original result without changing files or repeating effects; stale full-source versions refuse execution.
+
+The same actual CLI path inspects absent and completed requests without altering source, effect or execution-ledger bytes. Inspection remains valid after the run changed the jobs source version.
+
+This explicit local qualification requires `MITHRIL_AGENT_SOURCE_RUN_CHECKOUT` and `MITHRIL_AGENT_SOURCE_RUN_PYTHON` test inputs. CI without that checkout skips this qualification rather than substituting a fake CLI. It does not prove installed-client or production operation.
+
+
+## Original manual main transport receipts
+
+Real HTTP A/B/A take/report requests retain exact source and operation identity; malformed, foreign, oversized, redirected and lost replies refuse confirmation without retry. Replayed, empty and source-refused takes cannot grant fresh permission.
+
+## Original manual main transport identity fence
+
+Missing execution grants never upgrade the credential or send manual commands. Spoofed owner fields refuse before transmission; account/profile changes during streamed responses discard stale receipts.
+
+
+## Original manual durable dispatch fence
+
+An exact request/native-version binding commits unknown before external effects. Reopening after failure cannot dispatch it again; changed identities conflict, and the existing private cross-process lock remains mandatory.
+
+## Original manual durable result reporting
+
+Confirmed native results survive failed reporting. Only exact API acknowledgements mark them reported; repeated acknowledgement is idempotent and contradictory or foreign results cannot replace retained outcomes.
+
+## Original manual journal account isolation
+
+A-B-A journals isolate request identities. Unconfirmed transport outcomes cannot become completion, and a reserved request cannot retain a completed result before its dispatch fence is committed.
+
+
+## Original manual consumer retained report replay
+
+An actual SQLite journal is reopened after a lost report; only the retained result is resent, without another Agent invocation.
+
+## Original manual consumer nonblocking execution
+
+A long Agent peer releases the replica lock so another store can synchronize. Simultaneous local polls cannot dispatch a second effect.
+
+## Original manual consumer uncertainty retention
+
+Unknown child outcomes and lost take acknowledgements never rerun. Even a faulty peer repeating a fresh take cannot bypass the committed dispatch fence.
+
+## Original manual server uncertainty discovery
+
+A server-unknown request without a native journal is inspection only: exact completed/rejected Agent receipts synchronize, while absent/unknown outcomes remain uncertain and never dispatch.
+
+## Original manual consumer identity admission
+
+Fresh take receipts must match account, profile, timezone, source and custody bindings. Foreign, mismatched and replayed responses cannot reach the Agent port.
+
+## Original manual consumer account change fence
+
+Stopping or switching accounts during execution retains uncertainty and refuses stale reporting; reopening never invokes that request again.
+
+
+## Original manual lifecycle wiring
+
+The manual lifecycle starts independently of the source poller. A long running peer does not block original screen operations, and stop invalidates the consumer and its captured engine.
+
+Both original execution and retained-result inspection are connected to their main-only ports with the captured engine's active-scope fence.
+
+## Original manual read-only native receipt boundary
+
+Inspection uses the fixed bounded status command, correlates every request field, and admits absent only as inspection data. Foreign, malformed or lost results and account changes refuse confirmation.
+
+## Original manual read-only result recovery
+
+Reopened actual SQLite journals recover exact terminal Agent receipts even after unknown was acknowledged by the API. Failed reporting retains the terminal result for acknowledgement-only replay; effects never repeat.
+
+## Original manual read-only uncertainty fence
+
+Absent, unknown, foreign and unavailable inspection results retain uncertainty without dispatch. An account change during inspection prevents retaining or reporting its stale terminal receipt.
+
+## Original manual concrete source resource binding
+
+The real coordinator, private SQLite and actual script files bind dispatch to synchronized native/source versions. Output returns through ordinary replication; a reopened report obligation never invokes the effect again.
+
+## Original manual concrete stale resource refusal
+
+Changed script bytes, custody revisions, passive devices and stopped contexts refuse the concrete dispatch binding before reaching the Agent port.
+
+## Automatic background connection recovery
+
+Transient startup failures retry scoped connection reads automatically; missing authority and stale identities never enable background synchronization.
+
+The original background reconciler resumes native history after a five-second network retry without another sign-in. Online signals cannot overlap an in-flight read. Account changes suppress late status replies before enable; unmount clears timers/listeners. Missing scope waits for explicit account authorization.
+
+## Canonical Settings command routing
+
+Global settings commands delegate to the active workspace instead of opening a second native preference editor.
+
+The command retains its requested section and explicit profile. An accepted workspace handler mounts no bootstrap modal; cleanup restores the original setup path. A declined handler retains bootstrap setup before the workspace mounts. Explicit different-profile commands now retain their selected target in the canonical workspace. Browser tests separately exercise the original dialog's active/inactive lifecycle without replacing transports.
+
+## Background presentation synchronization
+
+Confirmed cloud presentation preferences apply while Chat is active, without opening Workspace or writing startup defaults.
+
+The always-mounted reconciler applies the initial theme and language, refreshes a revision edited on another device after ten seconds, and does not write preferences. An old-account reply after account change cannot reach Desktop providers.
+
+## Explicit profile Settings routing
+
+A Settings command for another profile uses the same canonical workspace without changing the agent selected in Chat.
+
+The selected profile and section remain fixed while the active Chat profile changes. A later command without an explicit profile uses the then-current Chat profile and remounts the settings provider. Neither path mounts the bootstrap preference editor.
+
+## Profile metadata retains original extension tokens
+
+Changing a profile name preserves exact unknown extension tokens, large opaque integers and unrelated source whitespace.
+
+## Invalid profile metadata is retained
+
+Malformed, duplicate-key or nonobject metadata cannot be overwritten by an appearance mutation, and no temporary file remains.
+
+## Profile metadata avatar capacity
+
+Clearing another appearance field retains the complete original native avatar allowance and extension metadata.
+
+## Profile metadata rejects linked storage
+
+Appearance edits refuse symbolic metadata links without changing their destination.
+
+## Profile metadata sequential appearance edits
+
+Main-process name and color mutations share a synchronous file lane so a later edit cannot discard the preceding field.
+
+## Original profile appearance handlers preserve data
+
+The original public name, color, avatar and removal handlers use the lossless lane, retain extension tokens and return failure while preserving malformed source.
+
+## Original profile metadata resource transport
+
+Profile resources use the fixed main-process API with captured owner and existing scopes. Invalid resource ids, another owner, stale account replies and read-only writes are rejected without expanding credentials.
+
+## Profile metadata downloaded writes preserve concurrent edits
+
+A download captured before a newer local appearance edit cannot replace or delete that edit, and an absent-file baseline cannot overwrite a created file.
+
+## Profile metadata exact replacement and tombstone
+
+A matched source accepts exact cloud bytes including BOM and opaque integers; invalid targets preserve the file, and matched deletion does not accept a stale recreation baseline.
+
+## Profile metadata durable interruption recovery
+
+Real SQLite pending intents recover exact bytes on reopening whether interruption occurred before or after the file rename.
+
+## Profile metadata durable receipt replay
+
+Completed receipts survive reopening, preserve later local edits, and reject a reused operation identity with a changed fingerprint.
+
+## Profile metadata interrupted restoration conflict
+
+Interrupted restoration refuses newer local bytes and retains its pending intent; another owner cannot access that intent.
+
+## Profile metadata receipt binds target bytes
+
+A mismatched target digest or foreign profile receipt is rejected before any original metadata mutation.
+
+## Profile metadata durable tombstone restoration
+
+Physical metadata deletion retains its completed receipt across restart, and replay never deletes a later recreated file.
+
+## Profile metadata replica resource roundtrip
+
+The original file is captured through the resource protocol, exact downloaded bytes are restored, and retained receipts preserve subsequent original edits.
+
+## Profile metadata download fences edits and identity
+
+Edits or authorization changes during resource download prevent native restoration and retain the current original file.
+
+## Profile metadata replica tombstone baseline
+
+Physical deletion produces a stable native tombstone, and documents for another profile never enter the metadata file adapter.
+
+## All-profile metadata inventory preserves selection
+
+The inventory includes empty and populated original profiles without changing the active selection or accessing runtime credential contents. Foreign source bindings remain excluded.
+
+## All-profile metadata inventory retains absent owned sources
+
+Missing current-owner profile identities remain in the metadata inventory so deletion can reconcile; missing foreign identities cannot become this account's sources.
+
+## All-profile metadata inventory rejects linked sources
+
+Linked roots and invalid names are not adopted, and mismatched private binding filenames fail inventory validation.
+
+## Deleted original profile is never recreated by metadata download
+
+When an original profile directory disappears, metadata download is deferred and neither a directory nor a metadata file is recreated.
+
+## All-profile Memory inventory preserves original files
+
+Tests capture default, research and empty owned profiles with original contents and limits, while excluding configuration credentials and avoiding profile selection writes.
+
+## All-profile Memory inventory preserves unavailable sources
+
+Tests retain missing, linked and malformed source data without claiming their Memory IDs as complete or deleting cloud records.
+
+## All-profile Capability configuration capture
+
+Tests capture default, research and empty profiles while excluding a differently owned profile.
+
+Original selection is preserved, public descriptors are keyed to the correct profile, and credential values and install/test execution remain excluded.
+
+## All-profile Capability restore targets its original profile
+
+Tests restore a cloud configuration change into the owned research working copy while the selected default configuration remains byte-identical. No installation is performed.
+
+## All-profile Skill resource capture
+
+Tests publish separate original Skill bytes under default and research profile resource IDs without executing installation.
+
+The existing restoration test also runs for both default and research, checks interruption recovery and receipt replay after later original edits, and rejects altered operation reuse.
+
+## Skill resource upload preserves concurrent original edits
+
+Tests change the original Skill file during chunk upload, refuse the stale repository pointer, retain the newer original bytes, and remove private capture staging.
+
+## All-profile original schedule lifecycle
+
+Runtime tests verify owned present profiles use their original homes without switching selection or recreating absent directories. Removing a captured root invalidates later operations.
+
+## All-profile schedule failure isolation
+
+A failed original source does not suppress later owned profiles. Captured engine operations reject an account change before continuing native or cloud work.
+
+## All-profile schedule transport identity
+
+Real HTTP transport tests verify another profile requires an explicit valid captured account context, receipts bind the requested profile, and stale contexts send no custody request.
+
+## All-profile manual independent polling
+
+With one original manual consumer held busy, another owned profile polls again on its interval without duplicating the busy run. Stopping prevents further polling across every profile.
+
+## All-profile manual transport identity
+
+Real HTTP tests require a valid captured active account context for another profile mailbox, reject foreign receipts and send nothing after account identity changes.
+
+## Shared original profile Memory native adapter
+
+The actual ProfileModal renders the shared Agent Memory editor and saves to its original Native profile with the exact observed MEMORY and USER baseline.
+
+## Shared profile Sync signed out
+
+The Native adapter renders the canonical shared Sync pane without a manual synchronization button when its observed account status is signed out.
+
+## Shared profile Sync target outcome
+
+The Native adapter verifies the selected original metadata record through the canonical workspace repository and invokes its real sync transport, never the retired agent-sync handlers.
+
+## Canonical profile Sync transient failure
+
+An identity transport error remains retryable in the original shared pane without misreporting the authenticated user as signed out.
+
+## Canonical profile Sync stale identity
+
+An old account identity resolving after an account-change refresh cannot mount or request another repository synchronization pass.
+
+## Agents canonical identity
+
+The original Agents list uses validated workspace identity, never retired agent-sync handlers or a separate Cloud Workspace entry.
+
+## Agents identity retry
+
+Transport failures retain the original list and allow identity retry without reporting the account as signed out.
+
+## Agents background list refresh
+
+Authenticated list refresh observes background working-copy changes without overlapping reads; unmount stops polling and rejects late results.
+
+## Agents failed initial list
+
+A failed initial profile read leaves loading and exposes refresh so the original list can recover without revisiting the screen.
+
+## Cloud profile first materialization
+
+A new remote profile creates an empty original directory and records ownership; completed intents never recreate a later deletion or copy runtime credentials.
+
+## Cloud profile retained deletion
+
+An existing source binding without a pending creation intent cannot recreate its missing original directory.
+
+## Cloud profile interrupted creation
+
+A durable pre-directory intent survives interruption and resumes its first creation instead of treating it as a deleted prior source.
+
+## Cloud profile creation authority
+
+Foreign ownership, account invalidation and symlink ancestors prevent working-copy creation before any original profile mutation.
+
+## Cloud profile replica materialization
+
+The actual Native replica transport verifies remote resources, restores exact original metadata, replays its receipt and defers after a later directory deletion.
+
+## Cloud profile replica resource failure
+
+Resource failure or changed account authority leaves the new original profile directory absent through the actual Native replica path.
+
+## Cloud profile replica scope
+
+The actual Native snapshot admits valid cloud-only profile IDs so background replication can restore them, while foreign original bindings remain outside its scope.
+
+
+## Profile dialog read recovery
+
+A failed original profile read exposes retry within the shared modal, then clears its error after successful recovery without a new sign-in.
+
+
+## Profile dialog missing source
+
+A missing original profile produces an actionable unavailable state with retry and close controls instead of an infinite loader.
+
+
+## Profile dialog scope fencing
+
+A late read from another profile cannot replace the currently selected agent or its original identity controls.
+
+
+## Profile dialog bounded read
+
+A pending original IPC read stops waiting after twelve seconds; a retry can recover and the old response cannot overwrite it.
+
+
+## Profile dialog late deletion
+
+A previously authorized deletion completing after selection changes cannot close another profile dialog or publish stale UI callbacks.
+
+## Wallet original publication and deletion
+
+The original public wallet metadata is published, subsequent edits advance its revision, and original deletion publishes a tombstone without transferring ciphertext.
+
+## Wallet retained acceptance recovery
+
+Creation and update acknowledgements lost in transport recover through the reopened SQLite journal with the same operation ID and no duplicate revisions.
+
+## Wallet concurrent cloud edit conflict
+
+A concurrent remote edit retains both the remote document and the exact queued native edit rather than silently overwriting either.
+
+## Wallet retired owner scope
+
+The wallet journal refuses unlocked, foreign-owner and retired-account access before publication.
+
+## Wallet source snapshot
+
+A single original wallet file snapshot projects public fields only and refuses malformed, unknown-field or duplicate records instead of interpreting them as deletions.
+
+## Wallet source replacement fencing
+
+Dangling links, account retirement and source replacement after capture refuse publication so an unsafe source cannot erase the cloud wallet list.
+
+## Wallet remote metadata restoration
+
+A remote name edit restores the original working record without re-publication; a subsequent native edit uses the restored cloud revision.
+
+## Wallet interrupted remote restoration
+
+Interruption after the original record was restored but before its checkpoint committed recovers on restart without a duplicate cloud revision.
+
+## Wallet original custody preservation
+
+Cloud restoration changes only the wallet name, preserving exact native ciphertext and other records while refusing signing identity replacement and concurrent native edits.
+
+## Original wallet card refresh after synchronization
+
+The actual Native adapter consumes the compiled shared pane and displays the restored original name after synchronization even with no remote-only wallets.
+
+## Canonical wallet balance resolution
+
+Native balance reads resolve a stable owner/profile descriptor across repository pages before calling the same canonical endpoint as Web.
+
+## Canonical wallet scope rejection
+
+Foreign owners, other profiles, deleted records and forged public descriptor identities refuse reads before balance transport.
+
+## Canonical wallet response fencing
+
+Account retirement or a mismatched returned address rejects the response instead of applying it to another card or presenting missing balances as zero.
+
+## Canonical wallet fixed API transport
+
+The Native main-process transport uses the same public balance response validator and fixed authenticated API route as Web, refusing malformed results and unsafe identifiers.
+
+## Wallet remote tombstone visibility
+
+A remote tombstone removes the public record from repeated Native synchronization without deleting or republishing its retained encrypted original key record.
+
+## Original wallet canonical deletion display
+
+The actual Native adapter consumes the compiled shared pane and hides a removed canonical card without issuing a native key deletion.
+
+
+## All-profile history background source coverage
+
+The startup lifecycle visits default, research and empty owned profiles using actual fixed-profile CloudWorkspace clients and the original source capture adapter, excludes another owner's profile and preserves selected profile state.
+
+## All-profile history account retirement
+
+A changed captured account generation aborts the pass before another profile is visited or the pending source result is accepted.
+
+## All-profile history source replacement
+
+Replacing an original profile directory after capture is refused by inode/device guards; prior owned profiles remain accepted without changing the replacement.
+
+## All-profile history native connection isolation
+
+A remote connection does not read local original profiles or initiate scoped API clients through the automatic local-history lifecycle.
+
+
+## All-profile history source failure isolation
+
+A temporary failure in one owned profile does not prevent other profiles from archiving; source bindings and the selected profile remain intact.
+
+## All-profile history lifecycle retirement
+
+Stopping the lifecycle fences in-flight source results, prevents later profile visits and unsubscribes account changes.
+
+## Shared history journal serialization
+
+Foreground and background consumers share one serial lane. A waiting operation cannot overlap the prior source journal mutation, and a failed operation releases the lane for retained-intent recovery.
+
+## All-profile history review coverage
+
+The foreground report labels each owned profile's conflicts and combines counts without changing the selected profile or creating foreign-owner sources.
+
+## All-profile history resolution ownership
+
+Title, model and visibility choices route to the owned source without selecting it; foreign profiles and a mismatched authenticated owner are rejected before resolution.
+
+## Cross-profile history review interaction
+
+The existing review UI displays the source profile and sends that profile's reviewed choice even when a different profile is selected.
+
+## All-profile history remote compatibility
+
+Remote history reconstruction and reviewed choices retain the existing authenticated adapter without visiting local original profiles.
+
+## All-profile history stale resolution retirement
+
+A changed account generation during reviewed metadata resolution rejects the result before accepting source effects.
+
+## All-profile history empty installation reconstruction
+
+A missing original home still admits selected-profile remote cache reconstruction without inventing original sources or requiring an agent installation.
+
+## All-profile real archival engine replay
+
+The real history engine, scoped canonical HTTP adapter and durable on-disk journals archive all owned source fixtures. A lost acknowledgement recovers through its receipt without duplicate sessions, history events or execution.
+
+## Saved metadata owner fencing
+
+Saved metadata from the renderer must match the current installation owner before a native POST is admitted.
+
+The regression in src/main/cloud-workspace.test.ts verifies a foreign expected owner causes no POST, while a matching owner sends x-mithril-workspace-owner to the canonical API. The shared SyncClient supplies the checked owner through preload and trusted IPC into [[src/main/cloud-workspace.ts#CloudWorkspace#applyOperations]]. API/local D1 tests independently check cookie-owner switching returns 409 before any operation row is written. Source tests do not establish installed or production qualification.
+
+
+## Terminal background connection errors
+
+Owner changes, rejected nontransient HTTP requests and invalid schemas stop automatic background retries; online events do not repeat status or enable reads until explicit recovery.
+
+
+## Canonical cloud connection settings
+
+The Native consumer mounts the actual shared account status component with main-owned reads, keeps original execution settings unmounted until expansion and opens account management only on an explicit click.
+
+
+## Paged canonical chat inventory
+
+The main-owned Chat adapter completes stable-boundary API pages before returning the owner-scoped inventory and retains recent activity ordering. The existing credential/profile fence applies to every page.
+
+
+## Large multi-profile cloud history inventory
+
+The original NativeHistorySync engine archives the selected native source against an owner-bound cloud inventory above one thousand sessions without dispatching inference or tools.
+
+## Complete large original source inventory
+
+The owner-checked original inventory returns all 1,205 histories through bounded pages without capture, sign-in or provenance adoption.
+
+## Stable paged original SQLite inventory
+
+Bounded SQLite pages retain equal-timestamp rows and archived sources within the original read transaction; overlapping pages are refused.
+
+## Large original profile archival replay
+
+The real archival engine synchronizes 1,005 source sessions and durable journal entries, recovering a lost acknowledgement without duplicate history or execution.
+
+## Large original provenance mapping
+
+Original SQLite mappings retain source ownership and exact deletion provenance above one thousand source sessions, including the last row.
+
+## Incremental durable history journal
+
+Changed-session journal files preserve legacy pending operations, retain untouched entries, survive interrupted temporary writes and reject mixed owners or symlinked storage.
+
+## Incremental journal failure fences dispatch
+
+A failed incremental journal write prevents cloud operations; compatibility adapters without incremental support still use the existing whole-journal durability boundary.
+
+## Complete large deletion inventory
+
+The original SQLite outbox returns all 1,205 retained deletions through stable keyset pages, excludes other owners/profiles, and prepares/acknowledges the exact final operation without scanning all intents per mutation.
+
+## Large original deletion receipt replay
+
+The real history engine synchronizes 1,005 original physical deletions, replays a lost acknowledgement with its retained ID/base revision and mirrors only tombstones without reconstructing pending or deleted conversations.
+
+## Complete large canonical sidebar
+
+The main-owned canonical read admits 1,205 valid owner-scoped pin/project placements through the same shared validator as Web, retaining fixed routes and account validation.
+## Periodic packaged update checks
+
+Signed packaged clients check after startup and every four hours after completion, recover from unavailable feeds and stop scheduling on quit. This verifies scheduling rather than a signed installer download or replacement.
+
+## Pending update check disposal
+
+A pending provider check never overlaps another periodic request and cannot rearm its timer after the application quits.
+
+## Compiled Desktop notice layout
+
+Real Chromium checks built Desktop styles at narrow/normal widths in both themes. A long bilingual synchronization notice must wrap above the page rather than obscure the heading or push the footer outside the viewport.
+
+These are layout fixtures, not authenticated client journeys.
+
+The Refresh ledger action must also pass real pointer hit testing, receive a click without forced interaction, and remain keyboard focusable beneath the notice. Screenshot geometry alone does not establish that a visible control can be used.
+
+## Complete long transcript checkpoints
+
+Mapped and remote-only conversations read all contiguous pages beyond a thousand before title writeback or cache publication, while preserving owner/version/cursor checks and never executing a turn.
+
+## Chunked remote transcript storage
+
+Large owner-bound remote timelines retain every event and display item through chunk storage; prior caches remain readable and failed replacements roll back without losing the previously complete timeline.
+
+## Complete mapped chat cache
+
+Mapped original transcripts retain all validated cloud overlays in owner-bound SQLite chunks. Legacy read-back, fifty-MiB-plus histories, exact completeness, missing chunks and replacement rollback are verified without changing agent history.
+
+## Complete mapped chat synchronization
+
+More than twenty thousand original items synchronize in protocol batches with exact archived read-back and no inferred turn. The large end-to-end fixture has a thirty-second deadline for complete receipt and journal processing.
+
+## Complete history attachment cache
+
+All valid attachments in a conversation restore sequentially even when their total exceeds fifty MiB. Real bytes, private files, reopen without network and account-isolated paths are verified.
+
+## Atomic attachment cache recovery
+
+Corrupt local cache bytes are re-fetched and atomically replaced only after canonical chunk verification. Invalid remote bytes or an account retiring during download cannot install partial data.
+
+## Attachment cache path integrity
+
+Attachment identities are validated before filesystem access. Symlinked storage is rejected, while original text/image representation and provenance sizes are retained.
+
+## Complete compression lineage synchronization
+
+A 1,205-session compression chain archives/restores through bounded SQL batches with complete read-back. Unexpected membership changes roll back the operation while messages, project links and unrelated conversations remain intact.
+
+## Complete packaged shared timeline
+
+The actual vendored Workspace export preserves 20,006 contiguous events, first and last messages, stable identities and tombstones. A missing late event is refused instead of displaying an incomplete conversation.
+
+
+## Packaged acknowledged journal cleanup
+
+The actual compiled vendored pending store restores 1,205 edits and deletes only acknowledged keys, retaining an interleaved unacknowledged edit and another owner before the final drain.
+
+## Packaged canonical snapshot replacement
+
+The compiled shared dependency loads 1,205 records, then replaces absent IDs and restored lower revisions from a complete snapshot while preserving queued operation identities and base revisions without sending them.
+
+## Packaged all-page Repository publication
+
+The compiled Repository consumer retains its prior display and cache when a later configured collection fails. Earlier pages cannot persist a partial mixed inventory or initiate queued writes.
+
+## Packaged counted Repository replacement
+
+The actual compiled vendor rejects a changed later page before cache publication. A coherent counted inventory then removes absent IDs and replaces lower revisions without dispatching queued writes.
+
+## Packaged Repository restore generation
+
+The compiled Repository cache replaces equal-revision restored bytes while retaining saved edits as conflicts in its durable state. The generic Workspace client likewise retains its old operation without dispatch after restoration.
+
+## Packaged session inventory replacement
+
+The actual shared vendor replaces 1,205 canonical sessions with lower revisions or an empty inventory, clears retired event caches and preserves queued original operation identities without writing or dispatching.
+
+## Packaged atomic long checkpoint
+
+The compiled shared checkpoint preserves its old complete cache after a late network failure, then reads 20,006 immutable events over more than a thousand advancing pages without truncation or execution.
+
+## Packaged checkpoint boundary fencing
+
+The compiled shared client rejects session revision/event boundary changes between pages, preserves its previous complete history and accepts a coherent retry without executing writes.
+
+## Packaged chat restore epoch
+
+The actual compiled vendor clears histories at equal IDs/revisions when the restore epoch changes, preserves saved operation identity and refuses both receipt checks and dispatch across epochs.
+
+## Packaged chat receipt generation
+
+The compiled shared client sends the observed dataset generation on a saved operation and retains that operation when a receipt belongs to another generation, without updating the visible session or dispatching a write.
+
+## Packaged Sidebar restore generation
+
+The compiled Sidebar protocol carries the restored dataset generation, rejects invalid epochs and owner injection, and validates owner-scoped complete placement inventories.
+
+## Packaged Workspace history generation
+
+The actual compiled vendor rejects a retained-history page from a restored dataset with equal record identity and revision, then accepts a fresh boundary after snapshot recovery.
+
 ## Verified Desktop sign-in gate
 
 Desktop never mounts the workspace for a stored but invalid account, refuses manual bypass, closes on sign-out and retires late account verification responses before admitting a newly verified session.
+
+## Packaged device replica restoration generation
+
+The actual vendored ReplicaSync keeps saved device edits as durable conflicts after restoration, including reopened clients, without uploading old bytes or overwriting local edits.
+
+## Project folder restoration generations
+
+Actual filesystem synchronization retains old saved operations and local edits across restart, while unchanged folders receive restored bytes and delayed downloads refuse replacement after a generation change.
+
+
+## Execution history review boundary
+
+The main transport admits only a safe history cursor or exact validated review decision, keeps credentials in main, and verifies owner/schema and exact review receipts.
+
+Invalid decisions never reach transport. Restored review history is not execution permission.
+
+## Project folder remote tombstones
+
+Remote deletion retains the file-set revision and moves unchanged bytes to recovery storage. Restart preserves the tombstone; new work uses its revision and concurrent local edits remain intact.
+
+## Native archive durable intent journal
+
+SQLite transactions retain archive IDs across reopening. Legacy JSON remains readable until superseded; confirmed removal writes a durable empty row that prevents stale JSON from reviving acknowledged work.
+## Archive destination replacement
+
+Native replacement preserves new bytes and removes the temporary file. Windows paths remain data; failed moves, cross-directory requests and owner changes cannot acknowledge an export.
+
+## Cloud Data modal account custody
+
+Original Settings tabs use account-bound archive actions, re-read the same prepared restore intent after tab changes, and never replay export/import/restore or legacy profile migration handlers on mount.

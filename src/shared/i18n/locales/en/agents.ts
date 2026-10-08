@@ -1,4 +1,6 @@
 export default {
+  profileLoadFailed: "Couldn't load the profile. Try again.",
+  profileUnavailable: "This profile is no longer available.",
   title: "Profiles",
   subtitle:
     "Each profile is an isolated Hermes workspace with its own config, memory, and skills",

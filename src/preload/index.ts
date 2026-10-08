@@ -523,6 +523,22 @@ const hermesAPI = {
       fetchRegistryDetail: (kind, item) =>
         ipcRenderer.invoke("cloud-workspace-registry-detail", kind, item),
     },
+    archive: {
+      pending: (owner) =>
+        ipcRenderer.invoke("cloud-workspace-archive-pending", owner),
+      exportAndSave: (owner) =>
+        ipcRenderer.invoke("cloud-workspace-archive-export", owner),
+      chooseAndPrepare: (owner) =>
+        ipcRenderer.invoke("cloud-workspace-archive-prepare", owner),
+      commit: (owner, confirmed) =>
+        ipcRenderer.invoke("cloud-workspace-archive-commit", owner, confirmed),
+    },
+    executionReview: {
+      list: (after) =>
+        ipcRenderer.invoke("cloud-workspace-execution-history", after),
+      review: (decision) =>
+        ipcRenderer.invoke("cloud-workspace-execution-review", decision),
+    },
     status: () => ipcRenderer.invoke("cloud-workspace-status"),
     enable: () => ipcRenderer.invoke("cloud-workspace-enable"),
     disable: () => ipcRenderer.invoke("cloud-workspace-disable"),
@@ -530,8 +546,12 @@ const hermesAPI = {
     applySidebar: (operation) =>
       ipcRenderer.invoke("cloud-workspace-sidebar-operation", operation),
     getSnapshot: () => ipcRenderer.invoke("cloud-workspace-snapshot"),
-    applyOperations: (operations) =>
-      ipcRenderer.invoke("cloud-workspace-operations", operations),
+    applyOperations: (operations, expectedOwner?: string) =>
+      ipcRenderer.invoke(
+        "cloud-workspace-operations",
+        operations,
+        expectedOwner,
+      ),
     history: (id: string, offset?: number) =>
       ipcRenderer.invoke("cloud-workspace-history", id, offset),
   } satisfies CloudWorkspaceAPI,
@@ -1369,8 +1389,11 @@ const hermesAPI = {
   ): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke("delete-wallet", profile, id),
 
-  getTokenBalances: (address: string): Promise<TokenBalancesResponse> =>
-    ipcRenderer.invoke("get-token-balances", address),
+  getTokenBalances: (
+    address: string,
+    profile?: string,
+  ): Promise<TokenBalancesResponse> =>
+    ipcRenderer.invoke("get-token-balances", address, profile),
 
   // Memory
   readMemory: (

@@ -4,7 +4,7 @@ import { legacyProviderSnapshot } from "./legacy-provider-snapshot";
 import type { LegacyProviderSnapshot } from "../shared/legacy-provider";
 import { CloudChat } from "./cloud-chat";
 import { CloudWorkspace } from "./cloud-workspace";
-import { readMithrilToken } from "./mithril-token-store";
+import { readCloudAccountToken } from "./mithril-token-store";
 import { mithrilApiOrigin } from "./mithril-token";
 import { getActiveProfileNameSync } from "./utils";
 import { onCloudWorkspaceInvalidated } from "./cloud-workspace-events";
@@ -12,7 +12,7 @@ import { onCloudWorkspaceInvalidated } from "./cloud-workspace-events";
 const listeners = new Set<() => void>();
 export const cloudChat = new CloudChat(
   new CloudWorkspace({
-    token: () => readMithrilToken(getActiveProfileNameSync()),
+    token: () => readCloudAccountToken(getActiveProfileNameSync()),
     profile: () => getActiveProfileNameSync() || "default",
     origin: mithrilApiOrigin,
     fetch: (input, init) => fetch(input, init),

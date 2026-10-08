@@ -93,7 +93,7 @@ export default function MithrilChat({
         )
           setSourceInventory(result);
       } catch {
-        // Source access remains in the existing history dialog during migration.
+        // Automatic archival can retry; original source rows remain in this same sidebar.
         if (current) setSourceInventory(undefined);
       } finally {
         busy = false;
@@ -233,7 +233,6 @@ export default function MithrilChat({
           await window.hermesAPI.cloudWorkspace.enable();
         }}
         identityEpoch={`${profile}:${epoch}`}
-        nativeImport={window.hermesAPI.nativeSessionImport}
         historyFiles={window.hermesAPI.cloudChat.historyFiles}
         loadModels={() => window.hermesAPI.cloudChat.models()}
         loadRuntime={() => window.hermesAPI.cloudChat.runtime()}

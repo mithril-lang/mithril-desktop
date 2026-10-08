@@ -15,10 +15,14 @@ import {
   type ChatOperationResponse,
   type ChatReceipt,
   type ChatSessionList,
+  type ChatSessionPage,
   type ChatSessionSnapshot,
   type ChatModel,
 } from "@mithril/workspace/sessions";
-import type { SessionTransport } from "@mithril/workspace/session-sync";
+import {
+  readSessionInventory,
+  type SessionTransport,
+} from "@mithril/workspace/session-sync";
 
 /** Fixed canonical D1 routes. No provider URLs or bearer credentials cross IPC. */
 export class CloudChat implements SessionTransport {
@@ -29,16 +33,17 @@ export class CloudChat implements SessionTransport {
     );
   }
   async list(): Promise<ChatSessionList> {
-    const { value } = await this.auth.authorizedRequest("/v1/chat/sessions");
-    const result = value as ChatSessionList;
-    if (
-      !Array.isArray(result.sessions) ||
-      !result.sessions.every(validateChatSession) ||
-      new Set(result.sessions.map((s) => s.id)).size !== result.sessions.length
-    )
-      throw new Error("Chat session list invalid");
-    return result;
+    return readSessionInventory(async (cursor) => {
+      const path =
+        "/v1/chat/sessions?page=1" +
+        (cursor
+          ? `&anchor=${cursor.anchor}&after=${encodeURIComponent(cursor.after)}`
+          : "");
+      const { value } = await this.auth.authorizedRequest(path);
+      return value as ChatSessionPage;
+    });
   }
+
   async models(): Promise<ChatModel[]> {
     const { value } = await this.auth.authorizedRequest("/v1/chat/models");
     const models = (value as { models?: unknown }).models;

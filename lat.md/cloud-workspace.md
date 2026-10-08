@@ -175,7 +175,7 @@ The default Memory route now mounts these original components using per-profile 
 
 Fixed known Memory files synchronize through the shared three-way journal while original UI components remain the editor.
 
-[[src/main/memory-replica-files.ts#memoryReplicaSnapshot]] reads only the selected owner-bound profile files and configured capacities. Snapshots explicitly claim only that profile’s three record IDs; unavailable collections report warnings and cannot delete unrelated data. Credentials, configuration values, installation metadata and device paths are excluded from canonical bodies.
+[[src/main/memory-replica-files.ts#memoryReplicaSnapshot]] reads fixed owner-bound profile files and configured capacities. The all-profile inventory now invokes this reader for each validated original profile and claims only successful profile record IDs; unavailable collections report warnings and cannot delete unrelated data. Credentials, configuration values, installation metadata and device paths are excluded from canonical bodies.
 
 [[src/main/memory-replica-files.ts#applyMemoryReplica]] uses the original Memory lock inodes, no-follow reads, source CAS, atomic file writes and durable operation receipts. Repeating a completed receipt never rewrites newer native contents; interrupted writes recover from their recorded before/after state. Tombstones preserve recoverable cloud bodies and deletion markers. Differing configured capacities defer pending shared Settings integration. Original Persona writes now use the same locks and observed text checks rather than an unlocked write.
 
@@ -241,7 +241,7 @@ All nine original Settings panes now mount in the normal Desktop cloud Settings 
 
 The normal Cmd/Ctrl+, shortcut now navigates to this same Settings route as the sidebar. It no longer opens a competing global preference store. Explicit native execution setup dialogs remain reachable until their data and runtime adapters are complete.
 
-Backups/imports, updates, connection tests and links retain existing explicit native handlers. Opening or switching panes does not replay those actions. Runtime credentials stay outside presentation documents. Tests cover native backup result retention and explicit profile ownership; browser default-route fixtures cover consumer state retention across general/runtime tabs. Web’s five runtime pane adapters and native provider-to-cloud uploads remain unfinished. Source checks are not installed-client or publication evidence.
+Account backups/restores now use the shared cloud Data controls and main-only account archive handlers. Opening or switching panes does not replay actions; prepared restore identity survives in the native journal and is re-read when Data reopens. Runtime credentials stay outside presentation documents. Tests cover account ownership, explicit export/selection, preserved pending restore and refusal to dispatch legacy profile migration handlers. Source checks are not installed-client or publication evidence.
 
 ### Capability configuration writeback (draft)
 
@@ -584,6 +584,135 @@ Fund main ce39255136317e89f67c6282d549309ec270cb81 passed App run 37537276513 an
 
 Preview.28 platform run 37530012973 succeeded. The prerelease contains all five platform installers, preview feeds, blockmaps and SHA256SUMS; the public download page actually advertises preview.28 for Apple silicon, Intel Mac, Windows and Linux. Installed preview.27 was not replaced in this verification. Desktop main 2aa62cc005508dc2ced221a35a406361e5835dd3 passed main CI 37537279932; its preview.29 platform run 37537682040 is still building. Agent PR12 at 235ffe24f18fc4bb9f1c78e180ec0ac1fd408d48 remains unmerged with full CI 37537312566 running. Rich schedules (Cron, delivery, scripts), history continuation and remaining profile/data adapters are still outstanding; removal of a native view must preserve its data and actions.
 
+### Original schedule source capture (draft)
+
+Original Cron files are captured completely before any projection, with their source shape and metadata preserved.
+
+[[src/main/cron-source-files.ts#captureOriginalCronFile]] reads the fixed profile's jobs.json through one opened inode, checks encoding, size, source identity and duplicate/malformed rows, and computes a byte-level source version. The final path check compares size and modification/change times with the opened descriptor, refusing in-place changes after its final read. Array and object file shapes remain distinct. Missing storage is not a fabricated empty file. Symlinked files/directories and changed sources fail without repairing or writing the original store.
+
+[[src/main/cronjobs.ts#readOriginalCronSource]] remains main-process-only: retained source may contain private runtime bindings and is not admitted for cloud upload. The existing selected-schedule preview now starts from this complete capture instead of silently filtering malformed records. Tests use real temporary A-B-A profile files and verify exact metadata, untouched bytes, source revisions, legacy shape and unsafe-source refusal. Cloud field binding, locked restoration, original Schedules mounting and execution ownership remain required.
+
+### Original schedule source restoration (draft)
+
+[[src/main/cronjobs.ts#restoreOriginalCronSource]] sends locally bound original schedule files to the original Agent CLI on stdin. Restoration retains file shape and metadata, with byte-version CAS and durable private receipts.
+
+The Agent uses its original profile-scoped jobs lock in strict cross-process mode. Changed jobs take original fire fences before the jobs lock and defer immediately if another process owns a fence, including the pre-claim window. Lost acknowledgement retries do not overwrite newer native edits; pending writes recover on either side of the atomic rename. Active execution claims and pending occurrences defer restoration; foreign claims and unbound activation are refused. Windows UTF-8 BOM sources retain unknown metadata through capture and subsequent original saves.
+
+[[src/main/cron-source-restore.ts#parseOriginalCronRestoreResult]] checks the exact owner/profile/operation receipt and suppresses raw child errors. This main-process port is not exposed through raw-source IPC. The new Agent command must be included in the pinned Agent release before this port is usable; portable cloud field binding, continuous schedule reconciliation, original Schedules mounting and authoritative execution ownership remain required.
+
+### Original schedule preparation (draft)
+
+Original schedule creation uses the Agent's existing parser without writing a native job or granting execution authority.
+
+[[src/main/cronjobs.ts#prepareOriginalCronSource]] sends the captured owner, profile, operation, timezone and original input to `cron source-prepare` on stdin. The Agent shares its complete job builder with native creation, preserving recurring phrases, Cron expressions and relative or dated one-time schedules. [[src/main/cron-source-prepare.ts#parseOriginalCronPrepareResult]] admits only a response bound to that exact request and suppresses raw child diagnostics. This main-only port still requires a qualified Agent pin and a cloud adapter; it is not an installed synchronization result.
+
+Local qualification: 2,660 Desktop tests in 285 files passed using bundled Node 24 and an isolated provider environment; node/web types, full lint and lat check passed. An earlier Node 26 run failed 24 tests because of host Web Storage and provider-environment differences and is retained as a failed result. The shared parser adapter passed 206 tests; Agent Cron/atomic-source tests passed 1,460 with 13 platform skips. Actual Windows CI and execution ownership remain required before publication.
+
+### Original lifecycle preparation (draft)
+
+Pause and resume preparation use the original Agent policy while preserving authored data and overdue occurrences. The receipt is data only and grants no execution lease.
+
+[[src/main/cronjobs.ts#prepareOriginalCronTransition]] captures owner, profile, timezone, operation and original source before invoking the readonly command. [[src/main/cron-source-transition.ts#parseOriginalCronTransitionResult]] rejects stale identity, lost counters, altered unknown metadata and active claims. The shared source validator allows only the original ordered skill canonicalization. Workspace 0.6.17 supplies this codec to both consumers. Source preparation is not yet installed-runtime qualification or a complete synchronized scheduler.
+
+The vendored Workspace 0.6.17 archive SHA-256 is `0ab207a81b30afa505b6f8e7a17d1fba17e2e2b3a33611506d920eed187f16bc`. Its compiled exports include the original source, lifecycle adapter and complete-file codecs; the consumer imports those artifacts rather than copying UI or schedule semantics.
+
+The archive was generated in a task-specific directory from Fund source `0352e6577dd8d466245bb4faca1f0f5944a1e56c`, and all three original schedule JS/type exports were checked before installation. A generic temporary archive is not accepted as source provenance.
+
+## Exact original schedule source restoration (draft)
+
+The complete schedule capture now carries exact UTF-8 source text, and restoration can preserve those bytes through the original locked CLI path.
+
+[[src/main/cron-source-files.ts#captureOriginalCronFile]] retains BOM, CRLF, file formatting and opaque integer metadata in `sourceText`, alongside the parsed preview and byte digest. [[src/main/cron-source-restore.ts#validOriginalCronRestoreRequest]] admits exactly one bounded representation: the existing parsed file or exact source text. [[src/main/cron-source-restore.ts#parseOriginalCronRestoreResult]] verifies a text-mode receipt against the exact requested source SHA256. [[src/main/cronjobs.ts#restoreOriginalCronSource]] snapshots the request before awaiting the child. Raw source remains main-only; no upload, resource permission, execution ownership or renderer IPC is added.
+
+## Exact original schedule preparation source (draft)
+
+Original parser receipts can carry complete prepared JSON source text, checked against the bound parsed job. The text preserves opaque numeric tokens and stays in the main process.
+
+Older Agent receipts remain readable but do not supply the raw source required by the full-file create adapter. This does not mount the shared Schedules screen, upgrade the Agent pin, authorize private upload or establish execution ownership. Tests reject malformed or mismatched source with static errors.
+
+
+## Original schedule source resources
+
+The shared package 0.6.21-schedules.2 provides a main-only owner-scoped schedule resource transport through the fixed Mithril API.
+
+Its private R2 namespace is separate from Capability registration, and D1 stores verified complete-file pointers. Original Schedules components are unchanged.
+
+[[src/main/cloud-workspace.ts#CloudWorkspace]] retains Workspace read/write scope, owner and account-generation checks for these binary requests. No raw source IPC or automatic upload is introduced. Continuous source restoration still requires private resource binding, exact Native receipts and one execution authority; original screen separation removal remains pending.
+
+## Durable original schedule replica journal (draft)
+
+The main process retains portable pending schedule source and its operation identity before network writes, using a private owner/profile/timezone journal.
+
+[[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore]] commits journal writes independently of its separate SQLite process lock. Abrupt process exit releases the OS-held lock without losing pending work; another window fails busy immediately and can retry its existing coordinator. Paths, permissions and identities are checked before access. This store does not capture, upload or restore Native scheduler files and is not yet mounted in the service lifecycle.
+
+## Bound original schedule source port (draft)
+
+A main-only adapter connects verified resource bindings with exact Native capture and original locked restoration, keeping portable source digests distinct from Native file CAS.
+
+[[src/main/original-schedule-native-port.ts#BoundOriginalScheduleNativePort]] requires explicit capture/restore resource binders. Shared raw-token patches retain source bytes elsewhere; failed binding has no raw-source upload fallback. Scope guards surround asynchronous binding and original writes, and only the exact bound source hash can be acknowledged. Restore binding must retain an operation-bound target before the original Agent write, allowing retained Agent receipts to acknowledge earlier work without overwriting later edits. Concrete resource/authority binding and service mounting remain required.
+
+The pinned workspace 0.6.21-schedules.4 archive was produced from Fund source `ba02898461e46b121b09703702b7e4b73cf5d31a`. It is complete (411 files) and has SHA256 `7ddc3e468a5837167055baab0587e7258d9244752cd29e70f4811f38c321d8da`; compiled source codec and replica exports were compared byte-for-byte with the completed producer build before installation. The earlier 0.6.21-schedules.2 archive remains unchanged.
+
+### Durable original schedule binding targets (draft)
+
+The private replica journal retains an operation's exact bound Native source before restoration, so restarting never recomputes a different target for a retained Agent receipt.
+
+[[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#retain]] stores the exact portable request, Native target and SHA under the coordinator lock. Reused IDs with changed source, CAS or scope refuse; identical retries skip binding. [[src/main/original-schedule-native-port.ts#BoundOriginalScheduleNativePort]] requires this target store. Concrete resource resolution and lifecycle mounting remain incomplete.
+
+### New Chat without connection gating
+
+The shared sidebar opens an empty Chat without waiting for cloud identity or model discovery; the first submitted message creates the session through the existing canonical outbox.
+
+Normal workspace screens and the Desktop sidebar no longer expose Device data/history migration sections. [[src/renderer/src/screens/CloudWorkspace/RepositoryReplication.tsx#RepositoryReplication]] continues background owner-scoped synchronization. [[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx]] shows a readable sign-in action instead of raw scope errors. Authentication and permissions remain enforced; no tokens gain scopes automatically.
+
+The New Chat candidate pins workspace 0.6.23-schedules.2 from Fund b8f68349, SHA256 `8e17de27e7930368fbaed553c6143a0a3395e5c6f4c461fa5e35280d79f8b699`. The immutable archive contains 411 files and was packed only after the completed build; it remains a draft dependency pending production publication.
+
+## Original schedule directory resources (draft)
+
+Original scripts and workdir trees can be retained through owner-scoped schedule resources, preserving permitted file bytes and executable flags without running jobs.
+
+[[src/main/original-schedule-directory-resources.ts#OriginalScheduleDirectoryResources]] uses the fixed schedule resource namespace with an immutable profile-bound manifest. Capture publishes verified chunks before returning its pointer and disposes staging files. Known credential/cache filenames are excluded by the existing directory capture policy; the main-only result retains the exclusion count. This is permitted-file synchronization, not synchronization of secrets, arbitrary runtime interpreters, empty directories or symbolic links.
+
+[[src/main/skill-resource-snapshot.ts#downloadDirectoryResources]] reuses the existing bounded manifest/chunk verifier for schedule directories; the Skill-specific wrapper still validates its original pointer contract. Restoration downloads the retained baseline and target, then uses the original transactional directory CAS and durable operation receipts. Concurrent local changes produce a conflict, while an acknowledged retry leaves newer edits untouched. Private state is separated by owner/profile/timezone. Account guards surround asynchronous I/O and the native write. Windows restoration remains deferred by the existing filesystem adapter.
+
+This primitive is tested against real temporary files and an owner-scoped storage fixture. Concrete job-field bindings, execution authority admission, lifecycle mounting, real-cloud qualification and installer publication are still required before claiming automatic original schedule synchronization. No new migration panel or renderer IPC is added.
+
+## Original schedule script resources (draft)
+
+Original script and monitor-script tokens now map to one immutable profile-script resource snapshot without reducing the rest of the original schedule source.
+
+[[src/main/original-schedule-script-resources.ts#OriginalScheduleScriptResources]] resolves authored paths under the selected profile's scripts directory, captures actual permitted bytes, and emits canonical portable references containing only profile, manifest digest and relative path. Excluded/missing scripts cannot become valid references. Raw token patches preserve BOM, CRLF, unrelated fields and opaque numeric tokens.
+
+Restoration accepts only canonical references from the same scope and snapshot. The directory transaction verifies every referenced file before writing; its retained baseline, durable operation and existing receipts preserve concurrent local edits and retries. Original script fields return to the Agent's existing scripts-relative path convention. Workdir/private-runtime bindings, execution authority and lifecycle mounting still need to compose this stage before complete schedule synchronization can ship.
+
+## Original schedule workdir resources (draft)
+
+Original workdir fields now bind to verified directory snapshots while retaining machine paths privately and preserving original job source tokens.
+
+[[src/main/original-schedule-workdir-resources.ts#OriginalScheduleWorkdirResources]] captures authored absolute or home-relative working directories through the existing permitted-file resource transport. References bind profile, stable job ID and immutable manifest, without publishing the source device path. Restore resolves an operation-bound private target and baseline through its caller, then uses transactional directory CAS. Durable receipts preserve newer local edits on retry. Account guards surround storage and native restoration. Script semantics and unrelated raw source bytes remain unchanged.
+
+This stage adds no UI split or migration panel. It remains draft: private target lifecycle persistence, runtime/authority binding, complete coordinator mounting and actual cloud/installer qualification must compose these resources before automatic schedule synchronization is complete.
+
+## Original schedule resource composition (draft)
+
+Script and workdir resource stages now compose with mandatory runtime binding under the private replica journal lock, retaining directory targets before writes.
+
+[[src/main/original-schedule-resource-bindings.ts#OriginalScheduleFileResourceBindings]] implements the bound Native port's resource interface. Runtime binding remains mandatory and precedes resource restoration; it must not execute jobs. The main-only [[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#retainDirectoryTarget]] durably retains each operation's scripts or job-specific workdir destination and immutable comparison baseline before filesystem changes. Reused IDs with changed source, CAS or manifest refuse. Restart uses retained targets, never today's recaptured baseline. Machine paths remain private. Full execution-authority admission and lifecycle mounting remain required before production qualification.
+
+## Original schedule runtime claim binding (draft)
+
+Native process claims now become portable references and restore only from the receiving device's exact source, under mandatory execution admission.
+
+[[src/main/original-schedule-runtime-bindings.ts#OriginalScheduleRuntimeBindings]] implements the runtime stage required by the composed resource binder. The original Agent's run_claim, fire_claim and pending_slot fields are replaced by canonical profile/job/field references before upload. Restoration rejects raw or foreign references, requires exact-source execution admission, verifies the current native file CAS and reuses exact receiving-device claim tokens. New inventories receive null claims. Unrelated source bytes and opaque metadata remain unchanged. This adapter never executes jobs or grants ownership. The cloud execution authority implementation and automatic lifecycle mounting remain unfinished; callers cannot supply a permissive production fallback.
+
+## Original schedule shared workdir restoration (draft)
+
+Jobs sharing a working directory restore one snapshot once. All private targets are resolved before filesystem writes, and aliases must agree on the source snapshot and native baseline.
+
+Automatic capture now emits v2 workdir references with an opaque random folder identity retained in the owner/profile/timezone SQLite journal under the same process lock. The identity is independent of local path, job ID and content digest. A fresh device uses it for one managed destination across all referencing jobs; subsequent capture retains that identity. Identical independent folders remain separate. Alias-to-path binding refuses mismatched roots rather than merging local data. The decoder retains existing v1 per-job references; upgrading already divergent historical destinations still requires conflict qualification and is not implied by the fresh-device test.
+
+[[src/main/original-schedule-workdir-resources.ts#OriginalScheduleWorkdirResources]] groups normalized absolute targets in original source order. The first job's existing operation receipt owns the shared directory transaction, so restart reuses that receipt instead of recapturing newer local edits. Conflicting manifests or baselines fail before directory writes. This remains draft resource integration; global execution ownership and automatic lifecycle installation are still required.
+
 ## New Chat and automatic synchronization
 
 New Chat opens the shared empty conversation before authentication or model discovery. The first submitted message creates its canonical cloud session; ordinary navigation never exposes device migration screens.
@@ -594,4 +723,886 @@ The installer candidate pins immutable workspace `0.6.24-chat.4`, SHA256 `2e32c3
 
 Preview.34 preserves the shared editor compile action approved in preview.33, and the Web URL history fix. The producer passed 228 workspace tests; Web consumer results are tracked independently.
 
-Desktop preview.39 requires a live Mithril account identity before mounting the workspace or device setup. Stored-token presence alone never admits the app. Sign-out closes the workspace; focus, network recovery and serialized one-minute checks revalidate the session. Successful sign-in enters the app; Retry connection verifies retained credentials without a new browser login. Source qualification is separate from signed release and installed-client evidence.
+## Current-main original schedule integration candidate
+
+The complete-file schedule draft now includes current-main Desktop authentication and shared UI updates, using one new immutable Workspace artifact.
+
+Desktop main `6e345be0a557eda54f3ed53ad087f67ea903d1c8` is merged into this draft. Workspace `0.6.26-schedules.1` was built from Fund `80e5cf576bfc787ac893dde74ac980fdd61d04a8`; its archive SHA256 is `2d80acd6c7b6f041e26190b9c5cd97ed7f693015f431e6ea2fba42b56544daee`. All compiled producer bytes were compared with its 415 archive files before dependency installation. The package and lockfile pin this exact local vendor archive.
+
+Current-main Chat distinguishes authorization, account expiry and network retry. Its initial linked session is consumed once, retaining the shared New Chat fix. The original schedule source/resource/replica adapters stay in the same candidate. Dependency consumption does not mount the automatic schedule lifecycle or grant execution custody; those integrations, production qualification and a new installer release remain unfinished. Preview.36 is the inherited main manifest version, not evidence that this draft is installed or publicly released.
+
+Qualification passed 64 selected tests across 13 files covering original source/resources, retained replica state, Chat/reconnection and account controls. Main/renderer typechecks, affected renderer lint, packaging identity, the complete Electron build and lat check passed. All installed package files were compared byte-for-byte with the vendor archive, and the lockfile version/path were verified. These local checks do not prove cross-device production synchronization or installer behavior.
+
+## Original schedule main execution transport (draft)
+
+The main process now connects the original schedule execution protocol to its existing account transport, without exposing credential or executor selection to renderer IPC.
+
+[[src/main/cloud-workspace.ts#CloudWorkspace#originalScheduleCustody]] supports the fixed status/select/claim/transition route. [[src/main/original-schedule-custody.ts#validOriginalScheduleCustodyCommand]] checks exact fields, the original UTC microsecond instant and safe revisions before transmission. The selected profile must match; all existing workspace:write, chat:write and inference grants are required even for custody inspection. No token gains scopes automatically.
+
+The route's receipt has no repository schemaVersion. It uses [[src/main/original-schedule-custody.ts#validOriginalScheduleCustodyReceipt]] rather than the unrelated repository envelope validator. Main validates the confirmed account, profile, operation and exact action receipt, limits response bytes to 8192, refuses redirects, and checks identity again after reading the response stream. Lost acknowledgements never retry mutations. Replayed fresh/changed false remain inspection evidence, not effect permission.
+
+Real local HTTP qualification covers A/B/A credentials, original microsecond identity, foreign/extra/oversized receipts, redirect refusal, lost acknowledgements, missing grants and identity changes during streamed responses. Bypassing receipt validation made the foreign-owner regression fail; restoring it passes. This is the Native main transport needed by automatic execution admission. Durable per-source/occurrence binding, lifecycle mounting, unknown-result reconciliation, production API publication and installer qualification remain unfinished; adding this transport does not activate schedules.
+
+Qualification passed 40 tests across five main-process transport, runtime binding, bound source and retained journal files. Main/renderer typechecks, changed-file ESLint, the complete Electron build, whitespace validation and lat check passed. The signed/installed release and production backend are separate evidence gates; this candidate remains draft.
+
+## Original schedule Agent binding bridge (draft)
+
+The main process can persist a published original source's execution policy through the selected profile's owned Agent CLI, without a migration panel or raw-source IPC.
+
+[[src/main/cronjobs.ts#bindOriginalCronExecution]] uses the existing profile credential environment and local interpreter. [[src/main/original-schedule-agent-binding.ts#bindOriginalScheduleAgent]] sends an exact bounded anchor on stdin, fixes the named profile and command, bounds output and time, checks account guards before and after the child, and accepts only the exact persistence receipt. Child errors and credentials are not exposed. This does not admit any occurrence, publish the source, select an executor or silently grant scopes. Background lifecycle mounting, full source/resource reconciliation, production publication and installed behavior remain required.
+
+The same main-only bridge prepares the required execution-policy lane before authored source restoration through [[src/main/cronjobs.ts#prepareOriginalCronExecution]]. Absent files retain a null CAS; existing source bytes remain unchanged. The owned Agent verifies account status and original fire fences before durable preparation. Passive replicas may retain source policies, but only the selected executor's fresh per-occurrence claim admits effects. Lifecycle mounting remains required.
+
+Preparation now invokes the Agent checkout's owned `plugins/mithril-schedules/bootstrap.py` directly with the existing interpreter, profile and bounded stdin. This works without manually enabling the plugin CLI. The draft Agent verifies fixed-origin identity before PM-owned admission, preserves unrelated configuration, and refuses explicit disabling or external overrides. Binding still uses the enabled existing CLI. Successful PM publication, the reviewed Agent installer pin and installed-client qualification remain required; a local child-peer test proves the Native command contract only.
+
+## Automatic original schedule replication (draft)
+
+The main lifecycle now composes exact original source, resource binding, a private durable repository outbox and Agent policy preparation without a migration screen.
+
+[[src/main/original-schedule-replication-runtime.ts#startOriginalScheduleReplication]] starts after secure profile credentials are registered and stops at app shutdown. [[src/main/original-schedule-replication-loop.ts#OriginalScheduleReplicationLoop]] serializes polling, cancels stale account/profile work and resumes the current identity after an interrupted run. Required API grants and the durable first-account source binding remain enforced.
+
+[[src/main/original-schedule-replication.ts#OriginalScheduleReplication]] prepares the required original Agent policy lane before restoring authored inventories or selecting an absent authority. It never takes over an existing selected device. [[src/main/original-schedule-replication-admission.ts#originalScheduleReplicationAdmission]] requires fresh owner/profile custody at the retained revision and the exact local or owner-bound cloud source digest. Passive replicas may retain data; actual execution still requires a fresh per-occurrence claim. [[src/main/cloud-workspace.ts#CloudWorkspace#assertNativeContext]] guards account, token, profile and generation between asynchronous stages.
+
+The private SQLite journal also retains repository snapshots and pending source-manifest operations under the same cross-process lock. Restoration retains existing scripts/workdir CAS and receipts. This composition is a draft: whole-coordinator multi-device tests, shared directory alias identity, default owned-plugin setup, cloud timezone policy, original shared Schedules mounting, production migration/publication and installer qualification remain required. No real-cloud or installed-app completion is claimed by the local lifecycle tests.
+
+### Coordinator peer qualification
+
+The mounted coordinator now has real-file/SQLite roundtrip and lost-acknowledgement tests across two device roots, retaining authored inventories and concurrent script edits.
+
+The tests exercise the actual source/resource adapters, shared repository engine and durable journals against owner-scoped cloud and Native receipt peers. Preparation and binding are test ports, not a live Agent CLI, D1/R2 deployment or installed application. Full authority/Agent/cloud qualification, shared directory alias identity and the original Schedules consumer remain release requirements.
+
+## Original Schedules screen mirror (draft)
+
+Desktop now mounts the original shared Schedules component directly over its automatically synchronized original inventory, with no separate device dialog.
+
+Workspace `0.6.29-schedules.5` resets the original renderer's rows, dialogs and action state when its API or profile changes. Out-of-order refresh replies cannot replace the newest inventory, and a successful refresh clears a prior load error. The new immutable vendor archive includes the shared browser original-file context export; the preceding archive is retained unchanged. Source package tests and consumer build checks remain distinct from a signed installer or installed behavior.
+
+[[src/renderer/src/screens/CloudWorkspace/CloudSchedules.tsx]] retains the original cards, creation form and lifecycle controls, remounting on account changes. The existing narrow Cron IPC operations call [[src/main/original-schedule-replication-runtime.ts#runOriginalScheduleScreen]] through the same serialized lane as background replication. Profile/account identity is captured before queuing and checked before/after actions; switching users cannot apply an old queued action to a new account.
+
+Before edits or manual execution, the original inventory must be confirmed synchronized and its required Agent policy prepared/bound. [[src/main/original-schedule-replication.ts#OriginalScheduleReplication#assertSelectedExecution]] additionally requires fresh selected-device custody for manual execution; the Agent still admits each occurrence separately. An owner-bound mirror remains readable during a sync outage/conflict, without allowing writes or execution through that recovery path. Committed edits retain their success acknowledgement after network confirmation fails and are retried by the durable background pipeline.
+
+This is the Desktop mirror consumer, not proof of the Web full-manifest consumer, remote execution forwarding, Agent-pin/plugin setup, shared workdir aliases or production/installer qualification. Those gates remain open. The normal Desktop route now composes the same unified schedules adapter as Web over original Cron IPC and the fixed cloud schedule IPC transport. Existing cloud intervals retain their model, history and execution policy; original schedules retain their source parser and native custody. Account changes invalidate the connection before replacement rendering. No simple cloud list or device dialog is mounted.
+
+## Original workdir private runtime boundaries (draft)
+
+Working directories retain authored files while device-specific execution authority and synchronization journals remain private. The same exclusions govern capture, manifest acceptance and locked restoration.
+
+[[src/main/original-schedule-replication.ts#OriginalScheduleReplication#sync]] supplies exact private paths for the profile's original jobs source, execution policy/bindings, lock and SQLite ledger sidecars, plus the replication state root. The canonical jobs source synchronizes through its separate original full-file port. Workdir snapshots retain scripts, outputs and other authored data; they cannot copy raw device bindings through a duplicate runtime source.
+
+[[src/main/original-schedule-directory-resources.ts#OriginalScheduleDirectoryResources]] computes destination-relative exclusions, refuses roots inside private state, rejects incoming manifests covering reserved paths, and binds the exclusion set into restoration identity. [[src/main/resource-exclusions.ts#resourceExclusions]] validates the consumer-owned paths. Capture and locked file transactions apply the same paths; native restore receipt files remain excluded. Real Python filesystem tests preserve distinct device-private bytes while copying authored files and refuse a foreign authority manifest before changing either target file. This does not establish installed-client or production synchronization.
+
+## Empty original profile synchronization (draft)
+
+A fresh original profile is discoverable in Web before its first job exists. Background synchronization registers data context without creating jobs or altering original source bytes.
+
+Workspace `0.6.28-schedules.2` adds `ensureOriginalScheduleFileContext` to the original file port. The main coordinator registers the confirmed profile/timezone after loading its durable repository, using the existing owner-bound CAS/outbox. A source manifest remains distinct and supplies the source revision; conflicting timezone metadata refuses. No device path or execution claim appears in the profile row.
+
+The immutable archive replaces the draft consumer pin while retaining preceding archives. Actual coordinator tests cover an absent native source, repeated background polling and no source writes or binding calls. Shared and browser tests discover an empty profile, display the actual Desktop empty screen and create the first original job using test parser receipts. Production Agent parsing/execution, main publication, signed installers and installed-client qualification remain open.
+
+The candidate archive SHA256 is `1b4e6cb8f382f8785ea72b9b68987a212cb559efcbff1877d005064249652040`; all 415 packaged files match the shared source build and installed dependency. This is dependency provenance, not an installed application update.
+
+## Original parser mailbox processing (draft)
+
+The background original schedule lane processes one confirmed read-only parser request per poll using the existing original Agent CLI, retaining results in the same account-bound repository.
+
+[[src/main/original-schedule-replication.ts#OriginalScheduleReplication]] uses workspace 0.6.29-schedules.2's preparation mailbox inside the private journal's exclusive lane. [[src/main/original-schedule-replication-runtime.ts#runOriginalScheduleScreen]] shares that lane with original screen operations. The captured owner/profile/timezone is checked around the actual source-prepare/source-transition calls; only confirmed requests for that context are processed. The mailbox cannot select an executor, grant execution, or write jobs.json. Passive devices may prepare without executing. Read-only preparation precedes execution-policy admission and custody lookup, so an unavailable execution service cannot suppress an already confirmed parser result. Policy admission still precedes every authored restore and executor selection. Repository CAS retains the first result and the existing outbox recovers lost replies. Original raw numeric text remains retained in the owner-scoped receipt.
+
+Local transport/parser peers verify composition and port wiring. Isolated actual Agent CLI tests verify read-only original preparation and transition behavior; neither check establishes installed-client or production API operation. The Agent pin, browser screen/manual execution connection, API release and installed-client qualification remain separate unfinished gates.
+
+## Exact original manual execution port (draft)
+
+The main-process manual run port sends a retained operation ID and the exact native source version to the original Agent. A correlated unknown receipt is distinct from confirmed completion.
+
+[[src/main/cronjobs.ts#runOriginalCronSource]] uses [[src/main/cron-source-run.ts#callOriginalCronRun]] with the captured profile's native runtime and secure environment. Requests and result identifiers are bounded and exact; owner/profile/operation/job/version mismatches, extra authority and raw child errors cannot confirm a receipt. Source bodies, secrets and private errors never enter renderer IPC. The caller must verify selected execution custody before invocation and check the active account/profile before and after the child. The parser's short timeout is not applied to a running job; the original Agent's watchdog remains responsible for execution liveness.
+
+The Agent `source-run` command retains request identity in its existing private executions database before effects, checks the full source under its original fire/store locks, and invokes the original runner including its execution policy. This does not grant execution authority or reconcile an unknown outcome. Local qualification executes harmless actual scripts through this Native transport in isolated A→B→A homes and verifies retained replay and source mismatch rejection. Agent source is PR #12 commit `835405c8833d77746a974fcf49d2aa2bc04b0ad8`; the installed Agent pin is not updated. The remote broker, background pump, primary Web route, publication and installed-client qualification remain unfinished.
+
+
+## Original manual main consumer transport (draft)
+
+Main owns manual take/report credentials and validates exact account/profile receipts; renderer intent cannot choose a device or grant dispatch authority.
+
+[[src/main/cloud-workspace.ts#CloudWorkspace#originalScheduleManual]] uses the fixed API manual route, existing workspace-write/chat-write/inference grants, 15-second network bound and 8192-byte response limit. [[src/main/original-schedule-manual.ts#validOriginalManualCommand]] rejects caller owner/executor fields. [[src/main/original-schedule-manual.ts#validOriginalManualResult]] validates each result shape: only a fresh unknown take with positive custody revision permits dispatch. Empty, source-refused and replay receipts cannot authorize another run. Completion matches every original operation/source field. Account/profile changes during streamed responses discard the result. Lost take/report replies never retry automatically.
+
+Real HTTP peers cover A/B/A identities, malformed/foreign/oversized/redirected/lost receipts, missing grants and streaming identity changes. This is the main transport boundary, not the background consumer or a running Web-to-Agent path. Durable dispatch/result storage, pump lifecycle, reconciliation, API publication and installed-client qualification remain unfinished.
+
+
+## Original manual durable journal (draft)
+
+Manual execution records share the original private owner/profile/timezone replica journal and its cross-process lock, with uncertainty committed before any external effect.
+
+[[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#reserveManual]] binds the exact portable request, custody revision and native source version. [[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#beginManual]] commits unknown once; a replay or reopened unknown never authorizes another dispatch. [[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#recordManualResult]] retains only an exact native receipt and refuses contradictory terminal outcomes. [[src/main/original-schedule-replica-store.ts#NativeOriginalScheduleReplicaStore#acknowledgeManual]] requires the matching API completion receipt before clearing the report obligation. No native credentials or path bindings enter these records.
+
+The existing FULL-synchronous SQLite journal holds bounded, digest-checked entries. Tests reopen real storage after simulated external/report failures and exercise A-B-A isolation. The caller still must verify a fresh API take and selected custody/resources before reservation and dispatch. A journal entry is not an execution grant. The background consumer, unknown reconciliation and installed production flow remain unfinished.
+
+
+## Original manual consumer coordinator (draft)
+
+The manual consumer combines main-only take/report transport with the private dispatch journal, while keeping long Agent execution outside the replica lock.
+
+[[src/main/original-schedule-manual-consumer.ts#OriginalScheduleManualConsumer#poll]] recovers and reports retained outcomes first. Dispatch requires a fresh validated API take and matching synchronized native-source/custody binding. It commits the dispatch fence under the existing cross-process lock and invokes original source-run outside that lock. Failed reporting retries the result, never the effect. Account changes and stop invalidate later acknowledgements.
+
+The API can rediscover an unresolved request for the exact selected credential/custody revision when no fresh pending request is available. Such nonfresh receipts never reach the run port. The consumer validates the synchronized source binding, journals uncertainty and reads the exact original Agent result. Only completed/rejected receipts settle; absent/unknown remain uncertain. Changed source or unavailable original native binding refuses recovery rather than guessing. Reserved entries lacking a recoverable receipt still require further reconciliation.
+
+Tests use real private SQLite and synthetic transport/Agent peers to verify reopening, replay refusal, identity fences and nonblocking execution. The lifecycle and concrete synchronized resource/custody binding are now connected as described below. Production API, original route mount, installer and installed-client verification remain required.
+
+
+## Original manual lifecycle mounting (draft)
+
+A separate main-process lifecycle consumes original manual requests without occupying the source replication poller or the original screen's serialized action lane during execution.
+
+[[src/main/original-schedule-replication-runtime.ts#startOriginalScheduleReplication]] starts and stops both lifecycles under the existing account-change subscription. [[src/main/original-schedule-replication.ts#OriginalScheduleReplication#manualConsumer]] serializes source/resource synchronization and binding, then invokes the existing main source-run port outside that lane. [[src/main/original-schedule-replication.ts#OriginalScheduleReplication#manualBinding]] recaptures verified script/workdir/runtime references under their original private store lock and checks the exact native version, source digest and selected custody revision. The Agent's original source CAS and execution policy still admit the effect. Output/counter changes return through the existing durable replication path after completion or report failure.
+
+Runtime tests use synthetic Agent/transport peers. Concrete coordinator tests use real SQLite and files to verify binding and output replication. The updated Agent pin, reserved and missing-native-journal reconciliation, API schema publication, normal Web renderer, installer and installed-client execution remain unfinished; lifecycle wiring alone is not production proof.
+
+## Original manual retained-result recovery (draft)
+
+Uncertain native requests are inspected read-only before reporting, including requests already acknowledged as unknown. Only an exact retained terminal result can advance their status.
+
+[[src/main/cronjobs.ts#inspectOriginalCronSource]] invokes [[src/main/cron-source-run.ts#callOriginalCronInspect]] through the existing selected-profile runtime. The fixed `source-run-status` command has a 15-second bound and the same strict receipt identity and active-account checks. `absent` is accepted solely by [[src/main/cron-source-run.ts#parseOriginalCronInspectResult]], never by the execution parser.
+
+[[src/main/original-schedule-manual-consumer.ts#OriginalScheduleManualConsumer#recover]] inspects the saved original native version outside the replica lock. Completed or rejected results update the existing durable journal and clear its report acknowledgement, then report through the existing API port. Missing markers, unknown results and inspection failures do not authorize dispatch. Account changes and stop discard stale receipts. Terminal entries skip further inspection.
+
+Actual Agent A/B/A tests verify read-only completed inspection after original source changes; consumer tests reopen real SQLite with synthetic Agent receipts. These checks do not establish a production Web-to-installed-Agent path, and lost take acknowledgements without a native journal still need separate reconciliation.
+
+
+## Current-main shared schedules package
+
+Desktop now pins workspace `0.6.29-schedules.8`, packed from Fund `51d1b162`, including current-main shared UI changes, the unified schedule adapter and individual browser settings pane support. Earlier archives remain immutable.
+
+The installer candidate is preview.37 because preview.36 already has published assets.
+
+Source, archive and installed files plus the lock integrity are checked together before consumer build verification. This package update does not change the Agent bootstrap pin, publish the original execution schema, or prove an installed-client release.
+
+
+## Live shared schedule inventory
+
+The original shared schedule renderer follows synchronized rows without reopening the screen.
+
+Workspace `0.6.29-schedules.5` refreshes idle rows every five seconds through the existing account-scoped API. Background reads are serial and stop when unmounted; dialogs and pending actions suspend new background reads. The screen retains the existing controls and generation checks. The producer passed 28 focused shared tests and 24 browser adapter tests. Consumer build and tests, CI, installers and live cross-device behavior are separate gates.
+
+
+## Memory drafts during cloud synchronization
+
+The original shared Memory editor keeps new input while a save or remote refresh is pending.
+
+Workspace `0.6.29-schedules.6` isolates Memory editors when the adapter/profile changes. Profile saves block duplicate submission, retain later typing and keep the acknowledged expected text. An older read cannot replace an acknowledged edit. Transport failures preserve drafts and do not report Saved. Producer renderer/file/note regressions passed 13 tests and browser screen tests passed four; App CI requires these regressions. Native credentials remain outside synchronized records. Production and installed-client checks remain separate.
+
+Consumer validation compared all 426 archive files with producer and installed bytes and checked the lock SHA512. Native build, 19 tests across Memory locking/reconciliation and shared cloud routes, and lat validation passed. The installer candidate remains preview.37; it has not been published or installed by this change.
+
+## Original settings pane consumer parity
+
+The Desktop consumer retains its original settings provider while using the same shared pane renderer as Web.
+
+Workspace `.7` permits individual consumer panes to fall back when undefined. Web Community now mounts the original component and original branding with browser link handling. Desktop keeps its complete native pane provider; the shared X icon is decorative so its button has one accessible name. Native runtime credentials and update actions do not move into browser authority.
+
+The new immutable archive SHA256 is `9093df699c3dfa6e89b5f82520eb4d9661cebbabe297f23dc11efc45726058c9`. All 426 files match producer and installed dependency bytes, and lock SHA512 matches the archive. Browser route/component regressions passed 13 tests. Native build and 72 regressions across original Settings/Data/Connection and Cloud Workspace passed; lat validation passed. CI, publication and installed application behavior remain separate evidence gates. Browser Connection/Data/About/Logs adapters remain incomplete.
+
+## Background connection retry lifecycle
+
+The existing reconciler automatically recovers temporary startup connection failures without introducing a migration screen or requesting another sign-in.
+
+[[src/renderer/src/screens/CloudWorkspace/RepositoryReplication.tsx#RepositoryReplication]] serializes status/enable reads and retries transient failures with a five-second delay growing to thirty seconds. Online events can retry immediately, but never overlap an outstanding request. Missing scopes or expired/refused authentication do not automatically prompt or grant authority. Identity generations are checked before enable and before applying owner state; cleanup removes timers and listeners. History and repository reconciliation begin only after the same owner is confirmed.
+
+This fixes the one-shot startup recovery gap; it does not qualify complete cloud data synchronization, release or installed-client behavior.
+
+## Canonical Settings entry points
+
+Main-workspace settings entry points use the same account repository and original modal, with route-owned visibility and section selection.
+
+[[src/renderer/src/components/settings/SettingsModalProvider.tsx#SettingsModalProvider]] delegates accepted commands to the handler registered by [[src/renderer/src/screens/Layout/Layout.tsx#Layout]]. Sidebar, shortcut and ordinary settings commands reset the requested section and open the canonical Cloud Workspace route. [[src/renderer/src/screens/CloudWorkspace/CloudWorkspace.tsx#CloudWorkspace]] forwards the original section argument and returns to Chat on close. Workspace `.8` closes its portaled modal when the retained screen is inactive.
+
+Bootstrap setup and an explicit different native profile still use the original provider; multi-profile canonical targeting remains required. This is not full preference migration or installed-client proof.
+
+The `.8` archive was verified against all 426 producer and installed files with lock SHA512; SHA256 `f09d12e8b5fcbb10b4de133a63c855f271406197b29be6f16b421c17a5427784`. Original Settings provider/modal/workspace tests passed 10 cases; shared browser Settings/Chat tests passed nine. Publication and installed-client qualification remain separate.
+
+## Background presentation synchronization
+
+Desktop applies confirmed account preferences independently of the selected screen using the canonical shared preferences observer.
+
+The background reconciler observes the same rich `preferences/presentation` record as Settings and forwards validated values through the original Desktop theme, font, language, spellcheck and sound providers. Owner/profile epochs suppress old replies; pending values are not applied as confirmed. Startup does not seed defaults or grant authority. This candidate still requires production publication and installed-client verification.
+
+## Explicit profile Settings routing
+
+Every Settings command in the mounted Desktop workspace uses the same original shared modal, including commands targeting another profile.
+
+[[src/renderer/src/screens/CloudWorkspace/useWorkspaceSettingsRoute.ts#useWorkspaceSettingsRoute]] preserves the explicit profile, section and request generation. Layout passes that profile to the original native Settings provider, while general preferences stay account-scoped. Opening settings never switches the current Chat agent or starts another conversation. Bootstrap setup remains available before Layout mounts.
+
+## Original profile metadata file preservation (draft)
+
+Original profile edits use the shared token-preserving metadata patcher and an atomic main-process file replacement before profile resource replication can be enabled.
+
+[[src/main/profile-meta-files.ts#readProfileMetadataFile]] captures exact bounded UTF-8 object bytes without following linked storage. [[src/main/profile-meta-files.ts#patchProfileMetadataFile]] synchronously reads, patches only the authored name/color/avatar token, checks the source again and fsyncs a private temporary file before rename. Unknown extension fields, opaque integer precision, whitespace and BOM survive. All original `profile-meta.ts` appearance handlers use this lane; malformed or ambiguous source is retained instead of being replaced with empty projected metadata. This prepares the original edit surface for bidirectional sync but does not itself enable profile replication or prove installed-client publication.
+
+## Original profile metadata compare and swap (draft)
+
+Downloaded profile metadata can replace or remove a native file only when its exact captured bytes still match; concurrent appearance edits remain intact.
+
+[[src/main/profile-meta-files.ts#replaceProfileMetadataFile]] snapshots caller buffers, validates the target, compares absence separately from an empty object, and checks again immediately before atomic replacement or deletion. Parent-directory fsync follows both mutations. Original appearance handlers share this lane. This is a file primitive for pending replica integration, not proof of automatic synchronization or publication.
+
+## Durable profile metadata restoration (draft)
+
+A private owner/profile/root SQLite journal commits exact pending bytes before replacement, retains completed receipts, and recovers interruptions without overwriting newer local edits.
+
+[[src/main/profile-metadata-replica.ts#ProfileMetadataReplica]] uses FULL synchronous transactions and separate committed intent and completion phases. Restoration is synchronous; its caller must revalidate workspace authorization before calling apply or recover. Exact target bytes are bound to the profile pointer digest and size. Replayed results are read before recapturing a newer source. This pending native replica integration does not yet activate automatic metadata synchronization or publish an installer.
+
+## Native profile test environment
+
+Original profile integration tests run in Node against a canonical temporary directory so native Buffer validation and no-symlink storage checks match Electron main-process execution.
+
+The prior jsdom suite treated native Node buffers as foreign Uint8Arrays, and macOS temporary paths passed through a system symlink. tests/profiles.test.ts now exercises its original 23 cases using the actual Node environment without weakening production metadata validation.
+
+## Original profile metadata replica port (draft)
+
+The existing rich replica now captures and restores the selected original profile metadata file through owner-bound resources, exact version checks and the durable native journal.
+
+[[src/main/profile-metadata-port.ts#ProfileMetadataPort]] guards authorization before recovery and after each resource await. Concurrent original edits return a conflict. Completed receipts are replayed before recapture; physical deletion remains a stable tombstone. [[src/main/repository-kanban-runtime.ts#nativeReplicaSnapshot]] restricts profile completeness to the selected metadata ID and retains recovery records on unavailable source. [[src/main/repository-kanban-runtime.ts#nativeReplicaApply]] routes metadata restoration before Kanban fallback. All-profile inventory and Web original profile UI remain pending; this candidate is not production qualification.
+
+## All-profile metadata source inventory (draft)
+
+Original metadata replication inventories every valid native profile directory and retained current-owner source binding without changing the active profile or reading credentials.
+
+[[src/main/profile-metadata-inventory.ts#profileMetadataInventory]] includes fresh empty directories and absent owned identities for deletion reconciliation. Different-owner sources are refused by the original source binding before bytes are captured. Symlinks, invalid names and forged binding identities are not adopted. The existing rich replica now claims each successfully captured metadata ID independently. Missing native profile directories defer nondeleted metadata download, including directory deletion during a resource await. This extends original metadata to all existing profiles; all-profile remaining file categories and creation of new cloud-only native profiles are not yet qualified.
+
+All-profile metadata inventory reauthenticates workspace:write once at the operation boundary. Each resource I/O stage then uses the original captured-context main-process guard and source-owner binding; enumerating profiles does not add a /v1/me request for each identity guard. Resource transports retain their own authorization checks.
+
+## Canonical original profile identity pane (draft)
+
+The original Desktop profile identity pane, avatar, palette, image resizer and CSS now have one shared workspace implementation for native and browser adapters.
+
+[[src/renderer/src/components/profile/ProfileModal.tsx#ProfileModal]] renders workspace DesktopProfileIdentity using original IPC, translation, chips and refresh callbacks. [[src/renderer/src/components/common/ProfileAvatar.tsx#ProfileAvatar]] supplies only the original logo to the shared avatar. Original Escape/blur cancellation and failed-save draft retention remain tested. Other modal panes remain original native components until their adapters are qualified. Browser metadata writes, live Web rendering and installer publication remain pending.
+
+## All-profile Memory source inventory (draft)
+
+Memory replication now captures all existing owner-bound profile working copies without switching the active profile.
+
+[[src/main/profile-memory-inventory.ts#profileMemoryInventory]] reads the original three Memory files and configured limits through the existing reader. Only successfully captured profile IDs are claimed; absent, linked or invalid sources cannot erase other cloud records. [[src/main/repository-kanban-runtime.ts#nativeReplicaApply]] selects the exact owned profile from the validated Memory body and stable ID before invoking the original lock/CAS/receipt transaction. Capability configuration, Skills and schedules still require their all-profile paths; this is not published or installed-client qualification.
+
+## All-profile Capability configuration capture (draft)
+
+Capability configuration records now come from every present owner-bound original profile without switching the active selection.
+
+[[src/main/repository-kanban-runtime.ts#nativeReplicaSnapshot]] reuses the validated profile inventory and original descriptor readers for each public configuration anchor. Exact configuration bytes and the original directory identity are checked across async descriptor reads; unavailable sources cannot claim deletion authority. [[src/main/repository-kanban-runtime.ts#nativeReplicaApply]] routes a validated Capability body and stable ID to the matching owned original profile before the existing lock/CAS transaction. Skill resources and schedule sources still need all-profile transport paths. Source tests and builds are separate from publication and installed-client verification.
+
+## All-profile Skill resource replication (draft)
+
+Original Skill directories now contribute separate cloud resource pointers for every present owner-bound profile.
+
+[[src/main/repository-kanban-runtime.ts#nativeReplicaSnapshot]] captures and uploads each source without switching profile selection. Directory identity, current account and owner binding are fenced across I/O; a fresh capture must match the uploaded snapshot before the pointer is returned. Pending native transactions retain per-profile recovery records. [[src/main/repository-kanban-runtime.ts#nativeReplicaApply]] routes validated pointers to the matching owned profile, keeping the original download verification, source CAS and receipt recovery. Absent or replaced profile directories cannot be recreated by this path. This remains an unpublished candidate; all-profile schedules, original UI completion and installed cross-device checks are still pending.
+
+## All-profile original schedule lifecycle (draft)
+
+The background lifecycle replicates every present original profile owned by the captured account without changing the selected profile or adding execution consumers.
+
+The existing metadata inventory supplies profile roots and account bindings. Each engine retains the original profile/timezone journal, parser, source CAS, resources and custody admission. Directory identity, ancestor symlinks and source ownership are checked across asynchronous stages. A failed profile leaves the pass deferred while later profiles can synchronize; account changes abort the captured pass. Missing directories are never recreated. Custody transport accepts a main-only captured active account context for these owned sources while retaining exact receipt validation, existing execution grants and no mutation retries. The default caller still requires the selected profile. The independent all-profile manual lifecycle now consumes each owned mailbox; production API/Agent publication and installed cross-device qualification remain unfinished.
+
+## Shared original profile editor package consumption (draft)
+
+Desktop now pins workspace `0.6.29-schedules.13`, including the same original identity component and revision-bound metadata editor available to Web.
+
+The immutable archive has 441 files and SHA256 `c1b50fe55cfdadc07278a97c80b50f59da5cc0868fe1c9d4ae7a0527211f38c4`. All producer/archive/installed files were compared byte-for-byte, and explicit compiled export targets were verified. The existing original ProfileModal continues to import its identity pane directly; native edits use the existing original metadata replication, rather than a second profile storage. The remaining original modal panes and full cloud-only creation remain unfinished. Package consumption does not prove main CI, a public installer or installed cross-device behavior.
+
+## All-profile original manual lifecycle (draft)
+
+Each present owned original profile has an independent manual mailbox poller; long work in one profile does not block another profile or the original screen.
+
+The same account-bound inventory discovers and removes profile pollers without switching active selection. Short engine creation, source synchronization and binding remain serialized; long Agent work remains outside that lane. Account changes and lifecycle stop invalidate every child consumer. Missing or unowned sources are removed, never recreated. Requests and results use the target engine's exact profile scope and original durable execution journal. Main-only transport accepts a captured active account context, preserves all execution grants and validates exact target-profile receipts; unknown outcomes are never retried as new work. Local runtime and real HTTP tests do not prove production or installed all-profile execution.
+
+## Original profile navigation shared consumption (draft)
+
+The original ProfileModal sidebar and section selection now render through DesktopProfileNavigation, shared directly with the Web profile surface.
+
+Workspace `0.6.29-schedules.14` keeps Native's original section labels, icons, title primitive and selection handlers behind its consumer adapter. Web uses the same navigation and original Persona editor with owner-bound memory-file storage. The archive has 441 files, SHA256 `1645ef8388616098fa52585771ce92f6726e869fbd5b81457036a005edc141f9`. Remaining Web profile panes, publication and installed cross-device qualification are unfinished.
+
+## Original Agent Memory shared consumption (draft)
+
+Native ProfileModal and Web profiles now render DesktopProfileMemory from one component, using their existing storage adapters.
+
+Workspace `0.6.29-schedules.15` removes the duplicate Native loader and connects Web Agent Memory to owner-bound original MEMORY resources. Failed loads require explicit retry instead of repeating forever, and late responses from replaced profiles are ignored. Entry saves retain the original MEMORY/USER baseline. Native preload Memory types now describe the actual main-process result. Publication and installed cross-device behavior remain unverified.
+
+## Background profile identity refresh (draft)
+
+The shared original identity editor retains active name drafts while Web observes remote metadata revisions automatically.
+
+Workspace `0.6.29-schedules.16` refreshes clean Web identity panes from the existing owner-bound metadata/resource adapter. During name editing, its original snapshot remains the save baseline; a remote change produces a conflict instead of replacing the draft or silently overwriting it. Native uses the same identity component. Its archive contains 443 files with SHA256 `824e9da90e59336d08c4c6f2a185077a2b7fa619433310348ea88f4644e9d1f7`. Source tests and local builds do not prove public or installed cross-device operation.
+
+## Background original Agent Memory pane (draft)
+
+Native and Web share periodic profile Memory refresh, with frozen entry drafts and observed save baselines retained across remote changes.
+
+Workspace `0.6.29-schedules.17` updates an already loaded pane every 20 seconds without overlapping reads or retrying an initial failed load automatically. Scope invalidation refuses late results. Removing the last remote entry cannot hide an active original entry editor or delete confirmation; adapter-provided portable-note baselines are preserved. The immutable archive contains 443 files, SHA256 `88aec801017fbc9508ebf8497b544a9c8f0c2997891ffbe089c873d97e2d3acd`. Timer/adapter regression tests and local builds remain distinct from publication and installed cross-device proof.
+
+## Original profile Sync shared presentation (draft)
+
+Native ProfileSyncPane now imports the original shared Sync body and styles, while its agent-sync effects remain behind the Native adapter.
+
+Workspace `0.6.29-schedules.18` adds DesktopProfileSync and removes duplicate Native JSX/CSS. Web uses the same component with observed owner-bound repository status for original profile metadata only. Verified rows require a successful pass; pending/conflicting edits and failed transports remain visible and retryable. This extraction does not change agent execution authority or claim whole-profile synchronization. Archive: 445 files, SHA256 `d1af6fbf61de7815ba8764d7bfcd92f1f52a0f70d5e3350375a1570edba6bb17`. Publication and installed cross-device proof remain incomplete.
+
+## Canonical Desktop profile Sync adapter (draft)
+
+The original Sync pane now uses the same account-bound repository lifecycle as Web, replacing retired handlers that always reported signed out.
+
+Workspace `0.6.29-schedules.19` exposes RepositoryProfileSync with owner-fenced background refresh, real repository metadata verification and explicit retry. Native obtains the current cloudWorkspace identity, enables only existing authorized workspace access, and invalidates late authentication on account/profile changes. Transient failures do not display the sign-in hint. Native tests exercise the actual shared repository component and verify that no retired agent-sync bridge is called. Full synchronization, public API/Web and installed behavior remain unfinished.
+
+The canonical Sync candidate archive has 447 files with SHA256 `c66061dd0712f5f3d00010dce62c6577fdfedf346103a44e1e81497febfa2d5c`; producer, package and installed bytes are compared independently.
+
+## Original Agents canonical connection (draft)
+
+The original Agents list and profile Sync pane share one canonical workspace identity hook, retaining native profile operations while removing the separate workspace button.
+
+The hook fences old account/profile responses and enables only already authorized workspace access. The list no longer invokes retired agent-sync handlers that always report signed out. Authenticated working copies refresh every 20 seconds without overlapping background reads; transport failures preserve the list and expose retry. This does not yet materialize cloud-only profiles or prove full Web list parity, production publication or installed synchronization.
+
+## Cloud-only profile working copies (draft)
+
+New remote original metadata can materialize a named Desktop profile automatically, while retained missing original sources remain deleted.
+
+The replica transport verifies owner-scoped resource bytes before creation. A durable creation intent distinguishes first materialization from retained deletion, and canonical authority is rechecked before directory mutations. No credentials, runtime configuration or active selection are cloned. Existing original metadata CAS and receipts perform the actual content restoration. Public and installed cross-device qualification remain unfinished.
+
+## Original Agents table shared consumption (draft)
+
+Native and Web now import DesktopAgentsTable and the original table styles from workspace 0.6.29-schedules.20 instead of maintaining separate profile lists.
+
+Native retains its original creation modal, profile selection, gateway polling, edit modal and Chat operations. Web uses owner-bound metadata resources and the same edit action without inventing runtime state or exposing unavailable execution. Original column layout scrolls on narrow browser viewports. Shared row tests cover keyboard event isolation and unknown state; Native creation/retry tests exercise the compiled package. Full management parity, release and installed proof remain incomplete.
+
+The immutable shared archive contains 449 files with SHA256 `d6db9999d3308c2f722d2ec9e105ec5ec0dd8eb8cce7cc5b90459f31adf14fd2`; producer, archive, Native vendor and installed package bytes were independently compared.
+
+## Original profile creation shared consumption (draft)
+
+Native and Web use the original shared profile creation modal and its styles from workspace 0.6.29-schedules.21.
+
+Native cloning remains behind its original adapter. Browser creation uploads public original metadata under the authenticated owner, requires a revision-zero receipt and selects only accepted profiles. Existing/tombstoned IDs cannot be reused; conflicts and offline operations stay durable without replacement requests. Account changes fence completion. Credentials and execution grants are not cloned. Real shared-form tests cover cloud creation and Native's existing ambiguous-create recovery; publication and installed cross-device proof remain unfinished.
+
+The immutable creation archive contains 451 files with SHA256 `2e39b59ec70e8bc2723bbbe9f2eabee45b469bdf8b3bce169433bc334c4e63f0`; producer, archive, Native vendor and installed package bytes were compared independently.
+
+
+## Installation account identity (draft)
+
+Cloud workspace and chat use one encrypted installation account credential across profile selection; original native provider settings remain profile-scoped.
+
+[[src/main/mithril-token-store.ts#readCloudAccountToken]] promotes only the selected legacy credential when the account record is absent. It never enumerates profiles. Sign-out persists a marker that blocks legacy fallback after restart; unreadable ciphertext also cannot select another account. API owner and existing scope validation, profile context fences and source custody remain mandatory. Explicit sign-in updates account and selected native provider records with ciphertext rollback on failure. Credential mutations serialize across profiles. Tests exercise both real CloudWorkspace instances, profile switches, stale contexts, sign-out and failed storage. Production, installer and installed upgrade qualification remain pending.
+
+Local validation: all 308 test files passed (2815 tests, one existing skip), full Desktop typecheck/build and changed-file lint passed. On this Node 26 host, tests ran with `NODE_OPTIONS=--no-experimental-webstorage` and ambient `OPENROUTER_API_KEY` unset to preserve browser/test isolation; CI remains pinned to Node 22.
+
+
+## Original profile dialog shared shell (draft)
+
+DesktopProfileModal from workspace 0.6.29-schedules.22 now owns the original Desktop dialog frame across Native and Web profile editing.
+
+Both consumers use the same modal, title, navigation, close control and Done footer. Native retains original pane adapters, icons and loader. Web opens the profile editor from the shared list and preserves owner-bound edits, Memory, Persona, Sync and conflict recovery inside the dialog. Shared tests cover actual modal open/close/reopen; the compiled Native package retains original name-edit, deletion and memory tests. Wallet, Advanced, full runtime parity, publication and installed qualification remain unfinished.
+
+The immutable archive contains 451 files with SHA256 `6b209c54bed7c554db095b97001e178f4281cb5bfdc178416df098cb37d49b58`. Producer, archive, Native vendor and installed bytes match; shared 17 tests and Native 13 tests, Web typecheck, Native full build/typecheck and changed-file lint pass.
+
+
+## Original profile dialog recovery (draft)
+
+The original Native profile adapter recovers failed or missing reads inside the shared dialog and bounds each initial read to twelve seconds.
+
+Read responses are fenced to the open profile and request generation. Changing or closing the dialog retires prior responses; loaded data from another profile is never rendered. Failed refresh keeps the current profile with retry, and a missing profile exposes close/retry instead of an infinite loader. A late deletion retains its authorized backend outcome but cannot close another selected profile or invoke stale view callbacks. Native read recovery does not yet qualify public cross-device synchronization or installed upgrade behavior.
+
+Local validation passes all 18 original ProfileModal, ProfileSyncPane and Agents tests, Desktop build/types, changed-file lint and lat links. Release and installed operation remain separate gates.
+
+
+## Original Advanced profile pane shared consumption (draft)
+
+The original Advanced deletion pane now renders through DesktopProfileAdvanced from workspace 0.6.29-schedules.28, preserving the Native profile-scoped operation.
+
+[[src/renderer/src/components/profile/ProfileModal.tsx#ProfileModal]] supplies the existing confirmation state, pending state, error, original icon and deletion handler. Default-profile protection and original confirmation markup are shared; Native retains account/profile effects and fences late responses. Existing adapter tests exercise failure/retry and dialog replacement against the actual compiled shared package. Browser all-data deletion remains unfinished because a metadata-only tombstone cannot represent removal of history, files, schedules and runtime state. Publication and installed upgrade/cross-device proof remain separate gates.
+
+The immutable archive contains 461 matching producer/archive/vendor/installed files with SHA256 `d8a8e9a90107aae96df2cbf991f2d8f99cb98b1b23b8195927654d20c44c8fc4`.
+
+
+## Ordinary Chat uses automatic history synchronization (draft)
+
+The ordinary MithrilChat consumer no longer supplies the manual Native history import adapter to the shared chat settings menu.
+
+[[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx#MithrilChat]] retains the same original source rows and canonical conversations in one shared sidebar. [[src/renderer/src/screens/CloudWorkspace/RepositoryReplication.tsx#RepositoryReplication]] continues existing background archival and conflict handling. The manual import service is retained for existing explicit operators, but it is not a second user migration flow. Tests open the real shared Chat settings and verify no local-history migration controls are rendered or invoked, alongside source selection and automatic synchronization tests. Installed upgrade and cross-device qualification remain pending.
+
+
+## All-profile automatic original history archival (draft)
+
+A main-process lifecycle now archives every present original profile owned by the captured account, independently of the selected screen and profile.
+
+[[src/main/native-history-all-profiles-runtime.ts#startAllProfileHistoryReplication]] reuses the owner-bound source inventory and [[src/main/native-history-runtime.ts#createNativeHistoryRuntime]] with a fixed-profile canonical CloudChat transport. It never changes profile selection, starts inference or provisions a runtime. Account/generation, source ownership, root identity and symlink guards fence asynchronous capture and restoration; source failures retain their journals and retry. Background runs restore associated original sessions only, rather than reconstructing all account-wide remote conversations into every profile.
+
+[[src/main/native-history-runtime.ts#serializeNativeHistory]] serializes foreground archival and metadata conflict recovery with background passes so the original durable journals cannot be overwritten by concurrent consumers. Startup installs the lifecycle and before-quit retires it. Existing conflict controls now review all owned profiles through [[cloud-workspace#All-profile history review without profile selection]]. Production publication and installed upgrade/cross-device evidence remain unfinished.
+
+Local verification: seven lifecycle/serialization tests use actual scoped CloudWorkspace clients and original capture ports with a controlled sync engine, alongside fifty existing history-engine/cache/deletion/sidebar tests (57 passing). This proves source wiring and local boundaries, not authenticated production synchronization or installer upgrade behavior.
+
+## All-profile history review without profile selection
+
+The ordinary synchronization review includes conflicts from every owned original profile and resolves each against its own source without changing profile selection.
+
+[[src/main/native-history-all-profiles-runtime.ts#synchronizeAllProfileHistories]] aggregates guarded canonical reports, labels metadata conflicts with their profile and restores unmapped remote conversations only for the selected profile. [[src/main/native-history-all-profiles-runtime.ts#resolveOwnedProfileHistory]] validates the authenticated owner and bound inventory before passing the reviewed choice to the original metadata engine. Both share the durable journal lane with background archival; account changes retire their results. The existing engine retains revision/value validation and receipt replay. A failed profile is reported as deferred rather than silently counted as complete. IPC exposes these operations to the existing review UI, not a separate migration screen.
+
+Remote/SSH connections retain the existing authenticated history adapter. An absent original home still allows selected-profile cloud cache reconstruction; a directory appearing during that captured pass retires it. Local validation covers 63 tests across lifecycle/source wiring, actual review interaction, original history engine, cache and deletion suites. Authenticated production cross-device behavior remains unverified.
+
+## All-profile archival protocol integration evidence
+
+Local protocol integration now exercises the real original history engine, canonical CloudChat HTTP adapter and durable on-disk journals together across owned source fixtures.
+
+The test simulates an accepted history write whose acknowledgement is lost. It checks that exactly one pending operation survives on disk, the next newly constructed profile engine queries the original receipt and clears that pending state, and another pass creates no duplicate sessions, events or execution. Original source database/cache ports remain controlled fixtures; this is not live D1/R2, installed upgrade or cross-device qualification. See [[cloud-workspace-tests#All-profile real archival engine replay]].
+
+## Browser About shared application information
+
+Workspace schedules.30 shares About information with Web while retaining native update and diagnostics ports.
+
+Web uses the original shared card/meta layout, reports the loaded document build identity and canonical API host, and opens the existing Desktop download page explicitly. Build identity is injected with the same Vite manifest identity; no latest-version or native update readiness is inferred. Missing metadata remains unknown. Native consumes the new immutable archive; no release or installed application update is claimed.
+
+The consumer continues to use [[src/renderer/src/components/settings/AboutPane.tsx#AboutPane]] and its original SettingsDataContext. This change does not authorize native diagnostics or updates in browsers. Connection/Data browser adapters and authenticated upgrade/cross-device QA remain required.
+
+Consumer verification: all 461 archive files match producer and installed bytes; explicit exports and lock integrity are checked. SHA256 `6cddfb8e1f54dd6b42a7a03f79f0c687167c0a731bae9a870439af1fe851a53e`. Native TypeScript checks, build and 64 Settings/route regressions passed. Source/CI, publication and installed-client behavior remain separate.
+
+## Automatic saved metadata reconnect
+
+The shared Workspace renderer automatically resumes saved metadata edits with their original receipt IDs after checked-owner connection, retaining conflicts for explicit review.
+
+The data-only synchronization lifecycle survives a cached inactive workspace, while account change/unmount retires it. Unsaved drafts, inference and tool actions remain outside the outbox. Background synchronization errors clear after recovery without clearing unrelated form errors; a pending/conflicted/offline state no longer reports Cloud synced. Original owned D1 receipts keep accepted replay idempotent. Shared tests include an actual WorkspaceApp/IndexedDB reconnect and inactive-screen recovery. Canonical API/local D1 qualification drops an accepted HTTP response and verifies one retained history row/revision after restart/replay, with another account isolated. Workspace Vitest source suites and Node packaging tests now run in their respective runners. This is not full cloud/installer qualification.
+
+Saved metadata carries the renderer's checked owner through trusted preload IPC to [[src/main/cloud-workspace.ts#CloudWorkspace#applyOperations]]. The current installation owner must match before POST. The fixed owner header lets the canonical API reject a cookie-owner change before D1 admission. Missing caller/header values remain compatible with older consumers; API-first rollout is required. The new Native regression verifies refusal without POST and the exact owner header.
+
+Consumer verification: workspace schedules.32 has 461 files and all explicit exports. Producer/archive/installed bytes and lock SHA512 match; archive SHA256 `e8de76d5ff7463796d39b9fb1905afcb0b5a98a322e5ffa4bbb9b4ebb1d8449f`. Native 32 targeted cloud transport/Settings regressions, types, build and lint pass. Shared 360, API/local D1 13 and Web 17 targeted tests pass separately. No production or installed-client qualification is claimed.
+
+
+## Shared initial connection recovery
+
+The original WorkspaceApp recovers transient startup transport failures without showing a separate device migration flow.
+
+Workspace `.33` serializes initial reads with five-to-thirty-second backoff and online recovery. Native background reconciliation uses the same transient failure classifier; authentication, owner, schema, persistence and unknown failures stop retries. Disposal fences late enable replies before snapshot reads. This does not automatically authorize access or replay inference/tool calls. Web requests default to a fifteen-second deadline. Source tests are separate from production and installed-client qualification.
+
+
+The `.33` consumer archive was compared against all 463 producer and installed files, with matching lock SHA512. SHA256 is `84a8174f0e53928c5e6f0443e3bc2ed984a6f7f5f1f0749b594077d47b02b0c6`. Shared qualification passed 375 tests and Native connection/route regressions passed 20 tests. Type checking and lat validation passed; publication and installed upgrade remain outstanding.
+
+
+## Canonical account connection pane
+
+The normal cloud Settings route uses the same original ConnectionPane cloud account renderer as Web, with native effects supplied through ports.
+
+[[src/renderer/src/screens/CloudWorkspace/CloudConnectionPane.tsx#CloudConnectionPane]] reads main-owned canonical account status and opens the existing account dialog only after explicit account management. Its scope follows profile and account epochs, so late replies cannot restore another identity's display. The original complete native connection component remains under a closed execution subsection and mounts only on expansion. It does not create a separate local workspace or transfer native credentials into browser authority. Standalone native setup remains available through the original settings provider.
+
+Workspace `.34` is a source candidate. Full Data archive adapters, authenticated release/upgrade/cross-device qualification and current-main publication remain required.
+
+
+The `.34` archive SHA256 is `6cab4b70ee2c4aebed56898018dd1cb46a8c2b74851bace6e818e165a911690b`; all 463 files match producer and installed bytes and the lock SHA512 matches. Shared qualification passed 378 tests, browser Settings/Logs passed 13 and Native connection/modal/routes passed 13. Both builds, type checking, changed-file lint and lat validation passed. These checks do not substitute for installed-client or production evidence.
+
+
+## Paged canonical session inventory
+
+The Web and Desktop Chat adapters now share bounded, owner-checked inventory pagination instead of the old whole-account one-thousand-session response.
+
+Workspace `.36` verifies every page, stable insertion boundary, total count, strict ID order and complete final count before exposing results; recent activity ordering is restored after all pages finish. [[src/main/cloud-chat.ts#CloudChat#list]] uses the existing main-owned authorized route per page. Native history synchronization no longer rejects a valid complete cloud inventory solely because other profiles bring its count above one thousand. Original per-profile source/journal and deletion limits remain to be migrated; this does not claim complete large-history synchronization.
+
+The additive API page mode requires API-before-consumer publication. Legacy list responses remain unchanged. The canonical create/history admission removes the old whole-account one-thousand-row ceiling, preserving operation receipts, revision CAS and execution fences. No production schema mutation or publication is part of this source change.
+
+
+## Installer API compatibility admission
+
+Stable and beta installer publication require the paged canonical API before creating a tag or uploading release assets.
+
+The release gate reads only the fixed `https://api.mithril.fund/health` route with a deadline, no credentials and no redirects, and requires `chat-inventory-keyset-v1`. CI tests reject absent/older protocol and failed health responses. This establishes compatibility admission, not authenticated behavior or complete synchronization qualification.
+
+Local qualification: 56 targeted Native history/Chat tests, one Node release-gate test, Desktop build/typechecks, changed-file lint and `lat check` pass. Workspace `.36` archive SHA256 is `b0ebaa11496c737ba0c3e69bf0faadf66229de1ac4566eee3204dad4425f76f1`; all 463 archive files match the producer and installed consumer, and lockfile integrity matches. No installer or installed-client success is implied.
+
+## Complete original profile source inventory
+
+Original history reads use bounded hundred-row pages in one SQLite transaction with deterministic timestamp/ID ordering, preserving archived rows for synchronization.
+
+The source inventory, rich history journal and provenance mapping no longer impose a one-thousand-session count ceiling. The existing journal byte bound, attachment limits, event checkpoints and deletion-outbox bounds remain; this is not yet unlimited storage or full synchronization qualification. Source ownership, captured-account checks, original transactional deletion and receipt replay remain unchanged. No inference is dispatched by history synchronization.
+
+Local qualification covers 62 targeted tests, including 1,205 source rows and mappings, a 1,005-session real-engine archive/restart with a lost receipt, owner isolation and retained last-row deletion provenance. The initial whole-journal replay fixture took about 21 seconds; the incremental durability implementation below addresses that repeated-copy cost. No production or installed-client result is claimed.
+
+## Incremental original history durability
+
+The rich history engine now persists only the current conversation at each operation/receipt boundary, retaining the original owner/profile guard and durable-before-dispatch ordering.
+
+Desktop stores an atomic, fsynced JSON entry per hashed session inside the existing hashed owner/profile journal namespace. Legacy JSON journals remain intact and are overlaid by newer checked entries on read, preserving pending operation IDs through an automatic upgrade. Temporary interrupted writes are not admitted. Entry envelopes check schema, owner, profile and filename identity; symlinked paths are refused. This removes whole-profile serialization and replacement per edit while preserving the old adapter fallback. The retained legacy-file and per-entry byte limits remain; all-entry reads, source capture, deletion paging and actual installed upgrade still need qualification.
+
+Local qualification: 65 targeted tests, typechecks, Desktop build, changed-file lint and `lat check` pass. The incremental fixture completes the 1,005-session replay within the default five-second test deadline; this is a fixture regression gate, not a production latency measurement. Real all-profile runtime tests retain on-disk pending entries and recover lost canonical acknowledgements. Actual installed upgrade and live cross-device synchronization remain unproven.
+
+## Complete original deletion synchronization
+
+The retained native deletion outbox uses bounded keyset pages within one SQLite transaction, preserving the complete owner/profile inventory without a thousand-intent ceiling.
+
+Preparation and acknowledgement query only the exact retained operation, preserving source/session identity, first base revision, acknowledged receipt bytes and suppression while a target is absent or a reply remains unknown. The local derived outbox gains an owner/profile/status/operation index; no cloud schema mutation is introduced. The engine validates the complete inventory before sending any delete, rechecks the account around transport, and admits exact deletion receipts before removing suppression. Accepted tombstones are mirrored to the working cache; pending deletes are not reconstructed. Long transcript/event and attachment limits remain separate outstanding work.
+
+Local qualification: 67 targeted history tests, typechecks, Desktop build, changed-file lint and `lat check` pass. Real original SQLite deletion covers 1,205 retained intents; the real archival engine completes 1,005 tombstones after a lost acknowledgement without repeated delete events or inference. Other account/profile intents are excluded and exact receipt bytes remain stored. This is source/fixture evidence, not installed-client or production completion.
+
+## Complete canonical sidebar inventory
+
+Workspace `.37` removes the separate thousand-placement validator ceiling from the same sidebar used by Web and Desktop, preserving owner, shape, duplicate-ID and private-field rejection.
+
+The API reads hundred-record keyset pages behind the existing endpoint, captures an insertion boundary and checks complete final count before returning the original response shape. New placements appear on the next read; changed tombstone membership/count rejects a partial response. Placement fields are observed during the read, not an immutable transactional snapshot across all D1 queries. Web and installer publication now require `sidebar-inventory-keyset-v1`; no provider or inference probe runs. HTTP still returns the complete placement inventory; provider response/query limits and pending-edit queue bounds remain separate work. Browser Data still needs a complete archive adapter rather than a substitute partial export.
+
+Local qualification: 29 main-process cloud tests, installer compatibility test, Desktop typechecks/build, changed-file lint and `lat check` pass. All 463 `.37` archive files match the producer and installed package, with lock integrity verified; SHA256 `4a4cd3a937a15dec98b8374bb8f660278722aa64e1c9b0619e36f0db226315c2`. Installer publication and authenticated upgrade/cross-device checks remain required.
+
+## Sidebar visual quality and automatic update cadence
+
+The canonical shared CSS entrypoint loads the original Desktop sidebar styles on the first cloud screen, independently of legacy screen imports.
+
+Fund's real Chromium component gate covers English/Japanese, empty/long lists and narrow/normal widths, with screenshots and a demonstrated failure when the stylesheet is removed. This fixture gate does not establish all-screen or authenticated installed-client usability.
+
+[[src/main/app/updater.ts#scheduleUpdateChecks]] checks signed packaged clients after five seconds and every four hours after a completed check. Errors permit the next check, pending requests do not overlap and application quit retires scheduling. Existing auto-download preference, signature/feed guards and quit-time installation remain. Manual-update links now go directly to the download page. Local observation found signed installed preview.35, its preview channel and public preview.36 feed; no actual installer replacement is inferred from those reads.
+
+Local qualification: 42 targeted cloud/updater tests, Desktop typechecks/build, changed-file lint and `lat check` pass. Native pins immutable workspace `.38`; all 463 files and lock integrity match, SHA256 `953f63c128eb98a72f4a9376d03113124584621b5e983a806921e199682f3018`. Candidate installer version is preview.38; it is not published or installed. The public preview.36 feed does not establish that the new source is deployed.
+
+The native synchronization notice now participates in the layout above the page rather than floating over headings at a fixed screen position. Its height is bounded and its content can scroll. Four real Chromium checks of the compiled Desktop CSS pass (552/1280 pixels, dark/light); screenshots are retained by Native CI. This is a built-style layout fixture, not proof of an installed authenticated screen.
+
+## Automatic durable chat metadata recovery
+
+The shared Chat client recovers previously saved rename/delete/restore edits after checked-owner connection without a separate recovery or migration click.
+
+Workspace `.39` retains original IDs/base revisions, receipt-first reconciliation and conflict review. Its automatic filter excludes inference, tools and unsaved queued edits. The owner-scoped IndexedDB journal reads complete hundred-record pages in one transaction instead of refusing inventories above a thousand edits. Known authority/data failures stop automatic recovery; no token scope changes occur. Pins/project placements still have their manual recovery path. Full archive and installed cross-device qualification remain required.
+
+Local qualification: 392 shared tests and 50 targeted Native cloud/Chat/updater tests pass, including late old-account response retirement, complete 1,205-edit retention and recovery without inference. Both consumer builds/typechecks, 12 local visual scenarios, changed-file lint and `lat check` pass. All 463 `.39` package files match the producer and Native dependency; lock integrity is verified, SHA256 `db8ceffcb7668e5d7b5f09f164360dc0265debde72baa066b5dd5c43f81c5811`. Prior `.38` CI run 37707740127 succeeds and retains Desktop layout screenshots. `.39` CI/publication/installer and authenticated cross-device proof remain separate. The live fixed-route installer preflight still refuses the current canonical API protocol, so no publication or installed replacement is claimed.
+
+## Automatic durable placement recovery
+
+Workspace `.40` resumes saved pin/project placement edits through the original shared sidebar, preserving owner, operation identity, revision and explicit conflict review.
+
+The connected client retries durable placement edits on reload and the established connection observer. Conflicts remain in IndexedDB across reload; explicit current-placement choice removes the edit, while explicit apply-my-change atomically replaces it with a new ID against the latest observed revision. Automatic recovery does not dispatch inference/tools or upgrade scopes. Late old-owner replies cannot retire pending edits or alter another account. Full archive/import and authenticated installed cross-device qualification remain outstanding.
+
+Shared DOM/IndexedDB regressions include same-ID lost-ack recovery, durable-before-network project/pin changes, retained reload conflicts with both explicit choices, and old-owner automatic receipt retirement. The full 395-test suite passes with two workers; an unrestricted 77-worker run exceeded the existing five-second large-journal test deadline, so the bounded-worker rerun preserves its deadline and assertions. Native `.39` CI run 37708823735 succeeded. `.40` publication and installed behavior remain separate gates.
+
+Candidate preview.40 pins the immutable `.40` package. All 463 archive files match producer and installed dependency, lock SHA512 matches and archive SHA256 is `43ea54eca9899ed9ae9b62b566e0bad72880bbdbd3a155e1ceebc5c241de097f`. Both builds/typechecks, 37 targeted cloud/Chat tests, updater tests and 12 visual scenarios pass. The fixed-route live installer preflight still rejects the unpublished canonical paged Chat API; no installer publication or installed replacement is claimed.
+
+## Complete long transcript page reads
+
+Mapped-source reconciliation and remote-only reconstruction no longer refuse a complete transcript solely because it spans more than a thousand HTTP pages.
+
+Each continuation must advance through contiguous events below the immutable session's declared final event. Owner, session identity/version, active work, terminal completeness and disposal checks remain; an invalid final-event continuation fails before cache publication or title writeback. Native preview.41 retains the immutable workspace `.40` pin. Remote-only event/byte and cache-size limits remain separate unfinished storage work; this removes the pagination ceiling without claiming unbounded transcript storage.
+
+Regression fixtures read 1,005 one-event pages on both mapped and remote-only paths, publish the complete remote-only inventory, update mapped title only after its complete checkpoint, reject false continuation at the final event, and never execute inference or tools. CI/publication and installed cross-device behavior remain separate evidence gates.
+
+Local qualification: all seven native history suites pass (76 tests), both TypeScript checks and the preview.41 build pass. The preceding preview.40 Native CI run 37709729661 completed successfully. None of these results establishes API publication, installer release or installed-device behavior.
+
+## Chunked complete remote history storage
+
+Remote-only display caches store complete events and materialized timeline items in owner-bound SQLite chunks rather than a single bounded JSON value.
+
+Native preview.42 removes the reconstruction's aggregate 20,000-event/50-MiB refusal and the corresponding cache ceiling. Chunks normally target at most 100 records/512 KiB; a single protocol-valid record remains indivisible. One immediate transaction replaces chunks and their count/hash manifest, preserving the previous complete cache on failure. Reads iterate chunks under one read transaction and validate order, counts, digests and contiguous events. Older single-body caches remain readable and convert on the next write; tombstones retain their previous complete timeline. Agent messages/execution tables remain untouched.
+
+The current renderer and transport ports still materialize complete arrays, so memory/disk availability is not unlimited. This changes aggregate persistence, not per-event protocol limits or attachment resources. Full account archive/export/import, profile resource closure, canonical publication and authenticated installed cross-device QA remain outstanding. Workspace `.40` stays pinned unchanged.
+
+Local qualification: all seven history suites pass (78 tests). The real SQLite cache regression retains 20,005 events and a combined timeline above 50 MiB, reads every record, checks chunk sizes, same-ID owner isolation, old-format conversion, same-revision rejection, missing/tampered chunk refusal and transactional rollback after simulated disk failure. Both typechecks and preview.42 build pass; installed/public behavior remains unproven.
+
+## Canonical portable inventory release gate
+
+Native preview.43 requires `workspace-inventory-keyset-v1` before installer publication, in addition to the existing Chat and Sidebar inventory protocols.
+
+Fund's candidate API removes the shared thousand-record admission ceiling and assembles portable record snapshots through hundred-record keyset reads, including tombstones and file manifests. Cursor/count/rowid changes reject a mixed inventory. CAS, scopes, owner and private resource quotas are unchanged. The complete-array HTTP response still has provider/memory constraints; full canonical archive/export/import remains unfinished. Native keeps workspace `.40` immutable.
+
+The local fixed-route compatibility test refuses the former API even when Chat/Sidebar protocols are present. The current public endpoint still fails the compatibility gate, so no installer publication or installed replacement is inferred.
+
+Local qualification: Fund's 19 Workspace/repository API tests pass using local D1, including controlled concurrent-read rejection and 1,302 portable records plus optional file manifests. API types and dry-run build pass. Both release compatibility tests pass; preview.43 Desktop types/build and `lat check` pass. Native preview.42 CI run 37710630739 succeeded. This draft gate update does not establish production readiness or an installed upgrade.
+
+## Complete durable portable metadata journal
+
+Workspace `.41` restores all owner-bound saved metadata operations through bounded IndexedDB keyset reads, preserving original receipt IDs without a thousand-operation ceiling.
+
+Storage rejects changed ID reuse, duplicate batches and replacement collisions before committing; explicit conflict replacement requires the saved predecessor. Startup validates the complete inventory. Replays avoid rewriting already durable records, retain saved fingerprints and refuse in-memory identity changes before network dispatch. Revision merging and restored-ID lookup use maps/sets while preserving existing ordering and stale-revision rules. Account retirement, fifty-operation API batches, conflict review and exclusion of inference/tools remain.
+
+Real IndexedDB fixtures retain 1,205 edits across reopen and recover a lost acknowledgement through exact-ID replay without duplicate revisions or foreign-owner cleanup. Native preview.44 pins the new immutable workspace archive; publication and installed behavior are separate gates. Full canonical account archive/export/import remains outstanding.
+
+Local qualification: all 399 shared Workspace tests pass with one worker and unchanged fixture deadlines; the two-worker run under concurrent packaging hit timing deadlines, so that earlier run is not green evidence. All 463 archive files match producer and installed Native dependency, and lock integrity is verified; SHA256 `31de9955705ab48c077a10ce7e1c97ffbed60f11eb1b0659d00cce22e8491d68`. Desktop types/build, 20 chat/updater tests, four compiled-CSS layout cases, eight shared-sidebar browser cases and `lat check` pass. Preview.43 CI run 37711282177 passed. The live canonical API compatibility gate still refuses installer publication.
+
+The installed client remains preview.35, the public Mac update feed advertises preview.36, and the local updater log ends with the October 7 preview.35 startup check. These reads do not prove an installed upgrade. UI checks cover sidebar and notification fixtures; authenticated end-to-end page navigation, sign-in recovery, new chat and actual installed update remain release qualification work.
+
+## Complete mapped original chat cache
+
+Preview.45 stores mapped original cloud overlays in owner/session-bound SQLite chunks while retaining the original agent history and execution tables.
+
+A manifest checks item count, order and full-content digest in one read transaction. Replacement writes chunks and manifest in one immediate transaction; failures retain the previous complete cache. Legacy overlay arrays remain readable and convert on the next write without deleting the retained original. Mapped sessions now keep both owners' same-ID caches instead of replacing the prior owner's record. Chunk targets are one hundred records and 512 KiB; individual records remain indivisible. Original history hashing streams the same JSON-array digest instead of creating a whole serialized string.
+
+Original transcript synchronization no longer refuses more than twenty thousand validated items. Existing protocol batches, identity guards, receipts and conflict handling remain; an advancing index avoids repeatedly shifting a growing transcript remainder. This data recovery does not infer or replay agent execution. Arrays are still materialized in the transport and renderer; memory/disk/provider limits and full canonical account archive remain separate work.
+
+Real SQLite and sync tests cover 20,005 original items, a greater-than-fifty-MiB overlay, complete read-back, legacy conversion, owner isolation, failed-replacement rollback and missing-chunk rejection. These are source qualification, not installed/public proof.
+
+Local qualification: seven original-history suites pass 81 tests, changed-file lint and full Desktop types/build pass, and all four compiled-CSS layout cases pass after reinstalling the missing Chromium test runtime. `lat check` passes. Prior preview.44 CI run 37712377489 succeeded. Preview.45 retains immutable Workspace `.41`; no production D1 writes, release publication or installed replacement occurred. The current public API compatibility gate remains an external publication requirement.
+
+## Complete aggregate chat attachment restoration
+
+Preview.46 restores conversation attachments sequentially into a verified private cache without refusing a fifty-MiB conversation total.
+
+The original timeline still uses the original image, text-file and path-reference representations. Each file retains the existing canonical chunk/digest and individual resource validation. An account/session adapter supplies fixed owner-bound transport; retirement guards run before restoration, after download and before returning. Metadata is validated before constructing cache paths, and symlinked or non-regular storage is refused.
+
+Valid cached files avoid network access. Missing or digest/size-corrupt working-cache bytes are fetched again through the canonical reader and atomically replaced with fsynced private staged files, rather than overwriting a target incrementally. POSIX directory durability is flushed; Windows retains atomic replacement without unsupported directory fsync. A corrupt download or retired account does not install its bytes. The existing one-thousand-entry upload map is a bounded reuse cache, not a loss/admission ceiling, and is retained.
+
+Real-byte tests restore fifty-four MiB, verify all file contents and owner paths, reopen without network, retain original text/image representation, recover corrupted cache bytes and reject corrupt transport bytes, retired results and symlinked storage. Individual file/protocol limits, materialized image/text memory and full account archive/export/import remain separate work. No production R2 write or installed restoration is inferred from these tests.
+
+Local qualification: eight original-history/attachment suites pass 84 tests. Changed-file lint, full Desktop typecheck/build, four compiled-CSS layout cases and `lat check` pass. The fixed-route public API preflight still refuses the unpublished canonical Workspace inventory protocol; preview.46 has no GitHub release. No production R2/D1 write or installed replacement occurred.
+
+## Complete original compression archive lineage
+
+Preview.47 removes the thousand-session refusal from original compression-lineage archive/restore writeback.
+
+The original ancestor/descendant traversal and exact captured anchor archive flag remain. A SQLite iterator captures every lineage row, and hundred-ID update batches avoid the SQLite variable-count ceiling. One immediate transaction protects capture, updates and complete read-back. Read-back recomputes lineage membership as well as every retained field; a trigger-created or altered member rolls the entire operation back. Original messages, project associations and unrelated conversations retain their original data. Arrays still hold lineage metadata for exact comparison; memory/SQLite capacity is not unlimited.
+
+A real SQLite fixture archives and restores 1,205 compressed sessions from their middle member, verifies every original row plus retained evidence/project links, and proves rollback when a trigger inserts unexpected lineage membership. This source qualification is distinct from production and installed synchronization. Full canonical archive/export/import and original attachment/protocol limits remain separate work.
+
+Local qualification: eight history/attachment suites pass 85 tests, changed-file lint and full Desktop types/build pass, and `lat check` passes after shortening the test-spec overview. Workspace `.41` stays immutable. No production write, installer publication or installed replacement occurred; the canonical API publication and full account archive gates remain outstanding.
+
+### Complete shared timeline projection (draft)
+
+Preview.48 pins Workspace 0.6.29-schedules.42, removing the shared transcript projection's total 20,000-event rejection while keeping contiguous sequence and individual event validation.
+
+Web and Desktop must project every already-validated event, including tombstones and stable original identities. A missing or malformed late event still refuses publication of an incomplete timeline. The original chunked storage and per-request bounds are unchanged. This candidate also includes current-main shared Browser web-tool state; compatible API publication remains required before an installer. Source/package tests are distinct from installed upgrade and live cross-device proof.
+
+Workspace .42 archive SHA256 is `f809a5a742b11d4273acc0bf029d4e28f8484c5d052e387ec7beab4b5b2c392f`. All 463 producer, tarball and installed package files were compared byte-for-byte before the consumer test. This is dependency verification, not an installed app update.
+
+
+### Acknowledged journal cleanup (draft)
+
+Preview.49 pins Workspace 0.6.29-schedules.43, using transaction-local paged primary-key reads to group only acknowledged adjacent stored keys for deletion.
+
+Unacknowledged keys break a range; other-owner and concurrent-window edits stay durable. Database version 1 remains compatible with earlier clients. Sidebar replacement refuses receipt collisions and identical receipts avoid index rewrites. The original 1,205-entry tests keep their complete fixtures and original deadlines. Native consumer testing uses the actual compiled packaged store. This is source/package proof, not installed synchronization or upgrade.
+
+Workspace .43 SHA256 is `b3472d11ab98207c3f0584f4bc49b01115751c57e24f7e08d4a08b92f12a19e5`; all 465 producer/archive/installed dependency files match. API publication and actual installed update remain release gates.
+
+
+### Current-main synchronization package (draft)
+
+Preview.50 pins Workspace 0.6.29-schedules.44 from Fund b4fef9d3, incorporating current-main UI changes while retaining pending/conflict/disconnected synchronization states and the complete inventory release gates.
+
+The original .43 archive stays immutable. All 465 producer/archive files match; .44 SHA256 is `f9f733bc4f05df9dbf7ee6689060101570b9345b5e08c2901cc5b73e4a752011`. Web source tests and API contract/types passed after the merge. Installed dependency verification and consumer checks are separate; publication and actual update/cross-device behavior remain unproven.
+
+### Canonical snapshot and all-page cache package (draft)
+
+Preview.51 pins Workspace 0.6.29-schedules.46 from Fund 9560d788, sharing the ordinary Workspace cache replacement and all-page Repository publication fixes with Web.
+
+The immutable archive has 465 files and SHA256 `5f8c53e5f1dbe031db59cbc0a603e3fbc923d39f261d3da52888064c7c60e25b`. Producer/archive bytes match. Full snapshots retain queued edits while replacing absent IDs and lower restored revisions; Repository page failures leave the previous cache intact. No device/cloud view split is added.
+
+This package does not complete immutable Repository pagination, monotonic restore generation, old-write fencing or chat cache restoration. Current API compatibility, current-main releases and the installed signed client's actual update/auth/data/synchronization remain separate gates. Earlier migration-separated descriptions above are historical; Jun's requested target is one original Desktop interface with automatic cloud data synchronization.
+
+Local qualification for preview.51 passed 44 selected compiled-consumer/cloud/updater tests, full main/renderer typecheck and Electron build, changed-file lint, packaging identity for 689 active runtime files, compiled notification layout and `lat check`. All 465 installed dependency bytes match the vendor archive. The live inventory preflight refused publication because its required protocol flags are still missing. No signed preview.51 release or change to `/Applications/Mithril.app` occurred.
+
+### Counted Repository consumer package (draft)
+
+Preview.52 pins Workspace 0.6.29-schedules.47, sharing the counted Repository boundary and complete canonical collection replacement with Web.
+
+All 465 producer/archive files match; archive SHA256 is `58dc58cb7ebca97a4bf48bf260fdc24009865dbf211ce7456cd534ae7383c142`. Per-page owner history cursor and collection count/anchor checks reject mixed ordinary reads before publishing. Verified counted collections replace missing IDs and lower revisions. Older unmarked transport merging is temporary compatibility.
+
+This is not monotonic archive generation or old-write fencing. API deployment, signed publication, installed update/restart/authentication and cross-device usability remain unproven. No cloud/device UI separation is introduced.
+
+Local preview.52 qualification passed 32 compiled-consumer/cloud tests, 13 updater tests, full Electron typecheck/build, 689-file packaging identity, compiled notification layout and API-preflight tests, changed-file lint and `lat check`. All 465 installed Workspace dependency bytes match the immutable vendor. The installer preflight now also requires the counted Repository protocol; it does not publish the API or upgrade the installed preview.35.
+
+### Complete session cache consumer package (draft)
+
+Preview.53 pins Workspace 0.6.29-schedules.48 with complete session inventory replacement and atomic long checkpoint publication shared by Web/Desktop.
+
+All 465 producer/archive files match; SHA256 is `711b605144bfaaaf6706d170e1dca810fafa65c6b02ef45c37cebe28e6a98d74`. Older overlapping lists cannot overwrite newer reads; removed/lower inventories retire their checkpoint/cache. Checkpoints stage all advancing bounded pages before publishing a complete history, without the previous thousand-page cutoff. Pending IDs/base revisions stay independent.
+
+This source candidate does not complete equal-identity archive generation, historical receipt fencing, enabled/hot execution reconciliation, current-main API publication or the installed client's signed update/synchronization. The ordinary cache fixes add no cloud/device view separation.
+
+Local preview.53 qualification passed 54 selected compiled cache/cloud/chat/updater tests. The two new compiled session cases passed again after their fixture return annotation was corrected; full Electron typecheck/build then passed. All 465 installed vendor bytes and lock identity match; 689-file packaging identity, changed-file lint and `lat check` pass. No new signed installer or installed update is claimed.
+
+### Session checkpoint boundary fencing (draft)
+
+The shared client stages only pages from one session revision and event-sequence boundary. A newer inventory retires delayed readers; older checkpoints cannot overwrite the known session's history.
+
+Mixed-page failures retain the prior complete history and queued operation identities. This prevents ordinary concurrent-read regression; equal-identity archive restoration still requires a monotonic dataset generation. API publication and actual signed installed synchronization remain separate gates.
+
+Preview.54 pins Workspace 0.6.29-schedules.49. All 465 producer/archive/installed files and exact lock identity match; archive SHA256 is `82b993d96d3b324893613797d11124774a6838dfe71b6132c21eb576b375518a`. Qualification passed 55 selected compiled-cache/cloud/chat/updater tests, full Electron typecheck/build, changed-file lint and `lat check`. No signed publication or installed replacement is claimed.
+
+### Chat restore epoch consumer (draft)
+
+Preview.55 pins shared Workspace 0.6.29-schedules.51. Canonical chat inventory and event reads use the owner epoch, clearing equal-identity restored cache and retaining old saved edits for review.
+
+Pending metadata stores its original epoch across IndexedDB reopen. API server write/receipt fencing and other data inventories still require integration; no production restore, signed release or installed replacement is claimed.
+
+All 465 producer/archive/installed bytes and exact lock identity match. Archive SHA256: `42d9e7b48e523a33cce92491a622a8426e6bf242471d362beb4c3781a1a865c1`.
+
+Local qualification passed 56 selected compiled-cache/cloud/chat/updater tests, full Electron typecheck/build, 689-file packaging identity, changed-file lint and `lat check`. Shared 425 cases and real D1 chat 16 cases passed in Fund; shared Chromium sidebar/Security/table QA passed. Signed installed behavior remains unverified.
+
+### Chat write generation consumer (draft)
+
+Preview.56 pins shared Workspace 0.6.29-schedules.52. New saved operations include the observed owner generation; a receipt from another generation retains the pending edit and cannot update the displayed session or dispatch a write.
+
+The paired API candidate rejects older writers and protects canonical mutations with a transactional epoch check before inference dispatch. Archive SHA256 is `052307834cdbcdf20abd84220d47640a602d121128072713e2f12f34e75abe44`. The production migration remains source-only; other inventories/writers, execution custody and signed installed synchronization still require integration and verification. This candidate is not a signed release or installed replacement.
+
+Qualification passed 33 selected compiled-cache/cloud/chat/updater tests, full Electron typecheck/build, 689 runtime-file packaging checks, independent equality of all 465 producer/archive/installed files, changed-test lint and `lat check`. The paired Fund candidate passed 427 shared and 38 API chat/browser/device/runtime cases; exact-source API CI is a separate gate.
+
+### Repository and Workspace restoration admission (draft)
+
+Preview.57 pins shared Workspace 0.6.29-schedules.53. Repository pages, history and saved edits use a durable owner generation; generic Workspace inventories and edits use that same generation boundary.
+
+Restoration replaces complete cached documents even at equal IDs/revisions while retaining old saved edits as conflicts without dispatching. Explicit resolution binds a new operation to the current generation. The API candidate checks generation and replay identity before canonical writes and inside their transaction. Archive SHA256 is `1d00a599a23df17e51b78a9ba8343fbc9ed4cab57cc15cde8afab39c2c396472`.
+
+Qualification passed 37 selected compiled-cache/cloud/chat/updater cases, Electron typecheck/build, 689 runtime-file packaging checks, all 465 producer/archive/installed bytes with exact lock identity, changed-test lint and `lat check`. The paired Fund candidate passed 432 shared cases and a bounded rerun of 23 D1 Repository/Workspace cases after an initial `SQLITE_FULL` failure. API standalone CI, native full archival writer admission, Sidebar, schedule/file custody, production publication and signed installed synchronization remain distinct requirements; no installed replacement or production restore is claimed.
+
+Shared candidate 0.6.29-schedules.54 / Desktop preview.58 replaces complete Sidebar placements after restoration, including removed pins. Chat, Workspace and Sidebar generations must agree; late old acknowledgements cannot repaint restored placements or clear retained intents. The Sidebar D1 transaction rejects an epoch change before any canonical placement or receipt survives. Source validation remains separate from archive deployment, signed publication and installed synchronization.
+
+Shared candidate .55 / Desktop preview.59 carries dataset generation and complete revision/count boundary through native history IPC. The shared history pane rejects delayed owner/restore responses and mixed later pages, and closes when a restored snapshot replaces the dataset. Existing very-large offset limits remain outstanding; this is not a signed installed or full production synchronization receipt.
+
+Desktop candidate preview.60 requires a live Mithril account identity before mounting the workspace or device setup. Stored-token presence alone never admits the app. Sign-out notifications close the workspace; focus, network recovery and serialized one-minute checks revalidate the session. Successful sign-in enters the app; Retry connection verifies retained credentials without a new browser login. Source qualification is separate from signed release and installed-client evidence.
+
+
+### Current-main integration for unified synchronization
+
+The synchronization candidate retains current-main verified sign-in, entry sidebar styles, locale typography, device care and endpoint lifecycle while preserving the original schedule/history replication services.
+
+Both compiled sidebar and notice geometry checks run after one renderer build in CI. Cloud account gating remains unchanged; optional local endpoint protection still opens from the original start screen without admitting the cloud workspace. Candidate validation and public/installed synchronization remain distinct release gates.
+
+
+### Browser-first shared chat bootstrap (draft)
+
+Preview.61 uses shared Workspace .56 and avoids automatic remote compute inspection when ordinary Chat is using browser JS/Python tools. Explicit runtime inspection and sandbox authorization remain unchanged.
+
+The same canonical component is compiled by Web and Desktop. All 441 shared tests pass after a first full run hit the existing profile conflict lookup deadline under simultaneous Native load; the isolated nine-profile suite also passes. Full Native qualification and published API inventory protocols remain required before release. The current public health read exposes none of the four required inventory protocols, so this candidate must not replace the published installer yet.
+
+
+Candidate qualification: shared .56 matches all 465 producer/vendor/dependency files, Native types/build, packaging (707 runtime files) and compiled sidebar/notice geometry pass. Node 22 full tests reached 2,930 passes with three failures; provider-key isolation fixes one, while real attachment restoration cases still exceed their unchanged five-second deadlines even in a serial targeted rerun. These failures are unresolved release gates. Config-health fixtures now explicitly clear the tested host OpenRouter environment credential and restore it afterwards; no real credential is read or logged by that isolation change.
+
+### Integrated main and shared .57 consumer (draft)
+
+Preview.62 consumes the fresh Workspace .57 package after merging current Desktop main ab18299 and Fund main 1443e2b0, preserving the original interface and cloud synchronization changes.
+
+All 469 producer/archive/installed dependency files match. Archive SHA256 is `ed3a80d7a34f89e2a7bcc903235aa193dd755d66e853f53772985148975b8c3f`. Existing .56 remains immutable. A clean lockfile installation supplies this consumer; no installed user data, credentials or application bundle was changed.
+
+Fund qualification passed 448 shared tests, 11 release-gate tests and Workspace/API types after building shared exports. The full API recheck has an archive export timeout at its unchanged 30-second deadline; complete runtime qualification remains a release gate. Source integration and package equality do not prove API/D1 publication, complete restore writer fencing/execution custody, signed installer availability or authenticated cross-device behavior.
+
+### Schedule edit restore generation consumer (draft)
+
+Preview.63 pins Workspace schedules.58, sharing captured schedule generation and unchanged operation retries across Web and the original Desktop Schedules screen.
+
+Main IPC rejects invalid snapshot generations and receipts from a different generation. Installer preflight requires `cloud-schedules-dataset-v1` before publication. The shared adapter requires review after an identical-row restore and never reassigns an unconfirmed operation to the new generation. Original source/runtime execution remains separately fenced; complete managed-bot/dispatch generation, hot restore custody and retained-object lifecycle are still required.
+
+Fund 4a817098 passed 449 shared tests, eight real-D1 Schedule cases including the HTTP 409 refusal and an admission/commit restore race, shared/API types, changed-file lint and 11 App release gates. The preceding exact integrated commit 35f4461c passed signed gad API CI with 572 tests, one existing skip and 34 release tests. A new receipt is required for the generation change. No production schema, published installer or installed cross-device behavior is claimed by this candidate.
+
+## Original Schedule restoration generations (candidate preview.64)
+
+The same workspace schedules.59 archive used by Web is consumed by Desktop.
+
+Whole-file entries retain their dataset generation; shared screen actions and
+RepositorySync outbox admission retain that generation through asynchronous
+preparation and file publication. Main-only custody and manual validators require
+positive-generation receipts to match the initiating command; legacy missing
+fields mean zero. A foreign/missing/newer epoch cannot acknowledge execution.
+
+[[src/main/original-schedule-replication.ts#OriginalScheduleReplication#manualBinding]]
+compares the request, synchronized anchor and current selected custody generation.
+Its manual consumer captures that anchor generation for take and retains it in
+journal report commands. Data-only runtime replication also checks authority epoch.
+The original Agent binding payload remains legacy: its plugin/policy generation
+propagation must be implemented and qualified before claiming scheduled native
+execution after restoration. This candidate neither upgrades old authority nor
+proves running-work restoration, public release or installed behavior.
+
+Preview.64 qualification passed 57 selected tests across seven execution,
+replication, custody and journal files, including positive epoch receipts and
+lost-report recovery without a second dispatch. Main/renderer typechecks,
+affected-file lint, Electron build, 711 active packaging-file checks and lat check
+passed. All 469 installed shared files match the schedules.59 archive; SHA256 is
+`b617d3199771763c5e1d5757a7729ecb0d6e6456bdf0ea95adb765122fe6ac5c`.
+Fund receipt changes are in candidate 49fd2735; the preceding signed API CI for
+9aabe604 passed 595 tests with one existing skip. A new exact-source qualification
+is required for release. No updated installer is published or installed here.
+
+## Original Schedule Agent generations (candidate preview.65)
+
+Native source binding now carries its captured restoration generation to the owned Agent policy through bounded stdin.
+
+The binding bridge validates safe integer generations and requires the child
+receipt to match the exact anchor. Replication checks the synchronized generation
+before binding. The matching Agent candidate b33052f60f persists that epoch in
+profile-scoped execution policies and forwards it to each claim and transition;
+old policies are never rebased to a restored dataset. This supersedes the legacy
+Agent-payload limitation recorded for preview.64.
+
+Qualification passed 48 tests across seven custody/replication files, including
+A/B/A real child processes with positive generation receipts. The final binding
+validator test also rejects unsafe and explicitly undefined generations before
+starting the child; all three binding tests passed after that change. Main and
+renderer typechecks, Electron build, affected-file lint and 711 active packaging
+file checks passed. The shared schedules.59 archive remains unchanged. Agent
+custody passed 10 tests and bootstrap passed 15 under the canonical isolated runner.
+Production D1/API/Web publication, running-work restoration, installer publication
+and authenticated multi-device/updater validation remain incomplete.
+
+## Current-main shared repack (candidate preview.66)
+
+Desktop consumes the integrated current-main workspace archive schedules.60 with all 469 installed files verified byte-identical.
+
+The vendor archive SHA256 is
+`974470a30d616677ec57897a61ac3c13660512943670bf28debb5d15a9d553bf`.
+Fund's integrated current main includes the standalone App publication gates;
+retired Actions are not re-enabled. Workspace qualification passed 451 tests in
+81 files and build/export checks. Desktop preview.66 passed 48 selected tests,
+Main/renderer typechecks, Electron build and 711 active packaging-file checks.
+Running-work restoration, resource lifecycle, public publication, installer
+updates and actual authenticated Web/Desktop synchronization remain unfinished.
+
+## Packaged device generation fencing (candidate preview.67)
+
+Desktop now consumes schedules.61, whose durable ReplicaSync journal preserves restoration generations across reopened clients.
+
+The installed package's 469 files match the vendor archive; SHA256 is
+`fff54f3a33dc82ed391d8438bf39ea76f74f9e29aa5b5358c3f9acec45ca8595`.
+Unsynchronized old-device edits remain conflicts instead of new cloud uploads;
+unchanged checkpointed data synchronizes automatically. Old deferred native writes
+are not replayed into the restored dataset. An explicit resolution binds the
+current generation, while an intervening restoration refuses the choice.
+
+Six packaged cache/native replica files passed 39 tests, including actual compiled
+shared ReplicaSync across reopen. Main/renderer types, Electron build, affected-file
+lint, 711 active packaging checks and lat validation passed. The source workspace
+suite passed 453 tests. Fund ff7204fe signed full API CI passed 597 tests with one
+existing skip; later shared candidate bfbc123f needs its own exact-commit receipt.
+This does not prove running-work restoration, production rollout, installed
+preview.67 behavior or authenticated multi-device/updater QA.
+
+## Project folder generation custody (candidate preview.68)
+
+Selected folder journals now retain the cloud dataset generation alongside their acknowledged file baseline and saved operation.
+
+A fresh snapshot precedes pending-operation replay. A generation mismatch retains
+the exact operation without resending or rebasing it. Old locally edited folders
+remain unchanged for review; unchanged folders reconcile restored cloud bytes
+automatically. Newly selected folders capture the observed generation. Pointer
+writes carry that captured epoch, and fresh generation checks precede manifest
+publication, local replacement and recoverable removal. These checks do not make
+R2, D1 and the local filesystem a single atomic transaction; the API generation
+write guard remains necessary before Desktop release.
+
+Filesystem tests cover lost acknowledgements and restart after restoration,
+changed versus unchanged roots and restoration during a delayed chunk download.
+The delayed download leaves no replacement file or temporary artifact and queues
+no cloud write. Production publication, hot execution restoration and final
+installed Web/Desktop/updater qualification remain separate open gates.
+
+Candidate preview.68 qualification passes seven real filesystem tests, main and renderer typechecks, affected-file lint, Electron build, 711-file packaging identity and lat checks. This remains source qualification; no installer or production application was changed.
+
+
+## Shared execution history review
+
+The original Settings Data pane now consumes the same review component as Web.
+
+[[src/main/cloud-workspace.ts#CloudWorkspace#executionHistory]] and [[src/main/cloud-workspace.ts#CloudWorkspace#reviewExecution]] expose fixed authenticated routes through trusted preload IPC. Pending review decisions are durably retained per owner/dataset/row/effect before sending. Lost acknowledgements retain the original decision ID and note across remount or restart. Confirmation records no-replay review, not completion/cancellation or new execution permission. Package schedules.62 is the canonical source; installed-client qualification is separate.
+
+## Shared Data archive package candidate
+
+Desktop consumes schedules.64 with the same original Data backup component and archive controller as Web. Main-process file transport is source-qualified below; this package update does not establish production or installed backup behavior.
+
+## Native archive file custody
+
+The original Data screen uses main-only archive dialogs, fixed authenticated API routes, a durable owner journal, disk-backed validation and bounded file slices. Renderer IPC carries operation metadata rather than full account bytes or credentials.
+
+[[src/main/cloud-archive.ts#NativeAccountArchive]] stages downloads and selected uploads privately, checks native owner context between I/O stages, and only clears export intent after file sync and destination replacement. Restoration requires an explicit confirmation; unknown responses retain the same operation identity. Production API/schema, installed dialogs, Windows destination replacement and cross-device restore remain separately qualified.
+
+Native archive candidate qualification: 47 focused archive/workspace/Data tests, Web 8 tests, shared controller/backup 9 tests, both consumers' typechecks and scoped lint passed locally. Producer, archive and Desktop dependency match across 481 files. Exact current main is included in both branches. Installer, real dialogs, cloud schema publication and cross-device QA remain pending.
+
+## File-set deletion convergence
+
+Selected folders retain file-set tombstones and revisions. Unchanged bytes move to recovery storage without a cloud write. Concurrent edits pause; later new files use the retained revision.
+
+## Native archive SQLite journal
+
+Archive intents use the Electron runtime's built-in SQLite with FULL-synchronous transactions. Private legacy JSON entries remain readable until replaced, and durable empty rows suppress old acknowledged intents without deleting recovery files.
+
+Electron 44.1.1's actual Node 24.19 runtime was checked for node:sqlite availability. The journal contains only owner-bound operation metadata, not account source data or credentials; api.mithril.fund remains the canonical backend. Installed and Windows destination-save qualification remain pending.
+
+## Archive destination replacement
+
+Closed, synced archive files replace their selected destination in the same directory. POSIX syncs the parent directory; Windows uses a fixed MoveFileExW program with replace-existing and write-through flags.
+
+[[src/main/archive-save.ts#replaceArchiveDestination]] keeps selected paths as JSON stdin data, checks owner context before and after replacement, and rejects failures before export acknowledgement. The temporary file closes before cleanup. The native-platform file test exercises real replacement; Windows runtime qualification requires that test on Windows and is not established by the mocked adapter test.
+
+The preview Windows packaging job runs the actual destination replacement test before building installers. Local macOS qualification passed eight save/archive tests, Node typechecking, scoped lint, lat checks and Electron compilation; the Windows job and installed behavior remain pending.

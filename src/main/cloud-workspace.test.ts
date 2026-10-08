@@ -1288,3 +1288,54 @@ it("uses fixed owner-scoped history routes and rejects forged review identities 
     "owner/schema",
   );
 });
+it("archive requests use fixed main-only credentials and require separate chat scopes", async () => {
+  let chat = false;
+  fetcher.mockImplementation(async (url: string) => {
+    if (url.endsWith("/v1/me"))
+      return reply({
+        via: "api_token",
+        scopes: [
+          "workspace:read",
+          "workspace:write",
+          ...(chat ? ["chat:read", "chat:write"] : []),
+        ],
+        user: { id: "a" },
+      });
+    return new Response("{}");
+  });
+  await client.enable();
+  await expect(
+    client.archiveRequest("/v1/workspace/archive/backups", { method: "POST" }),
+  ).rejects.toThrow("chat scope");
+  expect(
+    fetcher.mock.calls.some(([url]) => String(url).includes("/archive/")),
+  ).toBe(false);
+  chat = true;
+  client.reset();
+  await client.enable();
+  await client.archiveRequest("/v1/workspace/archive/backups", {
+    method: "POST",
+    body: "{}",
+  });
+  const request = fetcher.mock.calls.find(([url]) =>
+    String(url).endsWith("/archive/backups"),
+  )!;
+  const init = request[1] as RequestInit;
+  expect(new Headers(init.headers).get("authorization")).toBe(
+    `Bearer ${tokenA}`,
+  );
+  expect(init.redirect).toBe("error");
+  expect(init.credentials).toBe("omit");
+  expect(init.cache).toBe("no-store");
+  await expect(
+    client.archiveRequest(
+      "https://foreign.invalid/v1/workspace/archive/backups",
+      { method: "POST" },
+    ),
+  ).rejects.toThrow("Unsupported");
+  await expect(
+    client.archiveRequest("/v1/workspace/archive/backups", {
+      method: "DELETE",
+    }),
+  ).rejects.toThrow("Unsupported");
+});

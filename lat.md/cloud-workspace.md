@@ -1579,4 +1579,12 @@ The original Settings Data pane now consumes the same review component as Web.
 
 ## Shared Data archive package candidate
 
-Desktop consumes schedules.63 with the same original Data backup component and archive controller as Web. Main-process credential and file transport wiring remains pending; this package update does not establish native backup or installed behavior.
+Desktop consumes schedules.64 with the same original Data backup component and archive controller as Web. Main-process file transport is source-qualified below; this package update does not establish production or installed backup behavior.
+
+## Native archive file custody
+
+The original Data screen uses main-only archive dialogs, fixed authenticated API routes, a durable owner journal, disk-backed validation and bounded file slices. Renderer IPC carries operation metadata rather than full account bytes or credentials.
+
+[[src/main/cloud-archive.ts#NativeAccountArchive]] stages downloads and selected uploads privately, checks native owner context between I/O stages, and only clears export intent after file sync and destination replacement. Restoration requires an explicit confirmation; unknown responses retain the same operation identity. Production API/schema, installed dialogs, Windows directory sync behavior and cross-device restore remain separately qualified.
+
+Native archive candidate qualification: 47 focused archive/workspace/Data tests, Web 8 tests, shared controller/backup 9 tests, both consumers' typechecks and scoped lint passed locally. Producer, archive and Desktop dependency match across 481 files. Exact current main is included in both branches. Installer, real dialogs, cloud schema publication and cross-device QA remain pending.

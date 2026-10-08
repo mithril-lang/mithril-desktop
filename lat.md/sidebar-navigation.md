@@ -182,11 +182,11 @@ The grouped Appearance preferences use one shared logical text/control grid in [
 
 ### Migration path rendering
 
-Migration banners display filesystem paths as text inside trusted localized markup, preserving the exact path without interpreting it as HTML.
+The original Data pane uses cloud archive controls and never displays legacy migration paths, including paths containing markup. Signed-out archive actions stay disabled.
 
-[[src/main/installer.ts#checkOpenClawExists]] returns the raw discovered path; filesystem names may contain HTML-significant characters. [[src/renderer/src/components/settings/DataPane.tsx#DataPane]] escapes that value at the HTML rendering boundary before translation interpolation. The path used for filesystem operations remains unchanged.
+[[src/renderer/src/components/settings/DataPane.tsx#DataPane]] uses the shared cloud archive pane. Original legacy installer discovery remains separate and does not add a migration banner to this screen.
 
-[[src/renderer/src/components/settings/DataPane.test.tsx]] exercises the production translations across every supported locale, checking markup-shaped paths, literal entities, whitespace, and translation-like text. [[tests/installer-utils.test.ts]] confirms that a real populated POSIX install with HTML-significant path characters reaches discovery unchanged.
+[[src/renderer/src/components/settings/DataPane.test.tsx]] checks every supported locale for disabled signed-out backup actions and absence of legacy paths. [[tests/installer-utils.test.ts]] continues to qualify installer discovery separately.
 
 ### Long translated preference layout
 

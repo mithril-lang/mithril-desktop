@@ -1,3 +1,4 @@
+import { NativeAccountArchive } from "../cloud-archive";
 import {
   synchronizeAllProfileHistories,
   resolveOwnedProfileHistory,
@@ -1502,6 +1503,49 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudWorkspace.discoverDocuments.fetchRegistryDetail(kind, item);
   });
+  const archive = new NativeAccountArchive({
+    workspace: cloudWorkspace,
+    directory: join(app.getPath("userData"), "account-archives"),
+    chooseSave: async () => {
+      const win = getMainWindow();
+      if (!win) throw Error("Main window unavailable");
+      const result = await dialog.showSaveDialog(win, {
+        title: "Save workspace backup",
+        defaultPath: "mithril-workspace.tar",
+        filters: [{ name: "Mithril backup", extensions: ["tar"] }],
+      });
+      return result.canceled ? null : (result.filePath ?? null);
+    },
+    chooseOpen: async () => {
+      const win = getMainWindow();
+      if (!win) throw Error("Main window unavailable");
+      const result = await dialog.showOpenDialog(win, {
+        title: "Choose workspace backup",
+        properties: ["openFile"],
+        filters: [{ name: "Mithril backup", extensions: ["tar"] }],
+      });
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
+  });
+  ipcMain.handle("cloud-workspace-archive-pending", (event, owner) => {
+    trustedWorkspaceSender(event);
+    return archive.pending(owner);
+  });
+  ipcMain.handle("cloud-workspace-archive-export", (event, owner) => {
+    trustedWorkspaceSender(event);
+    return archive.exportAndSave(owner);
+  });
+  ipcMain.handle("cloud-workspace-archive-prepare", (event, owner) => {
+    trustedWorkspaceSender(event);
+    return archive.chooseAndPrepare(owner);
+  });
+  ipcMain.handle(
+    "cloud-workspace-archive-commit",
+    (event, owner, confirmed) => {
+      trustedWorkspaceSender(event);
+      return archive.commit(owner, confirmed);
+    },
+  );
   ipcMain.handle("cloud-workspace-execution-history", (event, after) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.executionHistory(after);

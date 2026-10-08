@@ -145,6 +145,72 @@ export class CloudWorkspace {
       this.authorizedBinaryRequest(path, init),
     );
   }
+  /** Fixed archive transport used only by main-process backup controls. */
+  async archiveRequest(path: string, init?: RequestInit): Promise<Response> {
+    const url = new URL(path, "https://api.mithril.fund");
+    const route = url.pathname;
+    const method = init?.method ?? "GET";
+    const id = "[a-zA-Z0-9_-]{1,128}";
+    const admitted =
+      (method === "POST" && route === "/v1/workspace/archive/backups") ||
+      (method === "GET" &&
+        new RegExp(`^/v1/workspace/archive/backups/${id}/download$`).test(
+          route,
+        )) ||
+      (method === "PUT" &&
+        new RegExp(`^/v1/workspace/archive/restores/${id}/entry$`).test(
+          route,
+        )) ||
+      (method === "POST" &&
+        new RegExp(
+          `^/v1/workspace/archive/restores/${id}/(?:complete-upload|prepare|commit)$`,
+        ).test(route));
+    if (
+      !admitted ||
+      !path.startsWith("/v1/workspace/archive/") ||
+      url.origin !== "https://api.mithril.fund"
+    )
+      throw Error("Unsupported archive route");
+    const session = await this.session();
+    const context = await this.nativeContext(method !== "GET");
+    if (
+      !session.scopes.includes(
+        method === "GET" || route.endsWith("/backups")
+          ? "chat:read"
+          : "chat:write",
+      )
+    )
+      throw Error("Archive chat scope required");
+    this.assertNativeContext(context);
+    if (
+      context.actor !== createHash("sha256").update(session.token).digest("hex")
+    )
+      throw Error("Archive identity changed");
+    const headers = new Headers(init?.headers);
+    headers.set("authorization", `Bearer ${session.token}`);
+    headers.set("x-mithril-workspace-owner", session.userId);
+    const response = await this.deps.fetch("https://api.mithril.fund" + path, {
+      ...init,
+      headers,
+      credentials: "omit",
+      redirect: "error",
+      cache: "no-store",
+      signal: AbortSignal.timeout(120000),
+    });
+    try {
+      this.assertNativeContext(context);
+    } catch (error) {
+      await response.body?.cancel().catch(() => {});
+      throw error;
+    }
+    if (response.status === 401 || response.status === 403) {
+      await response.body?.cancel().catch(() => {});
+      this.reset(false);
+      throw Error("Archive access refused");
+    }
+    return response;
+  }
+
   /** Owner/generation-checked bytes for fixed file routes; credentials stay in main. */
   async authorizedBinaryRequest(
     path: string,

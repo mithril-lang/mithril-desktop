@@ -523,6 +523,16 @@ const hermesAPI = {
       fetchRegistryDetail: (kind, item) =>
         ipcRenderer.invoke("cloud-workspace-registry-detail", kind, item),
     },
+    archive: {
+      pending: (owner) =>
+        ipcRenderer.invoke("cloud-workspace-archive-pending", owner),
+      exportAndSave: (owner) =>
+        ipcRenderer.invoke("cloud-workspace-archive-export", owner),
+      chooseAndPrepare: (owner) =>
+        ipcRenderer.invoke("cloud-workspace-archive-prepare", owner),
+      commit: (owner, confirmed) =>
+        ipcRenderer.invoke("cloud-workspace-archive-commit", owner, confirmed),
+    },
     executionReview: {
       list: (after) =>
         ipcRenderer.invoke("cloud-workspace-execution-history", after),

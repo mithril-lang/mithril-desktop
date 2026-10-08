@@ -9,8 +9,9 @@ export interface OriginalScheduleOccurrence {
   authorityRevision: number;
   sourceRevision: number;
   sourceDigest: string;
+  datasetGeneration?: number;
 }
-export type OriginalScheduleCustodyCommand =
+export type OriginalScheduleCustodyCommand = (
   | { action: "status"; profile: string }
   | { action: "select"; profile: string; expectedRevision: number }
   | ({ action: "claim" } & OriginalScheduleOccurrence)
@@ -18,9 +19,16 @@ export type OriginalScheduleCustodyCommand =
       action: "transition";
       from: "admitted" | "running";
       to: "running" | "completed" | "unknown";
-    } & OriginalScheduleOccurrence);
+    } & OriginalScheduleOccurrence)
+) & { datasetGeneration?: number };
 export type OriginalScheduleCustodyReceipt =
-  | { userId: string; profile: string; selected: boolean; revision: number }
+  | {
+      userId: string;
+      profile: string;
+      selected: boolean;
+      revision: number;
+      datasetGeneration?: number;
+    }
   | {
       userId: string;
       profile: string;
@@ -33,7 +41,10 @@ export type OriginalScheduleCustodyReceipt =
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
 const keys = (v: Record<string, unknown>, fields: readonly string[]): boolean =>
-  Object.keys(v).sort().join(",") === [...fields].sort().join(",");
+  Object.keys(v).sort().join(",") ===
+  [...fields, ...("datasetGeneration" in v ? ["datasetGeneration"] : [])]
+    .sort()
+    .join(",");
 const integer = (v: unknown, minimum = 0): boolean =>
   Number.isSafeInteger(v) && Number(v) >= minimum;
 const id = (v: unknown): boolean =>
@@ -65,7 +76,11 @@ function instant(v: unknown): boolean {
 export function validOriginalScheduleCustodyCommand(
   v: unknown,
 ): v is OriginalScheduleCustodyCommand {
-  if (!object(v) || !validOriginalScheduleContext(v.profile, "UTC"))
+  if (
+    !object(v) ||
+    !validOriginalScheduleContext(v.profile, "UTC") ||
+    (v.datasetGeneration !== undefined && !integer(v.datasetGeneration))
+  )
     return false;
   if (v.action === "status") return keys(v, ["action", "profile"]);
   if (v.action === "select")
@@ -103,7 +118,14 @@ export function validOriginalScheduleCustodyReceipt(
   owner: string,
   command: OriginalScheduleCustodyCommand,
 ): v is OriginalScheduleCustodyReceipt {
-  if (!object(v) || v.userId !== owner || v.profile !== command.profile)
+  if (
+    !object(v) ||
+    v.userId !== owner ||
+    v.profile !== command.profile ||
+    (v.datasetGeneration !== undefined && !integer(v.datasetGeneration)) ||
+    (command.action !== "status" &&
+      (v.datasetGeneration ?? 0) !== (command.datasetGeneration ?? 0))
+  )
     return false;
   if (command.action === "status" || command.action === "select")
     return (

@@ -6,10 +6,11 @@ export interface OriginalManualRequest {
   operationId: string;
   sourceRevision: number;
   sourceDigest: string;
+  datasetGeneration?: number;
 }
 export type OriginalManualStatus = "unknown" | "completed" | "rejected";
 export type OriginalManualCommand =
-  | { action: "take"; profile: string }
+  | { action: "take"; profile: string; datasetGeneration?: number }
   | (OriginalManualRequest & {
       action: "complete";
       status: OriginalManualStatus;
@@ -30,7 +31,10 @@ export const ORIGINAL_MANUAL_BYTES = 8192;
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
 const exact = (v: object, fields: string[]): boolean =>
-  Object.keys(v).sort().join(",") === fields.sort().join(",");
+  Object.keys(v).sort().join(",") ===
+  [...fields, ...("datasetGeneration" in v ? ["datasetGeneration"] : [])]
+    .sort()
+    .join(",");
 const fields = [
   "profile",
   "jobId",
@@ -46,6 +50,9 @@ const status = (v: unknown): boolean =>
   typeof v === "string" && ["unknown", "completed", "rejected"].includes(v);
 function request(v: Record<string, unknown>): boolean {
   return (
+    (v.datasetGeneration === undefined ||
+      (Number.isSafeInteger(v.datasetGeneration) &&
+        Number(v.datasetGeneration) >= 0)) &&
     validOriginalScheduleContext(v.profile, "UTC") &&
     id(v.jobId) &&
     id(v.operationId) &&
@@ -58,7 +65,13 @@ function request(v: Record<string, unknown>): boolean {
 export function validOriginalManualCommand(
   v: unknown,
 ): v is OriginalManualCommand {
-  if (!object(v) || !validOriginalScheduleContext(v.profile, "UTC"))
+  if (
+    !object(v) ||
+    !validOriginalScheduleContext(v.profile, "UTC") ||
+    (v.datasetGeneration !== undefined &&
+      (!Number.isSafeInteger(v.datasetGeneration) ||
+        Number(v.datasetGeneration) < 0))
+  )
     return false;
   if (v.action === "take") return exact(v, ["action", "profile"]);
   return (
@@ -92,6 +105,7 @@ export function validOriginalManualResult(
     return (
       receipt(v, owner, command.profile) &&
       v.status === command.status &&
+      (v.datasetGeneration ?? 0) === (command.datasetGeneration ?? 0) &&
       fields.every(
         (field) =>
           v[field as keyof OriginalManualRequest] ===
@@ -101,7 +115,11 @@ export function validOriginalManualResult(
   if (!object(v) || typeof v.fresh !== "boolean") return false;
   if (v.request === null)
     return v.fresh === false && exact(v, ["fresh", "request"]);
-  if (!receipt(v.request, owner, command.profile)) return false;
+  if (
+    !receipt(v.request, owner, command.profile) ||
+    (v.request.datasetGeneration ?? 0) !== (command.datasetGeneration ?? 0)
+  )
+    return false;
   if (v.request.status === "rejected")
     return v.fresh === false && exact(v, ["fresh", "request"]);
   return (

@@ -24,6 +24,7 @@ interface Ports {
   scope: OriginalScheduleReplicaScope;
   store: NativeOriginalScheduleReplicaStore;
   check(): Promise<void>;
+  generation?(): Promise<number>;
   command(input: OriginalManualCommand): Promise<OriginalManualResult>;
   /** Resolve only the freshly synchronized source/resources and selected custody. */
   bind(
@@ -109,7 +110,12 @@ export class OriginalScheduleManualConsumer {
       for (const entry of retained)
         await this.report(await this.recover(entry));
       await this.check();
-      const command = { action: "take" as const, profile: p.scope.profile };
+      const datasetGeneration = await p.generation?.();
+      const command = {
+        action: "take" as const,
+        profile: p.scope.profile,
+        ...(datasetGeneration === undefined ? {} : { datasetGeneration }),
+      };
       const value = await p.command(command);
       await this.check();
       if (

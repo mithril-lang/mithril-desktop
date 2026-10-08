@@ -1466,3 +1466,32 @@ Preview.63 pins Workspace schedules.58, sharing captured schedule generation and
 Main IPC rejects invalid snapshot generations and receipts from a different generation. Installer preflight requires `cloud-schedules-dataset-v1` before publication. The shared adapter requires review after an identical-row restore and never reassigns an unconfirmed operation to the new generation. Original source/runtime execution remains separately fenced; complete managed-bot/dispatch generation, hot restore custody and retained-object lifecycle are still required.
 
 Fund 4a817098 passed 449 shared tests, eight real-D1 Schedule cases including the HTTP 409 refusal and an admission/commit restore race, shared/API types, changed-file lint and 11 App release gates. The preceding exact integrated commit 35f4461c passed signed gad API CI with 572 tests, one existing skip and 34 release tests. A new receipt is required for the generation change. No production schema, published installer or installed cross-device behavior is claimed by this candidate.
+
+## Original Schedule restoration generations (candidate preview.64)
+
+The same workspace schedules.59 archive used by Web is consumed by Desktop.
+
+Whole-file entries retain their dataset generation; shared screen actions and
+RepositorySync outbox admission retain that generation through asynchronous
+preparation and file publication. Main-only custody and manual validators require
+positive-generation receipts to match the initiating command; legacy missing
+fields mean zero. A foreign/missing/newer epoch cannot acknowledge execution.
+
+[[src/main/original-schedule-replication.ts#OriginalScheduleReplication#manualBinding]]
+compares the request, synchronized anchor and current selected custody generation.
+Its manual consumer captures that anchor generation for take and retains it in
+journal report commands. Data-only runtime replication also checks authority epoch.
+The original Agent binding payload remains legacy: its plugin/policy generation
+propagation must be implemented and qualified before claiming scheduled native
+execution after restoration. This candidate neither upgrades old authority nor
+proves running-work restoration, public release or installed behavior.
+
+Preview.64 qualification passed 57 selected tests across seven execution,
+replication, custody and journal files, including positive epoch receipts and
+lost-report recovery without a second dispatch. Main/renderer typechecks,
+affected-file lint, Electron build, 711 active packaging-file checks and lat check
+passed. All 469 installed shared files match the schedules.59 archive; SHA256 is
+`b617d3199771763c5e1d5757a7729ecb0d6e6456bdf0ea95adb765122fe6ac5c`.
+Fund receipt changes are in candidate 49fd2735; the preceding signed API CI for
+9aabe604 passed 595 tests with one existing skip. A new exact-source qualification
+is required for release. No updated installer is published or installed here.

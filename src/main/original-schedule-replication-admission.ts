@@ -10,6 +10,7 @@ import {
 interface Ports {
   scope: OriginalScheduleReplicaScope;
   authorityRevision: number;
+  datasetGeneration?: number;
   check(): Promise<void>;
   custody(
     command: OriginalScheduleCustodyCommand,
@@ -40,7 +41,8 @@ export function originalScheduleReplicationAdmission(
       !validOriginalScheduleCustodyReceipt(authority, p.scope.owner, command) ||
       !("revision" in authority) ||
       authority.revision < 1 ||
-      authority.revision !== p.authorityRevision
+      authority.revision !== p.authorityRevision ||
+      (authority.datasetGeneration ?? 0) !== (p.datasetGeneration ?? 0)
     )
       throw Error("Schedule authority changed");
     const text = await p.source(input.direction);

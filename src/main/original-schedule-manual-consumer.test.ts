@@ -46,7 +46,9 @@ const binding: OriginalManualBinding = {
   authorityRevision: 3,
   nativeVersion: "b".repeat(64),
 };
-function fixture(): ConsumerFixture {
+function fixture(
+  expectedBinding: OriginalManualBinding = binding,
+): ConsumerFixture {
   const root = realpathSync(
     mkdtempSync(join(tmpdir(), "mithril-manual-consumer-")),
   );
@@ -64,7 +66,7 @@ function fixture(): ConsumerFixture {
           authorityRevision: 3,
           request: {
             userId: scope.owner,
-            ...originalManualWireRequest(binding),
+            ...originalManualWireRequest(expectedBinding),
             status: "unknown",
           },
         };
@@ -77,7 +79,7 @@ function fixture(): ConsumerFixture {
     async (): Promise<OriginalCronRunResult> => ({
       success: true as const,
       receipt: {
-        ...originalManualNativeRequest(binding),
+        ...originalManualNativeRequest(expectedBinding),
         status: "completed" as const,
       },
     }),
@@ -85,11 +87,15 @@ function fixture(): ConsumerFixture {
   const inspect = vi.fn(
     async (): Promise<OriginalCronInspectResult> => ({
       success: true,
-      receipt: { ...originalManualNativeRequest(binding), status: "unknown" },
+      receipt: {
+        ...originalManualNativeRequest(expectedBinding),
+        status: "unknown",
+      },
     }),
   );
   const bind = vi.fn(
-    async (): Promise<OriginalManualBinding> => structuredClone(binding),
+    async (): Promise<OriginalManualBinding> =>
+      structuredClone(expectedBinding),
   );
   const check = async (): Promise<void> => {
     if (!active) throw Error("account changed");
@@ -103,6 +109,9 @@ function fixture(): ConsumerFixture {
       inspect,
       bind,
       check,
+      ...(expectedBinding.datasetGeneration === undefined
+        ? {}
+        : { generation: async () => expectedBinding.datasetGeneration! }),
     });
   const read = async (): Promise<OriginalManualJournalEntry[]> => {
     const s = store();
@@ -363,4 +372,27 @@ it("never executes absent or uncertain inspection results and fences account cha
     { binding, status: "unknown", reported: true },
   ]);
   expect(f.run).toHaveBeenCalledTimes(1);
+});
+
+it("retains the restoration generation across fresh dispatch, lost report and journal recovery", async () => {
+  const expectedBinding = { ...binding, datasetGeneration: 1 };
+  const f = fixture(expectedBinding);
+  f.reportLoss(true);
+  await expect(f.consumer().poll()).rejects.toThrow("lost report reply");
+  expect(f.run).toHaveBeenCalledTimes(1);
+  expect(f.command.mock.calls[0][0]).toEqual({
+    action: "take",
+    profile: "default",
+    datasetGeneration: 1,
+  });
+  expect(f.command.mock.calls[1][0]).toMatchObject({
+    action: "complete",
+    datasetGeneration: 1,
+  });
+  expect((await f.read())[0].binding.datasetGeneration).toBe(1);
+  f.reportLoss(false);
+  f.fresh(false);
+  await f.consumer().poll();
+  expect(f.run).toHaveBeenCalledTimes(1);
+  expect((await f.read())[0].reported).toBe(true);
 });

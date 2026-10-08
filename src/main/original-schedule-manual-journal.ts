@@ -39,6 +39,9 @@ export function originalManualWireRequest(
     operationId: binding.operationId,
     sourceRevision: binding.sourceRevision,
     sourceDigest: binding.sourceDigest,
+    ...(binding.datasetGeneration === undefined
+      ? {}
+      : { datasetGeneration: binding.datasetGeneration }),
   };
 }
 export function validOriginalManualBinding(
@@ -48,7 +51,22 @@ export function validOriginalManualBinding(
   const b = v as OriginalManualBinding;
   return (
     Object.keys(b).sort().join(",") ===
-      "authorityRevision,jobId,nativeVersion,operationId,owner,profile,sourceDigest,sourceRevision,timeZone" &&
+      [
+        ...[
+          "authorityRevision",
+          "jobId",
+          "nativeVersion",
+          "operationId",
+          "owner",
+          "profile",
+          "sourceDigest",
+          "sourceRevision",
+          "timeZone",
+        ],
+        ...("datasetGeneration" in b ? ["datasetGeneration"] : []),
+      ]
+        .sort()
+        .join(",") &&
     validOriginalScheduleContext(b.profile, b.timeZone) &&
     Number.isSafeInteger(b.authorityRevision) &&
     b.authorityRevision > 0 &&

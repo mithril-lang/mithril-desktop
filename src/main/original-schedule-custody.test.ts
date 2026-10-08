@@ -2,7 +2,15 @@ import { createServer, type ServerResponse } from "node:http";
 import { once } from "node:events";
 import { expect, it } from "vitest";
 import { CloudWorkspace } from "./cloud-workspace";
-import type { OriginalScheduleCustodyCommand } from "./original-schedule-custody";
+import {
+  validOriginalScheduleCustodyCommand,
+  validOriginalScheduleCustodyReceipt,
+  type OriginalScheduleCustodyCommand,
+} from "./original-schedule-custody";
+import {
+  validOriginalManualCommand,
+  validOriginalManualResult,
+} from "./original-schedule-manual";
 
 const scopes = ["workspace:read", "workspace:write", "chat:write", "inference"];
 const occurrence = {
@@ -515,5 +523,81 @@ it("uses a captured account for another profile manual mailbox and rejects forei
     expect(p.calls).toHaveLength(calls);
   } finally {
     await p.close();
+  }
+});
+
+it("binds Native custody and manual results to the initiating restoration generation", () => {
+  const command = {
+    action: "claim" as const,
+    ...occurrence,
+    datasetGeneration: 1,
+  };
+  expect(validOriginalScheduleCustodyCommand(command)).toBe(true);
+  const result = {
+    userId: "owner",
+    profile: "default",
+    operationId: occurrence.operationId,
+    fresh: true,
+    status: "admitted",
+    datasetGeneration: 1,
+  };
+  expect(validOriginalScheduleCustodyReceipt(result, "owner", command)).toBe(
+    true,
+  );
+  expect(
+    validOriginalScheduleCustodyReceipt(
+      { ...result, datasetGeneration: 2 },
+      "owner",
+      command,
+    ),
+  ).toBe(false);
+  expect(
+    validOriginalScheduleCustodyReceipt(
+      { ...result, datasetGeneration: undefined },
+      "owner",
+      command,
+    ),
+  ).toBe(false);
+  const take = {
+    action: "take" as const,
+    profile: "default",
+    datasetGeneration: 1,
+  };
+  expect(validOriginalManualCommand(take)).toBe(true);
+  const manual = {
+    profile: "default",
+    jobId: occurrence.jobId,
+    operationId: occurrence.operationId,
+    sourceRevision: 2,
+    sourceDigest: occurrence.sourceDigest,
+    datasetGeneration: 1,
+    userId: "owner",
+    status: "unknown",
+  };
+  expect(
+    validOriginalManualResult(
+      { fresh: true, request: manual, authorityRevision: 1 },
+      "owner",
+      take,
+    ),
+  ).toBe(true);
+  expect(
+    validOriginalManualResult(
+      {
+        fresh: true,
+        request: { ...manual, datasetGeneration: 2 },
+        authorityRevision: 1,
+      },
+      "owner",
+      take,
+    ),
+  ).toBe(false);
+  for (const datasetGeneration of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1, "1"]) {
+    expect(
+      validOriginalScheduleCustodyCommand({ ...command, datasetGeneration }),
+    ).toBe(false);
+    expect(validOriginalManualCommand({ ...take, datasetGeneration })).toBe(
+      false,
+    );
   }
 });

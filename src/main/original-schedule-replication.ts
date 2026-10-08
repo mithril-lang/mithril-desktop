@@ -89,7 +89,9 @@ function managedDirectory(root: string): void {
 export class OriginalScheduleReplication {
   private stopped = false;
   private running = false;
-  private manualAnchor: OriginalScheduleAgentBinding | null = null;
+  private manualAnchor:
+    | (OriginalScheduleAgentBinding & { datasetGeneration?: number })
+    | null = null;
   private manualCapture:
     | (() => Promise<{ version: string | null; sourceDigest: string | null }>)
     | null = null;
@@ -128,7 +130,9 @@ export class OriginalScheduleReplication {
       ) ||
       !("selected" in authority) ||
       !authority.selected ||
-      authority.revision < 1
+      authority.revision < 1 ||
+      (authority.datasetGeneration ?? 0) !==
+        (this.manualAnchor?.datasetGeneration ?? 0)
     )
       throw Error("Run this schedule on its selected device");
   }
@@ -147,6 +151,7 @@ export class OriginalScheduleReplication {
       request.profile !== anchor.profile ||
       request.sourceRevision !== anchor.sourceRevision ||
       request.sourceDigest !== anchor.sourceDigest ||
+      (request.datasetGeneration ?? 0) !== (anchor.datasetGeneration ?? 0) ||
       authorityRevision !== anchor.authorityRevision
     )
       throw Error("Manual schedule source changed");
@@ -163,7 +168,8 @@ export class OriginalScheduleReplication {
       }) ||
       !("selected" in authority) ||
       !authority.selected ||
-      authority.revision !== authorityRevision
+      authority.revision !== authorityRevision ||
+      (authority.datasetGeneration ?? 0) !== (anchor.datasetGeneration ?? 0)
     )
       throw Error("Manual schedule custody changed");
     const current = await capture();
@@ -181,6 +187,9 @@ export class OriginalScheduleReplication {
       sourceDigest: anchor.sourceDigest,
       authorityRevision,
       nativeVersion: anchor.nativeVersion,
+      ...(anchor.datasetGeneration === undefined
+        ? {}
+        : { datasetGeneration: anchor.datasetGeneration }),
     };
   }
   manualConsumer(ports: {
@@ -197,6 +206,10 @@ export class OriginalScheduleReplication {
       ),
       check: () => this.check(),
       command: ports.command,
+      generation: async () => {
+        await this.assertSelectedExecution();
+        return this.manualAnchor?.datasetGeneration ?? 0;
+      },
       run: ports.run,
       inspect: ports.inspect,
       bind: (request, revision) =>
@@ -287,18 +300,25 @@ export class OriginalScheduleReplication {
         !("revision" in authority)
       )
         throw Error("Schedule authority unconfirmed");
+      const capturedGeneration = authority.datasetGeneration;
       if (authority.revision === 0) {
         // Only initialize an absent authority. Never steal another device's selected lane.
         authority = await p.custody({
           action: "select",
           profile: p.scope.profile,
           expectedRevision: 0,
+          ...(authority.datasetGeneration && authority.datasetGeneration > 0
+            ? { datasetGeneration: authority.datasetGeneration }
+            : {}),
         });
         if (
           !validOriginalScheduleCustodyReceipt(authority, p.scope.owner, {
             action: "select",
             profile: p.scope.profile,
             expectedRevision: 0,
+            ...(capturedGeneration && capturedGeneration > 0
+              ? { datasetGeneration: capturedGeneration }
+              : {}),
           }) ||
           !("revision" in authority)
         )
@@ -306,6 +326,9 @@ export class OriginalScheduleReplication {
       }
       await this.check();
       const authorityRevision = authority.revision;
+      const datasetGeneration = capturedGeneration ?? 0;
+      if ((repository.state.datasetGeneration ?? 0) !== datasetGeneration)
+        throw Error("Schedule dataset generation changed");
       const file = new OriginalScheduleFileRepository(
         repository,
         p.scope.profile,
@@ -351,6 +374,7 @@ export class OriginalScheduleReplication {
           assert: originalScheduleReplicationAdmission({
             scope: p.scope,
             authorityRevision,
+            datasetGeneration,
             check: () => this.check(),
             custody: p.custody,
             source: async (direction) =>
@@ -449,7 +473,12 @@ export class OriginalScheduleReplication {
         };
         await p.bind(anchor);
         await this.check();
-        this.manualAnchor = anchor;
+        if ((cloud.datasetGeneration ?? 0) !== datasetGeneration)
+          throw Error("Schedule dataset generation changed");
+        this.manualAnchor = {
+          ...anchor,
+          ...(datasetGeneration > 0 ? { datasetGeneration } : {}),
+        };
         // Native capture needs the very same store lock used by resource bindings.
         this.manualCapture = () =>
           store.exclusive(p.scope, () => native.capture());

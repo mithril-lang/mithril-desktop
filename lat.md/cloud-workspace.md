@@ -1383,3 +1383,13 @@ All 465 producer/archive files match; archive SHA256 is `58dc58cb7ebca97a4bf48bf
 This is not monotonic archive generation or old-write fencing. API deployment, signed publication, installed update/restart/authentication and cross-device usability remain unproven. No cloud/device UI separation is introduced.
 
 Local preview.52 qualification passed 32 compiled-consumer/cloud tests, 13 updater tests, full Electron typecheck/build, 689-file packaging identity, compiled notification layout and API-preflight tests, changed-file lint and `lat check`. All 465 installed Workspace dependency bytes match the immutable vendor. The installer preflight now also requires the counted Repository protocol; it does not publish the API or upgrade the installed preview.35.
+
+### Complete session cache consumer package (draft)
+
+Preview.53 pins Workspace 0.6.29-schedules.48 with complete session inventory replacement and atomic long checkpoint publication shared by Web/Desktop.
+
+All 465 producer/archive files match; SHA256 is `711b605144bfaaaf6706d170e1dca810fafa65c6b02ef45c37cebe28e6a98d74`. Older overlapping lists cannot overwrite newer reads; removed/lower inventories retire their checkpoint/cache. Checkpoints stage all advancing bounded pages before publishing a complete history, without the previous thousand-page cutoff. Pending IDs/base revisions stay independent.
+
+This source candidate does not complete equal-identity archive generation, historical receipt fencing, enabled/hot execution reconciliation, current-main API publication or the installed client's signed update/synchronization. The ordinary cache fixes add no cloud/device view separation.
+
+Local preview.53 qualification passed 54 selected compiled cache/cloud/chat/updater tests. The two new compiled session cases passed again after their fixture return annotation was corrected; full Electron typecheck/build then passed. All 465 installed vendor bytes and lock identity match; 689-file packaging identity, changed-file lint and `lat check` pass. No new signed installer or installed update is claimed.

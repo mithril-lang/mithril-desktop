@@ -1265,3 +1265,11 @@ The compiled Repository consumer retains its prior display and cache when a late
 ## Packaged counted Repository replacement
 
 The actual compiled vendor rejects a changed later page before cache publication. A coherent counted inventory then removes absent IDs and replaces lower revisions without dispatching queued writes.
+
+## Packaged session inventory replacement
+
+The actual shared vendor replaces 1,205 canonical sessions with lower revisions or an empty inventory, clears retired event caches and preserves queued original operation identities without writing or dispatching.
+
+## Packaged atomic long checkpoint
+
+The compiled shared checkpoint preserves its old complete cache after a late network failure, then reads 20,006 immutable events over more than a thousand advancing pages without truncation or execution.

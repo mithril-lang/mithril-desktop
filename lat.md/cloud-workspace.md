@@ -1283,3 +1283,13 @@ Native preview.42 removes the reconstruction's aggregate 20,000-event/50-MiB ref
 The current renderer and transport ports still materialize complete arrays, so memory/disk availability is not unlimited. This changes aggregate persistence, not per-event protocol limits or attachment resources. Full account archive/export/import, profile resource closure, canonical publication and authenticated installed cross-device QA remain outstanding. Workspace `.40` stays pinned unchanged.
 
 Local qualification: all seven history suites pass (78 tests). The real SQLite cache regression retains 20,005 events and a combined timeline above 50 MiB, reads every record, checks chunk sizes, same-ID owner isolation, old-format conversion, same-revision rejection, missing/tampered chunk refusal and transactional rollback after simulated disk failure. Both typechecks and preview.42 build pass; installed/public behavior remains unproven.
+
+## Canonical portable inventory release gate
+
+Native preview.43 requires `workspace-inventory-keyset-v1` before installer publication, in addition to the existing Chat and Sidebar inventory protocols.
+
+Fund's candidate API removes the shared thousand-record admission ceiling and assembles portable record snapshots through hundred-record keyset reads, including tombstones and file manifests. Cursor/count/rowid changes reject a mixed inventory. CAS, scopes, owner and private resource quotas are unchanged. The complete-array HTTP response still has provider/memory constraints; full canonical archive/export/import remains unfinished. Native keeps workspace `.40` immutable.
+
+The local fixed-route compatibility test refuses the former API even when Chat/Sidebar protocols are present. The current public endpoint still fails the compatibility gate, so no installer publication or installed replacement is inferred.
+
+Local qualification: Fund's 19 Workspace/repository API tests pass using local D1, including controlled concurrent-read rejection and 1,302 portable records plus optional file manifests. API types and dry-run build pass. Both release compatibility tests pass; preview.43 Desktop types/build and `lat check` pass. Native preview.42 CI run 37710630739 succeeded. This draft gate update does not establish production readiness or an installed upgrade.

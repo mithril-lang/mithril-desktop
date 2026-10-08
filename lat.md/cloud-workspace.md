@@ -1548,3 +1548,24 @@ suite passed 453 tests. Fund ff7204fe signed full API CI passed 597 tests with o
 existing skip; later shared candidate bfbc123f needs its own exact-commit receipt.
 This does not prove running-work restoration, production rollout, installed
 preview.67 behavior or authenticated multi-device/updater QA.
+
+## Project folder generation custody (candidate preview.68)
+
+Selected folder journals now retain the cloud dataset generation alongside their acknowledged file baseline and saved operation.
+
+A fresh snapshot precedes pending-operation replay. A generation mismatch retains
+the exact operation without resending or rebasing it. Old locally edited folders
+remain unchanged for review; unchanged folders reconcile restored cloud bytes
+automatically. Newly selected folders capture the observed generation. Pointer
+writes carry that captured epoch, and fresh generation checks precede manifest
+publication, local replacement and recoverable removal. These checks do not make
+R2, D1 and the local filesystem a single atomic transaction; the API generation
+write guard remains necessary before Desktop release.
+
+Filesystem tests cover lost acknowledgements and restart after restoration,
+changed versus unchanged roots and restoration during a delayed chunk download.
+The delayed download leaves no replacement file or temporary artifact and queues
+no cloud write. Production publication, hot execution restoration and final
+installed Web/Desktop/updater qualification remain separate open gates.
+
+Candidate preview.68 qualification passes seven real filesystem tests, main and renderer typechecks, affected-file lint, Electron build, 711-file packaging identity and lat checks. This remains source qualification; no installer or production application was changed.

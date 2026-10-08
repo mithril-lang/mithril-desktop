@@ -32,6 +32,7 @@ interface Fixture {
   deps(state: string): ConstructorParameters<typeof ProjectFolderSync>[0];
   owner(userId: string): void;
   loseAck(): void;
+  restore(): void;
   remote(text: string): Promise<void>;
 }
 async function fixture(): Promise<Fixture> {
@@ -48,7 +49,8 @@ async function fixture(): Promise<Fixture> {
     manifests = new Map<string, FileManifest>(),
     operations: WorkspaceOperation[] = [];
   let pointer: WorkspaceRecord | undefined,
-    loseAck = false;
+    loseAck = false,
+    datasetGeneration = 0;
   const files: ProjectFileTransport = {
     status: async () => ({ configured: true }),
     putChunk: async (_p, b) => {
@@ -70,6 +72,7 @@ async function fixture(): Promise<Fixture> {
     stateDir: join(root, state),
     context: async () => identity,
     snapshot: async () => ({
+      datasetGeneration,
       records: [
         {
           id: "p",
@@ -84,6 +87,8 @@ async function fixture(): Promise<Fixture> {
     }),
     files,
     apply: async (op: WorkspaceOperation) => {
+      if ((op.datasetGeneration ?? 0) !== datasetGeneration)
+        throw Error("Old dataset operation");
       operations.push(structuredClone(op));
       if (pointer?.revision === op.baseRevision || !pointer) {
         pointer = { ...op, revision: op.baseRevision + 1, updatedAt: 1 };
@@ -108,6 +113,9 @@ async function fixture(): Promise<Fixture> {
     },
     loseAck: () => {
       loseAck = true;
+    },
+    restore: () => {
+      datasetGeneration++;
     },
     remote: async (text: string) => {
       const bytes = new TextEncoder().encode(text),
@@ -256,4 +264,86 @@ describe("selected project folder synchronization", () => {
     await b.tick();
     expect((await b.status("p")).connected).toBe(false);
   });
+});
+
+// @lat: [[cloud-workspace-tests#Project folder restoration generations]]
+it("retains an old pending operation after restore and restart without rebasing or resending it", async () => {
+  const f = await fixture(),
+    sync = new ProjectFolderSync(f.deps("state"));
+  await writeFile(join(f.root, "a", "hello.txt"), "saved local bytes");
+  await sync.connect("p", (await sync.preview("p", join(f.root, "a"))).ticket);
+  f.loseAck();
+  await sync.tick();
+  const pending = f.operations[0];
+  expect(pending.datasetGeneration).toBe(0);
+  f.restore();
+  await f.remote("restored cloud bytes");
+  const restarted = new ProjectFolderSync(f.deps("state"));
+  await restarted.tick();
+  expect(f.operations).toHaveLength(1);
+  expect((await restarted.status("p")).error).toContain("retained for review");
+  expect(await readFile(join(f.root, "a", "hello.txt"), "utf8")).toBe(
+    "saved local bytes",
+  );
+  const stateFile = (await readdir(join(f.root, "state"))).find((name) =>
+    name.endsWith(".json"),
+  )!;
+  const links = JSON.parse(
+    await readFile(join(f.root, "state", stateFile), "utf8"),
+  );
+  expect(links[0].pending).toEqual(pending);
+});
+
+it("keeps pre-restore local edits while unchanged folders automatically receive restored bytes", async () => {
+  const f = await fixture(),
+    a = new ProjectFolderSync(f.deps("state-a")),
+    b = new ProjectFolderSync(f.deps("state-b"));
+  await writeFile(join(f.root, "a", "hello.txt"), "original");
+  await a.connect("p", (await a.preview("p", join(f.root, "a"))).ticket);
+  await a.tick();
+  await b.connect("p", (await b.preview("p", join(f.root, "b"))).ticket);
+  await b.tick();
+  await writeFile(join(f.root, "a", "hello.txt"), "unsynchronized local edit");
+  const before = f.operations.length;
+  f.restore();
+  await f.remote("restored");
+  await a.tick();
+  await b.tick();
+  expect(f.operations).toHaveLength(before);
+  expect(await readFile(join(f.root, "a", "hello.txt"), "utf8")).toBe(
+    "unsynchronized local edit",
+  );
+  expect((await a.status("p")).error).toContain("retained for review");
+  expect(await readFile(join(f.root, "b", "hello.txt"), "utf8")).toBe(
+    "restored",
+  );
+  expect((await b.status("p")).error).toBeNull();
+});
+
+it("refuses a delayed file replacement when restoration happens during download", async () => {
+  const f = await fixture(),
+    a = new ProjectFolderSync(f.deps("state-a")),
+    b = new ProjectFolderSync(f.deps("state-b"));
+  await writeFile(join(f.root, "a", "hello.txt"), "original");
+  await a.connect("p", (await a.preview("p", join(f.root, "a"))).ticket);
+  await a.tick();
+  await b.connect("p", (await b.preview("p", join(f.root, "b"))).ticket);
+  const readChunk = f.files.getChunk;
+  f.files.getChunk = async (project, digest) => {
+    const bytes = await readChunk(project, digest);
+    f.restore();
+    return bytes;
+  };
+  const before = f.operations.length;
+  await b.tick();
+  expect((await b.status("p")).error).toContain("retained for review");
+  await expect(readFile(join(f.root, "b", "hello.txt"))).rejects.toThrow(
+    "ENOENT",
+  );
+  expect(f.operations).toHaveLength(before);
+  expect(
+    (await readdir(join(f.root, "b"))).filter((name) =>
+      name.startsWith(".mithril-sync-"),
+    ),
+  ).toEqual([]);
 });

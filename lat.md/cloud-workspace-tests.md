@@ -1305,3 +1305,7 @@ Desktop never mounts the workspace for a stored but invalid account, refuses man
 ## Packaged device replica restoration generation
 
 The actual vendored ReplicaSync keeps saved device edits as durable conflicts after restoration, including reopened clients, without uploading old bytes or overwriting local edits.
+
+## Project folder restoration generations
+
+Actual filesystem synchronization retains old saved operations and local edits across restart, while unchanged folders receive restored bytes and delayed downloads refuse replacement after a generation change.

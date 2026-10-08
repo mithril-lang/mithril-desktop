@@ -35,6 +35,7 @@ interface JsonRpcNotification {
 }
 
 interface PendingRequest<T = unknown> {
+  selection?: number;
   reject: (reason: Error) => void;
   resolve: (value: T) => void;
   timeout: number;
@@ -98,6 +99,7 @@ export class DashboardGatewayClient {
   private pending = new Map<number | string, PendingRequest>();
   private socket: WebSocket | null = null;
   private capabilitySent = false;
+  private selectionEpoch = 0;
   private approvals = new OwnedGatewayApprovals();
   private readonly requestTimeoutMs: number;
   private readonly connectTimeoutMs: number;
@@ -199,6 +201,13 @@ export class DashboardGatewayClient {
 
     const id = this.nextRequestId++;
     const message = { jsonrpc: "2.0", id, method, params };
+    const selection = [
+      "session.resume",
+      "session.create",
+      "session.activate",
+    ].includes(method)
+      ? ++this.selectionEpoch
+      : undefined;
 
     return new Promise<T>((resolve, reject) => {
       const timeout = window.setTimeout(() => {
@@ -206,6 +215,7 @@ export class DashboardGatewayClient {
         reject(new Error(`Hermes dashboard request timed out: ${method}`));
       }, timeoutMs);
       this.pending.set(id, {
+        selection,
         resolve: (value: unknown) => resolve(value as T),
         reject,
         timeout,
@@ -306,6 +316,44 @@ export class DashboardGatewayClient {
       return;
     }
 
+    // Only the latest successful attachment response on this socket can restore
+    // original peer frames. Metadata-only pending_approval is never authority.
+    const snapshot = response.result;
+    if (
+      pending.selection === this.selectionEpoch &&
+      pending.selection !== undefined &&
+      !!this.options.onEvent &&
+      isRecord(snapshot) &&
+      typeof snapshot.session_id === "string" &&
+      Array.isArray(snapshot.open_requests)
+    ) {
+      for (const entry of snapshot.open_requests.slice(0, 32)) {
+        if (
+          !isRecord(entry) ||
+          entry.method !== "approval" ||
+          !isRecord(entry.params) ||
+          entry.params.session_id !== snapshot.session_id
+        )
+          continue;
+        const captured = this.approvals.receive(
+          {
+            jsonrpc: "2.0",
+            id: entry.id,
+            method: entry.method,
+            params: entry.params,
+          },
+          true,
+        );
+        if (captured && !captured.reply)
+          this.options.onEvent?.(
+            captured.event ?? {
+              type: "approval.request",
+              session_id: snapshot.session_id,
+              payload: { ...entry.params, server_request_id: entry.id },
+            },
+          );
+      }
+    }
     pending.resolve(response.result);
   }
 

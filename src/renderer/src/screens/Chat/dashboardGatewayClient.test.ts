@@ -52,6 +52,75 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// @lat: [[lat.md/owned-tool-calls#Owned tool calls#Test specifications#Original peer restoration]]
+it("restores only original pending peers from the latest attachment response", async () => {
+  const onEvent = vi.fn();
+  const client = new DashboardGatewayClient({ onEvent });
+  const opening = client.connect("ws://localhost/api/ws");
+  const socket = FakeWebSocket.last!;
+  const send = vi.fn();
+  Object.assign(socket, { send });
+  socket.readyState = FakeWebSocket.OPEN;
+  socket.emit("open");
+  await opening;
+  const receive = (value: unknown): void =>
+    socket.emit("message", { data: JSON.stringify(value) });
+  const peer = {
+    id: "srq-000000000001",
+    method: "approval",
+    params: {
+      session_id: "owned",
+      request_id: "queue",
+      choices: ["once", "deny"],
+    },
+  };
+  const snapshot = {
+    session_id: "owned",
+    open_requests: [
+      peer,
+      {
+        ...peer,
+        id: "srq-000000000002",
+        params: { ...peer.params, session_id: "foreign" },
+      },
+    ],
+  };
+  const old = client.request("session.resume", { session_id: "old" });
+  const current = client.request("session.resume", { session_id: "stored" });
+  receive({ id: JSON.parse(send.mock.calls[0][0]).id, result: snapshot });
+  await old;
+  expect(onEvent).not.toHaveBeenCalled();
+  receive({ id: JSON.parse(send.mock.calls[1][0]).id, result: snapshot });
+  await current;
+  expect(onEvent).toHaveBeenCalledTimes(1);
+  expect(client.answerApproval("srq-000000000002", "foreign", "once")).toBe(
+    false,
+  );
+  const revisit = client.request("session.resume", { session_id: "stored" });
+  receive({ id: JSON.parse(send.mock.calls.at(-1)![0]).id, result: snapshot });
+  await revisit;
+  expect(onEvent).toHaveBeenCalledTimes(2);
+  expect(client.answerApproval(peer.id, "owned", "once")).toBe(true);
+  const replay = client.request("session.resume", { session_id: "stored" });
+  receive({ id: JSON.parse(send.mock.calls.at(-1)![0]).id, result: snapshot });
+  await replay;
+  expect(onEvent).toHaveBeenCalledTimes(2);
+  const unrelated = client.request("tools.show", { session_id: "owned" });
+  receive({
+    id: JSON.parse(send.mock.calls.at(-1)![0]).id,
+    result: {
+      session_id: "owned",
+      open_requests: [{ ...peer, id: "srq-000000000003" }],
+    },
+  });
+  await unrelated;
+  expect(client.answerApproval("srq-000000000003", "owned", "once")).toBe(
+    false,
+  );
+  client.close();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
 describe("DashboardGatewayClient.connect", () => {
   it("rejects and closes the socket when the handshake stalls", async () => {
     const client = new DashboardGatewayClient({ connectTimeoutMs: 1_000 });

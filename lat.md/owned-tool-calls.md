@@ -16,11 +16,17 @@ The compiled shared SDK captures peer approval IDs, immutable session/choices an
 
 The dashboard client advertises server requests on gateway.ready and routes captured peer approval requests to the existing cards. User selection queues a response on the original peer ID; it is not an effect or delivery receipt. Cancel/retirement removes the card authority. Unsupported peer kinds explicitly return method-not-found; no automatic approval or credential entry occurs.
 
+The latest successful session attachment response restores original approval frames from its bounded open_requests snapshot. Session IDs must match, metadata never creates authority, and answered/cancelled IDs cannot revive. Restoring a pending card still requires a new explicit human choice.
+
 Desktop now vendors agency.12. Its Cloud Browser runner and main adapter consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or replace server effect grants.
 
 ## Test specifications
 
 Mounted consumer tests use the actual hook and compiled SDK with a synthetic gateway. They prove local admission and lifecycle behavior rather than hosted, installed or real provider execution.
+
+### Original peer restoration
+
+Only the latest attachment response restores its matching original peer frames. Stale responses, foreign session frames, unrelated RPC results and consumed requests cannot create authority; a still-pending frame can restore its display.
 
 ### Mounted owned call lifecycle
 

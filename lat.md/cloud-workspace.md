@@ -1363,3 +1363,13 @@ Workspace .43 SHA256 is `b3472d11ab98207c3f0584f4bc49b01115751c57e24f7e08d4a08b9
 Preview.50 pins Workspace 0.6.29-schedules.44 from Fund b4fef9d3, incorporating current-main UI changes while retaining pending/conflict/disconnected synchronization states and the complete inventory release gates.
 
 The original .43 archive stays immutable. All 465 producer/archive files match; .44 SHA256 is `f9f733bc4f05df9dbf7ee6689060101570b9345b5e08c2901cc5b73e4a752011`. Web source tests and API contract/types passed after the merge. Installed dependency verification and consumer checks are separate; publication and actual update/cross-device behavior remain unproven.
+
+### Canonical snapshot and all-page cache package (draft)
+
+Preview.51 pins Workspace 0.6.29-schedules.46 from Fund 9560d788, sharing the ordinary Workspace cache replacement and all-page Repository publication fixes with Web.
+
+The immutable archive has 465 files and SHA256 `5f8c53e5f1dbe031db59cbc0a603e3fbc923d39f261d3da52888064c7c60e25b`. Producer/archive bytes match. Full snapshots retain queued edits while replacing absent IDs and lower restored revisions; Repository page failures leave the previous cache intact. No device/cloud view split is added.
+
+This package does not complete immutable Repository pagination, monotonic restore generation, old-write fencing or chat cache restoration. Current API compatibility, current-main releases and the installed signed client's actual update/auth/data/synchronization remain separate gates. Earlier migration-separated descriptions above are historical; Jun's requested target is one original Desktop interface with automatic cloud data synchronization.
+
+Local qualification for preview.51 passed 44 selected compiled-consumer/cloud/updater tests, full main/renderer typecheck and Electron build, changed-file lint, packaging identity for 689 active runtime files, compiled notification layout and `lat check`. All 465 installed dependency bytes match the vendor archive. The live inventory preflight refused publication because its required protocol flags are still missing. No signed preview.51 release or change to `/Applications/Mithril.app` occurred.

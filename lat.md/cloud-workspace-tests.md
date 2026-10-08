@@ -1253,3 +1253,11 @@ The actual vendored Workspace export preserves 20,006 contiguous events, first a
 ## Packaged acknowledged journal cleanup
 
 The actual compiled vendored pending store restores 1,205 edits and deletes only acknowledged keys, retaining an interleaved unacknowledged edit and another owner before the final drain.
+
+## Packaged canonical snapshot replacement
+
+The compiled shared dependency loads 1,205 records, then replaces absent IDs and restored lower revisions from a complete snapshot while preserving queued operation identities and base revisions without sending them.
+
+## Packaged all-page Repository publication
+
+The compiled Repository consumer retains its prior display and cache when a later configured collection fails. Earlier pages cannot persist a partial mixed inventory or initiate queued writes.

@@ -39,12 +39,23 @@ vi.mock("./screens/Layout/Layout", () => ({
   default: () => <p>Cloud workspace</p>,
 }));
 vi.mock("./screens/MithrilStart/MithrilStart", () => ({
-  default: ({ onOpenWorkspace }: { onOpenWorkspace: () => void }) => (
+  default: ({
+    onOpenWorkspace,
+    onOpenProtection,
+  }: {
+    onOpenWorkspace: () => void;
+    onOpenProtection?: () => void;
+  }) => (
     <>
       <p>Sign in to Mithril</p>
       <button onClick={onOpenWorkspace}>Retry connection</button>
+      <button onClick={onOpenProtection}>Open local protection</button>
     </>
   ),
+}));
+vi.mock("./components/useI18n", () => ({ useI18n: () => ({ locale: "en" }) }));
+vi.mock("./screens/CloudWorkspace/EndpointProtection", () => ({
+  default: () => <p>Local protection</p>,
 }));
 vi.mock("./utils/analytics", () => ({ captureScreenView: vi.fn() }));
 let accountChanged = (): void => {};
@@ -107,6 +118,24 @@ it("keeps a signed-out user on Mithril sign-in instead of a native installation 
   });
   expect(screen.getByText("Sign in to Mithril")).toBeInTheDocument();
   expect(tunnel).not.toHaveBeenCalled();
+});
+it("keeps local protection open across focus and cloud account changes without admitting the workspace", async () => {
+  first.mockResolvedValue({ connected: false, protection: "keychain" });
+  account.mockResolvedValue({ live: false, userId: "" });
+  render(<App />);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(3100);
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByText("Open local protection"));
+  });
+  expect(screen.getByText("Local protection")).toBeInTheDocument();
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+    accountChanged();
+  });
+  expect(screen.getByText("Local protection")).toBeInTheDocument();
+  expect(screen.queryByText("Cloud workspace")).not.toBeInTheDocument();
 });
 // @lat: [[cloud-workspace-tests#Verified Desktop sign-in gate]]
 it("does not mount the app for a stored but revoked credential, including a manual open attempt", async () => {

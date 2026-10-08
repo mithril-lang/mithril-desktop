@@ -54,3 +54,4 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[mithril-code]] — profile-scoped System One coding through the Hermes plugin CLI, source review and real execution receipts.
 
 - [[language-typography]] — government-adopted default fonts, language switching and offline script fallbacks.
+- [[endpoint-protection]] — local endpoint monitoring, bounded detection and signed definition delivery.

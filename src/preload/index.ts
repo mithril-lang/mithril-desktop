@@ -219,6 +219,16 @@ const hermesAPI = {
     recovery: () => ipcRenderer.invoke("device-care-recovery"),
   } satisfies DeviceCareAPI,
 
+  endpoint: {
+    status: () => ipcRenderer.invoke("endpoint-status"),
+    setEnabled: (enabled: boolean) =>
+      ipcRenderer.invoke("endpoint-enabled", enabled),
+    chooseFolder: () => ipcRenderer.invoke("endpoint-folder-add"),
+    removeFolder: (folder: string) =>
+      ipcRenderer.invoke("endpoint-folder-remove", folder),
+    scanFile: () => ipcRenderer.invoke("endpoint-file-scan"),
+    updateDefinitions: () => ipcRenderer.invoke("endpoint-definitions-update"),
+  } satisfies import("../shared/endpoint-protection").EndpointAPI,
   // Installation
   checkInstall: (): Promise<{
     installed: boolean;

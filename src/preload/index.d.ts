@@ -273,6 +273,7 @@ interface KanbanCreateTaskInput {
 
 interface HermesAPI {
   deviceCare: DeviceCareAPI;
+  endpoint: import("../shared/endpoint-protection").EndpointAPI;
   // Installation
   checkInstall: () => Promise<InstallStatus>;
   verifyInstall: () => Promise<boolean>;

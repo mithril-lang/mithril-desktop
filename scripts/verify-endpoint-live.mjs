@@ -75,7 +75,11 @@ try {
   assert.equal(status.running, true);
   assert.equal(status.definitions.source, "signed-update");
   assert.ok(status.alerts.some((a) => a.rule === "php-post-eval"));
-  await page.waitForFunction(() => Array.from(document.querySelectorAll("button")).every(button => !button.disabled));
+  await page.waitForFunction(() =>
+    Array.from(document.querySelectorAll("button")).every(
+      (button) => !button.disabled,
+    ),
+  );
   const artifact = resolve(process.argv[2] || "/tmp/mithril-endpoint-live.png");
   await page.screenshot({ path: artifact });
   await page

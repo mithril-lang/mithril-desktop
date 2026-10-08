@@ -95,6 +95,11 @@ export class DashboardGatewayClient {
   private epoch = 0;
   private pending = new Map<number | string, PendingRequest>();
   private socket: WebSocket | null = null;
+  private capabilitySent = false;
+  private approvals = new Map<
+    string,
+    { sessionId: string; requestId: string; choices: Set<string> }
+  >();
   private readonly requestTimeoutMs: number;
   private readonly connectTimeoutMs: number;
 
@@ -141,9 +146,10 @@ export class DashboardGatewayClient {
         if (settled) return;
         settled = true;
         window.clearTimeout(timeout);
-        if (this.socket === socket) this.socket = null;
+        const current = this.socket === socket;
+        if (current) this.socket = null;
         reject(new Error(`Could not connect to Hermes dashboard WebSocket`));
-        this.options.onError?.(event);
+        if (current) this.options.onError?.(event);
       };
 
       socket.addEventListener(
@@ -158,9 +164,12 @@ export class DashboardGatewayClient {
         { once: true },
       );
       socket.addEventListener("error", failOpen, { once: true });
-      socket.addEventListener("message", (event) => this.handleMessage(event));
+      socket.addEventListener("message", (event) => {
+        if (this.socket === socket) this.handleMessage(event);
+      });
       socket.addEventListener("close", (event) => {
-        if (this.socket === socket) this.socket = null;
+        const current = this.socket === socket;
+        if (current) this.socket = null;
         // A close before the handshake settles must still reject the connect
         // promise — otherwise a CONNECTING→CLOSED transition with no `error`
         // event would hang it until the timeout fires.
@@ -169,6 +178,8 @@ export class DashboardGatewayClient {
           window.clearTimeout(timeout);
           reject(new Error("Hermes dashboard WebSocket closed"));
         }
+        if (!current) return;
+        this.approvals.clear();
         this.rejectPending("Hermes dashboard WebSocket closed");
         this.options.onClose?.(event);
       });
@@ -206,6 +217,8 @@ export class DashboardGatewayClient {
 
   close(): void {
     this.epoch++;
+    this.capabilitySent = false;
+    this.approvals.clear();
     const socket = this.socket;
     this.socket = null;
     this.rejectPending("Hermes dashboard WebSocket closed");
@@ -232,8 +245,111 @@ export class DashboardGatewayClient {
       return;
     }
 
+    if (
+      isRecord(message) &&
+      typeof message.id === "string" &&
+      /^srq-[a-f0-9]{12}$/.test(message.id) &&
+      typeof message.method === "string"
+    ) {
+      const params = isRecord(message.params) ? message.params : {};
+      if (message.method !== "approval" || !this.options.onEvent) {
+        this.socket?.send(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: message.id,
+            error: { code: -32601, message: "Unsupported client request" },
+          }),
+        );
+        return;
+      }
+      if (
+        typeof params.session_id !== "string" ||
+        !/^[A-Za-z0-9_-]{1,200}$/.test(params.session_id) ||
+        typeof params.request_id !== "string" ||
+        !params.request_id.trim() ||
+        params.request_id.length > 256 ||
+        !Array.isArray(params.choices) ||
+        !params.choices.length ||
+        params.choices.length > 4 ||
+        params.choices.some(
+          (choice) =>
+            !["once", "session", "always", "deny"].includes(String(choice)),
+        ) ||
+        new Set(params.choices).size !== params.choices.length ||
+        new TextEncoder().encode(JSON.stringify(message)).length > 128000 ||
+        this.approvals.size >= 32
+      ) {
+        this.socket?.send(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: message.id,
+            error: { code: -32602, message: "Invalid approval request" },
+          }),
+        );
+        return;
+      }
+      if (this.approvals.has(message.id)) return;
+      this.approvals.set(message.id, {
+        sessionId: params.session_id,
+        requestId: params.request_id,
+        choices: new Set(params.choices as string[]),
+      });
+      this.options.onEvent({
+        type: "approval.request",
+        session_id: params.session_id,
+        payload: { ...params, server_request_id: message.id },
+      });
+      return;
+    }
     const normalized = normalizeDashboardNotification(message);
+    if (
+      normalized?.type === "gateway.ready" &&
+      !this.capabilitySent &&
+      this.options.onEvent
+    ) {
+      this.capabilitySent = true;
+      void this.request("client.capabilities", { server_requests: true }).catch(
+        () => undefined,
+      );
+    }
+    if (normalized?.type === "request.cancel") {
+      const params =
+        isRecord(message) && isRecord(message.params) ? message.params : {};
+      const payload = isRecord(params.payload) ? params.payload : params;
+      const id = String(payload.id ?? "");
+      const approval = this.approvals.get(id);
+      if (approval) {
+        this.approvals.delete(id);
+        this.options.onEvent?.({
+          type: "approval.cancel",
+          session_id: approval.sessionId,
+          payload: { request_id: approval.requestId, server_request_id: id },
+        });
+      }
+      return;
+    }
     if (normalized) this.options.onEvent?.(normalized);
+  }
+
+  /** Queue a human choice on its original peer request; this is not an effect receipt. */
+  answerApproval(id: string, sessionId: string, choice: string): boolean {
+    const approval = this.approvals.get(id);
+    if (
+      !this.connected ||
+      !approval ||
+      approval.sessionId !== sessionId ||
+      !approval.choices.has(choice)
+    )
+      return false;
+    this.approvals.delete(id);
+    try {
+      this.socket!.send(
+        JSON.stringify({ jsonrpc: "2.0", id, result: { choice } }),
+      );
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private resolveResponse(response: JsonRpcResponse): void {

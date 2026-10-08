@@ -10,6 +10,8 @@ Desktop's existing dashboard Chat hook exposes explicit tool calls on its attach
 
 Connection, profile, model/provider, session, cancellation and unmount retire call authority. A late response after dispatch becomes unknown; this does not attest that a handler stopped. Package, installed source, authenticated runtime and UI routing remain separate qualification gates.
 
+The dashboard client advertises server requests on gateway.ready and routes captured peer approval requests to the existing cards. User selection queues a response on the original peer ID; it is not an effect or delivery receipt. Cancel/retirement removes the card authority. Unsupported peer kinds explicitly return method-not-found; no automatic approval or credential entry occurs.
+
 Desktop now vendors agency.10. Its Cloud Browser runner and main adapter consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or replace server effect grants.
 
 ## Test specifications
@@ -23,3 +25,20 @@ Reject missing or busy authority, capture arguments before discovery, dispatch e
 ### Actual client wire
 
 The real client sends one stable owned call with its explicit timeout. Discovery-only or malformed input is refused; replay, loss, expiry, reconnect and invalid results never trigger retry.
+
+
+### Peer approval wire
+
+The real client advertises peer requests and projects captured approvals into existing cards. Human choices match original request/session/choices; cancellation, close and unsupported requests never approve or replay an operation.
+
+### Retired socket cannot affect current peer
+
+Delayed messages and close from a retired socket cannot alter the current connection's events or pending responses.
+
+### Mounted peer approval choice
+
+The mounted hook returns only an explicit allowed human choice to the original peer ID. It does not auto-approve, repeat a choice or fall through to legacy approval RPC.
+
+### Mounted peer cancellation isolation
+
+A matching cancellation retires only its original approval. Foreign-session cancellation cannot disable the next owned card or grant its action.

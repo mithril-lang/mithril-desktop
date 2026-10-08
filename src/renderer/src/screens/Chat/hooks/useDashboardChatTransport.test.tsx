@@ -29,6 +29,7 @@ vi.mock("../../../components/useI18n", () => ({
 
 const dashboardMock = vi.hoisted(() => ({
   close: vi.fn(),
+  answerApproval: vi.fn(() => true),
   connect: vi.fn(async () => undefined),
   instances: [] as Array<{
     close: ReturnType<typeof vi.fn>;
@@ -45,6 +46,7 @@ const dashboardMock = vi.hoisted(() => ({
 vi.mock("../dashboardGatewayClient", () => ({
   DashboardGatewayClient: class MockDashboardGatewayClient {
     close = dashboardMock.close;
+    answerApproval = dashboardMock.answerApproval;
     connect = dashboardMock.connect;
     connected = true;
     connectionEpoch = 0;
@@ -2009,4 +2011,112 @@ describe("useDashboardChatTransport delta coalescing", () => {
       (afterFlush[afterFlush.length - 2] as { content?: string }).content,
     ).toBe("alphabeta");
   });
+});
+
+// @lat: [[owned-tool-calls#Test specifications#Mounted peer approval choice]]
+it("returns an explicit human choice to the original peer ID without legacy approval RPC", async () => {
+  const api: HarnessApi = {};
+  render(<Harness api={api} />);
+  await act(async () => {
+    await api.send?.("hello");
+    dashboardMock.onEvent?.({
+      type: "approval.request",
+      session_id: "live-1",
+      payload: {
+        request_id: "peer-approval",
+        server_request_id: "srq-0123456789ab",
+        choices: ["once", "deny"],
+      },
+    });
+  });
+  expect(dashboardMock.answerApproval).not.toHaveBeenCalled();
+  await expect(api.respondApproval?.("peer-approval", "always")).resolves.toBe(
+    false,
+  );
+  await act(async () => {
+    expect(await api.respondApproval?.("peer-approval", "once")).toBe(true);
+  });
+  expect(dashboardMock.answerApproval).toHaveBeenCalledWith(
+    "srq-0123456789ab",
+    "live-1",
+    "once",
+  );
+  expect(
+    dashboardMock.request.mock.calls.some(
+      ([method]) => method === "approval.respond",
+    ),
+  ).toBe(false);
+  await expect(api.respondApproval?.("peer-approval", "once")).resolves.toBe(
+    false,
+  );
+});
+
+// @lat: [[owned-tool-calls#Test specifications#Mounted peer cancellation isolation]]
+it("retires only a cancelled peer approval and leaves the next explicit choice available", async () => {
+  const api: HarnessApi = {};
+  render(<Harness api={api} />);
+  await act(async () => {
+    await api.send?.("hello");
+    for (const id of ["first", "second"])
+      dashboardMock.onEvent?.({
+        type: "approval.request",
+        session_id: "live-1",
+        payload: {
+          request_id: id,
+          server_request_id:
+            id === "first" ? "srq-0123456789ab" : "srq-abcdef012345",
+          choices: ["once"],
+        },
+      });
+    dashboardMock.onEvent?.({
+      type: "approval.cancel",
+      session_id: "foreign",
+      payload: { request_id: "second" },
+    });
+    dashboardMock.onEvent?.({
+      type: "approval.cancel",
+      session_id: "live-1",
+      payload: { request_id: "first" },
+    });
+  });
+  await expect(api.respondApproval?.("first", "once")).resolves.toBe(false);
+  await act(async () => {
+    expect(await api.respondApproval?.("second", "once")).toBe(true);
+  });
+  expect(dashboardMock.answerApproval).toHaveBeenCalledWith(
+    "srq-abcdef012345",
+    "live-1",
+    "once",
+  );
+  await act(async () => {
+    dashboardMock.onEvent?.({
+      type: "approval.request",
+      session_id: "live-1",
+      payload: {
+        request_id: "lost",
+        server_request_id: "srq-abcdef987654",
+        choices: ["once"],
+      },
+    });
+    dashboardMock.answerApproval.mockReturnValueOnce(false);
+    expect(await api.respondApproval?.("lost", "once")).toBe(false);
+  });
+  await expect(api.respondApproval?.("lost", "once")).resolves.toBe(false);
+  expect(
+    api.messages?.some(
+      (message) =>
+        message.kind === "approval" &&
+        message.requestId === "lost" &&
+        message.unavailable,
+    ),
+  ).toBe(true);
+
+  expect(
+    api.messages?.some(
+      (message) =>
+        message.kind === "approval" &&
+        message.requestId === "first" &&
+        message.unavailable,
+    ),
+  ).toBe(true);
 });

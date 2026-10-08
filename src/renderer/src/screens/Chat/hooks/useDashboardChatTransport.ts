@@ -158,6 +158,7 @@ interface UseDashboardChatTransportResult {
 }
 
 interface PendingDashboardApproval {
+  serverRequestId?: string;
   choices: ApprovalChoice[];
   gatewayRequestId: string | null;
   requestId: string;
@@ -1184,6 +1185,29 @@ export function useDashboardChatTransport({
       }
       logDashboardEvent(event, "accepted", runtimeSessionId);
 
+      if (event.type === "approval.cancel") {
+        const id = gatewayApprovalRequestId(event.payload);
+        const retired = pendingApprovalsRef.current.filter(
+          (pending) => pending.gatewayRequestId === id,
+        );
+        const ids = new Set(retired.map((pending) => pending.requestId));
+        pendingApprovalsRef.current = pendingApprovalsRef.current.filter(
+          (pending) => !ids.has(pending.requestId),
+        );
+        setMessages((current) => {
+          const next = current.map((message) =>
+            message.kind === "approval" &&
+            ids.has(message.requestId) &&
+            !message.resolved
+              ? { ...message, unavailable: true }
+              : message,
+          );
+          messagesRef.current = next;
+          return next;
+        });
+        return;
+      }
+
       if (event.type === "session.info") {
         toolCallEpochRef.current++;
         toolAttempts.invalidate();
@@ -1242,6 +1266,13 @@ export function useDashboardChatTransport({
               {
                 requestId: approvalRequestId,
                 gatewayRequestId: gatewayApprovalRequestId(event.payload),
+                serverRequestId:
+                  event.payload &&
+                  typeof event.payload === "object" &&
+                  "server_request_id" in event.payload &&
+                  typeof event.payload.server_request_id === "string"
+                    ? event.payload.server_request_id
+                    : undefined,
                 responding: false,
                 sessionId,
                 choices: normalizeApprovalRequest(
@@ -1418,6 +1449,7 @@ export function useDashboardChatTransport({
       connectionMode,
       flushDeltasNow,
       messagesRef,
+      setMessages,
       scheduleDeltaFlush,
       profile,
       setIsLoading,
@@ -2095,6 +2127,28 @@ export function useDashboardChatTransport({
       if (!client?.connected) return false;
       pending.responding = true;
       try {
+        if (pending.serverRequestId) {
+          const queued = client.answerApproval(
+            pending.serverRequestId,
+            pending.sessionId,
+            choice,
+          );
+          if (pendingApprovalsRef.current[0] !== pending) return false;
+          pendingApprovalsRef.current = pendingApprovalsRef.current.slice(1);
+          if (!queued)
+            setMessages((current) => {
+              const next = current.map((message) =>
+                message.kind === "approval" &&
+                message.requestId === pending.requestId &&
+                !message.resolved
+                  ? { ...message, unavailable: true }
+                  : message,
+              );
+              messagesRef.current = next;
+              return next;
+            });
+          return queued;
+        }
         const result = await client.request<{ resolved?: unknown }>(
           "approval.respond",
           {
@@ -2122,7 +2176,7 @@ export function useDashboardChatTransport({
         }
       }
     },
-    [enabled],
+    [enabled, messagesRef, setMessages],
   );
 
   const execSlash = useCallback(

@@ -1516,3 +1516,16 @@ file checks passed. The shared schedules.59 archive remains unchanged. Agent
 custody passed 10 tests and bootstrap passed 15 under the canonical isolated runner.
 Production D1/API/Web publication, running-work restoration, installer publication
 and authenticated multi-device/updater validation remain incomplete.
+
+## Current-main shared repack (candidate preview.66)
+
+Desktop consumes the integrated current-main workspace archive schedules.60 with all 469 installed files verified byte-identical.
+
+The vendor archive SHA256 is
+`974470a30d616677ec57897a61ac3c13660512943670bf28debb5d15a9d553bf`.
+Fund's integrated current main includes the standalone App publication gates;
+retired Actions are not re-enabled. Workspace qualification passed 451 tests in
+81 files and build/export checks. Desktop preview.66 passed 48 selected tests,
+Main/renderer typechecks, Electron build and 711 active packaging-file checks.
+Running-work restoration, resource lifecycle, public publication, installer
+updates and actual authenticated Web/Desktop synchronization remain unfinished.

@@ -1301,3 +1301,7 @@ The actual compiled vendor rejects a retained-history page from a restored datas
 ## Verified Desktop sign-in gate
 
 Desktop never mounts the workspace for a stored but invalid account, refuses manual bypass, closes on sign-out and retires late account verification responses before admitting a newly verified session.
+
+## Packaged device replica restoration generation
+
+The actual vendored ReplicaSync keeps saved device edits as durable conflicts after restoration, including reopened clients, without uploading old bytes or overwriting local edits.

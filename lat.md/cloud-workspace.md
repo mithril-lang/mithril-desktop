@@ -1529,3 +1529,22 @@ retired Actions are not re-enabled. Workspace qualification passed 451 tests in
 Main/renderer typechecks, Electron build and 711 active packaging-file checks.
 Running-work restoration, resource lifecycle, public publication, installer
 updates and actual authenticated Web/Desktop synchronization remain unfinished.
+
+## Packaged device generation fencing (candidate preview.67)
+
+Desktop now consumes schedules.61, whose durable ReplicaSync journal preserves restoration generations across reopened clients.
+
+The installed package's 469 files match the vendor archive; SHA256 is
+`fff54f3a33dc82ed391d8438bf39ea76f74f9e29aa5b5358c3f9acec45ca8595`.
+Unsynchronized old-device edits remain conflicts instead of new cloud uploads;
+unchanged checkpointed data synchronizes automatically. Old deferred native writes
+are not replayed into the restored dataset. An explicit resolution binds the
+current generation, while an intervening restoration refuses the choice.
+
+Six packaged cache/native replica files passed 39 tests, including actual compiled
+shared ReplicaSync across reopen. Main/renderer types, Electron build, affected-file
+lint, 711 active packaging checks and lat validation passed. The source workspace
+suite passed 453 tests. Fund ff7204fe signed full API CI passed 597 tests with one
+existing skip; later shared candidate bfbc123f needs its own exact-commit receipt.
+This does not prove running-work restoration, production rollout, installed
+preview.67 behavior or authenticated multi-device/updater QA.

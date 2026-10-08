@@ -13,6 +13,11 @@ import type {
   RepositoryDocument,
   RepositoryTransport,
 } from "@mithril/workspace/repository";
+import {
+  ReplicaSync,
+  emptyReplica,
+  type ReplicaRecord,
+} from "@mithril/workspace/replica-sync";
 
 // @lat: [[cloud-workspace-tests#Packaged canonical snapshot replacement]]
 it("uses the vendored complete snapshot cache without retaining absent or restored newer revisions", async () => {
@@ -329,4 +334,92 @@ it("rejects a restored retained-history page in the compiled shared client", asy
     "changed workspace history",
   );
   expect((await client.history("project")).datasetGeneration).toBe(1);
+});
+
+// @lat: [[cloud-workspace-tests#Packaged device replica restoration generation]]
+it("keeps unsynchronized native data from overwriting a restored cloud dataset across reopen", async () => {
+  let generation = 0,
+    writes = 0;
+  let document: RepositoryDocument = {
+    collection: "memory",
+    id: "note",
+    body: { text: "Original" },
+    deleted: false,
+    revision: 1,
+    updatedAt: 1,
+  };
+  let local: ReplicaRecord = {
+    collection: "memory",
+    id: "note",
+    body: document.body,
+    deleted: false,
+    version: "v1",
+  };
+  let repositoryState = emptyRepository(),
+    replicaState = emptyReplica();
+  const reopen = async (): Promise<ReplicaSync> => {
+    const cloud = new RepositorySync(
+      "alice",
+      {
+        page: async () => ({
+          schemaVersion: 1,
+          userId: "alice",
+          datasetGeneration: generation,
+          inventory: { cursor: 1, anchor: 1, total: 1 },
+          documents: [document],
+          nextAfter: null,
+        }),
+        apply: async () => {
+          writes++;
+          throw Error("Old native data must not upload");
+        },
+      },
+      {
+        read: async () => structuredClone(repositoryState),
+        update: async (_owner, change) => {
+          repositoryState = change(structuredClone(repositoryState));
+          return structuredClone(repositoryState);
+        },
+      },
+      () => {},
+      ["memory"],
+    );
+    await cloud.load();
+    return new ReplicaSync(
+      "alice",
+      cloud,
+      {
+        snapshot: async () => ({
+          schemaVersion: 1,
+          userId: "alice",
+          replicaId: "device",
+          complete: true,
+          collections: ["memory"],
+          documents: [local],
+        }),
+        apply: async () => {
+          throw Error("Unacknowledged device edits must not be replaced");
+        },
+      },
+      {
+        read: async () => structuredClone(replicaState),
+        write: async (_owner, _replica, next) => {
+          replicaState = structuredClone(next);
+        },
+      },
+    );
+  };
+  let replica = await reopen();
+  await replica.run();
+  local = { ...local, body: { text: "Saved device edit" }, version: "v2" };
+  generation = 1;
+  document = { ...document, body: { text: "Restored cloud bytes" } };
+  await replica.run();
+  expect(replicaState.datasetGeneration).toBe(1);
+  expect(replicaState.conflicts).toHaveLength(1);
+  replica = await reopen();
+  await replica.run();
+  expect(replica.state.conflicts[0].local?.body).toEqual(local.body);
+  expect(replica.state.conflicts[0].cloud?.body).toEqual(document.body);
+  expect(writes).toBe(0);
 });

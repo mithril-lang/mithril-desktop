@@ -1204,3 +1204,9 @@ Signed packaged clients check after startup and every four hours after completio
 ## Pending update check disposal
 
 A pending provider check never overlaps another periodic request and cannot rearm its timer after the application quits.
+
+## Compiled Desktop notice layout
+
+Real Chromium checks built Desktop styles at narrow/normal widths in both themes. A long bilingual synchronization notice must wrap above the page rather than obscure the heading or push the footer outside the viewport.
+
+These are layout fixtures, not authenticated client journeys.

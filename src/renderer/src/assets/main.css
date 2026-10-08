@@ -15416,12 +15416,12 @@ body:has(.shell-vibrant),
 .device-schedules-dialog { width:min(1000px, calc(100vw - 48px)); }
 
 .repository-sync-notice {
-  position: fixed;
+  position: relative;
   z-index: 30;
-  top: 64px;
-  right: 24px;
-  max-width: min(480px, calc(100vw - 48px));
-  max-height: 60vh;
+  flex: 0 0 auto;
+  margin: 8px 24px;
+  max-width: calc(100% - 48px);
+  max-height: 30vh;
   overflow: auto;
   padding: 12px 16px;
   border: 1px solid var(--border-color);

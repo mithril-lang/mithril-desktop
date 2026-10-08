@@ -1,47 +1,7 @@
-import {
-  getActiveConnection,
-  getConnectionConfig,
-  type ConnectionConfig,
-} from "./config";
-import { getActiveProfileNameSync } from "./utils";
+import { selectedSettingsScope } from "./selected-settings-scope";
 import { getToolsets, setToolsetEnabled, type ToolsetInfo } from "./tools";
 import { sshGetToolsets, sshSetToolsetEnabled } from "./ssh-remote";
 import { remoteDashboardRequestJson } from "./remote-api";
-
-function requestScope(profile?: string): {
-  connection: ConnectionConfig;
-  profile: string;
-  check: () => void;
-} {
-  const implicit = !profile?.trim();
-  const selectedProfile = profile?.trim() || getActiveProfileNameSync();
-  if (
-    selectedProfile === "all" ||
-    selectedProfile.length > 128 ||
-    selectedProfile.includes("/") ||
-    selectedProfile.includes("\\") ||
-    [...selectedProfile].some((char) => char.charCodeAt(0) < 32)
-  )
-    throw new Error("A single valid tool-settings profile is required.");
-  const connection = structuredClone(getConnectionConfig());
-  const stamp = (): string =>
-    JSON.stringify([
-      getActiveConnection().connectionId,
-      getConnectionConfig(),
-      implicit ? getActiveProfileNameSync() : selectedProfile,
-    ]);
-  const owner = stamp();
-  return {
-    connection,
-    profile: selectedProfile,
-    check: () => {
-      if (stamp() !== owner)
-        throw new Error(
-          "Tool-settings connection or profile changed. A submitted change may have completed; refresh the original target before retrying.",
-        );
-    },
-  };
-}
 
 function scopedPath(profile: string, key?: string): string {
   return `/api/tools/toolsets${key ? `/${encodeURIComponent(key)}` : ""}?profile=${encodeURIComponent(profile)}`;
@@ -93,7 +53,7 @@ function parseToolsets(value: unknown): ToolsetInfo[] {
 export async function getSelectedToolsets(
   profile?: string,
 ): Promise<ToolsetInfo[]> {
-  const scope = requestScope(profile);
+  const scope = selectedSettingsScope(profile);
   const conn = scope.connection;
   let result: ToolsetInfo[];
   if (conn.mode === "remote") {
@@ -124,7 +84,7 @@ export async function setSelectedToolsetEnabled(
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(key) || typeof enabled !== "boolean") {
     throw new Error("Invalid tool-settings change.");
   }
-  const scope = requestScope(profile);
+  const scope = selectedSettingsScope(profile);
   const conn = scope.connection;
   let result: boolean;
   if (conn.mode === "remote") {

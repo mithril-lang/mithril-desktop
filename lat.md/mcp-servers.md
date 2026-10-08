@@ -18,3 +18,15 @@ The add and edit flows share one modal: `editingMcpName` in `Tools.tsx` (null wh
 The `McpLogo` component shows a logo, source first: the community registry's icon (matched to a server by name → registry id; [[src/main/registry.ts#toItem]] resolves the entry's repo-relative `icon` to the registry service's icon URL, `https://registry.hermesone.org/registry-icon/<path>`), then the HTTP server's own-domain favicon, then a generic server glyph.
 
 Registry icons are Iconify-style SVGs — many monochrome (`fill="currentColor"`). Rather than fetch + inline them to theme the colour, `McpLogo` follows the registry's own web UI (`EntryIcon`): render a plain `<img>` on a **white tile in both themes**, so black single-colour glyphs stay legible (they'd vanish on a dark tile) and colour logos keep their colours. This needs no main-process fetch — `<img>` loads directly under CSP `img-src https:`; the generic glyph fallback keeps the normal dark tile. Since the icons are immutable content-addressed assets, [[src/main/app/start.ts#startMainProcess]]'s `onHeadersReceived` rewrites their `Cache-Control` to `max-age=31536000, immutable`, so each is fetched at most once and served from the on-disk HTTP cache across restarts.
+
+## Connection and profile isolation
+
+MCP operations capture their selected connection and one profile. Direct HTTP uses the existing token/OAuth dashboard transport; remote failures never fall back to local configuration.
+
+[[src/main/selected-settings-scope.ts#selectedSettingsScope]] binds connection identity, configuration and the implicit active profile. [[src/main/mcp-servers.ts#listMcpServers]] and mutations explicitly scope every dashboard URL, including default. SSH requests reject redirects and have a bounded deadline. Responses after an owner change fail; submitted mutations may have completed and never automatically retry. Probes require an explicit `ok: true` response, which remains discovery evidence rather than tool-call evidence.
+
+## Atomic remote edit
+
+Remote MCP edits use one per-server PUT, including renames. They never delete the old server before submitting replacement configuration.
+
+[[src/main/mcp-servers.ts#updateMcpServer]] requires an acknowledgement naming the new server. The Hermes per-server update endpoint is a separate implementation and deployment gate; unsupported versions report failure and preserve the original entry. Local edits retain their existing single config write. An HTTP success is not proof of MCP handshake or tool execution.

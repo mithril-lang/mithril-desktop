@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "@mithril/design-system/chat.css";
 @import "@mithril/design-system/desktop.css";
+@import "@mithril/workspace/desktop-sidebar.css";
 
 /* ========================================================================
    Mithril Desktop — Clean Design System

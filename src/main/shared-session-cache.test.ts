@@ -104,3 +104,47 @@ it("preserves the complete cache after a late checkpoint failure then reads over
   expect(client.events.get("s1")).toHaveLength(total);
   expect(client.events.get("s1")?.at(-1)).toEqual(event(total));
 });
+// @lat: [[cloud-workspace-tests#Packaged checkpoint boundary fencing]]
+it("keeps the previous complete history when session boundaries change between pages", async () => {
+  const transport: SessionTransport = {
+    list: async () => ({
+      schemaVersion: 1,
+      userId: "alice",
+      sessions: [session("s1", 1, 1)],
+    }),
+    events: vi.fn(async (): Promise<ChatSessionSnapshot> => {
+      throw Error("Unexpected read");
+    }),
+    receipt: async () => {
+      throw Error("Read must not acknowledge writes");
+    },
+    apply: async () => {
+      throw Error("Read must not execute");
+    },
+  };
+  const client = new SessionSyncClient(transport);
+  await client.connect("alice");
+  client.events.set("s1", [event(1)]);
+  const page = (
+    revision: number,
+    seq: number,
+    hasMore: boolean,
+  ): ChatSessionSnapshot => ({
+    schemaVersion: 1,
+    userId: "alice",
+    session: session("s1", revision, 3),
+    events: [event(seq)],
+    hasMore,
+    nextAfter: hasMore ? seq : null,
+  });
+  vi.mocked(transport.events)
+    .mockResolvedValueOnce(page(2, 2, true))
+    .mockResolvedValueOnce(page(3, 3, false));
+  await expect(client.checkpoint("s1")).rejects.toThrow("boundary changed");
+  expect(client.events.get("s1")).toEqual([event(1)]);
+  vi.mocked(transport.events)
+    .mockResolvedValueOnce(page(3, 2, true))
+    .mockResolvedValueOnce(page(3, 3, false));
+  await client.checkpoint("s1");
+  expect(client.events.get("s1")).toEqual([event(1), event(2), event(3)]);
+});

@@ -1393,3 +1393,11 @@ All 465 producer/archive files match; SHA256 is `711b605144bfaaaf6706d170e1dca81
 This source candidate does not complete equal-identity archive generation, historical receipt fencing, enabled/hot execution reconciliation, current-main API publication or the installed client's signed update/synchronization. The ordinary cache fixes add no cloud/device view separation.
 
 Local preview.53 qualification passed 54 selected compiled cache/cloud/chat/updater tests. The two new compiled session cases passed again after their fixture return annotation was corrected; full Electron typecheck/build then passed. All 465 installed vendor bytes and lock identity match; 689-file packaging identity, changed-file lint and `lat check` pass. No new signed installer or installed update is claimed.
+
+### Session checkpoint boundary fencing (draft)
+
+The shared client stages only pages from one session revision and event-sequence boundary. A newer inventory retires delayed readers; older checkpoints cannot overwrite the known session's history.
+
+Mixed-page failures retain the prior complete history and queued operation identities. This prevents ordinary concurrent-read regression; equal-identity archive restoration still requires a monotonic dataset generation. API publication and actual signed installed synchronization remain separate gates.
+
+Preview.54 pins Workspace 0.6.29-schedules.49. All 465 producer/archive/installed files and exact lock identity match; archive SHA256 is `82b993d96d3b324893613797d11124774a6838dfe71b6132c21eb576b375518a`. Qualification passed 55 selected compiled-cache/cloud/chat/updater tests, full Electron typecheck/build, changed-file lint and `lat check`. No signed publication or installed replacement is claimed.

@@ -1273,3 +1273,7 @@ The actual shared vendor replaces 1,205 canonical sessions with lower revisions 
 ## Packaged atomic long checkpoint
 
 The compiled shared checkpoint preserves its old complete cache after a late network failure, then reads 20,006 immutable events over more than a thousand advancing pages without truncation or execution.
+
+## Packaged checkpoint boundary fencing
+
+The compiled shared client rejects session revision/event boundary changes between pages, preserves its previous complete history and accepts a coherent retry without executing writes.

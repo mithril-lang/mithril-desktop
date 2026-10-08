@@ -33,7 +33,9 @@ export interface AttemptObservation {
   page: ToolAttemptPage | null;
 }
 const cursor = (v: unknown): v is string =>
-  typeof v === "string" && /^[A-Za-z0-9_-]{1,512}$/.test(v);
+  typeof v === "string" &&
+  v.length <= 512 &&
+  /^(?:rpc:)?[A-Za-z0-9_-]+$/.test(v);
 
 export function parseToolAttemptPage(raw: unknown): ToolAttemptPage {
   if (

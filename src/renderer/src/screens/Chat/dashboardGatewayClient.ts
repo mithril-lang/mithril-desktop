@@ -92,6 +92,7 @@ export function normalizeDashboardNotification(
 
 export class DashboardGatewayClient {
   private nextRequestId = 1;
+  private epoch = 0;
   private pending = new Map<number | string, PendingRequest>();
   private socket: WebSocket | null = null;
   private readonly requestTimeoutMs: number;
@@ -102,6 +103,10 @@ export class DashboardGatewayClient {
       options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     this.connectTimeoutMs =
       options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
+  }
+
+  get connectionEpoch(): number {
+    return this.epoch;
   }
 
   get connected(): boolean {
@@ -173,6 +178,7 @@ export class DashboardGatewayClient {
   request<T = unknown>(
     method: string,
     params: Record<string, unknown> = {},
+    timeoutMs = this.requestTimeoutMs,
   ): Promise<T> {
     const socket = this.socket;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -188,7 +194,7 @@ export class DashboardGatewayClient {
       const timeout = window.setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`Hermes dashboard request timed out: ${method}`));
-      }, this.requestTimeoutMs);
+      }, timeoutMs);
       this.pending.set(id, {
         resolve: (value: unknown) => resolve(value as T),
         reject,
@@ -199,6 +205,7 @@ export class DashboardGatewayClient {
   }
 
   close(): void {
+    this.epoch++;
     const socket = this.socket;
     this.socket = null;
     this.rejectPending("Hermes dashboard WebSocket closed");

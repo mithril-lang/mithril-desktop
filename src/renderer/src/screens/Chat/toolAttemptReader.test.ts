@@ -33,6 +33,13 @@ it("rejects malformed/unbounded metadata and retains only display fields", () =>
       terminal: false,
     },
   ]);
+  expect(
+    parseToolAttemptPage({
+      ...page,
+      attempts: [{ ...row, attempt_id: "rpc:stable-request" }],
+      next_cursor: "rpc:stable-request",
+    }).next_cursor,
+  ).toBe("rpc:stable-request");
   for (const bad of [
     { ...page, attempts: [row, row] },
     { ...page, attempts: Array(101).fill(row) },

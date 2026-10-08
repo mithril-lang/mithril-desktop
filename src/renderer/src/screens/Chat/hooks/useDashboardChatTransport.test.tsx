@@ -34,6 +34,7 @@ const dashboardMock = vi.hoisted(() => ({
     close: ReturnType<typeof vi.fn>;
     connect: ReturnType<typeof vi.fn>;
     connected: boolean;
+    connectionEpoch: number;
     request: ReturnType<typeof vi.fn>;
   }>,
   onClose: null as (() => void) | null,
@@ -46,6 +47,7 @@ vi.mock("../dashboardGatewayClient", () => ({
     close = dashboardMock.close;
     connect = dashboardMock.connect;
     connected = true;
+    connectionEpoch = 0;
     request = dashboardMock.request;
 
     constructor(
@@ -65,6 +67,7 @@ interface HarnessApi {
   isLoading?: boolean;
   activeTurnRef?: MutableRefObject<ActiveTurn | null>;
   abort?: () => void;
+  callTool?: ReturnType<typeof useDashboardChatTransport>["callTool"];
   messages?: ChatMessage[];
   respondClarify?: ReturnType<
     typeof useDashboardChatTransport
@@ -156,6 +159,7 @@ function Harness({
       isLoading,
       activeTurnRef,
       abort: transport.abort,
+      callTool: transport.callTool,
       messages,
       respondApproval: transport.respondApproval,
       respondClarify: transport.respondClarify,
@@ -176,6 +180,7 @@ function Harness({
     transport.respondApproval,
     transport.respondClarify,
     transport.abort,
+    transport.callTool,
   ]);
 
   return <ToolAttemptsPanel reader={transport.toolAttempts} />;
@@ -200,6 +205,140 @@ describe("useDashboardChatTransport recovery", () => {
         })),
       },
     });
+  });
+
+  // @lat: [[owned-tool-calls#Test specifications#Mounted owned call lifecycle]]
+  it.each([
+    "return",
+    "model",
+    "provider",
+    "connection",
+    "session",
+    "abort",
+    "disconnect",
+    "unmount",
+  ])("fences mounted owned calls after %s without retry", async (mode) => {
+    const api: HarnessApi = {};
+    const view = render(
+      <Harness api={api} connectionId="a" connectionRevision={1} />,
+    );
+    const request = {
+      requestId: "stable",
+      name: "write_file",
+      arguments: { content: "once" },
+      timeoutMs: 1000,
+    };
+    await expect(api.callTool!(request)).rejects.toMatchObject({
+      outcome: "not-dispatched",
+    });
+    expect(dashboardMock.request).not.toHaveBeenCalled();
+    dashboardMock.request.mockImplementation(async (method) =>
+      method === "session.create"
+        ? { session_id: "live", stored_session_id: "stored" }
+        : method === "model.options"
+          ? { model: "bad-model", provider: "bad-provider", providers: [] }
+          : {},
+    );
+    await act(async () => {
+      await api.send!("hello");
+    });
+    await expect(api.callTool!(request)).rejects.toMatchObject({
+      outcome: "not-dispatched",
+    });
+    api.activeTurnRef!.current = null;
+    dashboardMock.request.mockClear();
+    let finish!: (result: unknown) => void;
+    dashboardMock.request.mockImplementation(async (method) => {
+      if (method === "tools.show")
+        return {
+          runtime_snapshot: {
+            protocol: "hermes-session-tool-snapshot-v1",
+            status: "built",
+            coverage: "model-visible-only",
+            context_id: "a".repeat(32),
+            revision: "b".repeat(64),
+            definitions: [
+              {
+                function: {
+                  name: "write_file",
+                  parameters: { type: "object" },
+                },
+              },
+            ],
+          },
+        };
+      if (method === "tools.call")
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      return {};
+    });
+    const connections = dashboardMock.connect.mock.calls.length;
+    const observed = api.callTool!(request).then(
+      (value) => value,
+      (error) => error,
+    );
+    request.arguments.content = "changed";
+    await waitFor(() => expect(finish).toBeTypeOf("function"));
+    expect(dashboardMock.request.mock.calls).toEqual([
+      ["tools.show", { session_id: "live" }],
+      [
+        "tools.call",
+        {
+          session_id: "live",
+          name: "write_file",
+          arguments: { content: "once" },
+          request_id: "stable",
+          context_id: "a".repeat(32),
+          revision: "b".repeat(64),
+          timeout_ms: 1000,
+        },
+        4000,
+      ],
+    ]);
+    await act(async () => {
+      if (mode === "model") api.setModel!("changed");
+      if (mode === "provider") api.setProvider!("changed");
+      if (mode === "connection")
+        view.rerender(
+          <Harness api={api} connectionId="b" connectionRevision={2} />,
+        );
+      if (mode === "session")
+        dashboardMock.onEvent?.({
+          type: "session.info",
+          session_id: "live",
+          payload: {},
+        });
+      if (mode === "abort") api.abort!();
+      if (mode === "disconnect") dashboardMock.onClose?.();
+      if (mode === "unmount") view.unmount();
+    });
+    finish({
+      protocol: "hermes-owned-tool-call-v1",
+      attempt_id: "rpc:stable",
+      state: "returned",
+      terminal: true,
+      duplicate: false,
+      observation: "handler-return",
+      output: { written: true },
+    });
+    const result = await observed;
+    expect(result).toMatchObject(
+      mode === "return"
+        ? { attemptId: "rpc:stable", output: { written: true } }
+        : { outcome: "unknown", attemptId: "rpc:stable" },
+    );
+    expect(dashboardMock.connect.mock.calls).toHaveLength(connections);
+    expect(
+      dashboardMock.request.mock.calls.filter(
+        ([method]) => method === "tools.call",
+      ),
+    ).toHaveLength(1);
+    expect(
+      dashboardMock.request.mock.calls.some(([method]) =>
+        ["session.create", "session.resume", "prompt.submit"].includes(method),
+      ),
+    ).toBe(false);
   });
 
   // @lat: [[tool-attempts#Test specifications#Mounted transport consumer]]

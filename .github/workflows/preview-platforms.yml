@@ -202,6 +202,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Verify native Windows archive destination replacement
+        run: npx vitest run src/main/archive-save.test.ts
       - name: Build app
         run: npm run build
       # Windows signing is selected by the repository variable WIN_SIGNING:

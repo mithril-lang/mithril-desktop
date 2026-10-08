@@ -1324,3 +1324,6 @@ Remote deletion retains the file-set revision and moves unchanged bytes to recov
 ## Native archive durable intent journal
 
 SQLite transactions retain archive IDs across reopening. Legacy JSON remains readable until superseded; confirmed removal writes a durable empty row that prevents stale JSON from reviving acknowledged work.
+## Archive destination replacement
+
+Native replacement preserves new bytes and removes the temporary file. Windows paths remain data; failed moves, cross-directory requests and owner changes cannot acknowledge an export.

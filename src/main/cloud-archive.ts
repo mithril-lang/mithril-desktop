@@ -16,6 +16,7 @@ import {
 } from "@mithril/workspace/archive-client";
 import type { ArchiveSource } from "@mithril/workspace/portable-archive";
 import type { CloudWorkspace } from "./cloud-workspace";
+import { replaceArchiveDestination } from "./archive-save";
 
 /** Disk-backed bounded reads; a whole account never crosses renderer IPC. */
 export async function fileArchiveSource(
@@ -269,45 +270,42 @@ export class NativeAccountArchive {
       );
       const fd = await open(temporary, "wx", 0o600);
       try {
-        for (let offset = 0; offset < backup.blob.size; offset += 1024 * 1024) {
-          check();
-          const bytes = new Uint8Array(
-            await backup.blob
-              .slice(offset, Math.min(offset + 1024 * 1024, backup.blob.size))
-              .arrayBuffer(),
-          );
-          for (let written = 0; written < bytes.length; ) {
-            const result = await fd.write(
-              bytes,
-              written,
-              bytes.length - written,
+        try {
+          for (
+            let offset = 0;
+            offset < backup.blob.size;
+            offset += 1024 * 1024
+          ) {
+            check();
+            const bytes = new Uint8Array(
+              await backup.blob
+                .slice(offset, Math.min(offset + 1024 * 1024, backup.blob.size))
+                .arrayBuffer(),
             );
-            if (!result.bytesWritten) throw Error("Archive save failed");
-            written += result.bytesWritten;
+            for (let written = 0; written < bytes.length; ) {
+              const result = await fd.write(
+                bytes,
+                written,
+                bytes.length - written,
+              );
+              if (!result.bytesWritten) throw Error("Archive save failed");
+              written += result.bytesWritten;
+            }
           }
+          await fd.sync();
+          check();
+        } finally {
+          await fd.close();
         }
-        await fd.sync();
-        check();
-      } catch (error) {
-        await rm(temporary, { force: true });
-        throw error;
-      } finally {
-        await fd.close();
-      }
-      try {
-        check();
-        await import("node:fs/promises").then((fs) =>
-          fs.rename(temporary, destination),
-        );
       } catch (error) {
         await rm(temporary, { force: true });
         throw error;
       }
-      const parent = await open(dirname(destination), "r");
       try {
-        await parent.sync();
-      } finally {
-        await parent.close();
+        await replaceArchiveDestination(temporary, destination, check);
+      } catch (error) {
+        await rm(temporary, { force: true });
+        throw error;
       }
       check();
       client.confirmBackupSaved(backup.info);

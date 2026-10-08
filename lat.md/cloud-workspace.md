@@ -1598,3 +1598,11 @@ Selected folders retain file-set tombstones and revisions. Unchanged bytes move 
 Archive intents use the Electron runtime's built-in SQLite with FULL-synchronous transactions. Private legacy JSON entries remain readable until replaced, and durable empty rows suppress old acknowledged intents without deleting recovery files.
 
 Electron 44.1.1's actual Node 24.19 runtime was checked for node:sqlite availability. The journal contains only owner-bound operation metadata, not account source data or credentials; api.mithril.fund remains the canonical backend. Installed and Windows destination-save qualification remain pending.
+
+## Archive destination replacement
+
+Closed, synced archive files replace their selected destination in the same directory. POSIX syncs the parent directory; Windows uses a fixed MoveFileExW program with replace-existing and write-through flags.
+
+[[src/main/archive-save.ts#replaceArchiveDestination]] keeps selected paths as JSON stdin data, checks owner context before and after replacement, and rejects failures before export acknowledgement. The temporary file closes before cleanup. The native-platform file test exercises real replacement; Windows runtime qualification requires that test on Windows and is not established by the mocked adapter test.
+
+The preview Windows packaging job runs the actual destination replacement test before building installers. Local macOS qualification passed eight save/archive tests, Node typechecking, scoped lint, lat checks and Electron compilation; the Windows job and installed behavior remain pending.

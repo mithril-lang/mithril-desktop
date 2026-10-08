@@ -1208,8 +1208,19 @@ export function registerIpcHandlers(context: IpcContext): void {
   ipcMain.handle("mithril-device-login-cancel", () =>
     cancelMithrilDeviceLogin(),
   );
-  ipcMain.handle("mithril-account-disconnect", (_event, profile?: string) =>
-    mithrilRuntime.disconnect(profile?.trim() || getActiveProfileNameSync()),
+  ipcMain.handle(
+    "mithril-account-disconnect",
+    async (_event, profile?: string) => {
+      try {
+        return await mithrilRuntime.disconnect(
+          profile?.trim() || getActiveProfileNameSync(),
+        );
+      } finally {
+        const win = getMainWindow();
+        if (win && !win.webContents.isDestroyed())
+          win.webContents.send("cloud-workspace-account-changed");
+      }
+    },
   );
   // First-run gate: local-only (no network) so an offline launch never blocks.
   ipcMain.handle("mithril-first-run-state", (_event, profile?: string) =>

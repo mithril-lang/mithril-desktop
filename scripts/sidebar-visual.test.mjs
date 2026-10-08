@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { build } from "esbuild";
 import { chromium } from "playwright";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
@@ -28,12 +28,16 @@ test("compiled renderer styles preserve original pinned/project sidebar layout",
       format: "esm",
       outfile: join(directory, "sidebar.js"),
     });
-    const assets = "out/renderer/assets";
+    const html = await readFile("out/renderer/index.html", "utf8");
+    const initialStyles = [...html.matchAll(/href="([^"]+\.css)"/g)].map(
+      (match) => match[1],
+    );
+    assert.ok(initialStyles.length, "compiled entry must link its styles");
     const css = (
       await Promise.all(
-        (await readdir(assets))
-          .filter((n) => n.endsWith(".css"))
-          .map((n) => readFile(join(assets, n), "utf8")),
+        initialStyles.map((name) =>
+          readFile(join("out/renderer", name), "utf8"),
+        ),
       )
     ).join("\n");
     server = createServer(async (req, res) => {

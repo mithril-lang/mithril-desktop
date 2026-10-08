@@ -241,7 +241,7 @@ All nine original Settings panes now mount in the normal Desktop cloud Settings 
 
 The normal Cmd/Ctrl+, shortcut now navigates to this same Settings route as the sidebar. It no longer opens a competing global preference store. Explicit native execution setup dialogs remain reachable until their data and runtime adapters are complete.
 
-Backups/imports, updates, connection tests and links retain existing explicit native handlers. Opening or switching panes does not replay those actions. Runtime credentials stay outside presentation documents. Tests cover native backup result retention and explicit profile ownership; browser default-route fixtures cover consumer state retention across general/runtime tabs. Web’s five runtime pane adapters and native provider-to-cloud uploads remain unfinished. Source checks are not installed-client or publication evidence.
+Account backups/restores now use the shared cloud Data controls and main-only account archive handlers. Opening or switching panes does not replay actions; prepared restore identity survives in the native journal and is re-read when Data reopens. Runtime credentials stay outside presentation documents. Tests cover account ownership, explicit export/selection, preserved pending restore and refusal to dispatch legacy profile migration handlers. Source checks are not installed-client or publication evidence.
 
 ### Capability configuration writeback (draft)
 

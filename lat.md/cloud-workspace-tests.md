@@ -1327,3 +1327,7 @@ SQLite transactions retain archive IDs across reopening. Legacy JSON remains rea
 ## Archive destination replacement
 
 Native replacement preserves new bytes and removes the temporary file. Windows paths remain data; failed moves, cross-directory requests and owner changes cannot acknowledge an export.
+
+## Cloud Data modal account custody
+
+Original Settings tabs use account-bound archive actions, re-read the same prepared restore intent after tab changes, and never replay export/import/restore or legacy profile migration handlers on mount.

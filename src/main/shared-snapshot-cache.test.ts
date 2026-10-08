@@ -241,3 +241,44 @@ it("retains saved Repository and Workspace writes without dispatch across a rest
   expect(workspace.outbox).toEqual([edit]);
   expect(writes).toBe(0);
 });
+
+// @lat: [[cloud-workspace-tests#Packaged Sidebar restore generation]]
+it("uses the compiled Sidebar dataset protocol without admitting malformed or unscoped edits", async () => {
+  const { validSidebarOperation, validSidebarSnapshot } =
+    await import("@mithril/workspace/sidebar");
+  const operation = {
+    operationId: "retained",
+    chatId: "conversation",
+    baseRevision: 0,
+    pinned: true,
+    projectId: null,
+    datasetGeneration: 1,
+  };
+  expect(validSidebarOperation(operation)).toBe(true);
+  expect(validSidebarOperation({ ...operation, datasetGeneration: -1 })).toBe(
+    false,
+  );
+  expect(validSidebarOperation({ ...operation, userId: "other" })).toBe(false);
+  expect(
+    validSidebarSnapshot(
+      {
+        schemaVersion: 1,
+        userId: "alice",
+        datasetGeneration: 1,
+        placements: [],
+      },
+      "alice",
+    ),
+  ).toBe(true);
+  expect(
+    validSidebarSnapshot(
+      {
+        schemaVersion: 1,
+        userId: "alice",
+        datasetGeneration: 1,
+        placements: [],
+      },
+      "bob",
+    ),
+  ).toBe(false);
+});

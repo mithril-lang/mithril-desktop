@@ -1289,3 +1289,7 @@ The actual compiled vendor clears histories at equal IDs/revisions when the rest
 ## Packaged chat receipt generation
 
 The compiled shared client sends the observed dataset generation on a saved operation and retains that operation when a receipt belongs to another generation, without updating the visible session or dispatching a write.
+
+## Packaged Sidebar restore generation
+
+The compiled Sidebar protocol carries the restored dataset generation, rejects invalid epochs and owner injection, and validates owner-scoped complete placement inventories.

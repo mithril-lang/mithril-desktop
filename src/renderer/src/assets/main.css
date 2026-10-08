@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@mithril/design-system/chat.css";
+@import "@mithril/design-system/desktop.css";
 
 /* ========================================================================
    Mithril Desktop — Clean Design System
@@ -512,8 +513,7 @@
   --radius-xl: 20px;
   --transition: 150ms ease;
   --font-sans:
-    "Cairo", "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
+    var(--font-locale, "Noto Sans"), Arial, sans-serif;
   --font-mono:
     "SF Mono", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace;
   /* Amounts and money figures (bank teller totals, token balances). */

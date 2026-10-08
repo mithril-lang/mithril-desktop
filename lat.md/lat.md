@@ -51,3 +51,5 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[canonical-chat]] — default Mithril API-only D1 sessions, explicit native import and native runtime boundaries.
 
 - [[mithril-code]] — profile-scoped System One coding through the Hermes plugin CLI, source review and real execution receipts.
+
+- [[language-typography]] — government-adopted default fonts, language switching and offline script fallbacks.

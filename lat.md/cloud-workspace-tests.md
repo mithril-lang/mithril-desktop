@@ -1244,3 +1244,7 @@ Attachment identities are validated before filesystem access. Symlinked storage 
 ## Complete compression lineage synchronization
 
 A 1,205-session compression chain archives/restores through bounded SQL batches with complete read-back. Unexpected membership changes roll back the operation while messages, project links and unrelated conversations remain intact.
+
+## Complete packaged shared timeline
+
+The actual vendored Workspace export preserves 20,006 contiguous events, first and last messages, stable identities and tombstones. A missing late event is refused instead of displaying an incomplete conversation.

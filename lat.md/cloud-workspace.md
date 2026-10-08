@@ -1339,3 +1339,11 @@ The original ancestor/descendant traversal and exact captured anchor archive fla
 A real SQLite fixture archives and restores 1,205 compressed sessions from their middle member, verifies every original row plus retained evidence/project links, and proves rollback when a trigger inserts unexpected lineage membership. This source qualification is distinct from production and installed synchronization. Full canonical archive/export/import and original attachment/protocol limits remain separate work.
 
 Local qualification: eight history/attachment suites pass 85 tests, changed-file lint and full Desktop types/build pass, and `lat check` passes after shortening the test-spec overview. Workspace `.41` stays immutable. No production write, installer publication or installed replacement occurred; the canonical API publication and full account archive gates remain outstanding.
+
+### Complete shared timeline projection (draft)
+
+Preview.48 pins Workspace 0.6.29-schedules.42, removing the shared transcript projection's total 20,000-event rejection while keeping contiguous sequence and individual event validation.
+
+Web and Desktop must project every already-validated event, including tombstones and stable original identities. A missing or malformed late event still refuses publication of an incomplete timeline. The original chunked storage and per-request bounds are unchanged. This candidate also includes current-main shared Browser web-tool state; compatible API publication remains required before an installer. Source/package tests are distinct from installed upgrade and live cross-device proof.
+
+Workspace .42 archive SHA256 is `f809a5a742b11d4273acc0bf029d4e28f8484c5d052e387ec7beab4b5b2c392f`. All 463 producer, tarball and installed package files were compared byte-for-byte before the consumer test. This is dependency verification, not an installed app update.

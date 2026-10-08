@@ -635,9 +635,7 @@ export class NativeHistorySync {
         const history = [] as { type: string; data: Record<string, string> }[];
         let after = 0;
         let checkpointIdentity: string | undefined;
-        for (let page = 0; ; page++) {
-          if (page >= 1000)
-            throw Error("Native history exceeds supported page bound");
+        for (;;) {
           const checkpoint = await this.ports.transport.events(sid, after);
           await check();
           if (
@@ -676,7 +674,8 @@ export class NativeHistorySync {
           if (
             checkpoint.nextAfter === null ||
             checkpoint.nextAfter !== last ||
-            last <= after
+            last <= after ||
+            last >= remote.eventSeq
           )
             throw Error("Invalid history checkpoint cursor");
           after = checkpoint.nextAfter;
@@ -1151,9 +1150,7 @@ export class NativeHistorySync {
           const events: ChatEvent[] = [];
           let after = 0;
           let eventBytes = 0;
-          for (let page = 0; ; page++) {
-            if (page >= 1000)
-              throw Error("Cloud history exceeds supported page bound");
+          for (;;) {
             const snapshot = await this.ports.transport.events(
               session.id,
               after,
@@ -1193,7 +1190,11 @@ export class NativeHistorySync {
                 throw Error("Incomplete cloud history checkpoint");
               break;
             }
-            if (snapshot.nextAfter !== last || last <= after)
+            if (
+              snapshot.nextAfter !== last ||
+              last <= after ||
+              last >= session.eventSeq
+            )
               throw Error("Invalid cloud history cursor");
             after = last;
           }

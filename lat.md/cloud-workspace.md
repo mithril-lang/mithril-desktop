@@ -1263,3 +1263,13 @@ The connected client retries durable placement edits on reload and the establish
 Shared DOM/IndexedDB regressions include same-ID lost-ack recovery, durable-before-network project/pin changes, retained reload conflicts with both explicit choices, and old-owner automatic receipt retirement. The full 395-test suite passes with two workers; an unrestricted 77-worker run exceeded the existing five-second large-journal test deadline, so the bounded-worker rerun preserves its deadline and assertions. Native `.39` CI run 37708823735 succeeded. `.40` publication and installed behavior remain separate gates.
 
 Candidate preview.40 pins the immutable `.40` package. All 463 archive files match producer and installed dependency, lock SHA512 matches and archive SHA256 is `43ea54eca9899ed9ae9b62b566e0bad72880bbdbd3a155e1ceebc5c241de097f`. Both builds/typechecks, 37 targeted cloud/Chat tests, updater tests and 12 visual scenarios pass. The fixed-route live installer preflight still rejects the unpublished canonical paged Chat API; no installer publication or installed replacement is claimed.
+
+## Complete long transcript page reads
+
+Mapped-source reconciliation and remote-only reconstruction no longer refuse a complete transcript solely because it spans more than a thousand HTTP pages.
+
+Each continuation must advance through contiguous events below the immutable session's declared final event. Owner, session identity/version, active work, terminal completeness and disposal checks remain; an invalid final-event continuation fails before cache publication or title writeback. Native preview.41 retains the immutable workspace `.40` pin. Remote-only event/byte and cache-size limits remain separate unfinished storage work; this removes the pagination ceiling without claiming unbounded transcript storage.
+
+Regression fixtures read 1,005 one-event pages on both mapped and remote-only paths, publish the complete remote-only inventory, update mapped title only after its complete checkpoint, reject false continuation at the final event, and never execute inference or tools. CI/publication and installed cross-device behavior remain separate evidence gates.
+
+Local qualification: all seven native history suites pass (76 tests), both TypeScript checks and the preview.41 build pass. The preceding preview.40 Native CI run 37709729661 completed successfully. None of these results establishes API publication, installer release or installed-device behavior.

@@ -1210,3 +1210,7 @@ A pending provider check never overlaps another periodic request and cannot rear
 Real Chromium checks built Desktop styles at narrow/normal widths in both themes. A long bilingual synchronization notice must wrap above the page rather than obscure the heading or push the footer outside the viewport.
 
 These are layout fixtures, not authenticated client journeys.
+
+## Complete long transcript checkpoints
+
+Mapped and remote-only conversations read all contiguous pages beyond a thousand before title writeback or cache publication, while preserving owner/version/cursor checks and never executing a turn.

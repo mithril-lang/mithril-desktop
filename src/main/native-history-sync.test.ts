@@ -1564,3 +1564,114 @@ it("archives the current native source when other cloud profiles exceed one thou
   expect(f.sessions).toHaveProperty("size", 1206);
   expect(f.executions()).toBe(0);
 });
+
+// @lat: [[cloud-workspace-tests#Complete long transcript checkpoints]]
+it("reads complete mapped and remote-only transcripts beyond a thousand pages without executing work", async () => {
+  for (const mapped of [true, false]) {
+    const f = fixture();
+    const sync = new NativeHistorySync(f.ports);
+    if (mapped) await sync.run();
+    else f.ports.source = async () => [];
+    const sid = mapped
+      ? nativeCloudSessionId("default", "original")
+      : "browser-long-chat";
+    const original = f.sessions.get(sid);
+    const remote: ChatSession = {
+      id: sid,
+      title: "Complete cloud title",
+      model: "mock",
+      revision: (original?.revision ?? 0) + 1,
+      eventSeq: 1005,
+      deleted: false,
+      activeTurn: null,
+    };
+    const events: ChatEvent[] = Array.from(
+      { length: remote.eventSeq },
+      (_, index) => ({
+        seq: index + 1,
+        type: "user",
+        turnId: "archived-turn",
+        data: { content: `Retained message ${index}` },
+        createdAt: index + 1,
+      }),
+    );
+    f.sessions.set(sid, remote);
+    f.events.set(sid, events);
+    const read = vi.fn(async (_id: string, after = 0) => ({
+      schemaVersion: 1 as const,
+      userId: "alice",
+      session: remote,
+      events: events.slice(after, after + 1),
+      hasMore: after + 1 < remote.eventSeq,
+      nextAfter: after + 1 < remote.eventSeq ? after + 1 : null,
+    }));
+    f.ports.transport.events = read;
+    const cache = vi.fn();
+    f.ports.cacheRemote = cache;
+    const result = await sync.run();
+    expect(read).toHaveBeenCalledTimes(1005);
+    expect(read).toHaveBeenLastCalledWith(sid, 1004);
+    expect(result.deferred.some((value) => value.includes("page bound"))).toBe(
+      false,
+    );
+    if (mapped) expect(f.currentTitle()).toBe(remote.title);
+    else {
+      expect(result.deferred).toEqual([]);
+      expect(cache).toHaveBeenCalledExactlyOnceWith(
+        remote,
+        events,
+        expect.objectContaining({ userId: "alice" }),
+      );
+    }
+    expect(f.executions()).toBe(0);
+  }
+});
+
+it("rejects continuation at the declared final event before publishing mapped or remote-only history", async () => {
+  for (const mapped of [true, false]) {
+    const f = fixture(),
+      sync = new NativeHistorySync(f.ports);
+    if (mapped) await sync.run();
+    else f.ports.source = async () => [];
+    const sid = mapped
+      ? nativeCloudSessionId("default", "original")
+      : "browser-invalid-chat";
+    const remote: ChatSession = {
+      id: sid,
+      title: "Unverified cloud title",
+      model: "mock",
+      revision: 3,
+      eventSeq: 1,
+      deleted: false,
+      activeTurn: null,
+    };
+    f.sessions.set(sid, remote);
+    const read = vi.fn(async () => ({
+      schemaVersion: 1 as const,
+      userId: "alice",
+      session: remote,
+      events: [
+        {
+          seq: 1,
+          type: "user" as const,
+          turnId: null,
+          data: { content: "Final event" },
+          createdAt: 1,
+        },
+      ],
+      hasMore: true,
+      nextAfter: 1,
+    }));
+    f.ports.transport.events = read;
+    const cache = vi.fn();
+    f.ports.cacheRemote = cache;
+    const result = await sync.run();
+    expect(result.deferred.some((value) => value.includes("cursor"))).toBe(
+      true,
+    );
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(cache).not.toHaveBeenCalled();
+    expect(f.currentTitle()).toBe("Original chat");
+    expect(f.executions()).toBe(0);
+  }
+});

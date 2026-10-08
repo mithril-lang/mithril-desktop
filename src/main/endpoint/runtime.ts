@@ -2,7 +2,7 @@ import { constants, watch, type FSWatcher } from "node:fs";
 import {
   mkdir,
   open,
-  readdir,
+  opendir,
   realpath,
   readFile,
   rename,
@@ -284,7 +284,7 @@ export class EndpointRuntime {
         generation === this.generation
       ) {
         const dir = directories.shift()!;
-        for (const entry of await readdir(dir, { withFileTypes: true })) {
+        for await (const entry of await opendir(dir)) {
           if (generation !== this.generation || count >= 500) break;
           count++;
           const file = join(dir, entry.name);

@@ -8,6 +8,7 @@ import {
   rename,
   writeFile,
   stat as fileStat,
+  lstat,
 } from "node:fs/promises";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -131,9 +132,15 @@ export class EndpointRuntime {
     const actual = await realpath(file);
     if (root && !inside(root, actual))
       throw Error("File resolves outside the selected folder");
+    const before = await lstat(actual);
+    if (!before.isFile()) throw Error("Only regular files can be scanned");
+    if (before.size > FILE_LIMIT)
+      throw Error("File exceeds the 2 MiB scan limit");
     const handle = await open(
       actual,
-      constants.O_RDONLY | (constants.O_NOFOLLOW || 0),
+      constants.O_RDONLY |
+        (constants.O_NOFOLLOW || 0) |
+        (constants.O_NONBLOCK || 0),
     );
     try {
       const stat = await handle.stat();

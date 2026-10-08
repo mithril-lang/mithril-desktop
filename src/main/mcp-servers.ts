@@ -709,7 +709,7 @@ export async function addMcpServer(
     const scope = selectedSettingsScope(profile);
     profile = scope.profile;
     if (isRemoteMode(scope.connection)) {
-      await mcpApi(
+      const ack = await mcpApi<{ name?: string }>(
         "/api/mcp/servers",
         {
           method: "POST",
@@ -729,6 +729,10 @@ export async function addMcpServer(
         profile,
         scope,
       );
+      if (ack?.name !== validated.value.name)
+        throw new Error(
+          "Remote MCP create has no matching acknowledgement; refresh before retrying.",
+        );
       return { success: true };
     }
 
@@ -826,7 +830,7 @@ export async function removeMcpServer(
     const scope = selectedSettingsScope(profile);
     profile = scope.profile;
     if (isRemoteMode(scope.connection)) {
-      await mcpApi(
+      const ack = await mcpApi<{ ok?: boolean }>(
         `/api/mcp/servers/${encodeURIComponent(name)}`,
         {
           method: "DELETE",
@@ -834,6 +838,10 @@ export async function removeMcpServer(
         profile,
         scope,
       );
+      if (ack?.ok !== true)
+        throw new Error(
+          "Remote MCP removal has no acknowledgement; refresh before retrying.",
+        );
       return { success: true };
     }
     writeConfig(removeMcpServerFromConfig(readConfig(profile), name), profile);
@@ -855,12 +863,20 @@ export async function setMcpServerEnabled(
     const scope = selectedSettingsScope(profile);
     profile = scope.profile;
     if (isRemoteMode(scope.connection)) {
-      await mcpApi(
+      const ack = await mcpApi<{
+        ok?: boolean;
+        name?: string;
+        enabled?: boolean;
+      }>(
         `/api/mcp/servers/${encodeURIComponent(name)}/enabled`,
         { method: "PUT", body: JSON.stringify({ enabled }) },
         profile,
         scope,
       );
+      if (ack?.ok !== true || ack.name !== name || ack.enabled !== enabled)
+        throw new Error(
+          "Remote MCP toggle has no matching acknowledgement; refresh before retrying.",
+        );
       return { success: true };
     }
     writeConfig(

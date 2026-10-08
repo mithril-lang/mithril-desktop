@@ -34,6 +34,7 @@ vi.mock("./remote-api", () => ({
 import {
   addMcpServer,
   listMcpServers,
+  removeMcpServer,
   listMcpCatalog,
   setMcpServerEnabled,
   testMcpServer,
@@ -148,6 +149,15 @@ describe("MCP management owner routing", () => {
       error: expect.stringContaining("may have completed"),
     });
     expect(m.request).toHaveBeenCalledTimes(1);
+    expect(m.write).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing mutation acknowledgements without retries", async () => {
+    m.request.mockResolvedValue({});
+    expect((await addMcpServer(input)).success).toBe(false);
+    expect((await removeMcpServer("owned")).success).toBe(false);
+    expect((await setMcpServerEnabled("owned", false)).success).toBe(false);
+    expect(m.request).toHaveBeenCalledTimes(3);
     expect(m.write).not.toHaveBeenCalled();
   });
 

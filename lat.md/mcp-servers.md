@@ -23,7 +23,7 @@ Registry icons are Iconify-style SVGs — many monochrome (`fill="currentColor"`
 
 MCP operations capture their selected connection and one profile. Direct HTTP uses the existing token/OAuth dashboard transport; remote failures never fall back to local configuration.
 
-[[src/main/selected-settings-scope.ts#selectedSettingsScope]] binds connection identity, configuration and the implicit active profile. [[src/main/mcp-servers.ts#listMcpServers]] and mutations explicitly scope every dashboard URL, including default. SSH requests reject redirects and have a bounded deadline. Responses after an owner change fail; submitted mutations may have completed and never automatically retry. Probes require an explicit `ok: true` response, which remains discovery evidence rather than tool-call evidence.
+[[src/main/selected-settings-scope.ts#selectedSettingsScope]] binds connection identity, configuration and the implicit active profile. [[src/main/mcp-servers.ts#listMcpServers]] and mutations explicitly scope every dashboard URL, including default. SSH requests reject redirects and have a bounded deadline. Responses after an owner change fail; submitted mutations may have completed and never automatically retry. Create, remove and toggle mutations require matching acknowledgements and never retry unknown outcomes. Probes require an explicit `ok: true` response, which remains discovery evidence rather than tool-call evidence.
 
 ## Atomic remote edit
 

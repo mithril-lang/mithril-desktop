@@ -3,6 +3,7 @@ import { SyncClient } from "@mithril/workspace/sync";
 import type {
   WorkspaceRecord,
   WorkspaceSnapshot,
+  WorkspaceHistory,
 } from "@mithril/workspace/protocol";
 import {
   RepositorySync,
@@ -281,4 +282,51 @@ it("uses the compiled Sidebar dataset protocol without admitting malformed or un
       "bob",
     ),
   ).toBe(false);
+});
+
+// @lat: [[cloud-workspace-tests#Packaged Workspace history generation]]
+it("rejects a restored retained-history page in the compiled shared client", async () => {
+  let epoch = 0;
+  const row: WorkspaceRecord = {
+    id: "project",
+    kind: "project",
+    revision: 1,
+    data: { title: "Restored" },
+    deleted: false,
+    updatedAt: 1,
+  };
+  const history = (): WorkspaceHistory => ({
+    schemaVersion: 1 as const,
+    userId: "alice",
+    datasetGeneration: epoch,
+    boundaryRevision: 1,
+    total: 1,
+    records: [row],
+    hasMore: false,
+    nextOffset: null,
+  });
+  const client = new SyncClient({
+    getSnapshot: async () => ({
+      schemaVersion: 1,
+      userId: "alice",
+      datasetGeneration: epoch,
+      cursor: 0,
+      records: [row],
+    }),
+    history: async () => history(),
+    applyOperations: async () => {
+      throw Error("No history writes");
+    },
+  });
+  await client.connect("alice");
+  const previous = await client.history("project");
+  epoch = 1;
+  await expect(client.history("project", 0, previous)).rejects.toThrow(
+    "dataset changed",
+  );
+  await client.refresh();
+  await expect(client.history("project", 0, previous)).rejects.toThrow(
+    "changed workspace history",
+  );
+  expect((await client.history("project")).datasetGeneration).toBe(1);
 });

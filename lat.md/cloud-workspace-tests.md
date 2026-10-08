@@ -1293,3 +1293,7 @@ The compiled shared client sends the observed dataset generation on a saved oper
 ## Packaged Sidebar restore generation
 
 The compiled Sidebar protocol carries the restored dataset generation, rejects invalid epochs and owner injection, and validates owner-scoped complete placement inventories.
+
+## Packaged Workspace history generation
+
+The actual compiled vendor rejects a retained-history page from a restored dataset with equal record identity and revision, then accepts a fresh boundary after snapshot recovery.

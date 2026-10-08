@@ -59,6 +59,7 @@ import {
   type WorkspaceOperationsResponse,
   type WorkspaceOperation,
   type WorkspaceSnapshot,
+  type WorkspaceHistory,
 } from "@mithril/workspace/protocol";
 import type { CloudWorkspaceStatus } from "../shared/workspace";
 import { createHash } from "crypto";
@@ -884,16 +885,7 @@ export class CloudWorkspace {
     return response;
   }
 
-  async history(
-    id: string,
-    offset = 0,
-  ): Promise<{
-    schemaVersion: 1;
-    userId: string;
-    records: WorkspaceRecord[];
-    hasMore: boolean;
-    nextOffset: number | null;
-  }> {
+  async history(id: string, offset = 0): Promise<WorkspaceHistory> {
     if (!validId(id)) throw new Error("Invalid workspace record ID");
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000)
       throw new Error("Invalid workspace history offset");
@@ -903,16 +895,18 @@ export class CloudWorkspace {
       `/v1/workspace/history/${encodeURIComponent(id)}?offset=${offset}`,
       session.token,
       session.profile,
-    )) as {
-      schemaVersion: 1;
-      userId: string;
-      records: WorkspaceRecord[];
-      hasMore: boolean;
-      nextOffset: number | null;
-    };
+    )) as WorkspaceHistory;
     this.checkOwner(response, session.userId, generation);
     if (
       !response ||
+      (response.datasetGeneration !== undefined &&
+        (!Number.isSafeInteger(response.datasetGeneration) ||
+          response.datasetGeneration < 0)) ||
+      ((response.boundaryRevision !== undefined ||
+        response.total !== undefined) &&
+        ![response.boundaryRevision, response.total].every(
+          (value) => Number.isSafeInteger(value) && value! >= 0,
+        )) ||
       !Array.isArray(response.records) ||
       !response.records.every(
         (record) => validRecord(record) && record.id === id,

@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "version": 1,
+  "content": [
+    {
+      "id": "eicar-test-marker",
+      "hex": "45494341522d5354414e444152442d414e544956495255532d544553542d46494c45",
+      "severity": "medium",
+      "maxBytes": 1024
+    },
+    {
+      "id": "php-post-eval",
+      "hex": "6576616c28245f504f53545b",
+      "severity": "high",
+      "maxBytes": 2097152
+    },
+    {
+      "id": "php-request-system",
+      "hex": "73797374656d28245f524551554553545b",
+      "severity": "high",
+      "maxBytes": 2097152
+    },
+    {
+      "id": "shell-tcp-redirection",
+      "hex": "2f6465762f7463702f",
+      "severity": "medium",
+      "maxBytes": 2097152
+    },
+    {
+      "id": "powershell-encoded",
+      "hex": "2d456e636f646564436f6d6d616e6420",
+      "severity": "medium",
+      "maxBytes": 2097152
+    },
+    {
+      "id": "private-key-material",
+      "hex": "2d2d2d2d2d424547494e2050524956415445204b45592d2d2d2d2d",
+      "severity": "high",
+      "maxBytes": 2097152
+    }
+  ],
+  "network": {
+    "fanout": 20,
+    "windowMs": 60000,
+    "beaconSamples": 5,
+    "tolerance": 0.12
+  },
+  "files": {
+    "changes": 200,
+    "windowMs": 60000
+  }
+}

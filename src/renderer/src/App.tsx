@@ -13,9 +13,12 @@ import Setup from "./screens/Setup/Setup";
 import Layout from "./screens/Layout/Layout";
 import SplashScreen from "./screens/SplashScreen/SplashScreen";
 import { captureScreenView } from "./utils/analytics";
+import EndpointProtection from "./screens/CloudWorkspace/EndpointProtection";
+import { useI18n } from "./components/useI18n";
 
 type Screen =
   | "splash"
+  | "endpoint"
   | "mithril"
   | "welcome"
   | "installing"
@@ -148,10 +151,10 @@ function App(): React.JSX.Element {
       accountCheck.current++;
       setAuthenticated(false);
       setMithrilConnected(false);
-      void openWorkspace();
+      if (screen !== "endpoint") void openWorkspace();
     };
     const check = (): void => {
-      if (checking || screen === "splash") return;
+      if (checking || screen === "splash" || screen === "endpoint") return;
       checking = true;
       void openWorkspace().finally(() => {
         checking = false;
@@ -213,12 +216,18 @@ function App(): React.JSX.Element {
   }
 
   function renderScreen(): React.JSX.Element {
-    if (screen !== "splash" && screen !== "mithril" && !authenticated)
+    if (
+      screen !== "splash" &&
+      screen !== "mithril" &&
+      screen !== "endpoint" &&
+      !authenticated
+    )
       return (
         <MithrilStart
           initiallyConnected={false}
           profile={setupProfile}
           onOpenWorkspace={() => void openWorkspace()}
+          onOpenProtection={() => setScreen("endpoint")}
         />
       );
     switch (screen) {
@@ -238,8 +247,11 @@ function App(): React.JSX.Element {
             initiallyConnected={mithrilConnected}
             profile={setupProfile}
             onOpenWorkspace={() => void openWorkspace()}
+            onOpenProtection={() => setScreen("endpoint")}
           />
         );
+      case "endpoint":
+        return <NativeProtectionScreen onBack={() => setScreen("mithril")} />;
       case "welcome":
         return (
           <Welcome
@@ -317,4 +329,24 @@ function App(): React.JSX.Element {
   );
 }
 
+function NativeProtectionScreen({
+  onBack,
+}: {
+  onBack: () => void;
+}): React.JSX.Element {
+  const { locale } = useI18n();
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <button
+        className="self-start rounded-lg p-3 text-sm text-[var(--text-primary)]"
+        onClick={onBack}
+      >
+        {locale.startsWith("ja") ? "起動画面へ戻る" : "Back to start"}
+      </button>
+      <div className="min-h-0 flex-1">
+        <EndpointProtection locale={locale} />
+      </div>
+    </div>
+  );
+}
 export default App;

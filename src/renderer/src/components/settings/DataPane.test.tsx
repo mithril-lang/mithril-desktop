@@ -5,6 +5,13 @@ import { APP_LOCALES, sharedI18n } from "../../../../shared/i18n";
 import { I18nContext } from "../I18nContext";
 import DataPane from "./DataPane";
 
+vi.stubGlobal("hermesAPI", {
+  cloudWorkspace: {
+    status: async () => ({ userId: null, enabled: false }),
+    executionReview: { list: vi.fn(), review: vi.fn() },
+  },
+});
+
 const settings = vi.hoisted(() => ({
   backingUp: false,
   backupResult: null,

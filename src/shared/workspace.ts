@@ -8,6 +8,7 @@ export interface CloudWorkspaceStatus {
 }
 
 export interface CloudWorkspaceAPI extends WorkspaceTransport {
+  executionReview: import("@mithril/workspace/execution-review").ExecutionReviewTransport;
   replica: import("@mithril/workspace/replica-sync").ReplicaTransport;
   capabilitySnapshot: import("@mithril/workspace/capability-data").CapabilitySeed;
   memorySnapshot: import("@mithril/workspace/memory-files").MemorySeed;

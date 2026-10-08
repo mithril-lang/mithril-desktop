@@ -523,6 +523,12 @@ const hermesAPI = {
       fetchRegistryDetail: (kind, item) =>
         ipcRenderer.invoke("cloud-workspace-registry-detail", kind, item),
     },
+    executionReview: {
+      list: (after) =>
+        ipcRenderer.invoke("cloud-workspace-execution-history", after),
+      review: (decision) =>
+        ipcRenderer.invoke("cloud-workspace-execution-review", decision),
+    },
     status: () => ipcRenderer.invoke("cloud-workspace-status"),
     enable: () => ipcRenderer.invoke("cloud-workspace-enable"),
     disable: () => ipcRenderer.invoke("cloud-workspace-disable"),

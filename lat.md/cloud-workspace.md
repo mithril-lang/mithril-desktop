@@ -1569,3 +1569,10 @@ no cloud write. Production publication, hot execution restoration and final
 installed Web/Desktop/updater qualification remain separate open gates.
 
 Candidate preview.68 qualification passes seven real filesystem tests, main and renderer typechecks, affected-file lint, Electron build, 711-file packaging identity and lat checks. This remains source qualification; no installer or production application was changed.
+
+
+## Shared execution history review
+
+The original Settings Data pane now consumes the same review component as Web.
+
+[[src/main/cloud-workspace.ts#CloudWorkspace#executionHistory]] and [[src/main/cloud-workspace.ts#CloudWorkspace#reviewExecution]] expose fixed authenticated routes through trusted preload IPC. Pending review decisions are durably retained per owner/dataset/row/effect before sending. Lost acknowledgements retain the original decision ID and note across remount or restart. Confirmation records no-replay review, not completion/cancellation or new execution permission. Package schedules.62 is the canonical source; installed-client qualification is separate.

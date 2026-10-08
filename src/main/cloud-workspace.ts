@@ -1,3 +1,11 @@
+import {
+  validExecutionDecision,
+  validExecutionHistory,
+  validExecutionReceipt,
+  type ExecutionReviewDecision,
+  type ExecutionHistoryPage,
+  type ExecutionReviewReceipt,
+} from "@mithril/workspace/execution-review";
 import { createProfileResourceTransport } from "@mithril/workspace/profile-resources";
 import { createOriginalScheduleResourceTransport } from "@mithril/workspace/original-schedule-resources";
 import {
@@ -641,6 +649,29 @@ export class CloudWorkspace {
   }
 
   // @lat: [[cloud-workspace#Cloud workspace#Security diagnostics]]
+  async executionHistory(after = 0): Promise<ExecutionHistoryPage> {
+    if (!Number.isSafeInteger(after) || after < 0)
+      throw Error("Invalid history cursor");
+    const { value, userId } = await this.authorizedRequest(
+      "/v1/workspace/execution-history?after=" + after,
+    );
+    if (!validExecutionHistory(value, userId, after))
+      throw Error("Execution history identity changed");
+    return value;
+  }
+  async reviewExecution(
+    decision: ExecutionReviewDecision,
+  ): Promise<ExecutionReviewReceipt> {
+    if (!validExecutionDecision(decision))
+      throw Error("Invalid execution review");
+    const { value, userId } = await this.authorizedRequest(
+      "/v1/workspace/execution-history/review",
+      decision,
+    );
+    if (!validExecutionReceipt(value, userId, decision))
+      throw Error("Review receipt identity changed");
+    return value;
+  }
   async getSecurity(): Promise<SecuritySnapshot> {
     const { value } = await this.authorizedRequest(
       "/v1/security",

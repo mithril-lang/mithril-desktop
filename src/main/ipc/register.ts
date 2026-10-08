@@ -1502,6 +1502,14 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudWorkspace.discoverDocuments.fetchRegistryDetail(kind, item);
   });
+  ipcMain.handle("cloud-workspace-execution-history", (event, after) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.executionHistory(after);
+  });
+  ipcMain.handle("cloud-workspace-execution-review", (event, decision) => {
+    trustedWorkspaceSender(event);
+    return cloudWorkspace.reviewExecution(decision);
+  });
   ipcMain.handle("cloud-workspace-status", (event) => {
     trustedWorkspaceSender(event);
     return cloudWorkspace.status();

@@ -1309,3 +1309,10 @@ The actual vendored ReplicaSync keeps saved device edits as durable conflicts af
 ## Project folder restoration generations
 
 Actual filesystem synchronization retains old saved operations and local edits across restart, while unchanged folders receive restored bytes and delayed downloads refuse replacement after a generation change.
+
+
+## Execution history review boundary
+
+The main transport admits only a safe history cursor or exact validated review decision, keeps credentials in main, and verifies owner/schema and exact review receipts.
+
+Invalid decisions never reach transport. Restored review history is not execution permission.

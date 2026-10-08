@@ -1221,3 +1221,70 @@ it("binds original profile resources to main-process API identity without creden
     client.profileResources.forOwner("b").putChunk(id, bytes),
   ).rejects.toThrow("write scope");
 });
+
+// @lat: [[cloud-workspace-tests#Execution history review boundary]]
+it("uses fixed owner-scoped history routes and rejects forged review identities before transport", async () => {
+  const original = fetcher.getMockImplementation()! as (
+    url: string,
+    init: RequestInit,
+  ) => Promise<Response>;
+  const decision = {
+    decisionId: "decision",
+    rowId: 7,
+    effectId: "effect",
+    datasetGeneration: 2,
+    note: "Checked",
+    reviewedNoReplay: true as const,
+  };
+  const entry = {
+    rowId: 7,
+    operationId: "restore",
+    context: "baseline",
+    section: "original_schedule_occurrences",
+    effectId: "effect",
+    profile: "default",
+    jobId: "one",
+    sourceId: null,
+    reviewed: false,
+  };
+  let foreign = false;
+  fetcher.mockImplementation(async (url: string, init: RequestInit) => {
+    if (url.includes("/v1/workspace/execution-history?"))
+      return reply({
+        schemaVersion: 1,
+        userId: "a",
+        datasetGeneration: 2,
+        entries: [entry],
+        nextAfter: null,
+      });
+    if (url.endsWith("/v1/workspace/execution-history/review")) {
+      expect(JSON.parse(String(init.body))).toEqual(decision);
+      expect(new Headers(init.headers).get("authorization")).toBe(
+        "Bearer " + tokenA,
+      );
+      return reply({
+        schemaVersion: 1,
+        userId: foreign ? "other" : "a",
+        ...decision,
+        status: "reviewed_no_replay",
+        reviewedAt: 1,
+      });
+    }
+    return original(url, init);
+  });
+  await client.enable();
+  expect((await client.executionHistory()).entries[0]).toEqual(entry);
+  expect(await client.reviewExecution(decision)).toMatchObject({
+    status: "reviewed_no_replay",
+  });
+  const count = fetcher.mock.calls.length;
+  await expect(client.executionHistory(-1)).rejects.toThrow("cursor");
+  await expect(
+    client.reviewExecution({ ...decision, reviewedNoReplay: false } as never),
+  ).rejects.toThrow("Invalid");
+  expect(fetcher.mock.calls.length).toBe(count);
+  foreign = true;
+  await expect(client.reviewExecution(decision)).rejects.toThrow(
+    "owner/schema",
+  );
+});

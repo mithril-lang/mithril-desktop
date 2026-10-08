@@ -1356,3 +1356,10 @@ Preview.49 pins Workspace 0.6.29-schedules.43, using transaction-local paged pri
 Unacknowledged keys break a range; other-owner and concurrent-window edits stay durable. Database version 1 remains compatible with earlier clients. Sidebar replacement refuses receipt collisions and identical receipts avoid index rewrites. The original 1,205-entry tests keep their complete fixtures and original deadlines. Native consumer testing uses the actual compiled packaged store. This is source/package proof, not installed synchronization or upgrade.
 
 Workspace .43 SHA256 is `b3472d11ab98207c3f0584f4bc49b01115751c57e24f7e08d4a08b92f12a19e5`; all 465 producer/archive/installed dependency files match. API publication and actual installed update remain release gates.
+
+
+### Current-main synchronization package (draft)
+
+Preview.50 pins Workspace 0.6.29-schedules.44 from Fund b4fef9d3, incorporating current-main UI changes while retaining pending/conflict/disconnected synchronization states and the complete inventory release gates.
+
+The original .43 archive stays immutable. All 465 producer/archive files match; .44 SHA256 is `f9f733bc4f05df9dbf7ee6689060101570b9345b5e08c2901cc5b73e4a752011`. Web source tests and API contract/types passed after the merge. Installed dependency verification and consumer checks are separate; publication and actual update/cross-device behavior remain unproven.

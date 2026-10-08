@@ -494,9 +494,23 @@ export class CloudWorkspace {
     path: string,
     body?: unknown,
     extraScope?: string | readonly string[],
+    expectedContext?: Awaited<ReturnType<CloudWorkspace["nativeContext"]>>,
   ): Promise<{ value: unknown; userId: string }> {
+    // Capture before authentication awaits; a fresh sign-in cannot inherit a call.
+    const expected = expectedContext && { ...expectedContext };
     const session = await this.session();
     const generation = this.generation;
+    if (
+      expected &&
+      (expected.userId !== session.userId ||
+        expected.profile !== session.profile ||
+        expected.epoch !== generation ||
+        expected.actor !==
+          createHash("sha256").update(session.token).digest("hex"))
+    )
+      throw new Error(
+        "Native request context changed; operation not dispatched",
+      );
     if (
       body !== undefined &&
       !session.scopes.includes(this.deps.writeScope ?? "workspace:write")

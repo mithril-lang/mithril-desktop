@@ -455,3 +455,11 @@ Main retains only an ephemeral server checkpoint inventory bound to account/prof
 ## Dynamic inventory invalid and stale responses
 
 Invalid, duplicate, recursive and oversized server inventories are rejected. A late next response cannot restore an inventory retired by a later checkpoint command.
+
+## Captured native context before dispatch
+
+Requests bound to a captured main context refuse same-owner profile, credential and epoch replacement before POST. Unchanged context sends exactly once; successful new sign-in cannot inherit the old call authority.
+
+## Browser context switch before send
+
+The actual CloudChat and CloudWorkspace adapters send no Browser checkpoint when the captured context is retired and explicitly re-enabled before transport admission.

@@ -917,3 +917,45 @@ it("preserves both migration revisions on the fixed native API transport and rej
   ).rejects.toThrow("Invalid repository edit");
   expect(fetcher.mock.calls).toHaveLength(count);
 });
+
+// @lat: [[cloud-workspace-tests#Captured native context before dispatch]]
+it("refuses captured native context after same-owner profile, credential or epoch replacement before POST", async () => {
+  await client.enable();
+  for (const change of [
+    () => {
+      profile = "another-profile";
+    },
+    () => {
+      token = `mf_${"c".repeat(43)}`;
+    },
+    () => {},
+  ]) {
+    const captured = await client.nativeContext();
+    change();
+    client.reset();
+    await client.enable();
+    fetcher.mockClear();
+    await expect(
+      client.authorizedRequest(
+        "/v1/chat/sessions/s1/browser",
+        { action: "child" },
+        undefined,
+        captured,
+      ),
+    ).rejects.toThrow("Native request context changed");
+    expect(fetcher.mock.calls.every((call) => call[0].endsWith("/v1/me"))).toBe(
+      true,
+    );
+  }
+  const captured = await client.nativeContext();
+  fetcher.mockClear();
+  await client.authorizedRequest(
+    "/v1/chat/sessions/s1/browser",
+    { action: "child" },
+    undefined,
+    captured,
+  );
+  expect(
+    fetcher.mock.calls.filter((call) => !call[0].endsWith("/v1/me")),
+  ).toHaveLength(1);
+});

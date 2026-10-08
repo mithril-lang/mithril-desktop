@@ -234,6 +234,7 @@ export class CloudChat implements SessionTransport {
       `/v1/chat/sessions/${encodeURIComponent(id)}/browser`,
       { ...body, toolProtocol: "mithril-browser-tools-v2" },
       "inference",
+      context,
     );
     const result = value as {
       phase: string;

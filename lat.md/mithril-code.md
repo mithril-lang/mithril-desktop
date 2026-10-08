@@ -65,3 +65,9 @@ Preview.33 pins workspace0.6.23: the shared Mithril compile control uses the exi
 The canonical Chat uses the shared v2 Browser tool broker. Credentials stay in main; isolated JS/Python requests use the server checkpoint inventory under the initiating account, turn and checkpoint lease. Legacy replies retain four fixed reads.
 
 [[src/main/cloud-chat.ts#CloudChat]] validates child IDs, argument/output bounds and matching receipts, pins the protocol in main, and retains inference scope. [[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx#MithrilChat]] passes the shared broker to the opaque Kuro frame. Agency.10 main retains bounded server-returned child names for the exact JS/Python parent, owner context and checkpoint; renderer arguments cannot add names. Main forwards only the fixed API route, whose live grants, durable budgets and receipts remain authoritative. Native commands cannot be introduced directly through this child operation. App bridge assets and installed-client execution are separate release gates.
+
+## Browser dispatch identity fence
+
+Browser commands retain their captured main owner, profile, credential fingerprint and epoch through authentication. A changed context is refused before POST, even after explicit same-owner reconnection; post-response checks remain separate.
+
+[[src/main/cloud-workspace.ts#CloudWorkspace#authorizedRequest]] compares the caller's captured context after authenticated session discovery and before the fixed request. [[src/main/cloud-chat.ts#CloudChat#browserStep]] supplies that context for every Browser checkpoint, including child dispatch. This fence grants no human consent, adds no retry and does not connect Desktop to Web human grants.

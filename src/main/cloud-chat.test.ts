@@ -550,3 +550,30 @@ it("rejects malformed inventories and ignores superseded next responses", async 
     }),
   ).rejects.toThrow("child");
 });
+
+// @lat: [[cloud-workspace-tests#Browser context switch before send]]
+it("never sends a Browser checkpoint after context capture is retired and re-enabled", async () => {
+  const f = fixture(["chat:read", "chat:write", "inference"]);
+  await f.auth.enable();
+  const nativeContext = f.auth.nativeContext.bind(f.auth);
+  vi.spyOn(f.auth, "nativeContext").mockImplementationOnce(async () => {
+    const captured = await nativeContext();
+    f.auth.reset();
+    await f.auth.enable();
+    return captured;
+  });
+  f.fetcher.mockClear();
+  await expect(
+    f.client.browserStep("s1", {
+      action: "child",
+      turnId: "turn1",
+      executionToken: "a".repeat(64),
+      round: 0,
+      parentCallId: "parent1",
+      childId: "child1",
+      name: "web_search",
+      args: { query: "test" },
+    }),
+  ).rejects.toThrow("Native request context changed");
+  expect(f.fetcher.mock.calls.some((call) => call[1]?.body)).toBe(false);
+});

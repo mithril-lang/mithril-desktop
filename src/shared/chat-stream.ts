@@ -1,4 +1,14 @@
 export interface ChatToolEvent {
+  /** Advisory schema observation, never admission or an execution receipt. */
+  schemaObservation?: {
+    schemaHash: string;
+    contextId: string;
+    revision: string | null;
+    source: "model-visible" | "profile-discovery";
+    observedAt: number;
+    expiresAt: number;
+    verified: false;
+  };
   callId: string;
   hasStableCallId?: boolean;
   name: string;

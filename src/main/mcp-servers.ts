@@ -2,7 +2,12 @@ import { execFile } from "child_process";
 import { existsSync, readFileSync } from "fs";
 import { profilePaths, safeWriteFile } from "./utils";
 import { getApiUrl, getRemoteAuthHeader, isRemoteMode } from "./hermes";
-import { getApiServerKey } from "./config";
+import {
+  remoteDashboardRequestJson,
+  RemoteDashboardApiError,
+} from "./remote-api";
+import { selectedSettingsScope } from "./selected-settings-scope";
+type McpScope = ReturnType<typeof selectedSettingsScope>;
 import { getEnhancedPath, HERMES_PYTHON, hermesCliArgs } from "./installer";
 
 export type McpTransport = "http" | "stdio" | "unknown";
@@ -606,44 +611,56 @@ export function parseMcpTestTools(
 
 async function mcpApi<T>(
   path: string,
-  init: RequestInit = {},
-  profile?: string,
+  init: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: string },
+  profile: string,
+  scope: McpScope,
 ): Promise<T> {
-  const headers: Record<string, string> = {
-    ...getRemoteAuthHeader(),
-    ...((init.headers as Record<string, string>) || {}),
-  };
-  if (!isRemoteMode()) {
-    const apiServerKey = getApiServerKey(profile);
-    if (apiServerKey && !headers.Authorization) {
-      headers.Authorization = `Bearer ${apiServerKey}`;
-    }
+  scope.check();
+  const scoped = new URL(path, "http://scope.invalid");
+  scoped.searchParams.set("profile", profile);
+  const scopedPath = scoped.pathname + scoped.search;
+  if (scope.connection.mode === "remote") {
+    const result = await remoteDashboardRequestJson<T>(
+      scope.connection,
+      scopedPath,
+      {
+        method: init.method,
+        body: init.body ? JSON.parse(String(init.body)) : undefined,
+        timeoutMs: 15_000,
+      },
+      profile,
+    );
+    scope.check();
+    return result;
   }
-  if (init.body && !headers["Content-Type"]) {
-    headers["Content-Type"] = "application/json";
-  }
-  const response = await fetch(`${getApiUrl(profile)}${path}`, {
-    ...init,
-    headers,
-  });
+  if (scope.connection.mode !== "ssh")
+    throw new Error("MCP dashboard requires a remote connection.");
+  const response = await fetch(
+    `${getApiUrl(profile, scope.connection)}${scopedPath}`,
+    {
+      ...init,
+      headers: {
+        ...getRemoteAuthHeader(scope.connection),
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(15_000),
+      redirect: "error",
+    },
+  );
+  scope.check();
   if (!response.ok) {
-    let detail = response.statusText;
-    try {
-      const body = (await response.json()) as { detail?: string };
-      detail = body.detail || detail;
-    } catch {
-      // leave status text
-    }
-    const err = new Error(detail || `HTTP ${response.status}`);
+    const err = new Error(`MCP dashboard HTTP ${response.status}`);
     Object.assign(err, { status: response.status });
     throw err;
   }
   const text = await response.text();
+  scope.check();
   if (!text.trim()) return {} as T;
   return JSON.parse(text) as T;
 }
 
 function isNotFoundError(err: unknown): boolean {
+  if (err instanceof RemoteDashboardApiError) return err.statusCode === 404;
   return (
     typeof err === "object" &&
     err !== null &&
@@ -667,11 +684,14 @@ function unsupportedMcpApiMessage(
 export async function listMcpServers(
   profile?: string,
 ): Promise<McpServerInfo[]> {
-  if (isRemoteMode()) {
+  const scope = selectedSettingsScope(profile);
+  profile = scope.profile;
+  if (isRemoteMode(scope.connection)) {
     const data = await mcpApi<{ servers?: Record<string, unknown>[] }>(
       "/api/mcp/servers",
       {},
       profile,
+      scope,
     );
     return (data.servers || []).map(normalizeRemoteServer);
   }
@@ -686,8 +706,10 @@ export async function addMcpServer(
   if (!validated.ok) return { success: false, error: validated.error };
 
   try {
-    if (isRemoteMode()) {
-      await mcpApi(
+    const scope = selectedSettingsScope(profile);
+    profile = scope.profile;
+    if (isRemoteMode(scope.connection)) {
+      const ack = await mcpApi<{ name?: string }>(
         "/api/mcp/servers",
         {
           method: "POST",
@@ -705,7 +727,12 @@ export async function addMcpServer(
           }),
         },
         profile,
+        scope,
       );
+      if (ack?.name !== validated.value.name)
+        throw new Error(
+          "Remote MCP create has no matching acknowledgement; refresh before retrying.",
+        );
       return { success: true };
     }
 
@@ -738,19 +765,13 @@ export async function updateMcpServer(
   if (!validated.ok) return { success: false, error: validated.error };
 
   try {
-    if (isRemoteMode()) {
-      // Remote has no rename-in-place; drop the old entry if the name changed.
-      if (originalName !== validated.value.name) {
-        await mcpApi(
-          `/api/mcp/servers/${encodeURIComponent(originalName)}`,
-          { method: "DELETE" },
-          profile,
-        );
-      }
-      await mcpApi(
-        "/api/mcp/servers",
+    const scope = selectedSettingsScope(profile);
+    profile = scope.profile;
+    if (isRemoteMode(scope.connection)) {
+      const ack = await mcpApi<{ name?: string }>(
+        `/api/mcp/servers/${encodeURIComponent(originalName)}`,
         {
-          method: "POST",
+          method: "PUT",
           body: JSON.stringify({
             name: validated.value.name,
             url:
@@ -765,7 +786,12 @@ export async function updateMcpServer(
           }),
         },
         profile,
+        scope,
       );
+      if (ack?.name !== validated.value.name)
+        throw new Error(
+          "Remote MCP update has no matching acknowledgement; refresh before retrying.",
+        );
       return { success: true };
     }
 
@@ -801,14 +827,21 @@ export async function removeMcpServer(
   profile?: string,
 ): Promise<McpOperationResult> {
   try {
-    if (isRemoteMode()) {
-      await mcpApi(
+    const scope = selectedSettingsScope(profile);
+    profile = scope.profile;
+    if (isRemoteMode(scope.connection)) {
+      const ack = await mcpApi<{ ok?: boolean }>(
         `/api/mcp/servers/${encodeURIComponent(name)}`,
         {
           method: "DELETE",
         },
         profile,
+        scope,
       );
+      if (ack?.ok !== true)
+        throw new Error(
+          "Remote MCP removal has no acknowledgement; refresh before retrying.",
+        );
       return { success: true };
     }
     writeConfig(removeMcpServerFromConfig(readConfig(profile), name), profile);
@@ -827,12 +860,23 @@ export async function setMcpServerEnabled(
   profile?: string,
 ): Promise<McpOperationResult> {
   try {
-    if (isRemoteMode()) {
-      await mcpApi(
+    const scope = selectedSettingsScope(profile);
+    profile = scope.profile;
+    if (isRemoteMode(scope.connection)) {
+      const ack = await mcpApi<{
+        ok?: boolean;
+        name?: string;
+        enabled?: boolean;
+      }>(
         `/api/mcp/servers/${encodeURIComponent(name)}/enabled`,
         { method: "PUT", body: JSON.stringify({ enabled }) },
         profile,
+        scope,
       );
+      if (ack?.ok !== true || ack.name !== name || ack.enabled !== enabled)
+        throw new Error(
+          "Remote MCP toggle has no matching acknowledgement; refresh before retrying.",
+        );
       return { success: true };
     }
     writeConfig(
@@ -853,8 +897,11 @@ export async function testMcpServer(
   profile?: string,
 ): Promise<McpOperationResult> {
   try {
-    if (!isRemoteMode()) {
+    const scope = selectedSettingsScope(profile);
+    profile = scope.profile;
+    if (!isRemoteMode(scope.connection)) {
       const result = await runHermesMcpCli(["test", name], profile);
+      scope.check();
       return {
         success: true,
         tools: parseMcpTestTools(result.stdout),
@@ -869,9 +916,10 @@ export async function testMcpServer(
       `/api/mcp/servers/${encodeURIComponent(name)}/test`,
       { method: "POST" },
       profile,
+      scope,
     );
     return {
-      success: data.ok !== false,
+      success: data.ok === true,
       error: data.error,
       tools: data.tools || [],
     };
@@ -892,8 +940,11 @@ export async function listMcpCatalog(profile?: string): Promise<{
   error?: string;
 }> {
   try {
-    if (!isRemoteMode()) {
+    const scope = selectedSettingsScope(profile);
+    profile = scope.profile;
+    if (!isRemoteMode(scope.connection)) {
       const result = await runHermesMcpCli(["catalog"], profile);
+      scope.check();
       return {
         entries: parseCatalogOutput(result.stdout),
         diagnostics: result.stderr.trim() ? [result.stderr.trim()] : [],
@@ -903,7 +954,7 @@ export async function listMcpCatalog(profile?: string): Promise<{
     const data = await mcpApi<{
       entries?: Array<Record<string, unknown>>;
       diagnostics?: unknown[];
-    }>("/api/mcp/catalog", {}, profile);
+    }>("/api/mcp/catalog", {}, profile, scope);
     return {
       entries: (data.entries || []).map((entry) => ({
         name: String(entry.name || ""),
@@ -952,8 +1003,11 @@ export async function installMcpCatalogEntry(
   profile?: string,
 ): Promise<McpOperationResult> {
   try {
-    if (!isRemoteMode()) {
+    const scope = selectedSettingsScope(profile);
+    profile = scope.profile;
+    if (!isRemoteMode(scope.connection)) {
       await runHermesMcpCli(["install", name], profile);
+      scope.check();
       return { success: true };
     }
 
@@ -968,9 +1022,10 @@ export async function installMcpCatalogEntry(
         body: JSON.stringify({ name, env, enable: true }),
       },
       profile,
+      scope,
     );
     return {
-      success: data.ok !== false,
+      success: data.ok === true,
       background: Boolean(data.background),
       action: data.action,
     };

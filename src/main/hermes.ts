@@ -108,6 +108,7 @@ import {
   sanitizeAgentCommandInventory,
   sanitizeAgentRuntimeInfo,
 } from "../shared/agent-capabilities";
+import { GatewayToolSchemas } from "./gateway-tool-schemas";
 
 /**
  * Resolve which profile a gateway call targets. An explicit profile always
@@ -2203,11 +2204,37 @@ async function sendMessageViaTuiGateway(
   let fallbackStarted = false;
   let promptSubmitted = false;
   let approvalInteraction = false;
+  const toolSchemas = new GatewayToolSchemas();
+  let schemaReadGeneration = 0;
   let cleanup = (): void => undefined;
   // request_id of an in-flight clarify question, if the agent is awaiting an
   // answer. Cleared on turn end so an abandoned turn leaks no stale resolver.
   let pendingClarifyId: string | null = null;
   const pendingApprovalIds = new Set<string>();
+
+  async function refreshToolSchemas(): Promise<void> {
+    const sessionId = activeSessionId;
+    if (!sessionId || finished || fallbackStarted) return;
+    const generation = ++schemaReadGeneration;
+    try {
+      const value = await client.request(
+        "tools.show",
+        { session_id: sessionId },
+        1_000,
+      );
+      if (
+        generation !== schemaReadGeneration ||
+        sessionId !== activeSessionId ||
+        finished ||
+        fallbackStarted
+      )
+        return;
+      await toolSchemas.observe(value);
+    } catch {
+      if (generation === schemaReadGeneration && !finished && !fallbackStarted)
+        toolSchemas.invalidate();
+    }
+  }
 
   function clearApprovals(): void {
     for (const requestId of pendingApprovalIds) {
@@ -2219,6 +2246,7 @@ async function sendMessageViaTuiGateway(
   function finish(error?: string): void {
     if (finished) return;
     finished = true;
+    toolSchemas.close();
     if (pendingClarifyId) {
       clearPendingClarify(pendingClarifyId);
       pendingClarifyId = null;
@@ -2237,6 +2265,7 @@ async function sendMessageViaTuiGateway(
   function cancel(): void {
     if (finished) return;
     finished = true;
+    toolSchemas.close();
     if (pendingClarifyId) {
       clearPendingClarify(pendingClarifyId);
       pendingClarifyId = null;
@@ -2254,6 +2283,7 @@ async function sendMessageViaTuiGateway(
       return;
     }
     fallbackStarted = true;
+    toolSchemas.close();
     cleanup();
     client.stop();
     console.warn(
@@ -2282,6 +2312,10 @@ async function sendMessageViaTuiGateway(
 
   cleanup = client.onEvent((event) => {
     if (finished || fallbackStarted) return;
+    if (event.type === "gateway.disconnected") {
+      schemaReadGeneration++;
+      toolSchemas.invalidate();
+    }
     if (event.type === "gateway.disconnected" && approvalInteraction) {
       finish(
         "The gateway disconnected after requesting approval. The prompt was not replayed.",
@@ -2291,10 +2325,12 @@ async function sendMessageViaTuiGateway(
     if (event.session_id && event.session_id !== activeSessionId) return;
 
     if (event.type === "session.info") {
+      toolSchemas.invalidate();
       if (connectionId) {
         recordAgentRuntimeInfo(event.payload, profile, connectionId);
       }
       hasSessionInfo = true;
+      void refreshToolSchemas();
       return;
     }
 
@@ -2313,7 +2349,8 @@ async function sendMessageViaTuiGateway(
       return;
     }
 
-    const toolEvent = gatewayToolEvent(event);
+    const rawToolEvent = gatewayToolEvent(event);
+    const toolEvent = rawToolEvent ? toolSchemas.annotate(rawToolEvent) : null;
     if (toolEvent) {
       hasGatewayOutput = true;
       if (cb.onToolEvent) {
@@ -2576,11 +2613,16 @@ async function sendMessageViaTuiGateway(
       );
     }
 
-    promptSubmitted = true;
-    await client.request("prompt.submit", {
-      session_id: activeSessionId,
-      text: message,
-    });
+    // Same attached RPC transport and session as the prompt. Old runtimes may
+    // lack the new fields: discovery then stays unknown without replaying chat.
+    await refreshToolSchemas();
+    if (!finished && !fallbackStarted) {
+      promptSubmitted = true;
+      await client.request("prompt.submit", {
+        session_id: activeSessionId,
+        text: message,
+      });
+    }
   } catch (error) {
     if (approvalInteraction) {
       void client
@@ -2590,6 +2632,7 @@ async function sendMessageViaTuiGateway(
         "The gateway lost the prompt acknowledgment after requesting approval. The prompt was not replayed.",
       );
     } else {
+      toolSchemas.close();
       cleanup();
       if (!promptSubmitted) client.stop();
       throw error;

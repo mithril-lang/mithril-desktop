@@ -1,3 +1,4 @@
+import { ToolAttemptsPanel } from "./ToolAttemptsPanel";
 import { ChatSurface } from "@mithril/design-system/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -1069,6 +1070,9 @@ function Chat({
       </div>
 
       <div className="chat-input-area">
+        {dashboardTransport.enabled && (
+          <ToolAttemptsPanel reader={dashboardTransport.toolAttempts} />
+        )}
         <QueuedMessages
           messages={queuedMessages}
           onRemove={handleRemoveQueued}

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
+import { ToolAttemptReader } from "../toolAttemptReader";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LOCAL_PRESETS } from "../../../constants";
 import {
   isBubbleMessage,
@@ -118,6 +119,7 @@ interface UseDashboardChatTransportArgs {
 }
 
 interface UseDashboardChatTransportResult {
+  toolAttempts: ToolAttemptReader;
   abort: () => void;
   enabled: boolean;
   respondClarify: (requestId: string, answer: string) => Promise<boolean>;
@@ -965,6 +967,21 @@ export function useDashboardChatTransport({
   const dashboardUnavailableRef = useRef(false);
   const runtimeSessionIdRef = useRef<string | null>(null);
   const storedSessionIdRef = useRef<string | null>(hermesSessionId);
+  const attemptEnabledRef = useRef(enabled);
+  const [toolAttempts] = useState(
+    () =>
+      new ToolAttemptReader(() => {
+        const client = clientRef.current,
+          sessionId = runtimeSessionIdRef.current;
+        return attemptEnabledRef.current && client && sessionId
+          ? { client, sessionId, generation: clientGenerationRef.current }
+          : null;
+      }),
+  );
+  useEffect(() => {
+    attemptEnabledRef.current = enabled;
+    if (!enabled) toolAttempts.invalidate();
+  }, [enabled, toolAttempts]);
   const reasoningSegmentClosedRef = useRef(false);
   const appliedModelRef = useRef<string | null>(null);
   const recreateRuntimeSessionRef = useRef(false);
@@ -1105,6 +1122,7 @@ export function useDashboardChatTransport({
     if (hermesSessionId === storedSessionIdRef.current) return;
     expirePendingApprovalsRef.current();
     storedSessionIdRef.current = hermesSessionId;
+    toolAttempts.invalidate();
     runtimeSessionIdRef.current = null;
     reasoningSegmentClosedRef.current = false;
     appliedModelRef.current = null;
@@ -1112,7 +1130,7 @@ export function useDashboardChatTransport({
     lastRuntimeSessionWasCreatedRef.current = false;
     expirePendingClarifyRef.current();
     lastSyncedCwdRef.current = null;
-  }, [hermesSessionId]);
+  }, [hermesSessionId, toolAttempts]);
 
   useEffect(() => {
     appliedModelRef.current = null;
@@ -1125,6 +1143,7 @@ export function useDashboardChatTransport({
     clientRef.current?.close();
     clientRef.current = null;
     connectingRef.current = null;
+    toolAttempts.invalidate();
     runtimeSessionIdRef.current = null;
     reasoningSegmentClosedRef.current = false;
     appliedModelRef.current = null;
@@ -1133,7 +1152,7 @@ export function useDashboardChatTransport({
     expirePendingClarifyRef.current();
     pendingRecoveredContinuationRef.current = [];
     lastSyncedCwdRef.current = null;
-  }, [connectionId, connectionMode, connectionRevision, profile]);
+  }, [connectionId, connectionMode, connectionRevision, profile, toolAttempts]);
 
   const handleGatewayEvent = useCallback(
     (event: DashboardStreamEvent): void => {
@@ -1149,6 +1168,7 @@ export function useDashboardChatTransport({
       logDashboardEvent(event, "accepted", runtimeSessionId);
 
       if (event.type === "session.info") {
+        toolAttempts.invalidate();
         const recordRuntimeInfo = window.hermesAPI.recordAgentRuntimeInfo;
         if (typeof recordRuntimeInfo === "function") {
           void recordRuntimeInfo(event.payload, profile, connectionId).catch(
@@ -1374,6 +1394,7 @@ export function useDashboardChatTransport({
       }
     },
     [
+      toolAttempts,
       activeTurnRef,
       connectionId,
       connectionMode,
@@ -1451,6 +1472,7 @@ export function useDashboardChatTransport({
                 // A replacement dashboard process cannot resolve the old
                 // process-local runtime id. Preserve the stored id so the next
                 // connection resumes it before model.options or prompt.submit.
+                toolAttempts.invalidate();
                 runtimeSessionIdRef.current = null;
                 appliedModelRef.current = null;
                 lastSyncedCwdRef.current = null;
@@ -1507,6 +1529,7 @@ export function useDashboardChatTransport({
         }
       }
     }, [
+      toolAttempts,
       handleGatewayEvent,
       profile,
       connectionId,
@@ -1554,6 +1577,7 @@ export function useDashboardChatTransport({
         }
 
         targetSessionId = response.runtimeSessionId;
+        toolAttempts.invalidate();
         runtimeSessionIdRef.current = targetSessionId;
         lastRuntimeSessionWasCreatedRef.current = response.created;
         justCreated = response.created;
@@ -1586,6 +1610,7 @@ export function useDashboardChatTransport({
       return targetSessionId;
     },
     [
+      toolAttempts,
       activeTurnRef,
       connectionId,
       contextFolder,
@@ -1609,6 +1634,7 @@ export function useDashboardChatTransport({
         await client
           .request("session.close", { session_id: targetSessionId })
           .catch(() => undefined);
+        toolAttempts.invalidate();
         runtimeSessionIdRef.current = null;
         pendingApprovalsRef.current = [];
         storedSessionIdRef.current = storedSessionId;
@@ -1730,7 +1756,7 @@ export function useDashboardChatTransport({
         return switchAndValidate(freshSessionId);
       }
     },
-    [ensureRuntimeSession, model, modelBaseUrl, provider],
+    [ensureRuntimeSession, model, modelBaseUrl, provider, toolAttempts],
   );
 
   const syncDashboardAttachments = useCallback(
@@ -1860,6 +1886,7 @@ export function useDashboardChatTransport({
         }
       };
       const failActiveTurn = (message: string): true => {
+        toolAttempts.invalidate();
         const activeTurn = activeTurnRef.current;
         if (activeTurn) activeTurn.status = "failed";
         if (pendingApprovalsRef.current.length) {
@@ -1894,7 +1921,10 @@ export function useDashboardChatTransport({
         return true;
       };
       if (dashboardText === null) {
-        if (fallbackOnUnavailable) return false;
+        if (fallbackOnUnavailable) {
+          toolAttempts.invalidate();
+          return false;
+        }
         return failActiveTurn(
           "Dashboard chat supports image attachments only in this build. Use Auto or Legacy for mixed file attachments.",
         );
@@ -1915,6 +1945,7 @@ export function useDashboardChatTransport({
         }
         if (fallbackOnUnavailable) {
           console.warn("Falling back to legacy chat transport.", err);
+          toolAttempts.invalidate();
           return false;
         }
         const message = err instanceof Error ? err.message : String(err);
@@ -1935,6 +1966,7 @@ export function useDashboardChatTransport({
               .request("session.close", { session_id: staleRuntimeSessionId })
               .catch(() => undefined);
           }
+          toolAttempts.invalidate();
           runtimeSessionIdRef.current = null;
           pendingApprovalsRef.current = [];
           reasoningSegmentClosedRef.current = false;
@@ -1964,7 +1996,10 @@ export function useDashboardChatTransport({
           attachments,
         );
         if (!syncedAttachments.handled) {
-          if (fallbackOnUnavailable) return false;
+          if (fallbackOnUnavailable) {
+            toolAttempts.invalidate();
+            return false;
+          }
           return failActiveTurn(
             "Hermes dashboard could not attach the selected file. Use Auto or Legacy to fall back to the legacy attachment path.",
           );
@@ -1982,6 +2017,7 @@ export function useDashboardChatTransport({
           text: submitText,
           profile,
           onRecoveredSessionId: (recoveredSessionId) => {
+            toolAttempts.invalidate();
             runtimeSessionIdRef.current = recoveredSessionId;
           },
         });
@@ -1994,6 +2030,7 @@ export function useDashboardChatTransport({
       }
     },
     [
+      toolAttempts,
       activeTurnRef,
       respondClarify,
       connectionMode,
@@ -2127,6 +2164,7 @@ export function useDashboardChatTransport({
   );
 
   const abort = useCallback(() => {
+    toolAttempts.invalidate();
     expirePendingClarifyRef.current();
     expirePendingApprovalsRef.current();
     const client = clientRef.current;
@@ -2137,19 +2175,21 @@ export function useDashboardChatTransport({
       .catch(() => {
         client.close();
       });
-  }, [enabled]);
+  }, [enabled, toolAttempts]);
 
   useEffect(
     () => () => {
       expirePendingClarifyRef.current();
       expirePendingApprovalsRef.current();
+      toolAttempts.invalidate();
       clientRef.current?.close();
       clientRef.current = null;
     },
-    [],
+    [toolAttempts],
   );
 
   return {
+    toolAttempts,
     abort,
     enabled,
     respondApproval,

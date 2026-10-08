@@ -56,3 +56,7 @@ This directory defines the high-level concepts, business logic, and architecture
 
 - [[language-typography]] — government-adopted default fonts, language switching and offline script fallbacks.
 - [[endpoint-protection]] — local endpoint monitoring, bounded detection and signed definition delivery.
+
+- [[tool-settings]] — selected connection and profile own tool settings, with remote metadata validation and no local fallback.
+- [[gateway-tool-schemas]] — ephemeral, attached-turn schema observations use the common SDK hash and remain separate from execution admission and receipts.
+- [[tool-attempts]] — explicit attached-dashboard attempt metadata reads, unknown outcomes, bounded lifetime and mounted consumer verification.

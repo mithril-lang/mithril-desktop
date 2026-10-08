@@ -53,6 +53,7 @@ export interface CloudChatAPI extends SessionTransport {
     phase: string;
     round: number;
     calls: import("@mithril/workspace/client-tool-turn").ClientToolCall[];
+    childResult?: import("@mithril/workspace/client-tool-turn").ClientToolResult;
   }>;
   nativeHistoryInventory(): Promise<{
     userId: string;

@@ -1297,3 +1297,7 @@ The compiled Sidebar protocol carries the restored dataset generation, rejects i
 ## Packaged Workspace history generation
 
 The actual compiled vendor rejects a retained-history page from a restored dataset with equal record identity and revision, then accepts a fresh boundary after snapshot recovery.
+
+## Verified Desktop sign-in gate
+
+Desktop never mounts the workspace for a stored but invalid account, refuses manual bypass, closes on sign-out and retires late account verification responses before admitting a newly verified session.

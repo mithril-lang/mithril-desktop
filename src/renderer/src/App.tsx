@@ -45,8 +45,10 @@ function App(): React.JSX.Element {
   const [setupProfile, setSetupProfile] = useState<string | undefined>(
     undefined,
   );
-  // Whether an mf_ token is stored (local check only; no network at launch).
+  // Account admission requires API verification, not merely a stored token.
   const [mithrilConnected, setMithrilConnected] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+  const accountCheck = useRef(0);
   const isMac = window.electron?.process?.platform === "darwin";
   // Bumped on every runInstallCheck so a superseded run (e.g. the user hit
   // "Switch to local mode" while an SSH tunnel attempt was still in flight)
@@ -70,8 +72,14 @@ function App(): React.JSX.Element {
       nextSetupProfile = status?.activeProfile || "default";
       const first =
         await window.hermesAPI.getMithrilFirstRunState(nextSetupProfile);
-      setMithrilConnected(first.connected);
-      next = first.connected ? "main" : "mithril";
+      const account = first.connected
+        ? await window.hermesAPI.getMithrilAccount(nextSetupProfile)
+        : null;
+      if (myRun !== runIdRef.current) return;
+      const verified = !!account?.live && !!account.userId;
+      setAuthenticated(verified);
+      setMithrilConnected(verified);
+      next = verified ? "main" : "mithril";
     } catch {
       next = "mithril";
     }
@@ -120,9 +128,47 @@ function App(): React.JSX.Element {
     setScreen("setup");
   }
 
-  async function openWorkspace(): Promise<void> {
-    setScreen("main");
-  }
+  const openWorkspace = useCallback(async (): Promise<void> => {
+    const attempt = ++accountCheck.current;
+    const account = await window.hermesAPI
+      .getMithrilAccount(setupProfile)
+      .catch(() => null);
+    if (attempt !== accountCheck.current) return;
+    const verified = !!account?.live && !!account.userId;
+    setAuthenticated(verified);
+    setMithrilConnected(verified);
+    setScreen(verified ? "main" : "mithril");
+  }, [setupProfile]);
+
+  useEffect(() => {
+    const checks = accountCheck;
+    let checking = false;
+    const changed = (): void => {
+      runIdRef.current++;
+      accountCheck.current++;
+      setAuthenticated(false);
+      setMithrilConnected(false);
+      void openWorkspace();
+    };
+    const check = (): void => {
+      if (checking || screen === "splash") return;
+      checking = true;
+      void openWorkspace().finally(() => {
+        checking = false;
+      });
+    };
+    const stop = window.hermesAPI.onCloudWorkspaceAccountChanged(changed);
+    const timer = screen === "main" ? setInterval(check, 60_000) : undefined;
+    window.addEventListener("focus", check);
+    window.addEventListener("online", check);
+    return () => {
+      checks.current++;
+      stop();
+      if (timer !== undefined) clearInterval(timer);
+      window.removeEventListener("focus", check);
+      window.removeEventListener("online", check);
+    };
+  }, [screen, openWorkspace]);
 
   async function openDeviceRuntime(): Promise<void> {
     // Explicit opt-in to the local Hermes agent runtime (large download).
@@ -167,6 +213,14 @@ function App(): React.JSX.Element {
   }
 
   function renderScreen(): React.JSX.Element {
+    if (screen !== "splash" && screen !== "mithril" && !authenticated)
+      return (
+        <MithrilStart
+          initiallyConnected={false}
+          profile={setupProfile}
+          onOpenWorkspace={() => void openWorkspace()}
+        />
+      );
     switch (screen) {
       case "splash":
         return (
@@ -231,7 +285,7 @@ function App(): React.JSX.Element {
     <ThemeProvider>
       <FontProvider>
         <ChatPreferencesProvider>
-          <ProfileModalProvider>
+          <ProfileModalProvider key={authenticated ? "verified" : "signed-out"}>
             <SettingsModalProvider>
               <ErrorBoundary>
                 <div

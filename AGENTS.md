@@ -108,6 +108,10 @@ The second example is invalid because `Bad Section` has no leading paragraph. `l
 
 # Shipping
 
+## International investigation design — Jun, 2026-10-08
+
+Read `lat.md/international-investigation.md` for the Registry-pinned planned contract `3c65bd553f8cae684a87863ed8c37bb4d8a19af5`. Each agency retains domestic case/source custody; selected sharing binds recipient, purpose, material version, authority, jurisdictions, storage/retention, expiry and channel. Local evidence evaluation, cloud account scopes and native profiles do not grant agency identity or cross-border access. Dispatch/receipt/integrity/authority/judicial decisions are separate. No international connector, remote case sharing, forensic screen or native sync is implemented by this design. Keep police, prosecution, counsel/defense and judges separate; record provenance, translations, partial/unknown outcomes and independent trust. Official-channel operations and institutional acceptance need separate implementation and validation.
+
 When jun asks for a change, take it through publication. A local edit is not the end of the task.
 
 ## Packaged app

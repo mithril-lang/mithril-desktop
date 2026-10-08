@@ -1197,3 +1197,10 @@ The real history engine synchronizes 1,005 original physical deletions, replays 
 ## Complete large canonical sidebar
 
 The main-owned canonical read admits 1,205 valid owner-scoped pin/project placements through the same shared validator as Web, retaining fixed routes and account validation.
+## Periodic packaged update checks
+
+Signed packaged clients check after startup and every four hours after completion, recover from unavailable feeds and stop scheduling on quit. This verifies scheduling rather than a signed installer download or replacement.
+
+## Pending update check disposal
+
+A pending provider check never overlaps another periodic request and cannot rearm its timer after the application quits.

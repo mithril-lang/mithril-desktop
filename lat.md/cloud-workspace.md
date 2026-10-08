@@ -1233,3 +1233,13 @@ Workspace `.37` removes the separate thousand-placement validator ceiling from t
 The API reads hundred-record keyset pages behind the existing endpoint, captures an insertion boundary and checks complete final count before returning the original response shape. New placements appear on the next read; changed tombstone membership/count rejects a partial response. Placement fields are observed during the read, not an immutable transactional snapshot across all D1 queries. Web and installer publication now require `sidebar-inventory-keyset-v1`; no provider or inference probe runs. HTTP still returns the complete placement inventory; provider response/query limits and pending-edit queue bounds remain separate work. Browser Data still needs a complete archive adapter rather than a substitute partial export.
 
 Local qualification: 29 main-process cloud tests, installer compatibility test, Desktop typechecks/build, changed-file lint and `lat check` pass. All 463 `.37` archive files match the producer and installed package, with lock integrity verified; SHA256 `4a4cd3a937a15dec98b8374bb8f660278722aa64e1c9b0619e36f0db226315c2`. Installer publication and authenticated upgrade/cross-device checks remain required.
+
+## Sidebar visual quality and automatic update cadence
+
+The canonical shared CSS entrypoint loads the original Desktop sidebar styles on the first cloud screen, independently of legacy screen imports.
+
+Fund's real Chromium component gate covers English/Japanese, empty/long lists and narrow/normal widths, with screenshots and a demonstrated failure when the stylesheet is removed. This fixture gate does not establish all-screen or authenticated installed-client usability.
+
+[[src/main/app/updater.ts#scheduleUpdateChecks]] checks signed packaged clients after five seconds and every four hours after a completed check. Errors permit the next check, pending requests do not overlap and application quit retires scheduling. Existing auto-download preference, signature/feed guards and quit-time installation remain. Manual-update links now go directly to the download page. Local observation found signed installed preview.35, its preview channel and public preview.36 feed; no actual installer replacement is inferred from those reads.
+
+Local qualification: 42 targeted cloud/updater tests, Desktop typechecks/build, changed-file lint and `lat check` pass. Native pins immutable workspace `.38`; all 463 files and lock integrity match, SHA256 `953f63c128eb98a72f4a9376d03113124584621b5e983a806921e199682f3018`. Candidate installer version is preview.38; it is not published or installed. The public preview.36 feed does not establish that the new source is deployed.

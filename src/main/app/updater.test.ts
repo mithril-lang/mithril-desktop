@@ -24,6 +24,7 @@ import {
   macManualUpdateReason,
   offeredUpdateVersion,
   setupManualUpdater,
+  scheduleUpdateChecks,
   updateFeedAvailable,
 } from "./updater";
 
@@ -132,8 +133,56 @@ describe("macManualUpdateReason", () => {
       | undefined;
     await expect(check?.()).resolves.toBe("0.8.0-preview.2");
     expect(electronState.openExternal).toHaveBeenCalledWith(
-      "https://app.mithril.fund/",
+      "https://app.mithril.fund/download/",
     );
     expect(checkForUpdates).not.toHaveBeenCalled();
+  });
+});
+
+describe("scheduled update checks", () => {
+  // @lat: [[cloud-workspace-tests#Periodic packaged update checks]]
+  it("checks after startup, recovers failures and cancels on quit", async () => {
+    vi.useFakeTimers();
+    try {
+      const check = vi
+        .fn()
+        .mockRejectedValueOnce(Error("offline"))
+        .mockResolvedValue(null);
+      const stop = scheduleUpdateChecks(check);
+      await vi.advanceTimersByTimeAsync(4999);
+      expect(check).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(check).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000);
+      expect(check).toHaveBeenCalledTimes(2);
+      stop();
+      await vi.advanceTimersByTimeAsync(8 * 60 * 60 * 1000);
+      expect(check).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  // @lat: [[cloud-workspace-tests#Pending update check disposal]]
+  it("does not overlap a pending check or rearm it after quit", async () => {
+    vi.useFakeTimers();
+    try {
+      let finish!: () => void;
+      const check = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const stop = scheduleUpdateChecks(check);
+      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(8 * 60 * 60 * 1000);
+      expect(check).toHaveBeenCalledTimes(1);
+      stop();
+      finish();
+      await vi.advanceTimersByTimeAsync(8 * 60 * 60 * 1000);
+      expect(check).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

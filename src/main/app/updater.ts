@@ -14,7 +14,29 @@ let autoUpdaterInstance: AppUpdater | null = null;
 // Where a person installs a new build by hand. The same origin as the
 // electron-builder.yml `publish.url` feed; it redirects to the current brand's
 // download page, which links the per-arch .dmg files.
-const DOWNLOAD_PAGE_URL = "https://app.mithril.fund/";
+const DOWNLOAD_PAGE_URL = "https://app.mithril.fund/download/";
+
+/** Keep long-running clients current without overlapping provider requests. */
+export function scheduleUpdateChecks(
+  check: () => Promise<unknown>,
+): () => void {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout>;
+  const run = async (): Promise<void> => {
+    try {
+      await check();
+    } catch {
+      // The updater emits its existing error event; a later check can recover.
+    } finally {
+      if (!stopped) timer = setTimeout(() => void run(), 4 * 60 * 60 * 1000);
+    }
+  };
+  timer = setTimeout(() => void run(), 5000);
+  return () => {
+    stopped = true;
+    clearTimeout(timer);
+  };
+}
 
 /**
  * electron-updater reads its feed from `<resources>/app-update.yml`, which
@@ -233,9 +255,10 @@ export function setupUpdater({ getMainWindow }: UpdaterDeps): void {
     autoUpdater.quitAndInstall(false, true);
   });
 
-  setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(() => {});
-  }, 5000);
+  const stopUpdateChecks = scheduleUpdateChecks(() =>
+    autoUpdater.checkForUpdates(),
+  );
+  app.once("before-quit", stopUpdateChecks);
 }
 
 /**

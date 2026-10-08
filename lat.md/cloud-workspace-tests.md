@@ -439,3 +439,7 @@ Failed identity checks display readable sign-in guidance and no chat operation i
 ## Signed-in scoped authorization recovery
 
 Chat distinguishes missing scoped permission from account expiry and transport errors. Its original shared welcome action offers permission approval or network retry; retries never start device sign-in or change stored credentials.
+
+## Verified Desktop sign-in gate
+
+Desktop never mounts the workspace for a stored but invalid account, refuses manual bypass, closes on sign-out and retires late account verification responses before admitting a newly verified session.

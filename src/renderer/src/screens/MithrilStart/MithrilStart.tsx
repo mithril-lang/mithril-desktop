@@ -138,6 +138,7 @@ function MithrilStart({
         setProtection(result.protection);
         setConnected(true);
         setToken("");
+        onOpenWorkspace();
       } else setError(result.error);
     } catch {
       if (deviceAttempt.current === attempt) setError("device_start_failed");
@@ -202,6 +203,7 @@ function MithrilStart({
         setAccount(result.account);
         setProtection(result.protection);
         setConnected(true);
+        onOpenWorkspace();
       } else {
         setError(result.error);
       }
@@ -283,6 +285,14 @@ function MithrilStart({
             )}
           </button>
         </div>
+        <button
+          type="button"
+          className="onboard-btn onboard-btn-glass"
+          disabled={busy}
+          onClick={onOpenWorkspace}
+        >
+          {l("Retry connection", "接続を再確認")}
+        </button>
         {busy && deviceAttempt.current && (
           <div role="status" className="onboard-subtitle">
             {deviceCode ? (

@@ -13,7 +13,10 @@ vi.mock("../../components/useI18n", () => ({
 }));
 afterEach(cleanup);
 
-function mount(protection: "keychain" | "reduced"): void {
+function mount(
+  protection: "keychain" | "reduced",
+  onOpenWorkspace: () => void = () => {},
+): void {
   Object.defineProperty(window, "hermesAPI", {
     configurable: true,
     value: {
@@ -29,7 +32,10 @@ function mount(protection: "keychain" | "reduced"): void {
     },
   });
   render(
-    <MithrilStart initiallyConnected={false} onOpenWorkspace={() => {}} />,
+    <MithrilStart
+      initiallyConnected={false}
+      onOpenWorkspace={onOpenWorkspace}
+    />,
   );
 }
 
@@ -62,7 +68,8 @@ describe("first-run browser connection", () => {
     scopes: ["inference"],
   };
   it("connects from a click and moves to the connected screen after approval", async () => {
-    mount("keychain");
+    const opened = vi.fn();
+    mount("keychain", opened);
     let finish!: (
       value: import("../../../../shared/account").MithrilAccountConnectResult,
     ) => void;
@@ -91,10 +98,12 @@ describe("first-run browser connection", () => {
     expect(window.hermesAPI.openExternal).toHaveBeenCalledWith(
       info.verificationUriComplete,
     );
+    expect(opened).not.toHaveBeenCalled();
     await act(async () =>
       finish({ status: "connected", account, protection: "keychain" }),
     );
     expect(screen.getByText("Connected to Mithril")).toBeTruthy();
+    expect(opened).toHaveBeenCalledTimes(1);
     expect(window.hermesAPI.connectMithrilAccount).not.toHaveBeenCalled();
   });
   it.each(["device_expired", "device_denied", "device_start_failed"])(

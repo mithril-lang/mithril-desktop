@@ -1218,3 +1218,11 @@ Mapped and remote-only conversations read all contiguous pages beyond a thousand
 ## Chunked remote transcript storage
 
 Large owner-bound remote timelines retain every event and display item through chunk storage; prior caches remain readable and failed replacements roll back without losing the previously complete timeline.
+
+## Complete mapped chat cache
+
+Mapped original transcripts retain all validated cloud overlays in owner-bound SQLite chunks. Legacy read-back, fifty-MiB-plus histories, exact completeness, missing chunks and replacement rollback are verified without changing agent history.
+
+## Complete mapped chat synchronization
+
+More than twenty thousand original items synchronize in protocol batches with exact archived read-back and no inferred turn. The large end-to-end fixture has a thirty-second deadline for complete receipt and journal processing.

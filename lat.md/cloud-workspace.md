@@ -1305,3 +1305,15 @@ Real IndexedDB fixtures retain 1,205 edits across reopen and recover a lost ackn
 Local qualification: all 399 shared Workspace tests pass with one worker and unchanged fixture deadlines; the two-worker run under concurrent packaging hit timing deadlines, so that earlier run is not green evidence. All 463 archive files match producer and installed Native dependency, and lock integrity is verified; SHA256 `31de9955705ab48c077a10ce7e1c97ffbed60f11eb1b0659d00cce22e8491d68`. Desktop types/build, 20 chat/updater tests, four compiled-CSS layout cases, eight shared-sidebar browser cases and `lat check` pass. Preview.43 CI run 37711282177 passed. The live canonical API compatibility gate still refuses installer publication.
 
 The installed client remains preview.35, the public Mac update feed advertises preview.36, and the local updater log ends with the October 7 preview.35 startup check. These reads do not prove an installed upgrade. UI checks cover sidebar and notification fixtures; authenticated end-to-end page navigation, sign-in recovery, new chat and actual installed update remain release qualification work.
+
+## Complete mapped original chat cache
+
+Preview.45 stores mapped original cloud overlays in owner/session-bound SQLite chunks while retaining the original agent history and execution tables.
+
+A manifest checks item count, order and full-content digest in one read transaction. Replacement writes chunks and manifest in one immediate transaction; failures retain the previous complete cache. Legacy overlay arrays remain readable and convert on the next write without deleting the retained original. Mapped sessions now keep both owners' same-ID caches instead of replacing the prior owner's record. Chunk targets are one hundred records and 512 KiB; individual records remain indivisible. Original history hashing streams the same JSON-array digest instead of creating a whole serialized string.
+
+Original transcript synchronization no longer refuses more than twenty thousand validated items. Existing protocol batches, identity guards, receipts and conflict handling remain; an advancing index avoids repeatedly shifting a growing transcript remainder. This data recovery does not infer or replay agent execution. Arrays are still materialized in the transport and renderer; memory/disk/provider limits and full canonical account archive remain separate work.
+
+Real SQLite and sync tests cover 20,005 original items, a greater-than-fifty-MiB overlay, complete read-back, legacy conversion, owner isolation, failed-replacement rollback and missing-chunk rejection. These are source qualification, not installed/public proof.
+
+Local qualification: seven original-history suites pass 81 tests, changed-file lint and full Desktop types/build pass, and all four compiled-CSS layout cases pass after reinstalling the missing Chromium test runtime. `lat check` passes. Prior preview.44 CI run 37712377489 succeeded. Preview.45 retains immutable Workspace `.41`; no production D1 writes, release publication or installed replacement occurred. The current public API compatibility gate remains an external publication requirement.

@@ -911,7 +911,6 @@ export class NativeHistorySync {
         const items = await native.items(sid);
         await check();
         if (
-          items.length > 20000 ||
           !items.every(validArchivedHistoryItem) ||
           new Set(items.map((item) => item.id)).size !== items.length
         )
@@ -960,14 +959,17 @@ export class NativeHistorySync {
           for (const item of cache) journal.hashes[item.id] = fingerprint(item);
         }
         await persist();
-        while (changed.length) {
+        let changedIndex = 0;
+        while (changedIndex < changed.length) {
           const batch: ArchivedHistoryItem[] = [];
-          while (changed.length && batch.length < 100) {
+          while (changedIndex < changed.length && batch.length < 100) {
             if (
-              Buffer.byteLength(JSON.stringify([...batch, changed[0]])) > 800000
+              Buffer.byteLength(
+                JSON.stringify([...batch, changed[changedIndex]]),
+              ) > 800000
             )
               break;
-            batch.push(changed.shift()!);
+            batch.push(changed[changedIndex++]!);
           }
           if (!batch.length)
             throw Error(

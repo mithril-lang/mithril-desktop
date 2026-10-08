@@ -1675,3 +1675,30 @@ it("rejects continuation at the declared final event before publishing mapped or
     expect(f.executions()).toBe(0);
   }
 });
+
+// @lat: [[cloud-workspace-tests#Complete mapped chat synchronization]]
+it("synchronizes every original item above the former transcript ceiling without executing a turn", async () => {
+  const f = fixture();
+  f.items.splice(
+    0,
+    f.items.length,
+    ...Array.from({ length: 20005 }, (_, index) => ({
+      id: `user_${index}`,
+      kind: "user" as const,
+      content: `Original ${index}`,
+      timestamp: index,
+    })),
+  );
+  const result = await new NativeHistorySync(f.ports).run();
+  expect(result.deferred).toEqual([]);
+  expect(result.conflicts).toEqual([]);
+  expect(result.synced).toBe(20005);
+  const sid = nativeCloudSessionId("default", "original");
+  const archived = f.events
+    .get(sid)!
+    .filter((event) => event.type === "history_item")
+    .map((event) => JSON.parse(event.data.payload));
+  expect(archived).toEqual(f.items);
+  expect(Object.keys(f.state().entries[sid].hashes)).toHaveLength(20005);
+  expect(f.executions()).toBe(0);
+}, 30000);

@@ -11,6 +11,8 @@ import {
 } from "@mithril/workspace/sessions";
 
 const TABLE = "mithril_history_cache";
+const MAPPED_TABLE = "mithril_history_cache_manifests";
+const MAPPED_CHUNKS = "mithril_history_cache_chunks";
 const REMOTE_TABLE = "mithril_remote_session_cache";
 const owners = new Map<string, string>();
 export function setNativeHistoryCacheOwner(path: string, owner: string): void {
@@ -31,7 +33,7 @@ export function nativeHistoryItemId(item: HistoryItem): string {
   );
 }
 export function nativeHistoryVersion(items: HistoryItem[]): string {
-  return createHash("sha256").update(JSON.stringify(items)).digest("hex");
+  return digestRows(items);
 }
 interface CachedItem {
   sourceId: string;
@@ -126,11 +128,28 @@ export function replaceNativeHistoryCache(
     if (new Set(cached.map((row) => row.sourceId)).size !== cached.length)
       throw Error("Duplicate cloud history cache identity");
     db.exec(
-      `CREATE TABLE IF NOT EXISTS ${TABLE}(session_id TEXT PRIMARY KEY,owner TEXT NOT NULL,items TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS ${MAPPED_TABLE}(owner TEXT NOT NULL,session_id TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(owner,session_id));CREATE TABLE IF NOT EXISTS ${MAPPED_CHUNKS}(owner TEXT NOT NULL,session_id TEXT NOT NULL,ordinal INTEGER NOT NULL,body TEXT NOT NULL,PRIMARY KEY(owner,session_id,ordinal))`,
     );
     db.prepare(
-      `INSERT INTO ${TABLE}(session_id,owner,items) VALUES(?,?,?) ON CONFLICT(session_id) DO UPDATE SET owner=excluded.owner,items=excluded.items`,
-    ).run(sessionId, owner, JSON.stringify(cached));
+      `DELETE FROM ${MAPPED_CHUNKS} WHERE owner=? AND session_id=?`,
+    ).run(owner, sessionId);
+    const insert = db.prepare(
+      `INSERT INTO ${MAPPED_CHUNKS}(owner,session_id,ordinal,body) VALUES(?,?,?,?)`,
+    );
+    writeChunks(cached, (ordinal, body) =>
+      insert.run(owner, sessionId, ordinal, body),
+    );
+    db.prepare(
+      `INSERT INTO ${MAPPED_TABLE}(owner,session_id,body) VALUES(?,?,?) ON CONFLICT(owner,session_id) DO UPDATE SET body=excluded.body`,
+    ).run(
+      owner,
+      sessionId,
+      JSON.stringify({
+        format: 1,
+        count: cached.length,
+        digest: digestRows(cached),
+      }),
+    );
   }).immediate();
 }
 export function mergeNativeHistoryCache(
@@ -140,18 +159,64 @@ export function mergeNativeHistoryCache(
 ): HistoryItem[] {
   const owner = owners.get(db.name);
   if (!owner) return source;
+  const cached = db.transaction((): CachedItem[] | null => {
+    const exists = (table: string): boolean =>
+      !!db
+        .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?")
+        .get(table);
+    const row = exists(MAPPED_TABLE)
+      ? (db
+          .prepare(
+            `SELECT body FROM ${MAPPED_TABLE} WHERE owner=? AND session_id=?`,
+          )
+          .get(owner, sessionId) as { body: string } | undefined)
+      : undefined;
+    if (row) {
+      const manifest = JSON.parse(row.body),
+        cached: CachedItem[] = [];
+      if (
+        manifest.format !== 1 ||
+        !Number.isSafeInteger(manifest.count) ||
+        manifest.count < 0
+      )
+        throw Error("Invalid cloud history cache manifest");
+      let ordinal = 0;
+      const chunks = db
+        .prepare(
+          `SELECT ordinal,body FROM ${MAPPED_CHUNKS} WHERE owner=? AND session_id=? ORDER BY ordinal`,
+        )
+        .iterate(owner, sessionId) as Iterable<{
+        ordinal: number;
+        body: string;
+      }>;
+      for (const chunk of chunks) {
+        if (chunk.ordinal !== ordinal++)
+          throw Error("Invalid cloud history chunk order");
+        const values = JSON.parse(chunk.body);
+        if (!Array.isArray(values) || !values.length)
+          throw Error("Invalid cloud history chunk");
+        for (const value of values) cached.push(value);
+      }
+      if (
+        cached.length !== manifest.count ||
+        digestRows(cached) !== manifest.digest
+      )
+        throw Error("Incomplete cloud history chunks");
+      return cached;
+    }
+    const legacy = exists(TABLE)
+      ? (db
+          .prepare(`SELECT items FROM ${TABLE} WHERE session_id=? AND owner=?`)
+          .get(sessionId, owner) as { items: string } | undefined)
+      : undefined;
+    return legacy ? (JSON.parse(legacy.items) as CachedItem[]) : null;
+  })();
+  if (!cached) return source;
   if (
-    !db
-      .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?")
-      .get(TABLE)
+    !Array.isArray(cached) ||
+    new Set(cached.map((row) => row.sourceId)).size !== cached.length
   )
-    return source;
-  const row = db
-    .prepare(`SELECT items FROM ${TABLE} WHERE session_id=? AND owner=?`)
-    .get(sessionId, owner) as { items: string } | undefined;
-  if (!row) return source;
-  const cached = JSON.parse(row.items) as CachedItem[];
-  if (!Array.isArray(cached)) throw Error("Invalid cloud history cache");
+    throw Error("Invalid cloud history cache");
   const values = new Map(cached.map((item) => [item.sourceId, item]));
   const result: HistoryItem[] = [];
   for (const original of source) {
@@ -177,9 +242,39 @@ export function deleteNativeHistoryCache(
       .get(TABLE)
   )
     db.prepare(`DELETE FROM ${TABLE} WHERE session_id=?`).run(sessionId);
+  for (const table of [MAPPED_TABLE, MAPPED_CHUNKS])
+    if (
+      db
+        .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?")
+        .get(table)
+    )
+      db.prepare(`DELETE FROM ${table} WHERE session_id=?`).run(sessionId);
 }
 
 const REMOTE_CHUNKS = "mithril_remote_session_chunks";
+/** Whole records stay indivisible; a large record is kept in its own chunk. */
+function writeChunks(
+  values: unknown[],
+  insert: (ordinal: number, body: string) => void,
+): void {
+  let ordinal = 0,
+    bytes = 2;
+  let chunk: string[] = [];
+  const flush = (): void => {
+    if (chunk.length) insert(ordinal++, "[" + chunk.join(",") + "]");
+    chunk = [];
+    bytes = 2;
+  };
+  for (const value of values) {
+    const serialized = JSON.stringify(value),
+      size = Buffer.byteLength(serialized) + 1;
+    if (chunk.length && (bytes + size > 512 * 1024 || chunk.length >= 100))
+      flush();
+    chunk.push(serialized);
+    bytes += size;
+  }
+  flush();
+}
 function digestRows(rows: unknown[]): string {
   const hash = createHash("sha256");
   hash.update("[");
@@ -307,30 +402,9 @@ export function replaceRemoteSessionCache(
       ["events", retained.events],
       ["items", retained.items],
     ] as const) {
-      let ordinal = 0,
-        bytes = 2;
-      let chunk: string[] = [];
-      const flush = (): void => {
-        if (chunk.length)
-          insert.run(
-            owner,
-            session.id,
-            kind,
-            ordinal++,
-            "[" + chunk.join(",") + "]",
-          );
-        chunk = [];
-        bytes = 2;
-      };
-      for (const value of values) {
-        const serialized = JSON.stringify(value),
-          size = Buffer.byteLength(serialized) + 1;
-        if (chunk.length && (bytes + size > 512 * 1024 || chunk.length >= 100))
-          flush();
-        chunk.push(serialized);
-        bytes += size;
-      }
-      flush();
+      writeChunks(values, (ordinal, body) =>
+        insert.run(owner, session.id, kind, ordinal, body),
+      );
     }
     db.prepare(
       `INSERT INTO ${REMOTE_TABLE}(owner,session_id,revision,body) VALUES(?,?,?,?) ON CONFLICT(owner,session_id) DO UPDATE SET revision=excluded.revision,body=excluded.body`,

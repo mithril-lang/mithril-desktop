@@ -1,4 +1,44 @@
 export default {
+  vendor:
+    "Vendor connections are measured separately from ClamAV. Local quarantine is Mithril custody, not Trend Micro quarantine.",
+  monitorTitle: "ClamAV background inspection",
+  monitorNote:
+    "Inspect the selected folder every 60 seconds while Desktop is open. Stops on app exit; restart requires a new selection. Detection occurs after file arrival, cannot block access, and never quarantines automatically. Large scopes and engine limits may leave gaps.",
+  monitorOn: "Background inspection enabled",
+  monitorOff: "Background inspection off",
+  lastRun: "Last inspection started",
+  startMonitor: "Choose folder and enable background inspection",
+  stopMonitor: "Stop future inspections",
+  quarantineTitle: "Local encrypted quarantine",
+  quarantineNote:
+    "Review genuine ClamAV detections, confirm the exact file, and preserve an encrypted local copy under the OS keyring. Up to 25 MiB, owned files only. Captured bytes are scanned again before removal. Restore to a new file without overwriting or executing it. An OS-backed keyring is required. Interrupted originals remain in the private device-care-quarantine vault.",
+  reviewQuarantine: "Review eligible detections",
+  quarantineAction: "Confirm encrypted quarantine…",
+  restoreAction: "Choose destination and restore…",
+  noQuarantine: "No quarantine entries",
+  vendorTitle: "Trend Micro connections",
+  consumerNote:
+    "Consumer product integration opens the installed Antivirus for Mac. Protection, license and quarantine status remain unmeasured; operate them in the product.",
+  consumerInstalled:
+    "Antivirus for Mac installation found; protection not measured",
+  consumerMissing: "Antivirus for Mac not detected on this platform",
+  openConsumer: "Open Trend Micro Antivirus",
+  visionNote:
+    "Read-only Workbench alerts from the selected tenant region, first page only (up to 10). No sample upload or remote response. Alerts are not mapped to this computer and cannot authorize local quarantine. Token is encrypted in the OS keyring. Reading alerts sends the token only to the selected official regional API.",
+  region: "API region",
+  apiToken: "Vision One API token",
+  saveVendor: "Save connection",
+  configured: "Connection saved; authentication unverified",
+  notConfigured: "Not configured",
+  readAlerts: "Read tenant alerts",
+  disconnectVendor: "Remove saved connection",
+  moreAlerts: "More pages exist; displayed coverage is partial",
+  quarantineState: {
+    pending: "Pending / recovery review",
+    quarantined: "Quarantined",
+    "recovery-required": "Recovery required",
+    restored: "Restored (copy retained)",
+  },
   title: "Device care",
   subtitle: "Protection and storage maintenance for this computer",
   overview: "Overview",
@@ -19,8 +59,7 @@ export default {
     "Local ClamAV scans only the selected folder. Files are not uploaded. Limits: 25 MiB per file, 100 MiB archive expansion, depth 16, 10 minutes. Symlinks and other volumes are excluded; coverage is partial.",
   setup:
     "Install ClamAV and update its signatures with freshclam, then refresh. No engine is installed automatically.",
-  vendor:
-    "Trend Micro / Vision One: not connected. Quarantine, restore, resident protection and schedules are not enabled.",
+
   noFindings:
     "No findings reported in the inspected scope. This does not establish whole-device safety.",
   findings: "Engine findings",

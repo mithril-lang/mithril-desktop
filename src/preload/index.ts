@@ -204,6 +204,22 @@ function historyFilesForOwner(owner: string): CloudChatAPI["historyFiles"] {
 
 const hermesAPI = {
   deviceCare: {
+    monitorStatus: () => ipcRenderer.invoke("device-care-monitor-status"),
+    startMonitor: () => ipcRenderer.invoke("device-care-start-monitor"),
+    stopMonitor: () => ipcRenderer.invoke("device-care-stop-monitor"),
+    reviewQuarantine: () => ipcRenderer.invoke("device-care-review-quarantine"),
+    quarantine: (id: string) =>
+      ipcRenderer.invoke("device-care-quarantine", id),
+    quarantineEntries: () =>
+      ipcRenderer.invoke("device-care-quarantine-entries"),
+    restoreQuarantine: (id: string) =>
+      ipcRenderer.invoke("device-care-restore-quarantine", id),
+    vendorStatus: () => ipcRenderer.invoke("device-care-vendor-status"),
+    configureVendor: (region: string, token: string) =>
+      ipcRenderer.invoke("device-care-configure-vendor", region, token),
+    disconnectVendor: () => ipcRenderer.invoke("device-care-disconnect-vendor"),
+    vendorAlerts: () => ipcRenderer.invoke("device-care-vendor-alerts"),
+    openConsumer: () => ipcRenderer.invoke("device-care-open-consumer"),
     status: () => ipcRenderer.invoke("device-care-status"),
     analyze: (scope: "temp" | "folder") =>
       ipcRenderer.invoke("device-care-analyze", scope),

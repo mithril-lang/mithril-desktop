@@ -124,3 +124,24 @@
     flex-direction: column;
   }
 }
+
+.device-care-card form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin: 12px 0;
+}
+.device-care-card form label {
+  display: grid;
+  gap: 6px;
+}
+.device-care-card input[type="password"],
+.device-care-card select {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  max-width: 100%;
+}

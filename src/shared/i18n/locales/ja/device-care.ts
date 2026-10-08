@@ -1,4 +1,43 @@
 export default {
+  vendor:
+    "製品連携の状態は ClamAV と別に測定します。ローカル隔離は Mithril の保管機能で、Trend Micro の隔離機能とは別です。",
+  monitorTitle: "ClamAV バックグラウンド検査",
+  monitorNote:
+    "Desktop 起動中、選択フォルダーを 60 秒ごとに検査します。終了時に停止し、再起動後は再選択が必要です。ファイル到着後の検出で、アクセスは阻止できません。自動隔離はしません。大きな範囲や検査上限による未検査が残ります。",
+  monitorOn: "バックグラウンド検査：有効",
+  monitorOff: "バックグラウンド検査：停止",
+  lastRun: "前回の検査開始",
+  startMonitor: "フォルダーを選んでバックグラウンド検査を開始",
+  stopMonitor: "次回以降の検査を停止",
+  quarantineTitle: "端末内の暗号化隔離",
+  quarantineNote:
+    "ClamAV の検出を確認し、対象ファイルごとに承認して暗号化コピーを保管します。所有する 25 MiB 以下のファイルが対象です。移動前に捕捉した内容を再検査します。復元先は新規ファイルで、上書き・実行はしません。OS キーリングが必要です。中断時の原本は非公開の device-care-quarantine 保管庫に保全します。",
+  reviewQuarantine: "隔離できる検出を確認",
+  quarantineAction: "暗号化隔離を確認…",
+  restoreAction: "復元先を選んで確認…",
+  noQuarantine: "隔離項目はありません",
+  vendorTitle: "Trend Micro 製品との連携",
+  consumerNote:
+    "個人向けはインストール済み Antivirus for Mac を開きます。保護・契約・隔離の状態は未測定です。製品側で確認・操作してください。",
+  consumerInstalled: "Antivirus for Mac を検出しました（保護状態は未測定）",
+  consumerMissing: "この OS で Antivirus for Mac を検出していません",
+  openConsumer: "Trend Micro Antivirus を開く",
+  visionNote:
+    "選択地域のテナントから Workbench アラートを読み取ります。最初のページ（最大 10 件）のみです。検体送信・遠隔操作は行いません。この端末への対応付けはなく、ローカル隔離の権限にはなりません。トークンは OS キーリングで暗号化します。読取時は選択した公式地域 API にだけトークンを送ります。",
+  region: "API 地域",
+  apiToken: "Vision One API トークン",
+  saveVendor: "接続情報を保存",
+  configured: "接続情報保存済み（認証は未確認）",
+  notConfigured: "未設定",
+  readAlerts: "テナントのアラートを読み取る",
+  disconnectVendor: "保存した接続情報を削除",
+  moreAlerts: "後続ページがあります。表示範囲は一部です。",
+  quarantineState: {
+    pending: "保留・復旧確認",
+    quarantined: "隔離済み",
+    "recovery-required": "復旧確認が必要",
+    restored: "復元済み（コピー保全）",
+  },
   title: "端末の保護とメンテナンス",
   subtitle: "このコンピューターのウイルス検査とストレージ管理",
   overview: "概要",
@@ -19,8 +58,7 @@ export default {
     "ClamAV で選択したフォルダーをローカル検査します。ファイルはアップロードしません。上限はファイル 25 MiB、展開 100 MiB、深さ 16、10 分です。シンボリックリンク・別ボリュームは除外され、検査範囲は限定されます。",
   setup:
     "ClamAV をインストールし、freshclam で定義を更新してから状態を更新してください。自動インストールは行いません。",
-  vendor:
-    "Trend Micro / Vision One：未接続。隔離・復元、常駐保護、定期実行は未対応です。",
+
   noFindings:
     "検査した範囲で検出の報告はありません。端末全体の安全を保証する結果ではありません。",
   findings: "エンジンの検出結果",

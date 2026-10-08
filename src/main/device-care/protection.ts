@@ -110,6 +110,42 @@ export class DeviceCareProtection {
       observedAt: new Date().toISOString(),
     };
   }
+  async verifyCapturedFile(path: string): Promise<boolean> {
+    const status = await this.status();
+    if (
+      !this.executable ||
+      !status.signatureDate ||
+      Date.now() - Date.parse(status.signatureDate) > 7 * 86400000 ||
+      Date.parse(status.signatureDate) > Date.now() + 86400000
+    )
+      throw Error("Fresh ClamAV signatures required");
+    return new Promise((resolve, reject) =>
+      execFile(
+        this.executable!,
+        scanArguments(path),
+        { timeout: 60000, maxBuffer: 1024 * 1024, env: SCAN_ENV },
+        (error, output) => {
+          const code = error ? error.code : 0;
+          if (code !== 0 && code !== 1) {
+            reject(Error("ClamAV verification failed"));
+            return;
+          }
+          resolve(
+            code === 1 &&
+              output
+                .split(/\r?\n/)
+                .some(
+                  (line) =>
+                    line.startsWith(`${path}: `) &&
+                    line.endsWith(" FOUND") &&
+                    !line.includes(": Heuristics.Limits") &&
+                    !line.includes(": Heuristics.Encrypted"),
+                ),
+          );
+        },
+      ),
+    );
+  }
   job(): ScanJob | null {
     return this.current
       ? { ...this.current, findings: [...this.current.findings] }

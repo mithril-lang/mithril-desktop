@@ -10,7 +10,7 @@ The local Device care screen provides ClamAV status and bounded folder scans, se
 
 [[src/renderer/src/screens/DeviceCare/DeviceCare.tsx]] uses Desktop theme tokens, shared button styles and Japanese/English translations. It identifies the local computer even when the chat workspace is cloud-connected. [[src/main/device-care/ipc.ts#registerDeviceCareIpc]] exposes a typed [[src/shared/device-care.ts#DeviceCareAPI]] through preload and admits only the main window's main frame. Folder scope comes from native selection, never renderer paths.
 
-[[src/main/device-care/protection.ts#DeviceCareProtection]] discovers ClamAV only at fixed installation paths, validates engine output, and requires signatures no older than seven days. Local folder scans have no upload, delete or quarantine arguments; they exclude symlinks and cross-volume traversal, bound archive/file size and depth, and stop after ten minutes. Engine completion always retains partial coverage. Cancellation terminates the owned scan process. Windows, OS resident-status reads, Trend Micro/Vision One, quarantine/restore, scheduling and helper installation remain unsupported.
+[[src/main/device-care/protection.ts#DeviceCareProtection]] discovers ClamAV only at fixed installation paths, validates engine output, and requires signatures no older than seven days. Local folder scans have no upload, delete or quarantine arguments; they exclude symlinks and cross-volume traversal, bound archive/file size and depth, and stop after ten minutes. Engine completion always retains partial coverage. Cancellation terminates the owned scan process. Windows ClamAV engine discovery, OS access blocking, privileged helpers and commercial-provider remediation remain unsupported. The extensions below add selected-folder inspection, encrypted local custody and bounded vendor reads without claiming those unavailable capabilities.
 
 [[src/main/device-care/storage.ts#DeviceCareStorage]] analyzes at most 20,000 entries, depth 16 and 15 seconds. Symlinks, other volumes and unreadable paths are excluded and counted. Folder analysis grants no cleanup authority. Only direct, single-link, current-user-owned generated media in the existing Desktop temp root, with old access/modification timestamps, matching content-name hash and a private or non-shared writable root, can become cleanup candidates. Internal legacy media cleanup still has its original scope; this slice does not turn it into whole-device cleanup.
 
@@ -19,6 +19,26 @@ Plans expire after five minutes and bind exact candidates and content digests. T
 Jobs serialize scans with storage analysis/cleanup. Analysis cancellation stops traversal; cleanup is bounded to the approved batch and reports per-item failures and skipped changes. A crash during staging preserves originals for manual recovery. OS Trash restoration uses the OS interface; in-app restoration is not implemented. History retains the latest 100 local summaries with private permissions and atomic writes, excluding paths, content and secrets. Clearing history does not change recovery data or Trash.
 
 Local source-build verification on 2026-10-08 JST: the real Desktop sidebar opened Device care, detected ClamAV 1.5.4 with definition 28147, scanned two isolated test files, and displayed Eicar-Test-Signature for the harmless EICAR fixture. Desktop temp analysis displayed measured volume capacity, available space and zero eligible files. User files were not cleaned. This receipt does not qualify Windows/Linux, packaged-client behavior, resident protection or commercial vendor connectivity.
+
+## Protection extension
+
+Session background inspection, encrypted local quarantine and regional Vision One alert reads extend the initial device-care slice without claiming OS-wide malware prevention.
+
+[[src/main/device-care/monitor.ts#DeviceCareMonitor]] defaults off and scans one native-selected folder every 60 seconds while Desktop is open. Scans serialize with analysis, cleanup and quarantine. Busy intervals are skipped visibly. Stopping prevents future starts; an already running scan has its separate Cancel control. App exit cancels its owned scan and stops monitoring; restarting requires selection again. It detects after arrival and does not block access or automatically isolate anything. The independent [[endpoint-protection]] sensor remains separate. ClamAV's clamonacc access-blocking mechanism is Linux-only; no privileged daemon or macOS Endpoint Security extension is shipped.
+
+[[src/main/device-care/quarantine.ts#DeviceCareQuarantine]] is Mithril local custody, not a vendor quarantine API. Native per-file confirmation binds a five-minute single-use review, exact digest, owned single-link regular file and selected root. Limits/encrypted-file inspection heuristics are ineligible. Captured bytes are rescanned by the fresh installed ClamAV before mutation. A private 0700 vault stores AES-256-GCM ciphertext, its SHA-256 and a key wrapped by a real OS keyring; basic_text/plaintext fallback is refused. Ciphertext and metadata are synced and decrypted for integrity verification before moving the original. File identity and bytes are revalidated; a substituted or interrupted staged original remains in the private vault for recovery. Quarantine refuses insufficient storage, uses no network and never executes a sample. This cannot stop another process already holding an open handle; full OS containment is outside its scope.
+
+Restoration uses native destination selection and a Cancel-default warning for the detected content. Exclusive file creation refuses overwrite and symlinks, writes mode 0600 and syncs bytes. It never executes restored content. Encrypted copies remain retained, including after restore; permanent purge is not provided. Entries marked pending/recovery-required remain recoverable after interruption. Vault locations are visible in retained recovery locations even if the keyring becomes unavailable. Vault keys require the same OS account/keyring; no export or cross-device recovery is promised. Private staging can temporarily contain a non-executable captured sample during reinspection; a crash preserves it in the private vault for manual recovery.
+
+[[src/main/device-care/vendor.ts#DeviceCareVendor]] detects a fixed macOS Antivirus for Mac application bundle and provides an open-product handoff. Installation is not license, engine health or resident-state proof. Consumer-product status and controls stay unmeasured. Vision One configuration selects an official regional allowlist and wraps the token with the OS keyring; no credentials are read by renderer status calls. The user explicitly requests a single GET to /v3.0/workbench/alerts, with 15-second timeout, redirects rejected and 1 MiB body cap. Only ten projected alert summaries enter the renderer; nextLink is recorded as partial coverage and is never followed. HTTP/provider errors exclude body/credentials. No request runs just by opening the screen. Tenant alerts have no verified local endpoint mapping and cannot authorize local quarantine. Removing the connection removes the saved token but does not revoke it remotely.
+
+Official references: [ClamAV on-access scope](https://docs.clamav.net/manual/OnAccess.html), [Vision One token authentication](https://docs.trendmicro.com/en-us/documentation/article/trend-vision-one-automation-center-authentication), and [Trend Micro API cookbook](https://github.com/trendmicro/tm-v1-api-cookbook). Live tenant authentication and consumer-product controls remain gated on the user's actual product, license and authorized API token. No vendor tenant was contacted during development.
+
+### Extension live receipt
+
+On 2026-10-08 JST, the isolated live adapter fixture verified detection, encrypted custody and exact restoration using ClamAV 1.5.4 and the macOS keyring.
+
+`scripts/verify-device-care-live.mjs` used current signatures against an isolated EICAR fixture. One signature was detected, the original became an encrypted quarantine entry, and restoration reproduced the exact bytes. No customer files or vendor network were used. This adapter receipt does not establish installed UI, Windows/Linux keyrings, access blocking or Vision One authentication.
 
 ## Product surface
 
@@ -161,3 +181,19 @@ Main-process admission rejects other windows and embedded frames before reading 
 ### Requires native folder selection
 
 Renderer-provided filesystem paths are invalid scopes, and cancellation of the native folder picker leaves history unchanged.
+
+### Encrypts and restores quarantine
+
+A detected file becomes a digest-verified encrypted entry after native approval, its lease cannot replay, and restoration refuses existing destinations while retaining its encrypted recovery copy.
+
+### Rejects changed quarantine content
+
+Cancelled or changed content and symlink substitution preserve user files; an engine that does not reconfirm the captured bytes cannot authorize removal.
+
+### Bounds session monitoring
+
+Inspection requires explicit native scope, never overlaps jobs, reports busy intervals and stops future inspections when disabled or Desktop exits.
+
+### Confines vendor credentials
+
+Vendor reads use one fixed official regional GET, reject redirects and malformed responses, never follow arbitrary pagination links and refuse weak OS keyrings.

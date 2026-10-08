@@ -73,6 +73,18 @@ export interface DeviceCareHistoryEntry {
 }
 
 export interface DeviceCareAPI {
+  monitorStatus: () => Promise<MonitorStatus>;
+  startMonitor: () => Promise<MonitorStatus | null>;
+  stopMonitor: () => Promise<MonitorStatus>;
+  reviewQuarantine: () => Promise<QuarantineCandidate[]>;
+  quarantine: (id: string) => Promise<QuarantineEntry | null>;
+  quarantineEntries: () => Promise<QuarantineEntry[]>;
+  restoreQuarantine: (id: string) => Promise<boolean>;
+  vendorStatus: () => Promise<VendorReport>;
+  configureVendor: (region: string, token: string) => Promise<void>;
+  disconnectVendor: () => Promise<void>;
+  vendorAlerts: () => Promise<VendorReport>;
+  openConsumer: () => Promise<void>;
   status: () => Promise<ProtectionStatus>;
   analyze: (scope: "temp" | "folder") => Promise<StorageReport | null>;
   cancelAnalysis: () => Promise<void>;
@@ -84,4 +96,40 @@ export interface DeviceCareAPI {
   history: () => Promise<DeviceCareHistoryEntry[]>;
   clearHistory: () => Promise<void>;
   recovery: () => Promise<string[]>;
+}
+
+export interface MonitorStatus {
+  enabled: boolean;
+  root: string | null;
+  intervalSeconds: number;
+  lastRun: string | null;
+  error: string | null;
+  lifetime: "desktop-session";
+}
+export interface QuarantineCandidate {
+  id: string;
+  path: string;
+  signature: string;
+  bytes: number;
+  digest: string;
+  expiresAt: string;
+}
+export interface QuarantineEntry {
+  id: string;
+  name: string;
+  signature: string;
+  bytes: number;
+  digest: string;
+  createdAt: string;
+  state: "pending" | "quarantined" | "recovery-required" | "restored";
+}
+export interface VendorReport {
+  consumerInstalled: boolean;
+  consumerProtection: "unknown";
+  configured: boolean;
+  region: string | null;
+  observedAt: string;
+  alerts: { id: string; name: string; severity: string; updatedAt: string }[];
+  coverage: "tenant-first-page";
+  nextPage: boolean;
 }

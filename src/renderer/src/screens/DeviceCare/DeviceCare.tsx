@@ -8,6 +8,10 @@ import {
 } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 import type {
+  MonitorStatus,
+  QuarantineCandidate,
+  QuarantineEntry,
+  VendorReport,
   CleanupPlan,
   CleanupReceipt,
   DeviceCareHistoryEntry,
@@ -30,6 +34,16 @@ export default function DeviceCare(): React.JSX.Element {
   const [tab, setTab] = useState<
     "overview" | "protection" | "storage" | "history"
   >("overview");
+  const [monitor, setMonitor] = useState<MonitorStatus | null>(null);
+  const [quarantineReview, setQuarantineReview] = useState<
+    QuarantineCandidate[]
+  >([]);
+  const [quarantineEntries, setQuarantineEntries] = useState<QuarantineEntry[]>(
+    [],
+  );
+  const [vendor, setVendor] = useState<VendorReport | null>(null);
+  const [region, setRegion] = useState("jp");
+  const [token, setToken] = useState("");
   const [status, setStatus] = useState<ProtectionStatus | null>(null);
   const [report, setReport] = useState<StorageReport | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -44,13 +58,38 @@ export default function DeviceCare(): React.JSX.Element {
   const date = (value: string): string =>
     new Date(value).toLocaleString(locale);
   const refresh = useCallback(async (): Promise<void> => {
-    const [nextStatus, nextHistory, nextJob, nextRecovery] = await Promise.all([
+    const [
+      nextStatus,
+      nextHistory,
+      nextJob,
+      nextRecovery,
+      nextMonitor,
+      nextQuarantine,
+      nextVendor,
+    ] = await Promise.all([
       api.status(),
       api.history(),
       api.scanJob(),
       api.recovery(),
+      api.monitorStatus(),
+      api.quarantineEntries(),
+      api.vendorStatus(),
     ]);
     setStatus(nextStatus);
+    setMonitor(nextMonitor);
+    setQuarantineEntries(nextQuarantine);
+    setVendor((prev) =>
+      prev?.configured &&
+      nextVendor.configured &&
+      prev.region === nextVendor.region
+        ? {
+            ...nextVendor,
+            alerts: prev.alerts,
+            nextPage: prev.nextPage,
+            observedAt: prev.observedAt,
+          }
+        : nextVendor,
+    );
     setHistory(nextHistory);
     setJob(nextJob);
     setRecovery(nextRecovery);
@@ -59,19 +98,26 @@ export default function DeviceCare(): React.JSX.Element {
     void refresh().catch((err) => setError(String(err)));
   }, [refresh]);
   useEffect(() => {
-    if (job?.state !== "running") return;
+    if (job?.state !== "running" && !monitor?.enabled) return;
     const timer = setInterval(() => {
       void api
         .scanJob()
         .then((next) => {
           setJob(next);
-          if (next?.state !== "running")
+          void api
+            .monitorStatus()
+            .then(setMonitor)
+            .catch((err) => setError(String(err)));
+          if (
+            next?.state !== "running" &&
+            (next?.id !== job?.id || next?.state !== job?.state)
+          )
             void refresh().catch((err) => setError(String(err)));
         })
         .catch((err) => setError(String(err)));
     }, 1000);
     return () => clearInterval(timer);
-  }, [api, job?.state, refresh]);
+  }, [api, job?.id, job?.state, monitor?.enabled, refresh]);
   const perform = async (
     kind: string,
     action: () => Promise<void>,
@@ -124,6 +170,33 @@ export default function DeviceCare(): React.JSX.Element {
         ],
       ])}
       <p>{text("resident")}</p>
+      <h3>{text("monitorTitle")}</h3>
+      <p>{text("monitorNote")}</p>
+      <p>
+        {monitor?.enabled ? text("monitorOn") : text("monitorOff")}
+        {monitor?.root && ` · ${monitor.root}`}
+      </p>
+      {monitor?.lastRun && (
+        <p>
+          {text("lastRun")}: {date(monitor.lastRun)}
+        </p>
+      )}
+      {monitor?.error && <p role="alert">{monitor.error}</p>}
+      <button
+        className="btn btn-secondary"
+        disabled={!!busy || (!monitor?.enabled && locked) || !status?.available}
+        onClick={() =>
+          void perform("monitor", async () => {
+            setMonitor(
+              monitor?.enabled
+                ? await api.stopMonitor()
+                : await api.startMonitor(),
+            );
+          })
+        }
+      >
+        {monitor?.enabled ? text("stopMonitor") : text("startMonitor")}
+      </button>
       <p>{text("scanNote")}</p>
       {!status?.available && <p>{text("setup")}</p>}
       <p className="device-care-note">{text("vendor")}</p>
@@ -133,6 +206,7 @@ export default function DeviceCare(): React.JSX.Element {
           disabled={locked || !status?.available}
           onClick={() =>
             void perform("scan", async () => {
+              setQuarantineReview([]);
               setJob(await api.startScan());
             })
           }
@@ -168,6 +242,19 @@ export default function DeviceCare(): React.JSX.Element {
           ) : job.state === "partial" || job.state === "complete" ? (
             <p>{text("noFindings")}</p>
           ) : null}
+          {!!job.findings.length && job.state === "partial" && (
+            <button
+              className="btn btn-secondary"
+              disabled={locked}
+              onClick={() =>
+                void perform("review", async () => {
+                  setQuarantineReview(await api.reviewQuarantine());
+                })
+              }
+            >
+              {text("reviewQuarantine")}
+            </button>
+          )}
           {job.error && <p role="alert">{job.error}</p>}
           {job.output && (
             <details>
@@ -177,6 +264,159 @@ export default function DeviceCare(): React.JSX.Element {
           )}
         </div>
       )}
+    </section>
+  );
+  const responses = (
+    <section className="device-care-card">
+      <h2>{text("quarantineTitle")}</h2>
+      <p>{text("quarantineNote")}</p>
+      {quarantineReview.map((item) => (
+        <div key={item.id} className="device-care-result">
+          <p className="device-care-path">{item.path}</p>
+          <p>
+            {item.signature} · {formatBytes(item.bytes)}
+          </p>
+          <p className="device-care-path">SHA-256: {item.digest}</p>
+          <button
+            className="btn btn-primary"
+            disabled={locked}
+            onClick={() =>
+              void perform("quarantine", async () => {
+                await api.quarantine(item.id);
+                setQuarantineReview([]);
+                await refresh();
+              })
+            }
+          >
+            {text("quarantineAction")}
+          </button>
+        </div>
+      ))}
+      {quarantineEntries.length ? (
+        quarantineEntries.map((item) => (
+          <div key={item.id} className="device-care-result">
+            <strong>{item.name}</strong>
+            <p>
+              {item.signature} · {formatBytes(item.bytes)} ·{" "}
+              {text(`quarantineState.${item.state}`)}
+            </p>
+            <button
+              className="btn btn-secondary"
+              disabled={locked || item.state === "restored"}
+              onClick={() =>
+                void perform("restore", async () => {
+                  await api.restoreQuarantine(item.id);
+                  await refresh();
+                })
+              }
+            >
+              {text("restoreAction")}
+            </button>
+          </div>
+        ))
+      ) : (
+        <p>{text("noQuarantine")}</p>
+      )}
+      <h2>{text("vendorTitle")}</h2>
+      <p>{text("consumerNote")}</p>
+      <p>
+        {vendor?.consumerInstalled
+          ? text("consumerInstalled")
+          : text("consumerMissing")}
+      </p>
+      <button
+        className="btn btn-secondary"
+        disabled={!!busy || !vendor?.consumerInstalled}
+        onClick={() => void perform("consumer", () => api.openConsumer())}
+      >
+        {text("openConsumer")}
+      </button>
+      <h3>Trend Vision One</h3>
+      <p>{text("visionNote")}</p>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const credential = token;
+          setToken("");
+          void perform("vendor", async () => {
+            await api.configureVendor(region, credential);
+            await refresh();
+          });
+        }}
+      >
+        <label>
+          {text("region")}{" "}
+          <select
+            value={region}
+            onChange={(event) => setRegion(event.target.value)}
+            disabled={!!busy}
+          >
+            {["jp", "us", "eu", "au", "sg", "in"].map((value) => (
+              <option key={value} value={value}>
+                {value.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {text("apiToken")}{" "}
+          <input
+            type="password"
+            value={token}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(event) => setToken(event.target.value)}
+            disabled={!!busy}
+          />
+        </label>
+        <button
+          type="submit"
+          className="btn btn-secondary"
+          disabled={!!busy || !token}
+        >
+          {text("saveVendor")}
+        </button>
+      </form>
+      <p>
+        {vendor?.configured
+          ? `${text("configured")} · ${vendor.region?.toUpperCase()}`
+          : text("notConfigured")}
+      </p>
+      <div className="device-care-actions">
+        <button
+          className="btn btn-secondary"
+          disabled={!!busy || !vendor?.configured}
+          onClick={() =>
+            void perform("vendor", async () =>
+              setVendor(await api.vendorAlerts()),
+            )
+          }
+        >
+          {text("readAlerts")}
+        </button>
+        <button
+          className="btn btn-secondary"
+          disabled={!!busy || !vendor?.configured}
+          onClick={() =>
+            void perform("vendor", async () => {
+              await api.disconnectVendor();
+              await refresh();
+            })
+          }
+        >
+          {text("disconnectVendor")}
+        </button>
+      </div>
+      {vendor?.alerts.map((item) => (
+        <div key={item.id} className="device-care-result">
+          <strong>
+            {item.id} · {item.severity}
+          </strong>
+          <p>{item.name}</p>
+          <p>{item.updatedAt}</p>
+        </div>
+      ))}
+      {vendor?.nextPage && <p>{text("moreAlerts")}</p>}
     </section>
   );
   const storage = (
@@ -376,7 +616,12 @@ export default function DeviceCare(): React.JSX.Element {
         </p>
       )}
       {busy && <p role="status">{text("loading")}</p>}
-      {(tab === "overview" || tab === "protection") && protection}
+      {(tab === "overview" || tab === "protection") && (
+        <>
+          {protection}
+          {responses}
+        </>
+      )}
       {(tab === "overview" || tab === "storage") && storage}
       {tab === "history" && (
         <section className="device-care-card">

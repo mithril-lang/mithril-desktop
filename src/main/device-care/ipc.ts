@@ -21,6 +21,9 @@ import type { DeviceCareHistoryEntry } from "../../shared/device-care";
 import { getAppLocale } from "../locale";
 import { DeviceCareStorage } from "./storage";
 import { DeviceCareProtection } from "./protection";
+import { DeviceCareMonitor } from "./monitor";
+import { DeviceCareQuarantine } from "./quarantine";
+import { CONSUMER_MAC, DeviceCareVendor } from "./vendor";
 
 export function registerDeviceCareIpc(
   getMainWindow: () => BrowserWindow | null,
@@ -98,6 +101,23 @@ export function registerDeviceCareIpc(
       operation = null;
     }
   };
+  const monitor = new DeviceCareMonitor(async (root) => {
+    await synchronizeScan();
+    if (operation) return null;
+    operation = "scan";
+    try {
+      if ((await realpath(root)) !== root)
+        throw Error("Selected folder changed");
+      return await protection.start(root);
+    } catch (error) {
+      operation = null;
+      throw error;
+    }
+  });
+  const quarantine = new DeviceCareQuarantine(app.getPath("userData"), (path) =>
+    protection.verifyCapturedFile(path),
+  );
+  const vendor = new DeviceCareVendor(app.getPath("userData"));
   const ja = (): boolean => getAppLocale() === "ja";
   ipcMain.handle("device-care-status", (event) => {
     owner(event);
@@ -228,10 +248,121 @@ export function registerDeviceCareIpc(
     owner(event);
     const names = await readdir(app.getPath("userData"));
     return names
-      .filter((name) => name.startsWith("device-care-recovery-"))
+      .filter(
+        (name) =>
+          name.startsWith("device-care-recovery-") ||
+          name === "device-care-quarantine",
+      )
       .map((name) => join(app.getPath("userData"), name));
   });
+  ipcMain.handle("device-care-monitor-status", (event) => {
+    owner(event);
+    return monitor.status();
+  });
+  ipcMain.handle("device-care-start-monitor", async (event) => {
+    const window = owner(event);
+    const root = await exclusive(async () => {
+      if (!(await protection.status()).available)
+        throw Error("ClamAV is not installed");
+      const result = await dialog.showOpenDialog(window, {
+        title: ja()
+          ? "Desktop 起動中に定期検査するフォルダー"
+          : "Inspect this folder every minute while Desktop is open",
+        properties: ["openDirectory"],
+      });
+      if (result.canceled || !result.filePaths[0]) return null;
+      return realpath(result.filePaths[0]);
+    });
+    return root ? monitor.start(root) : null;
+  });
+  ipcMain.handle("device-care-stop-monitor", (event) => {
+    owner(event);
+    return monitor.stop();
+  });
+  ipcMain.handle("device-care-review-quarantine", (event) => {
+    owner(event);
+    return exclusive(() => quarantine.review(protection.job()));
+  });
+  ipcMain.handle("device-care-quarantine-entries", (event) => {
+    owner(event);
+    return quarantine.entries();
+  });
+  ipcMain.handle("device-care-quarantine", async (event, id: unknown) => {
+    const window = owner(event);
+    return exclusive(() =>
+      quarantine.quarantine(id, async (item) => {
+        const result = await dialog.showMessageBox(window, {
+          type: "warning",
+          defaultId: 0,
+          cancelId: 0,
+          buttons: ja()
+            ? ["キャンセル", "暗号化して隔離"]
+            : ["Cancel", "Encrypt and quarantine"],
+          message: ja()
+            ? "検出されたファイルを隔離しますか？"
+            : "Quarantine this detected file?",
+          detail: `${item.path}\n${item.signature}\nSHA-256: ${item.digest}\n\n${ja() ? "原位置から移し、OS キーリングで保護した暗号化コピーを端末内に保存します。自動実行・アップロードはしません。" : "Remove from its original path and preserve an encrypted local copy protected by the OS keyring. No automatic execution or upload."}`,
+        });
+        return result.response === 1;
+      }),
+    );
+  });
+  ipcMain.handle(
+    "device-care-restore-quarantine",
+    async (event, id: unknown) => {
+      const window = owner(event);
+      return exclusive(async () => {
+        const result = await dialog.showSaveDialog(window, {
+          title: ja()
+            ? "隔離ファイルの復元先（既存ファイルは上書きしません）"
+            : "Restore quarantine to a new file (no overwrite)",
+          defaultPath: "restored-file.bin",
+        });
+        if (result.canceled || !result.filePath) return false;
+        return quarantine.restore(id, result.filePath, async (item) => {
+          const answer = await dialog.showMessageBox(window, {
+            type: "warning",
+            defaultId: 0,
+            cancelId: 0,
+            buttons: ja() ? ["キャンセル", "復元"] : ["Cancel", "Restore"],
+            message: ja()
+              ? "検出された内容を復元しますか？"
+              : "Restore the detected content?",
+            detail: `${item.name}\n${item.signature}\n${result.filePath}\nSHA-256: ${item.digest}\n\n${ja() ? "有害な内容を含む可能性があります。復元しても実行はしません。暗号化コピーは保全します。" : "This may contain harmful content. Restoration does not execute it. The encrypted copy is retained."}`,
+          });
+          return answer.response === 1;
+        });
+      });
+    },
+  );
+  ipcMain.handle("device-care-vendor-status", (event) => {
+    owner(event);
+    return vendor.status();
+  });
+  ipcMain.handle(
+    "device-care-configure-vendor",
+    (event, region: unknown, token: unknown) => {
+      owner(event);
+      return vendor.configure(region, token);
+    },
+  );
+  ipcMain.handle("device-care-disconnect-vendor", (event) => {
+    owner(event);
+    return vendor.disconnect();
+  });
+  ipcMain.handle("device-care-vendor-alerts", (event) => {
+    owner(event);
+    return vendor.alerts();
+  });
+  ipcMain.handle("device-care-open-consumer", async (event) => {
+    owner(event);
+    if (!(await vendor.status()).consumerInstalled)
+      throw Error("Trend Micro Antivirus for Mac is not installed");
+    const error = await shell.openPath(CONSUMER_MAC);
+    if (error) throw Error("Unable to open Trend Micro Antivirus");
+  });
   app.on("before-quit", () => {
+    monitor.stop();
     protection.cancel();
     storage.cancel();
   });

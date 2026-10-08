@@ -6,6 +6,7 @@ export interface OriginalScheduleAgentBinding {
   profile: string;
   sourceRevision: number;
   sourceDigest: string;
+  datasetGeneration?: number;
   authorityRevision: number;
   nativeVersion: string;
 }
@@ -29,7 +30,22 @@ export function validOriginalScheduleAgentBinding(
   const value = input as Record<string, unknown>;
   return (
     Object.keys(value).sort().join(",") ===
-      "authorityRevision,nativeVersion,owner,profile,sourceDigest,sourceRevision" &&
+      [
+        ...[
+          "authorityRevision",
+          "nativeVersion",
+          "owner",
+          "profile",
+          "sourceDigest",
+          "sourceRevision",
+        ],
+        ...("datasetGeneration" in value ? ["datasetGeneration"] : []),
+      ]
+        .sort()
+        .join(",") &&
+    (!("datasetGeneration" in value) ||
+      (Number.isSafeInteger(value.datasetGeneration) &&
+        Number(value.datasetGeneration) >= 0)) &&
     [value.owner, value.profile].every(
       (part) => typeof part === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(part),
     ) &&

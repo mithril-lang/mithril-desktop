@@ -55,9 +55,17 @@ it("binds exact source/profile through bounded stdin and guards account changes 
   const guard = async (): Promise<void> => {
     calls.push("guard");
   };
-  for (const profile of ["a", "b", "a"]) {
+  for (const [profile, datasetGeneration] of [
+    ["a", 0],
+    ["b", 1],
+    ["a", 1],
+  ] as const) {
     await expect(
-      bindOriginalScheduleAgent({ ...request, profile }, runtime(), guard),
+      bindOriginalScheduleAgent(
+        { ...request, profile, datasetGeneration },
+        runtime(),
+        guard,
+      ),
     ).resolves.toEqual({ bindingDigest: "c".repeat(64) });
   }
   expect(calls).toHaveLength(6);
@@ -81,11 +89,20 @@ it("refuses foreign, enlarged, lost receipts and malformed source anchors withou
     { ...request, profile: "../b" },
     { ...request, sourceDigest: "wrong" },
     { ...request, token: "synthetic-secret" },
+    { ...request, datasetGeneration: -1 },
+    { ...request, datasetGeneration: 1.5 },
+    { ...request, datasetGeneration: Number.MAX_SAFE_INTEGER + 1 },
+    { ...request, datasetGeneration: "1" },
+    { ...request, datasetGeneration: undefined },
   ]) {
     await expect(
-      bindOriginalScheduleAgent(input, runtime(), async () => {
-        calls++;
-      }),
+      bindOriginalScheduleAgent(
+        input as OriginalScheduleAgentBinding,
+        runtime(),
+        async () => {
+          calls++;
+        },
+      ),
     ).rejects.toThrow(/^Original schedule execution binding unconfirmed$/);
   }
   expect(calls).toBe(0);

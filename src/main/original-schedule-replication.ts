@@ -470,7 +470,10 @@ export class OriginalScheduleReplication {
           sourceDigest: captured.sourceDigest,
           nativeVersion: captured.version,
           authorityRevision,
+          ...(datasetGeneration > 0 ? { datasetGeneration } : {}),
         };
+        if ((cloud.datasetGeneration ?? 0) !== datasetGeneration)
+          throw Error("Schedule dataset generation changed");
         await p.bind(anchor);
         await this.check();
         if ((cloud.datasetGeneration ?? 0) !== datasetGeneration)

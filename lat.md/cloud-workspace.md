@@ -1495,3 +1495,24 @@ passed. All 469 installed shared files match the schedules.59 archive; SHA256 is
 Fund receipt changes are in candidate 49fd2735; the preceding signed API CI for
 9aabe604 passed 595 tests with one existing skip. A new exact-source qualification
 is required for release. No updated installer is published or installed here.
+
+## Original Schedule Agent generations (candidate preview.65)
+
+Native source binding now carries its captured restoration generation to the owned Agent policy through bounded stdin.
+
+The binding bridge validates safe integer generations and requires the child
+receipt to match the exact anchor. Replication checks the synchronized generation
+before binding. The matching Agent candidate b33052f60f persists that epoch in
+profile-scoped execution policies and forwards it to each claim and transition;
+old policies are never rebased to a restored dataset. This supersedes the legacy
+Agent-payload limitation recorded for preview.64.
+
+Qualification passed 48 tests across seven custody/replication files, including
+A/B/A real child processes with positive generation receipts. The final binding
+validator test also rejects unsafe and explicitly undefined generations before
+starting the child; all three binding tests passed after that change. Main and
+renderer typechecks, Electron build, affected-file lint and 711 active packaging
+file checks passed. The shared schedules.59 archive remains unchanged. Agent
+custody passed 10 tests and bootstrap passed 15 under the canonical isolated runner.
+Production D1/API/Web publication, running-work restoration, installer publication
+and authenticated multi-device/updater validation remain incomplete.

@@ -545,11 +545,11 @@ Chat distinguishes missing scoped permission from account expiry and transport e
 
 ## Original schedule Agent binding bridge
 
-Real child processes receive exact anchors on stdin for A/B/A profiles; fixed command arguments and account checks surround persistence receipts, and changed accounts cannot accept a receipt.
+Real child processes receive exact anchors and restoration generations on stdin for A/B/A profiles; account checks surround persistence receipts, and changed accounts cannot accept a receipt.
 
 ## Original schedule Agent binding refusal
 
-Foreign identities, extra fields, oversized output, lost acknowledgements and malformed anchors cannot confirm persistence or leak child stderr. Invalid anchors never reach the account guard or child invocation.
+Foreign identities, unsafe generations, extra fields, oversized output and lost acknowledgements cannot confirm persistence or leak child stderr. Invalid anchors never reach the account guard or child invocation.
 
 ## Original schedule Agent preparation
 

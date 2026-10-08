@@ -223,6 +223,8 @@ const hermesAPI = {
     status: () => ipcRenderer.invoke("device-care-status"),
     analyze: (scope: "temp" | "folder" | "home") =>
       ipcRenderer.invoke("device-care-analyze", scope),
+    analyzeNode: (id: string) =>
+      ipcRenderer.invoke("device-care-analyze-node", id),
     cancelAnalysis: () => ipcRenderer.invoke("device-care-cancel-analysis"),
     plan: (ids: string[]) => ipcRenderer.invoke("device-care-plan", ids),
     execute: (id: string, digest: string) =>

@@ -52,6 +52,12 @@ describe("device-care main-process admission", () => {
     await expect(analyze(event, "/Users/private-data")).rejects.toThrow(
       "Invalid storage scope",
     );
+    await expect(
+      mocks.handlers.get("device-care-analyze-node")!(
+        event,
+        "/Users/private-data",
+      ),
+    ).rejects.toThrow();
     expect(mocks.dialog).not.toHaveBeenCalled();
     mocks.dialog.mockResolvedValue({ canceled: true, filePaths: [] });
     await expect(analyze(event, "folder")).resolves.toBeNull();

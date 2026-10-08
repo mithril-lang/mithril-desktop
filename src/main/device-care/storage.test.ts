@@ -72,6 +72,39 @@ describe("device-care scoped storage executor", () => {
     expect(report.status).toBe("partial");
     expect(report.candidates).toEqual([]);
   });
+  // @lat: [[device-care#Disk space visualization#Balances traversal and binds drilldown]]
+  it("measures siblings before exhausting a huge directory and binds renewed scope to report identities", async () => {
+    await mkdir(join(root, "huge"));
+    for (let i = 0; i < 150; i++)
+      await writeFile(join(root, "huge", String(i)), "x");
+    await mkdir(join(root, "small"));
+    await writeFile(join(root, "small", "keep"), "keep");
+    const bounded = new DeviceCareStorage(root, parent, 80);
+    const report = await bounded.analyze(root, false);
+    expect(report.status).toBe("partial");
+    expect(
+      report.groups.some((g) => g.name === "small" && g.logicalBytes === 4),
+    ).toBe(true);
+    const tree = report.tree!;
+    const top = tree.find((n) => n.parentId === null)!;
+    expect(top.logicalBytes).toBe(report.logicalBytes);
+    expect(
+      tree
+        .filter((n) => n.parentId === top.id)
+        .reduce((sum, n) => sum + n.logicalBytes, 0),
+    ).toBe(report.logicalBytes);
+    const small = tree.find((n) => n.name === "small")!;
+    await expect(bounded.analyzeNode("/unselected")).rejects.toThrow();
+    const detail = await bounded.analyzeNode(small.id);
+    expect(detail.root).toBe(join(root, "small"));
+    expect(detail.cleanupScope).toBe(false);
+    expect(detail.logicalBytes).toBe(4);
+    await expect(bounded.analyzeNode(small.id)).rejects.toThrow();
+    const folder = detail.tree![0];
+    await rm(join(root, "small"), { recursive: true });
+    await symlink(parent, join(root, "small"));
+    await expect(bounded.analyzeNode(folder.id)).rejects.toThrow();
+  });
   // @lat: [[device-care#Implementation verification#Protects unselected data]]
   it("only proposes old direct generated media, and selected-folder analysis never grants cleanup", async () => {
     await fixture();

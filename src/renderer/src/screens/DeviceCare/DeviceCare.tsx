@@ -462,15 +462,20 @@ export default function DeviceCare(): React.JSX.Element {
           <p>
             {text(`state.${report.status}`)} · {date(report.observedAt)}
           </p>
-          {facts([
-            [text("capacity"), formatBytes(report.capacity)],
-            [text("free"), formatBytes(report.freeBytes)],
-            [text("logical"), formatBytes(report.logicalBytes)],
-            [text("allocated"), formatBytes(report.allocatedBytes)],
-            [text("files"), report.files],
-            [text("skipped"), report.skipped],
-          ])}
-          <StorageVisualization key={report.observedAt} report={report} />
+          <StorageVisualization
+            key={report.observedAt}
+            report={report}
+            disabled={locked}
+            onAnalyzeNode={(id) => {
+              void perform("analysis", async () => {
+                setPlan(null);
+                setReceipt(null);
+                setSelected([]);
+                setReport(await api.analyzeNode(id));
+                await refresh();
+              });
+            }}
+          />
           {report.cleanupScope && (
             <>
               <h3>{text("candidates")}</h3>
@@ -517,16 +522,6 @@ export default function DeviceCare(): React.JSX.Element {
               )}
             </>
           )}
-          <details>
-            <summary>{text("largest")}</summary>
-            <ul>
-              {report.largest.map((item) => (
-                <li key={item.name} className="device-care-path">
-                  {item.name} · {formatBytes(item.bytes)}
-                </li>
-              ))}
-            </ul>
-          </details>
         </div>
       ) : (
         <p className="device-care-note">{text("noAnalysis")}</p>

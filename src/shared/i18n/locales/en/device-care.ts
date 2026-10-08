@@ -1,4 +1,37 @@
 export default {
+  folderTrail: "Folder navigation",
+  upFolder: "Parent folder",
+  measured: "Measured scope",
+  partialShort: "Partial measurement",
+  moreFolders:
+    "Showing the largest 48 entries. Analyze this folder to narrow the scope.",
+  inspectFolder: "Analyze this folder in detail",
+  causeTitle: "What may be taking space",
+  causeNote:
+    "A path-based clue, not a verified cause or permission to delete. Compare complete measurements to confirm growth.",
+  registryWorkflow: "Registry · storage workflow",
+  registryWorkflowNote:
+    "Audit → compare growth → check owner and active use → review exact cleanup candidates → measure free space again.",
+  mapNote:
+    "Tile area represents measured file size. Open a folder to explore its children; tiny items remain in the list.",
+  groupNote:
+    "Cleanup requires a reviewed plan. Source, chats, credentials, models and recovery data are preserved by default.",
+  cause: {
+    protected:
+      "History, source or recovery data may be present. Preserve it; use the owning application’s retention/export controls.",
+    dependencies:
+      "Dependencies or development environments may have accumulated. Verify active projects and a reproducible reinstall before proposing cleanup.",
+    cache:
+      "Possible application cache. Verify its owner, active use and documented regeneration method.",
+    logs: "Possible log accumulation. Check retention and the writing process before reviewing archived logs.",
+    models:
+      "Possible local model weights. Verify configured models and a recoverable download before reviewing unused versions.",
+    downloads:
+      "Possible downloads or installer archives. Verify the original and recovery copy before selecting exact items.",
+    unknown:
+      "The name does not establish a cause. Inspect the largest files and their owning application first.",
+  },
+
   analyzeHome: "Analyze home folder (bounded, read-only)",
   diskMap: "Disk space overview",
   occupied: "Used or unavailable",
@@ -6,14 +39,10 @@ export default {
   volumeNote:
     "Whole-volume capacity. Folder analysis below is a separate, bounded measurement.",
   folderMap: "Measured folder breakdown",
-  mapNote:
-    "Shares use measured file sizes in this scope, not the whole disk. Select a group for details.",
   partialMap:
     "Coverage is incomplete. Uninspected files are excluded from the chart.",
   rootFiles: "Files directly in this folder",
   otherGroups: "Other measured groups",
-  groupNote:
-    "Large groups are not automatically disposable. Use the folder picker to narrow the analysis. Only reviewed Desktop temporary files can be cleaned here.",
   noMeasuredFiles: "No regular files measured in this scope.",
   allocatedNote:
     "Allocated bytes are estimates. Hard links count once; APFS clones, compression and snapshots may differ from actual free space.",

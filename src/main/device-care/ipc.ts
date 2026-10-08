@@ -156,6 +156,10 @@ export function registerDeviceCareIpc(
       return report;
     });
   });
+  ipcMain.handle("device-care-analyze-node", (event, id: unknown) => {
+    owner(event);
+    return exclusive(() => storage.analyzeNode(id));
+  });
   ipcMain.handle("device-care-cancel-analysis", (event) => {
     owner(event);
     storage.cancel();

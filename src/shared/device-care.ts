@@ -22,7 +22,17 @@ export interface StorageGroup {
   allocatedBytes: number;
   files: number;
 }
+export interface StorageNode {
+  id: string;
+  parentId: string | null;
+  name: string;
+  kind: "folder" | "file";
+  logicalBytes: number;
+  allocatedBytes: number;
+  files: number;
+}
 export interface StorageReport {
+  tree?: StorageNode[];
   groups: StorageGroup[];
   root: string;
   observedAt: string;
@@ -95,6 +105,7 @@ export interface DeviceCareAPI {
   openConsumer: () => Promise<void>;
   status: () => Promise<ProtectionStatus>;
   analyze: (scope: "temp" | "folder" | "home") => Promise<StorageReport | null>;
+  analyzeNode: (id: string) => Promise<StorageReport>;
   cancelAnalysis: () => Promise<void>;
   plan: (ids: string[]) => Promise<CleanupPlan>;
   execute: (id: string, digest: string) => Promise<CleanupReceipt>;

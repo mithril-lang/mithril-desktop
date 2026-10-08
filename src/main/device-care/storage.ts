@@ -12,13 +12,14 @@ import {
 } from "fs/promises";
 import { basename, dirname, join, resolve, relative, sep } from "path";
 import { createHash, randomUUID } from "crypto";
-import type { Stats } from "fs";
+import type { Stats, Dir } from "fs";
 import type {
   CleanupPlan,
   CleanupReceipt,
   StorageCandidate,
   StorageReport,
   StorageGroup,
+  StorageNode,
 } from "../../shared/device-care";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -104,11 +105,16 @@ export class DeviceCareStorage {
   private plans = new Map<string, PlanRecord>();
   private rootIdentity: Identity | null = null;
   private cleanupRoot: string | null = null;
+  private folders = new Map<
+    string,
+    { path: string; dev: number; ino: number }
+  >();
   private busy = false;
   private cancelRequested = false;
   constructor(
     private readonly tempRoot: string,
     private readonly stagingParent: string,
+    private readonly entryLimit = LIMIT,
   ) {}
 
   cancel(): void {
@@ -120,6 +126,7 @@ export class DeviceCareStorage {
     this.busy = true;
     this.cancelRequested = false;
     this.candidates.clear();
+    this.folders.clear();
     this.plans.clear();
     this.cleanupRoot = null;
     this.rootIdentity = null;
@@ -136,6 +143,7 @@ export class DeviceCareStorage {
         candidates: [],
         largest: [],
         groups: [],
+        tree: [],
         cleanupScope,
         ...(await freeSpace(root)),
       };
@@ -166,114 +174,212 @@ export class DeviceCareStorage {
       }
       this.rootIdentity = identity(rootStat);
       this.cleanupRoot = report.cleanupScope ? root : null;
-      const queue = [{ path: root, depth: 0 }];
+      const rootNode: StorageNode = {
+        id: randomUUID(),
+        parentId: null,
+        name: basename(root) || root,
+        kind: "folder",
+        logicalBytes: 0,
+        allocatedBytes: 0,
+        files: 0,
+      };
+      const nodes = new Map<string, StorageNode>([[rootNode.id, rootNode]]);
+      this.folders.set(rootNode.id, {
+        path: root,
+        dev: rootStat.dev,
+        ino: rootStat.ino,
+      });
+      const queue: {
+        path: string;
+        depth: number;
+        node: StorageNode;
+        cursor?: Dir;
+      }[] = [{ path: root, depth: 0, node: rootNode }];
+      const openCursors = new Set<Dir>();
       const seenFiles = new Set<string>();
       const groups = new Map<string, StorageGroup>();
       const start = Date.now();
-      let visited = 0;
-      while (
-        queue.length &&
-        visited < LIMIT &&
-        Date.now() - start < 15000 &&
-        !this.cancelRequested
-      ) {
-        const entry = queue.pop()!;
-        try {
-          const stat = await lstat(entry.path);
-          visited++;
-          if (
-            stat.isSymbolicLink() ||
-            stat.dev !== rootStat.dev ||
-            entry.depth > 16
-          ) {
-            report.skipped++;
-            continue;
-          }
-          if (stat.isDirectory()) {
-            if ((await realpath(entry.path)) !== entry.path) {
-              report.skipped++;
-              continue;
-            }
-            const children = await opendir(entry.path);
-            for await (const child of children) {
+      let visited = 1;
+      try {
+        while (
+          queue.length &&
+          visited < this.entryLimit &&
+          Date.now() - start < 15000 &&
+          !this.cancelRequested
+        ) {
+          const entry = queue.shift()!;
+          try {
+            if (!entry.cursor) {
+              const current = await lstat(entry.path);
               if (
-                visited + queue.length >= LIMIT ||
-                Date.now() - start >= 15000 ||
-                this.cancelRequested
+                !current.isDirectory() ||
+                current.dev !== rootStat.dev ||
+                (await realpath(entry.path)) !== entry.path
               ) {
                 report.skipped++;
-                break;
-              }
-              queue.push({
-                path: join(entry.path, child.name),
-                depth: entry.depth + 1,
-              });
-            }
-          } else if (stat.isFile()) {
-            report.files++;
-            const fileId = `${stat.dev}:${stat.ino}`;
-            report.logicalBytes += stat.size;
-            const parts = relative(root, entry.path).split(sep);
-            const groupKey = parts.length === 1 ? "" : parts[0];
-            const group = groups.get(groupKey) || {
-              name: groupKey,
-              kind: groupKey ? ("folder" as const) : ("files" as const),
-              logicalBytes: 0,
-              allocatedBytes: 0,
-              files: 0,
-            };
-            group.logicalBytes += stat.size;
-            group.files++;
-            if (!seenFiles.has(fileId))
-              group.allocatedBytes +=
-                typeof stat.blocks === "number" ? stat.blocks * 512 : stat.size;
-            groups.set(groupKey, group);
-            if (!seenFiles.has(fileId)) {
-              report.allocatedBytes +=
-                typeof stat.blocks === "number" ? stat.blocks * 512 : stat.size;
-              seenFiles.add(fileId);
-            }
-            report.largest.push({ name: entry.path, bytes: stat.size });
-            report.largest.sort((a, b) => b.bytes - a.bytes);
-            report.largest.length = Math.min(20, report.largest.length);
-            const owned = !process.getuid || stat.uid === process.getuid();
-            if (
-              report.cleanupScope &&
-              entry.depth === 1 &&
-              owned &&
-              stat.nlink === 1 &&
-              /^[a-f0-9]{16}-.+\.[a-zA-Z0-9]+$/.test(basename(entry.path)) &&
-              Date.now() - Math.max(stat.mtimeMs, stat.atimeMs) >= DAY &&
-              stat.size <= 25 * 1024 * 1024
-            ) {
-              const candidate: Candidate = {
-                public: {
-                  id: randomUUID(),
-                  name: basename(entry.path),
-                  bytes: stat.size,
-                  modifiedAt: stat.mtime.toISOString(),
-                },
-                path: entry.path,
-                identity: identity(stat),
-                hash: await digestFile(entry.path),
-              };
-              if (
-                candidate.hash.slice(0, 16) !==
-                basename(entry.path).slice(0, 16)
-              ) {
                 continue;
               }
-              // Hashing may update atime; identity deliberately excludes atime.
-              this.candidates.set(candidate.public.id, candidate);
-              report.candidates.push(candidate.public);
+              entry.cursor = await opendir(entry.path);
+              openCursors.add(entry.cursor);
             }
-          } else {
+            let exhausted = false;
+            // Rotate directory cursors so a huge folder cannot consume the entire scan.
+            for (
+              let batch = 0;
+              batch < 32 &&
+              visited < this.entryLimit &&
+              Date.now() - start < 15000 &&
+              !this.cancelRequested;
+              batch++
+            ) {
+              const child = await entry.cursor.read();
+              if (!child) {
+                exhausted = true;
+                break;
+              }
+              visited++;
+              const filePath = join(entry.path, child.name);
+              const depth = entry.depth + 1;
+              let stat: Stats;
+              try {
+                stat = await lstat(filePath);
+              } catch {
+                report.skipped++;
+                continue;
+              }
+              if (
+                stat.isSymbolicLink() ||
+                stat.dev !== rootStat.dev ||
+                depth > 16
+              ) {
+                report.skipped++;
+                continue;
+              }
+              const node: StorageNode = {
+                id: randomUUID(),
+                parentId: entry.node.id,
+                name: child.name,
+                kind: stat.isDirectory() ? "folder" : "file",
+                logicalBytes: 0,
+                allocatedBytes: 0,
+                files: 0,
+              };
+              if (stat.isDirectory()) {
+                if (
+                  queue.length >= 128 ||
+                  (await realpath(filePath)) !== filePath
+                ) {
+                  report.skipped++;
+                  continue;
+                }
+                nodes.set(node.id, node);
+                this.folders.set(node.id, {
+                  path: filePath,
+                  dev: stat.dev,
+                  ino: stat.ino,
+                });
+                queue.push({ path: filePath, depth, node });
+              } else if (stat.isFile()) {
+                nodes.set(node.id, node);
+                report.files++;
+                const fileId = `${stat.dev}:${stat.ino}`;
+                report.logicalBytes += stat.size;
+                const parts = relative(root, filePath).split(sep);
+                const groupKey = parts.length === 1 ? "" : parts[0];
+                const group = groups.get(groupKey) || {
+                  name: groupKey,
+                  kind: groupKey ? ("folder" as const) : ("files" as const),
+                  logicalBytes: 0,
+                  allocatedBytes: 0,
+                  files: 0,
+                };
+                group.logicalBytes += stat.size;
+                group.files++;
+                const fileAllocated = seenFiles.has(fileId)
+                  ? 0
+                  : typeof stat.blocks === "number"
+                    ? stat.blocks * 512
+                    : stat.size;
+                group.allocatedBytes += fileAllocated;
+                groups.set(groupKey, group);
+                if (!seenFiles.has(fileId)) {
+                  report.allocatedBytes +=
+                    typeof stat.blocks === "number"
+                      ? stat.blocks * 512
+                      : stat.size;
+                  seenFiles.add(fileId);
+                }
+                node.files = 1;
+                node.logicalBytes = stat.size;
+                // Allocation was assigned to the first measured pathname of this inode.
+                let ancestor: StorageNode | undefined = nodes.get(
+                  node.parentId!,
+                );
+                while (ancestor) {
+                  ancestor.files++;
+                  ancestor.logicalBytes += stat.size;
+                  ancestor.allocatedBytes += fileAllocated;
+                  ancestor = ancestor.parentId
+                    ? nodes.get(ancestor.parentId)
+                    : undefined;
+                }
+                node.allocatedBytes = fileAllocated;
+                report.largest.push({ name: filePath, bytes: stat.size });
+                report.largest.sort((a, b) => b.bytes - a.bytes);
+                report.largest.length = Math.min(20, report.largest.length);
+                const owned = !process.getuid || stat.uid === process.getuid();
+                if (
+                  report.cleanupScope &&
+                  depth === 1 &&
+                  owned &&
+                  stat.nlink === 1 &&
+                  /^[a-f0-9]{16}-.+\.[a-zA-Z0-9]+$/.test(basename(filePath)) &&
+                  Date.now() - Math.max(stat.mtimeMs, stat.atimeMs) >= DAY &&
+                  stat.size <= 25 * 1024 * 1024
+                ) {
+                  const candidate: Candidate = {
+                    public: {
+                      id: randomUUID(),
+                      name: basename(filePath),
+                      bytes: stat.size,
+                      modifiedAt: stat.mtime.toISOString(),
+                    },
+                    path: filePath,
+                    identity: identity(stat),
+                    hash: await digestFile(filePath),
+                  };
+                  if (
+                    candidate.hash.slice(0, 16) !==
+                    basename(filePath).slice(0, 16)
+                  ) {
+                    continue;
+                  }
+                  // Hashing may update atime; identity deliberately excludes atime.
+                  this.candidates.set(candidate.public.id, candidate);
+                  report.candidates.push(candidate.public);
+                }
+              } else {
+                report.skipped++;
+              }
+            }
+            if (exhausted) {
+              await entry.cursor.close();
+              openCursors.delete(entry.cursor);
+            } else queue.push(entry);
+          } catch {
             report.skipped++;
+            if (entry.cursor) {
+              await entry.cursor.close().catch(() => {});
+              openCursors.delete(entry.cursor);
+            }
           }
-        } catch {
-          report.skipped++;
         }
+      } finally {
+        await Promise.all(
+          [...openCursors].map((cursor) => cursor.close().catch(() => {})),
+        );
       }
+      report.tree = [...nodes.values()];
       const ordered = [...groups.values()].sort(
         (a, b) =>
           b.logicalBytes - a.logicalBytes || a.name.localeCompare(b.name),
@@ -305,6 +411,21 @@ export class DeviceCareStorage {
     } finally {
       this.busy = false;
     }
+  }
+
+  async analyzeNode(id: unknown): Promise<StorageReport> {
+    const selected = typeof id === "string" ? this.folders.get(id) : undefined;
+    if (!selected || this.busy)
+      throw new Error("Choose a folder from the current storage report");
+    const stat = await lstat(selected.path);
+    if (
+      !stat.isDirectory() ||
+      stat.dev !== selected.dev ||
+      stat.ino !== selected.ino ||
+      (await realpath(selected.path)) !== selected.path
+    )
+      throw new Error("Folder changed; analyze again");
+    return this.analyze(selected.path, false);
   }
 
   plan(ids: unknown): CleanupPlan {

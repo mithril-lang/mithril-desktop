@@ -146,3 +146,98 @@ it("replaces complete counted collections and rejects a changed later page witho
   await sync.sync();
   expect(state.documents).toEqual([record("original", 1), record("second", 1)]);
 });
+
+// @lat: [[cloud-workspace-tests#Packaged Repository restore generation]]
+it("retains saved Repository and Workspace writes without dispatch across a restoration", async () => {
+  const original: RepositoryDocument = {
+    collection: "memory",
+    id: "note",
+    revision: 1,
+    deleted: false,
+    updatedAt: 1,
+    body: { text: "Original" },
+  };
+  let datasetGeneration = 0,
+    document = original,
+    state = emptyRepository(),
+    writes = 0;
+  const repository = new RepositorySync(
+    "alice",
+    {
+      page: async () => ({
+        schemaVersion: 1,
+        userId: "alice",
+        datasetGeneration,
+        documents: [document],
+        nextAfter: null,
+        inventory: { cursor: 1, anchor: 1, total: 1 },
+      }),
+      apply: async () => {
+        writes++;
+        throw Error("Must not send across restoration");
+      },
+    },
+    {
+      read: async () => structuredClone(state),
+      update: async (_owner, change) => {
+        state = change(structuredClone(state));
+        return structuredClone(state);
+      },
+    },
+    () => {},
+    ["memory"],
+  );
+  await repository.sync();
+  await repository.edit("memory", "note", { text: "Saved" });
+  const pending = structuredClone(repository.state.pending[0]);
+  expect(pending.datasetGeneration).toBe(0);
+  datasetGeneration = 1;
+  document = { ...original, body: { text: "Restored at the same revision" } };
+  await repository.sync();
+  expect(state.datasetGeneration).toBe(1);
+  expect(state.documents).toEqual([document]);
+  expect(state.pending).toEqual([pending]);
+  expect(state.conflicts).toEqual([
+    { operationId: pending.operationId, remote: document },
+  ]);
+  expect(writes).toBe(0);
+
+  const record: WorkspaceRecord = {
+    id: "project",
+    kind: "project",
+    revision: 1,
+    deleted: false,
+    updatedAt: 1,
+    data: { title: "Original" },
+  };
+  let snapshot: WorkspaceSnapshot = {
+    schemaVersion: 1,
+    userId: "alice",
+    datasetGeneration: 0,
+    cursor: 1,
+    records: [record],
+  };
+  const workspace = new SyncClient({
+    getSnapshot: async () => structuredClone(snapshot),
+    applyOperations: async () => {
+      writes++;
+      throw Error("Must not send across restoration");
+    },
+    history: async () => {
+      throw Error("Unexpected history read");
+    },
+  });
+  await workspace.connect("alice");
+  const edit = workspace.queue("project", "project", {
+    title: "Saved project",
+  });
+  snapshot = {
+    ...snapshot,
+    datasetGeneration: 1,
+    records: [{ ...record, data: { title: "Restored project" } }],
+  };
+  await expect(workspace.flush()).rejects.toThrow("review saved operation");
+  expect(workspace.records).toEqual(snapshot.records);
+  expect(workspace.outbox).toEqual([edit]);
+  expect(writes).toBe(0);
+});

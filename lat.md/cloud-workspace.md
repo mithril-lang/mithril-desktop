@@ -1419,3 +1419,11 @@ Preview.56 pins shared Workspace 0.6.29-schedules.52. New saved operations inclu
 The paired API candidate rejects older writers and protects canonical mutations with a transactional epoch check before inference dispatch. Archive SHA256 is `052307834cdbcdf20abd84220d47640a602d121128072713e2f12f34e75abe44`. The production migration remains source-only; other inventories/writers, execution custody and signed installed synchronization still require integration and verification. This candidate is not a signed release or installed replacement.
 
 Qualification passed 33 selected compiled-cache/cloud/chat/updater tests, full Electron typecheck/build, 689 runtime-file packaging checks, independent equality of all 465 producer/archive/installed files, changed-test lint and `lat check`. The paired Fund candidate passed 427 shared and 38 API chat/browser/device/runtime cases; exact-source API CI is a separate gate.
+
+### Repository and Workspace restoration admission (draft)
+
+Preview.57 pins shared Workspace 0.6.29-schedules.53. Repository pages, history and saved edits use a durable owner generation; generic Workspace inventories and edits use that same generation boundary.
+
+Restoration replaces complete cached documents even at equal IDs/revisions while retaining old saved edits as conflicts without dispatching. Explicit resolution binds a new operation to the current generation. The API candidate checks generation and replay identity before canonical writes and inside their transaction. Archive SHA256 is `1d00a599a23df17e51b78a9ba8343fbc9ed4cab57cc15cde8afab39c2c396472`.
+
+Qualification passed 37 selected compiled-cache/cloud/chat/updater cases, Electron typecheck/build, 689 runtime-file packaging checks, all 465 producer/archive/installed bytes with exact lock identity, changed-test lint and `lat check`. The paired Fund candidate passed 432 shared cases and a bounded rerun of 23 D1 Repository/Workspace cases after an initial `SQLITE_FULL` failure. API standalone CI, native full archival writer admission, Sidebar, schedule/file custody, production publication and signed installed synchronization remain distinct requirements; no installed replacement or production restore is claimed.

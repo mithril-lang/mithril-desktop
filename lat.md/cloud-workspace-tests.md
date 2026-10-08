@@ -1266,6 +1266,10 @@ The compiled Repository consumer retains its prior display and cache when a late
 
 The actual compiled vendor rejects a changed later page before cache publication. A coherent counted inventory then removes absent IDs and replaces lower revisions without dispatching queued writes.
 
+## Packaged Repository restore generation
+
+The compiled Repository cache replaces equal-revision restored bytes while retaining saved edits as conflicts in its durable state. The generic Workspace client likewise retains its old operation without dispatch after restoration.
+
 ## Packaged session inventory replacement
 
 The actual shared vendor replaces 1,205 canonical sessions with lower revisions or an empty inventory, clears retired event caches and preserves queued original operation identities without writing or dispatching.

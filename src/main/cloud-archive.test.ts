@@ -3,7 +3,11 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { NativeAccountArchive, fileArchiveSource } from "./cloud-archive";
+import {
+  NativeAccountArchive,
+  fileArchiveSource,
+  diskArchiveJournal,
+} from "./cloud-archive";
 const directories: string[] = [];
 afterEach(async () => {
   for (const path of directories.splice(0))
@@ -220,4 +224,24 @@ it("native selected-file restore retains its operation across an unknown commit 
   await native().commit("alice", true);
   expect(await native().pending("alice")).toBeNull();
   expect(commits).toEqual([prepared!.operationId, prepared!.operationId]);
+});
+
+// @lat: [[cloud-workspace-tests#Native archive durable intent journal]]
+it("retains journal identities across reopening and suppresses legacy JSON after confirmed removal", async () => {
+  const root = await directory(),
+    key = "mithril:account-archive:v1:restore:alice";
+  const legacy = join(
+    root,
+    createHash("sha256").update(key).digest("hex") + ".json",
+  );
+  await writeFile(legacy, "legacy intent");
+  const journal = (): ReturnType<typeof diskArchiveJournal> =>
+    diskArchiveJournal(root, () => {});
+  expect(journal().get(key)).toBe("legacy intent");
+  journal().set(key, "retained operation");
+  expect(journal().get(key)).toBe("retained operation");
+  expect(journal().get("other owner")).toBeNull();
+  journal().remove(key);
+  expect(journal().get(key)).toBe("");
+  expect(await readFile(legacy, "utf8")).toBe("legacy intent");
 });

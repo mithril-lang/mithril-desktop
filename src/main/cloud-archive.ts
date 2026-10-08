@@ -1,13 +1,11 @@
+import { DatabaseSync } from "node:sqlite";
 import { createHash, randomUUID } from "node:crypto";
 import {
   closeSync,
-  fsyncSync,
   mkdirSync,
   openSync,
   readFileSync,
-  renameSync,
   statSync,
-  writeFileSync,
 } from "node:fs";
 import { mkdtemp, open, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -74,43 +72,63 @@ export function diskArchiveJournal(
   directory: string,
   check: () => void,
 ): ArchiveJournal {
-  const path = (key: string): string =>
+  const legacyPath = (key: string): string =>
     join(directory, createHash("sha256").update(key).digest("hex") + ".json");
+  const withDatabase = <T>(action: (db: DatabaseSync) => T): T => {
+    check();
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    const path = join(directory, "journal.sqlite");
+    const fd = openSync(path, "a", 0o600);
+    closeSync(fd);
+    const db = new DatabaseSync(path);
+    try {
+      db.exec(
+        "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS archive_intents(key TEXT PRIMARY KEY,value TEXT NOT NULL) STRICT;",
+      );
+      check();
+      return action(db);
+    } finally {
+      db.close();
+    }
+  };
   return {
     get(key) {
+      const value = withDatabase((db) =>
+        db.prepare("SELECT value FROM archive_intents WHERE key=?").get(key),
+      );
       check();
+      if (value) {
+        if (
+          typeof value.value !== "string" ||
+          Buffer.byteLength(value.value, "utf8") > 16384
+        )
+          throw Error("Invalid archive journal");
+        return value.value;
+      }
+      // Previously retained JSON intentions remain available until a confirmed write supersedes them.
       try {
-        const info = statSync(path(key));
+        const info = statSync(legacyPath(key));
         if (!info.isFile() || info.size > 16384)
           throw Error("Invalid archive journal");
-        return readFileSync(path(key), "utf8");
+        return readFileSync(legacyPath(key), "utf8");
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
         throw error;
       }
     },
     set(key, value) {
-      check();
-      mkdirSync(directory, { recursive: true, mode: 0o700 });
-      const target = path(key),
-        temporary = target + "." + randomUUID();
-      const fd = openSync(temporary, "wx", 0o600);
-      try {
-        writeFileSync(fd, value);
-        fsyncSync(fd);
-      } finally {
-        closeSync(fd);
-      }
-      check();
-      renameSync(temporary, target);
-      const parent = openSync(directory, "r");
-      try {
-        fsyncSync(parent);
-      } finally {
-        closeSync(parent);
-      }
+      if (Buffer.byteLength(value, "utf8") > 16384)
+        throw Error("Invalid archive journal");
+      withDatabase((db) => {
+        db.exec("BEGIN IMMEDIATE");
+        db.prepare(
+          "INSERT INTO archive_intents(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        ).run(key, value);
+        check();
+        db.exec("COMMIT");
+      });
     },
-    // Keep an explicit durable tombstone so a process crash cannot revive the intent.
+    // A durable empty row prevents legacy intentions from reappearing after acknowledgement.
     remove(key) {
       this.set(key, "");
     },

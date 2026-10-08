@@ -1320,3 +1320,7 @@ Invalid decisions never reach transport. Restored review history is not executio
 ## Project folder remote tombstones
 
 Remote deletion retains the file-set revision and moves unchanged bytes to recovery storage. Restart preserves the tombstone; new work uses its revision and concurrent local edits remain intact.
+
+## Native archive durable intent journal
+
+SQLite transactions retain archive IDs across reopening. Legacy JSON remains readable until superseded; confirmed removal writes a durable empty row that prevents stale JSON from reviving acknowledged work.

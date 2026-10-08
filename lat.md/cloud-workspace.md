@@ -1585,10 +1585,16 @@ Desktop consumes schedules.64 with the same original Data backup component and a
 
 The original Data screen uses main-only archive dialogs, fixed authenticated API routes, a durable owner journal, disk-backed validation and bounded file slices. Renderer IPC carries operation metadata rather than full account bytes or credentials.
 
-[[src/main/cloud-archive.ts#NativeAccountArchive]] stages downloads and selected uploads privately, checks native owner context between I/O stages, and only clears export intent after file sync and destination replacement. Restoration requires an explicit confirmation; unknown responses retain the same operation identity. Production API/schema, installed dialogs, Windows directory sync behavior and cross-device restore remain separately qualified.
+[[src/main/cloud-archive.ts#NativeAccountArchive]] stages downloads and selected uploads privately, checks native owner context between I/O stages, and only clears export intent after file sync and destination replacement. Restoration requires an explicit confirmation; unknown responses retain the same operation identity. Production API/schema, installed dialogs, Windows destination replacement and cross-device restore remain separately qualified.
 
 Native archive candidate qualification: 47 focused archive/workspace/Data tests, Web 8 tests, shared controller/backup 9 tests, both consumers' typechecks and scoped lint passed locally. Producer, archive and Desktop dependency match across 481 files. Exact current main is included in both branches. Installer, real dialogs, cloud schema publication and cross-device QA remain pending.
 
 ## File-set deletion convergence
 
 Selected folders retain file-set tombstones and revisions. Unchanged bytes move to recovery storage without a cloud write. Concurrent edits pause; later new files use the retained revision.
+
+## Native archive SQLite journal
+
+Archive intents use the Electron runtime's built-in SQLite with FULL-synchronous transactions. Private legacy JSON entries remain readable until replaced, and durable empty rows suppress old acknowledged intents without deleting recovery files.
+
+Electron 44.1.1's actual Node 24.19 runtime was checked for node:sqlite availability. The journal contains only owner-bound operation metadata, not account source data or credentials; api.mithril.fund remains the canonical backend. Installed and Windows destination-save qualification remain pending.

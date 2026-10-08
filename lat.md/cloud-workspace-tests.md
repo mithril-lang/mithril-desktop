@@ -1226,3 +1226,15 @@ Mapped original transcripts retain all validated cloud overlays in owner-bound S
 ## Complete mapped chat synchronization
 
 More than twenty thousand original items synchronize in protocol batches with exact archived read-back and no inferred turn. The large end-to-end fixture has a thirty-second deadline for complete receipt and journal processing.
+
+## Complete history attachment cache
+
+All valid attachments in a conversation restore sequentially even when their total exceeds fifty MiB. Real bytes, private files, reopen without network and account-isolated paths are verified.
+
+## Atomic attachment cache recovery
+
+Corrupt local cache bytes are re-fetched and atomically replaced only after canonical chunk verification. Invalid remote bytes or an account retiring during download cannot install partial data.
+
+## Attachment cache path integrity
+
+Attachment identities are validated before filesystem access. Symlinked storage is rejected, while original text/image representation and provenance sizes are retained.

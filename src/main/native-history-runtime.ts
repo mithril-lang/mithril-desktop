@@ -1,3 +1,4 @@
+import { restoreHistoryAttachment } from "./history-attachment-cache";
 import {
   bindNativeHistorySources,
   nativeHistoryDeletions,
@@ -11,13 +12,7 @@ import {
 } from "./native-history-title";
 import { app } from "electron";
 import { createHash } from "crypto";
-import {
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "fs";
+import { existsSync, lstatSync, readFileSync } from "fs";
 import { dirname, join, resolve, basename } from "path";
 import { cloudChat, onCloudChatAccountChanged } from "./cloud-chat-runtime";
 import type { CloudChat } from "./cloud-chat";
@@ -49,7 +44,6 @@ import {
   writeHistoryAttachment,
   type ArchivedHistoryItem,
   type HistoryAttachment,
-  readHistoryAttachment,
 } from "@mithril/workspace/history";
 import {
   nativeHistoryItemId,
@@ -234,62 +228,19 @@ export async function materializeCloudHistory(
   const originals = new Map(
     items.map((item) => [nativeHistoryItemId(item), item]),
   );
-  let attachmentBytes = 0;
   for (const value of cloudItems) {
     const localAttachments: Attachment[] = [];
     for (const file of value.deleted ? [] : (value.attachments ?? [])) {
-      attachmentBytes += file.size;
-      if (attachmentBytes > 50 * 1024 * 1024)
-        throw Error("History attachments exceed supported cache bound");
-      await guard();
-      const directory = join(
-        root(),
-        "attachments",
-        createHash("sha256").update(context.userId).digest("hex"),
+      localAttachments.push(
+        await restoreHistoryAttachment(
+          root(),
+          context.userId,
+          sessionId,
+          file,
+          client.historyFiles,
+          guard,
+        ),
       );
-      checked(directory);
-      mkdirSync(directory, { recursive: true, mode: 0o700 });
-      const path = join(directory, file.digest);
-      checked(path);
-      if (
-        existsSync(path) &&
-        (!lstatSync(path).isFile() || lstatSync(path).size !== file.size)
-      )
-        throw Error("Invalid cached attachment");
-      const bytes = existsSync(path)
-        ? readFileSync(path)
-        : await readHistoryAttachment(
-            client.historyFiles.forOwner(context.userId),
-            sessionId,
-            file,
-          );
-      if ((await digestBytes(bytes)) !== file.digest)
-        throw Error("Cached attachment digest mismatch");
-      await guard();
-      if (!existsSync(path))
-        writeFileSync(path, bytes, { flag: "wx", mode: 0o600 });
-      localAttachments.push({
-        id: file.id,
-        kind:
-          file.kind === "image"
-            ? "image"
-            : file.kind === "text-file"
-              ? "text-file"
-              : "path-ref",
-        name: file.name,
-        mime: file.mime,
-        size: file.size,
-        ...(file.originalSize ? { originalSize: file.originalSize } : {}),
-        ...(file.kind === "image"
-          ? {
-              dataUrl: `data:${file.mime};base64,${Buffer.from(bytes).toString("base64")}`,
-            }
-          : file.kind === "text-file"
-            ? {
-                text: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
-              }
-            : { path }),
-      });
     }
     materialized.push({
       source: value,

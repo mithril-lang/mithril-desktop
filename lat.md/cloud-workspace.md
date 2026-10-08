@@ -1317,3 +1317,15 @@ Original transcript synchronization no longer refuses more than twenty thousand 
 Real SQLite and sync tests cover 20,005 original items, a greater-than-fifty-MiB overlay, complete read-back, legacy conversion, owner isolation, failed-replacement rollback and missing-chunk rejection. These are source qualification, not installed/public proof.
 
 Local qualification: seven original-history suites pass 81 tests, changed-file lint and full Desktop types/build pass, and all four compiled-CSS layout cases pass after reinstalling the missing Chromium test runtime. `lat check` passes. Prior preview.44 CI run 37712377489 succeeded. Preview.45 retains immutable Workspace `.41`; no production D1 writes, release publication or installed replacement occurred. The current public API compatibility gate remains an external publication requirement.
+
+## Complete aggregate chat attachment restoration
+
+Preview.46 restores conversation attachments sequentially into a verified private cache without refusing a fifty-MiB conversation total.
+
+The original timeline still uses the original image, text-file and path-reference representations. Each file retains the existing canonical chunk/digest and individual resource validation. An account/session adapter supplies fixed owner-bound transport; retirement guards run before restoration, after download and before returning. Metadata is validated before constructing cache paths, and symlinked or non-regular storage is refused.
+
+Valid cached files avoid network access. Missing or digest/size-corrupt working-cache bytes are fetched again through the canonical reader and atomically replaced with fsynced private staged files, rather than overwriting a target incrementally. POSIX directory durability is flushed; Windows retains atomic replacement without unsupported directory fsync. A corrupt download or retired account does not install its bytes. The existing one-thousand-entry upload map is a bounded reuse cache, not a loss/admission ceiling, and is retained.
+
+Real-byte tests restore fifty-four MiB, verify all file contents and owner paths, reopen without network, retain original text/image representation, recover corrupted cache bytes and reject corrupt transport bytes, retired results and symlinked storage. Individual file/protocol limits, materialized image/text memory and full account archive/export/import remain separate work. No production R2 write or installed restoration is inferred from these tests.
+
+Local qualification: eight original-history/attachment suites pass 84 tests. Changed-file lint, full Desktop typecheck/build, four compiled-CSS layout cases and `lat check` pass. The fixed-route public API preflight still refuses the unpublished canonical Workspace inventory protocol; preview.46 has no GitHub release. No production R2/D1 write or installed replacement occurred.

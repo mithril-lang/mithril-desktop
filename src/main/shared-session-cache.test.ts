@@ -175,11 +175,54 @@ it("retires equal-identity histories and saved writes after a restore epoch chan
     type: "rename",
     data: { title: "Saved edit" },
   });
+  expect(pending.operation.datasetGeneration).toBe(0);
   datasetGeneration = 1;
   await client.refresh();
   expect(client.events.size).toBe(0);
   expect(client.outbox).toEqual([pending]);
   await expect(client.flush()).rejects.toThrow("review saved operation");
   expect(transport.receipt).not.toHaveBeenCalled();
+  expect(transport.apply).not.toHaveBeenCalled();
+});
+
+// @lat: [[cloud-workspace-tests#Packaged chat receipt generation]]
+it("retains saved metadata when a compiled receipt belongs to an old dataset", async () => {
+  const transport: SessionTransport = {
+    list: async () => ({
+      schemaVersion: 1,
+      userId: "alice",
+      datasetGeneration: 1,
+      sessions: [session("s1")],
+    }),
+    events: async () => {
+      throw Error("No checkpoint requested");
+    },
+    receipt: vi.fn(async () => {
+      throw Error("Receipt not configured");
+    }),
+    apply: vi.fn(async () => {
+      throw Error("Must not dispatch after a mismatched receipt");
+    }),
+  };
+  const client = new SessionSyncClient(transport);
+  await client.connect("alice");
+  const pending = client.queue("s1", {
+    type: "rename",
+    data: { title: "Saved edit" },
+  });
+  expect(pending.operation.datasetGeneration).toBe(1);
+  vi.mocked(transport.receipt).mockResolvedValueOnce({
+    schemaVersion: 1,
+    userId: "alice",
+    datasetGeneration: 0,
+    operationId: pending.operation.operationId,
+    status: "accepted",
+    session: session("s1", 2),
+  });
+  await expect(client.flush()).rejects.toThrow(
+    "Chat receipt generation changed",
+  );
+  expect(client.outbox).toEqual([pending]);
+  expect(client.sessions).toEqual([session("s1")]);
   expect(transport.apply).not.toHaveBeenCalled();
 });

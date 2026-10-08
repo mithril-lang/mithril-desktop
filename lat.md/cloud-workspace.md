@@ -1411,3 +1411,11 @@ Pending metadata stores its original epoch across IndexedDB reopen. API server w
 All 465 producer/archive/installed bytes and exact lock identity match. Archive SHA256: `42d9e7b48e523a33cce92491a622a8426e6bf242471d362beb4c3781a1a865c1`.
 
 Local qualification passed 56 selected compiled-cache/cloud/chat/updater tests, full Electron typecheck/build, 689-file packaging identity, changed-file lint and `lat check`. Shared 425 cases and real D1 chat 16 cases passed in Fund; shared Chromium sidebar/Security/table QA passed. Signed installed behavior remains unverified.
+
+### Chat write generation consumer (draft)
+
+Preview.56 pins shared Workspace 0.6.29-schedules.52. New saved operations include the observed owner generation; a receipt from another generation retains the pending edit and cannot update the displayed session or dispatch a write.
+
+The paired API candidate rejects older writers and protects canonical mutations with a transactional epoch check before inference dispatch. Archive SHA256 is `052307834cdbcdf20abd84220d47640a602d121128072713e2f12f34e75abe44`. The production migration remains source-only; other inventories/writers, execution custody and signed installed synchronization still require integration and verification. This candidate is not a signed release or installed replacement.
+
+Qualification passed 33 selected compiled-cache/cloud/chat/updater tests, full Electron typecheck/build, 689 runtime-file packaging checks, independent equality of all 465 producer/archive/installed files, changed-test lint and `lat check`. The paired Fund candidate passed 427 shared and 38 API chat/browser/device/runtime cases; exact-source API CI is a separate gate.

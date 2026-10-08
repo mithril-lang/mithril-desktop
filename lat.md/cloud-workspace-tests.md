@@ -1281,3 +1281,7 @@ The compiled shared client rejects session revision/event boundary changes betwe
 ## Packaged chat restore epoch
 
 The actual compiled vendor clears histories at equal IDs/revisions when the restore epoch changes, preserves saved operation identity and refuses both receipt checks and dispatch across epochs.
+
+## Packaged chat receipt generation
+
+The compiled shared client sends the observed dataset generation on a saved operation and retains that operation when a receipt belongs to another generation, without updating the visible session or dispatching a write.

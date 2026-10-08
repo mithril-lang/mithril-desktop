@@ -23,6 +23,19 @@ import type { SessionTransport } from "@mithril/workspace/session-sync";
 /** Fixed canonical D1 routes. No provider URLs or bearer credentials cross IPC. */
 export class CloudChat implements SessionTransport {
   readonly historyFiles: HistoryFileTransport;
+  // Main-owned ephemeral inventory; server admission remains authoritative.
+  private browserInventories = new Map<
+    string,
+    {
+      ticket: symbol;
+      turnId: unknown;
+      executionToken: unknown;
+      round?: number;
+      parents?: Set<string>;
+      tools?: Set<string>;
+      expires?: number;
+    }
+  >();
   constructor(readonly auth: CloudWorkspace) {
     this.historyFiles = createHistoryFileTransport((path, init) =>
       auth.authorizedBinaryRequest(path, init),
@@ -136,6 +149,7 @@ export class CloudChat implements SessionTransport {
     round: number;
     calls: import("@mithril/workspace/client-tool-turn").ClientToolCall[];
     childResult?: import("@mithril/workspace/client-tool-turn").ClientToolResult;
+    childTools?: string[];
   }> {
     if (
       !chatId(id) ||
@@ -165,13 +179,32 @@ export class CloudChat implements SessionTransport {
       JSON.stringify(body).length > 524288
     )
       throw Error("Invalid tool checkpoint");
+    body = structuredClone(body);
+    const context = await this.auth.nativeContext();
+    const inventoryKey = JSON.stringify([context, id]);
+    // Context fingerprints stay in main; bound memory across accounts/sessions.
+    for (const [key, value] of this.browserInventories)
+      if (value.expires !== undefined && value.expires <= Date.now())
+        this.browserInventories.delete(key);
+    const inventory = this.browserInventories.get(inventoryKey);
+    const dynamicChild =
+      inventory?.tools?.has(String(body.name)) &&
+      inventory.turnId === body.turnId &&
+      inventory.executionToken === body.executionToken &&
+      inventory.round === body.round &&
+      inventory.parents?.has(String(body.parentCallId)) &&
+      (inventory.expires ?? 0) > Date.now();
     if (body.action === "child") {
       if (
         !chatId(body.parentCallId) ||
         !chatId(body.childId) ||
-        !["tool_catalog", "mithril_tool", "web_search", "web_extract"].includes(
-          String(body.name),
-        ) ||
+        (!dynamicChild &&
+          ![
+            "tool_catalog",
+            "mithril_tool",
+            "web_search",
+            "web_extract",
+          ].includes(String(body.name))) ||
         !body.args ||
         typeof body.args !== "object" ||
         Array.isArray(body.args) ||
@@ -183,6 +216,20 @@ export class CloudChat implements SessionTransport {
       ["parentCallId", "childId", "name", "args"].some((key) => key in body)
     )
       throw Error("Invalid child tool checkpoint");
+    const ticket = Symbol();
+    if (body.action !== "child") {
+      this.browserInventories.delete(inventoryKey);
+      if (this.browserInventories.size >= 32)
+        this.browserInventories.delete(
+          this.browserInventories.keys().next().value!,
+        );
+      this.browserInventories.set(inventoryKey, {
+        ticket,
+        turnId: body.turnId,
+        executionToken: body.executionToken,
+        expires: Date.now() + 45000,
+      });
+    }
     const { value } = await this.auth.authorizedRequest(
       `/v1/chat/sessions/${encodeURIComponent(id)}/browser`,
       { ...body, toolProtocol: "mithril-browser-tools-v2" },
@@ -193,6 +240,7 @@ export class CloudChat implements SessionTransport {
       round: number;
       calls: import("@mithril/workspace/client-tool-turn").ClientToolCall[];
       childResult?: import("@mithril/workspace/client-tool-turn").ClientToolResult;
+      childTools?: string[];
     };
     if (
       ![
@@ -219,6 +267,62 @@ export class CloudChat implements SessionTransport {
       throw Error("Invalid child tool response");
     if (body.action !== "child" && result.phase === "child_result")
       throw Error("Unexpected child tool response");
+    if (
+      result.childTools !== undefined &&
+      (!Array.isArray(result.childTools) ||
+        result.childTools.length > 4100 ||
+        new Set(result.childTools).size !== result.childTools.length ||
+        result.childTools.some(
+          (name) =>
+            typeof name !== "string" ||
+            !/^[A-Za-z0-9_-]{1,256}$/.test(name) ||
+            ["js", "python", "mithril_code"].includes(name),
+        ))
+    )
+      throw Error("Invalid child tool inventory");
+    const latest = await this.auth.nativeContext();
+    if (JSON.stringify(latest) !== JSON.stringify(context))
+      throw Error("Chat owner changed");
+    if (
+      body.action !== "child" &&
+      this.browserInventories.get(inventoryKey)?.ticket === ticket
+    ) {
+      if (
+        body.action === "next" &&
+        result.phase === "tools_wait" &&
+        result.round === body.round &&
+        result.childTools
+      ) {
+        const parents = new Set<string>();
+        for (const call of result.calls ?? []) {
+          if (
+            !chatId(call?.id) ||
+            !call.function ||
+            ![
+              "js",
+              "python",
+              "mithril_code",
+              "tool_catalog",
+              "mithril_tool",
+              "web_search",
+              "web_extract",
+            ].includes(call.function.name)
+          )
+            throw Error("Invalid tool parent");
+          if (["js", "python"].includes(call.function.name))
+            parents.add(call.id);
+        }
+        this.browserInventories.set(inventoryKey, {
+          ticket,
+          turnId: body.turnId,
+          executionToken: body.executionToken,
+          round: result.round,
+          parents,
+          tools: new Set(result.childTools),
+          expires: Date.now() + 45000,
+        });
+      } else this.browserInventories.delete(inventoryKey);
+    }
     return result;
   }
 }

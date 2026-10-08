@@ -443,3 +443,15 @@ Chat distinguishes missing scoped permission from account expiry and transport e
 ## Verified Desktop sign-in gate
 
 Desktop never mounts the workspace for a stored but invalid account, refuses manual bypass, closes on sign-out and retires late account verification responses before admitting a newly verified session.
+
+## Dynamic Browser children through main
+
+The compiled agency.10 runner routes JS/Python children through the real main adapter using server-returned names. Retained brokers and unlisted names cannot dispatch after their parent ends.
+
+## Dynamic inventory authority fences
+
+Main retains only an ephemeral server checkpoint inventory bound to account/profile/credential epoch, session, token, turn, round and JS/Python parent. Result acknowledgement, expiry, account changes and missing inventories retire admission.
+
+## Dynamic inventory invalid and stale responses
+
+Invalid, duplicate, recursive and oversized server inventories are rejected. A late next response cannot restore an inventory retired by a later checkpoint command.

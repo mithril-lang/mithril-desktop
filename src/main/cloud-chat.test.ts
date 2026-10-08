@@ -1,3 +1,4 @@
+import { createClientToolTurnRunner } from "@mithril/workspace/client-tool-turn";
 import { describe, it, expect, vi } from "vitest";
 import { CloudWorkspace } from "./cloud-workspace";
 import { CloudChat } from "./cloud-chat";
@@ -332,4 +333,220 @@ describe("owner-bound browser code children", () => {
       "Invalid child tool response",
     );
   });
+});
+
+// @lat: [[cloud-workspace-tests#Dynamic Browser children through main]]
+it.each(["js", "python"])(
+  "runs %s dynamic children through the compiled runner and real main adapter",
+  async (language) => {
+    const f = fixture(["chat:read", "chat:write", "inference"]);
+    await f.auth.enable();
+    const commands: Record<string, unknown>[] = [];
+    f.fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/v1/me"))
+        return f.response({
+          via: "api_token",
+          user: { id: "a" },
+          scopes: ["chat:read", "chat:write", "inference"],
+        });
+      const body = JSON.parse(String(init?.body));
+      commands.push(body);
+      return f.response({
+        schemaVersion: 1,
+        userId: "a",
+        ...(body.action === "next" && body.round === 0
+          ? {
+              phase: "tools_wait",
+              round: 0,
+              childTools: ["dynamic_write"],
+              calls: [
+                { id: "parent", function: { name: language, arguments: "{}" } },
+              ],
+            }
+          : body.action === "child"
+            ? {
+                phase: "child_result",
+                round: 0,
+                calls: [],
+                childResult: {
+                  id: body.childId,
+                  receipt: {},
+                  result: 42,
+                  files: {},
+                },
+              }
+            : { phase: "completed", round: 1, calls: [] }),
+      });
+    });
+    let retained!: (name: string, args: unknown) => Promise<unknown>;
+    const execute = vi.fn(async (call, _signal, broker) => {
+      retained = broker;
+      expect(await broker("dynamic_write", { content: "once" })).toMatchObject({
+        result: 42,
+      });
+      await expect(broker("unlisted", {})).rejects.toThrow();
+      return { id: call.id, receipt: {}, result: 42, files: {} };
+    });
+    const runner = createClientToolTurnRunner(
+      (sid, body) => f.client.browserStep(sid, body),
+      execute,
+    );
+    const op = {
+      type: "browser_turn",
+      operationId: "turn",
+      data: { executionToken: "a".repeat(64) },
+    } as never;
+    runner.start("s1", op, {
+      status: "accepted",
+      operationId: "turn",
+      session: { id: "s1", activeTurn: { id: "turn", status: "running" } },
+    } as never);
+    await vi.waitFor(() => expect(commands).toHaveLength(4));
+    expect(commands[1]).toMatchObject({
+      action: "child",
+      name: "dynamic_write",
+      parentCallId: "parent",
+      toolProtocol: "mithril-browser-tools-v2",
+    });
+    expect(execute).toHaveBeenCalledOnce();
+    await expect(retained("dynamic_write", {})).rejects.toThrow();
+    runner.stop();
+  },
+);
+
+// @lat: [[cloud-workspace-tests#Dynamic inventory authority fences]]
+it("binds a dynamic child inventory to owner, token, turn, round and parent and retires it after result", async () => {
+  const f = fixture(["chat:read", "chat:write", "inference"]);
+  await f.auth.enable();
+  const base = { turnId: "turn", executionToken: "a".repeat(64), round: 0 };
+  f.fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return f.response({
+        via: "api_token",
+        user: { id: "a" },
+        scopes: ["chat:read", "chat:write", "inference"],
+      });
+    const body = JSON.parse(String(init?.body));
+    return f.response({
+      schemaVersion: 1,
+      userId: "a",
+      ...(body.action === "next"
+        ? {
+            phase: "tools_wait",
+            round: 0,
+            childTools: ["dynamic_write"],
+            calls: [
+              { id: "parent", function: { name: "js", arguments: "{}" } },
+            ],
+          }
+        : body.action === "child"
+          ? {
+              phase: "child_result",
+              round: 0,
+              calls: [],
+              childResult: { id: body.childId, receipt: {} },
+            }
+          : { phase: "ready", round: 1, calls: [] }),
+    });
+  });
+  const child = {
+    ...base,
+    action: "child",
+    parentCallId: "parent",
+    childId: "child",
+    name: "dynamic_write",
+    args: {},
+  };
+  await expect(f.client.browserStep("s1", child)).rejects.toThrow("child");
+  await f.client.browserStep("s1", { ...base, action: "next" });
+  for (const patch of [
+    { turnId: "other" },
+    { executionToken: "b".repeat(64) },
+    { round: 1 },
+    { parentCallId: "other" },
+    { name: "unlisted" },
+    { childTools: ["unlisted"] },
+  ])
+    await expect(
+      f.client.browserStep("s1", { ...child, ...patch }),
+    ).rejects.toThrow();
+  await f.client.browserStep("s1", child);
+  await f.client.browserStep("s1", { ...base, action: "result", results: [] });
+  await expect(f.client.browserStep("s1", child)).rejects.toThrow("child");
+  await f.client.browserStep("s1", { ...base, action: "next" });
+  const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 45001);
+  await expect(f.client.browserStep("s1", child)).rejects.toThrow("child");
+  clock.mockRestore();
+  await f.client.browserStep("s1", { ...base, action: "next" });
+  f.change();
+  await expect(f.client.browserStep("s1", child)).rejects.toThrow();
+  await f.auth.enable();
+  await expect(f.client.browserStep("s1", child)).rejects.toThrow("child");
+});
+
+// @lat: [[cloud-workspace-tests#Dynamic inventory invalid and stale responses]]
+it("rejects malformed inventories and ignores superseded next responses", async () => {
+  const f = fixture(["chat:read", "chat:write", "inference"]);
+  await f.auth.enable();
+  const base = { turnId: "turn", executionToken: "a".repeat(64), round: 0 };
+  let mode: unknown = ["js"];
+  let release!: (value: Response) => void;
+  f.fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/v1/me"))
+      return f.response({
+        via: "api_token",
+        user: { id: "a" },
+        scopes: ["chat:read", "chat:write", "inference"],
+      });
+    const body = JSON.parse(String(init?.body));
+    if (mode === "stall" && body.action === "next")
+      return new Promise<Response>((resolve) => {
+        release = resolve;
+      });
+    return f.response({
+      schemaVersion: 1,
+      userId: "a",
+      phase: body.action === "next" ? "tools_wait" : "ready",
+      round: 0,
+      childTools: mode,
+      calls: [{ id: "parent", function: { name: "js", arguments: "{}" } }],
+    });
+  });
+  for (mode of [
+    ["js"],
+    ["x", "x"],
+    ["../path"],
+    ["x".repeat(257)],
+    Array(4101).fill("x"),
+    "all",
+  ])
+    await expect(
+      f.client.browserStep("s1", { ...base, action: "next" }),
+    ).rejects.toThrow("inventory");
+  mode = "stall";
+  const old = f.client.browserStep("s1", { ...base, action: "next" });
+  await vi.waitFor(() => expect(release).toBeDefined());
+  mode = [];
+  await f.client.browserStep("s1", { ...base, action: "result", results: [] });
+  release(
+    f.response({
+      schemaVersion: 1,
+      userId: "a",
+      phase: "tools_wait",
+      round: 0,
+      childTools: ["dynamic_write"],
+      calls: [{ id: "parent", function: { name: "js", arguments: "{}" } }],
+    }),
+  );
+  await old;
+  await expect(
+    f.client.browserStep("s1", {
+      ...base,
+      action: "child",
+      parentCallId: "parent",
+      childId: "child",
+      name: "dynamic_write",
+      args: {},
+    }),
+  ).rejects.toThrow("child");
 });

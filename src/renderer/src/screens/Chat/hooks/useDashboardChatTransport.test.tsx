@@ -1,4 +1,11 @@
-import { act, render, waitFor } from "@testing-library/react";
+import { ToolAttemptsPanel } from "../ToolAttemptsPanel";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import {
   useEffect,
   useRef,
@@ -15,6 +22,10 @@ import { useTranscriptState } from "./useTranscriptState";
 import type { ActiveTurn, ChatMessage, UsageState } from "../types";
 
 type SetUsageMock = Mock<(value: SetStateAction<UsageState | null>) => void>;
+
+vi.mock("../../../components/useI18n", () => ({
+  useI18n: () => ({ locale: "en" }),
+}));
 
 const dashboardMock = vi.hoisted(() => ({
   close: vi.fn(),
@@ -98,7 +109,7 @@ function Harness({
   initialConnectionMode?: "local" | "remote" | "ssh";
   onDashboardUnavailable?: (reason: string) => void;
   setUsage?: SetUsageMock;
-}): null {
+}): React.JSX.Element {
   // Same write-through transcript state Chat.tsx uses — the transport's
   // coalescing contract requires setMessages and messagesRef to be paired.
   const { messages, setMessages, messagesRef } = useTranscriptState([
@@ -167,7 +178,7 @@ function Harness({
     transport.abort,
   ]);
 
-  return null;
+  return <ToolAttemptsPanel reader={transport.toolAttempts} />;
 }
 
 describe("useDashboardChatTransport recovery", () => {
@@ -189,6 +200,99 @@ describe("useDashboardChatTransport recovery", () => {
         })),
       },
     });
+  });
+
+  // @lat: [[tool-attempts#Test specifications#Mounted transport consumer]]
+  it("reads metadata from the mounted existing transport without read-triggered connect or prompts", async () => {
+    const api: HarnessApi = {};
+    const view = render(
+      <Harness api={api} connectionId="a" connectionRevision={1} />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Read attempt states" }),
+    );
+    expect(dashboardMock.connect).not.toHaveBeenCalled();
+    expect(dashboardMock.request).not.toHaveBeenCalled();
+    dashboardMock.request.mockImplementation(async (method) =>
+      method === "session.create"
+        ? { session_id: "live", stored_session_id: "stored" }
+        : method === "model.options"
+          ? { model: "bad-model", provider: "bad-provider", providers: [] }
+          : {},
+    );
+    await act(async () => {
+      await api.send?.("hello");
+    });
+    const connected = dashboardMock.connect.mock.calls.length;
+    dashboardMock.request.mockClear();
+    const page = {
+      protocol: "hermes-tool-attempts-v1",
+      coverage: "exact-session-metadata-only",
+      available: true,
+      attempts: [
+        {
+          attempt_id: "attempt-1",
+          parent_call_id: "parent",
+          tool_name: "write_file",
+          state: "running",
+          terminal: false,
+          result: "private-payload",
+        },
+      ],
+      next_cursor: "attempt-1",
+    };
+    dashboardMock.request
+      .mockResolvedValueOnce(page)
+      .mockResolvedValueOnce({ ...page, attempts: [], next_cursor: null });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Read attempt states" }),
+    );
+    await screen.findByText("write_file");
+    expect(screen.queryByText("private-payload")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Read older records" }));
+    await screen.findByText("No attempt records on this page.");
+    expect(dashboardMock.request.mock.calls).toEqual([
+      ["tools.attempts", { session_id: "live", limit: 50 }],
+      [
+        "tools.attempts",
+        { session_id: "live", limit: 50, before_attempt_id: "attempt-1" },
+      ],
+    ]);
+    expect(dashboardMock.connect.mock.calls).toHaveLength(connected);
+    let finish!: (value: unknown) => void;
+    for (const retire of [
+      () =>
+        dashboardMock.onEvent?.({
+          type: "session.info",
+          session_id: "live",
+          payload: {},
+        }),
+      () => api.abort?.(),
+      () => dashboardMock.onClose?.(),
+    ]) {
+      dashboardMock.request.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: "Read attempt states" }),
+      );
+      await act(async () => {
+        retire();
+        finish(page);
+      });
+      expect(screen.queryByText("write_file")).toBeNull();
+    }
+    dashboardMock.request.mockClear();
+    view.rerender(
+      <Harness api={api} connectionId="b" connectionRevision={2} />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Read attempt states" }),
+    );
+    expect(dashboardMock.request).not.toHaveBeenCalled();
   });
 
   async function clarifyHarness(): Promise<HarnessApi> {

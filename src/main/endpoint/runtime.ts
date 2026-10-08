@@ -13,7 +13,12 @@ import { isAbsolute, join, relative, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { EndpointStatus } from "../../shared/endpoint-protection";
 import { DefinitionStore } from "./definitions";
-import { ConnectionDetector, scanBytes, type Finding } from "./detection";
+import {
+  ConnectionDetector,
+  FileChangeDetector,
+  scanBytes,
+  type Finding,
+} from "./detection";
 import { collectConnections } from "./sensors";
 
 const FILE_LIMIT = 2 * 1024 * 1024;
@@ -29,7 +34,7 @@ export class EndpointRuntime {
   private generation = 0;
   private queue = new Map<string, string>();
   private draining = false;
-  private fileChanges: number[] = [];
+  private fileChanges = new FileChangeDetector();
   private cooldown = new Map<string, number>();
   private scanGaps = new Set<string>();
   private sensorGaps: string[] = [];
@@ -183,7 +188,7 @@ export class EndpointRuntime {
     this.watchers = [];
     this.queue.clear();
     this.detector.reset();
-    this.fileChanges = [];
+    this.fileChanges.reset();
     this.connections = [];
     this.lastPoll = null;
   }
@@ -224,19 +229,13 @@ export class EndpointRuntime {
             return;
           }
           const now = Date.now();
-          if (!this.queue.has(file)) {
-            this.fileChanges = this.fileChanges.filter(
-              (t) => now - t <= this.definitions.pack.files.windowMs,
-            );
-            this.fileChanges.push(now);
-            if (this.fileChanges.length >= this.definitions.pack.files.changes)
-              this.record({
-                rule: "mass-file-change",
-                severity: "high",
-                subject: root,
-              });
-            this.fileChanges = this.fileChanges.slice(-10000);
-          }
+          const finding = this.fileChanges.evaluate(
+            root,
+            file,
+            this.definitions.pack,
+            now,
+          );
+          if (finding) this.record(finding);
           if (this.queue.size >= 100) {
             this.addGap(
               "File event queue exceeded 100 entries; some events were missed.",

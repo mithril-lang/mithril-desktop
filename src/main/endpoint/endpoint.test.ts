@@ -19,7 +19,7 @@ import {
   verifyManifest,
   verifyPack,
 } from "./definitions";
-import { ConnectionDetector, scanBytes } from "./detection";
+import { ConnectionDetector, FileChangeDetector, scanBytes } from "./detection";
 import { parseLsof, parseNetstat, parseSs } from "./sensors";
 import { EndpointRuntime, inside } from "./runtime";
 const pack = validateDefinitions(bundled);
@@ -150,6 +150,19 @@ describe("Signed definition admission", () => {
   });
 });
 describe("Bounded detection", () => {
+  it("counts distinct changed paths per folder, ignoring duplicate notifications and other roots", () => {
+    const detector = new FileChangeDetector();
+    for (let i = 0; i < 500; i++)
+      expect(detector.evaluate("one", "one/repeated", pack, 100000)).toBeNull();
+    for (let i = 0; i < 199; i++)
+      expect(
+        detector.evaluate("two", `two/file-${i}`, pack, 100000),
+      ).toBeNull();
+    expect(
+      detector.evaluate("two", "two/file-199", pack, 100000)?.subject,
+    ).toBe("two");
+    expect(detector.evaluate("two", "two/new", pack, 200000)).toBeNull();
+  });
   it("finds literal content and does not claim clean for a non-match", () => {
     expect(
       scanBytes(Buffer.from("eval($_POST['input'])"), "sample.php", pack)[0]

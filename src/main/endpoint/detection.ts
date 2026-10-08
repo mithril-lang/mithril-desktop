@@ -7,6 +7,28 @@ export interface Finding {
   severity: "medium" | "high";
   subject: string;
 }
+export class FileChangeDetector {
+  private roots = new Map<string, Map<string, number>>();
+  reset(): void {
+    this.roots.clear();
+  }
+  evaluate(
+    root: string,
+    file: string,
+    pack: Definitions,
+    now: number,
+  ): Finding | null {
+    const changed = this.roots.get(root) || new Map<string, number>();
+    for (const [path, time] of changed)
+      if (now - time > pack.files.windowMs) changed.delete(path);
+    changed.set(file, now);
+    if (changed.size > 10000) changed.delete(changed.keys().next().value!);
+    this.roots.set(root, changed);
+    return changed.size >= pack.files.changes
+      ? { rule: "mass-file-change", severity: "high", subject: root }
+      : null;
+  }
+}
 export function scanBytes(
   bytes: Buffer,
   subject: string,

@@ -32,6 +32,12 @@ export interface StorageNode {
   files: number;
 }
 export interface StorageReport {
+  workflow?: {
+    name: "mithril-diskspace-management";
+    version: string;
+    state: "awaiting-selection" | "nothing-eligible";
+    cleanupScope: "desktop-generated-media";
+  };
   index?: {
     reusedDirectories: number;
     enumeratedDirectories: number;
@@ -99,6 +105,10 @@ export interface DeviceCareHistoryEntry {
 }
 
 export interface DeviceCareAPI {
+  storageSkillStatus: (
+    profile?: string,
+  ) => Promise<{ name: string; version: string } | null>;
+  runStorageSkill: (profile?: string) => Promise<StorageReport>;
   monitorStatus: () => Promise<MonitorStatus>;
   startMonitor: () => Promise<MonitorStatus | null>;
   stopMonitor: () => Promise<MonitorStatus>;

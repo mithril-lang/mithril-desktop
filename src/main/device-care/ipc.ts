@@ -24,6 +24,7 @@ import { DeviceCareProtection } from "./protection";
 import { DeviceCareMonitor } from "./monitor";
 import { DeviceCareQuarantine } from "./quarantine";
 import { CONSUMER_MAC, DeviceCareVendor } from "./vendor";
+import { installedStorageSkill } from "./storage-skill";
 
 export function registerDeviceCareIpc(
   getMainWindow: () => BrowserWindow | null,
@@ -119,6 +120,45 @@ export function registerDeviceCareIpc(
   );
   const vendor = new DeviceCareVendor(app.getPath("userData"));
   const ja = (): boolean => getAppLocale() === "ja";
+  ipcMain.handle(
+    "device-care-storage-skill-status",
+    (event, profile: unknown) => {
+      owner(event);
+      return installedStorageSkill(profile);
+    },
+  );
+  ipcMain.handle("device-care-run-storage-skill", (event, profile: unknown) => {
+    owner(event);
+    return exclusive(async () => {
+      const skill = await installedStorageSkill(profile);
+      if (!skill)
+        throw Error("Install the Desktop-enabled diskspace Skill first");
+      let root = join(tmpdir(), "hermes-desktop-media");
+      try {
+        root = await realpath(root);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      const report = await storage.analyze(root, true);
+      report.workflow = {
+        name: "mithril-diskspace-management",
+        version: skill.version,
+        state: report.candidates.length
+          ? "awaiting-selection"
+          : "nothing-eligible",
+        cleanupScope: "desktop-generated-media",
+      };
+      await writeHistory({
+        id: randomUUID(),
+        kind: "analysis",
+        state: report.status,
+        observedAt: report.observedAt,
+        files: report.files,
+        bytes: report.logicalBytes,
+      });
+      return report;
+    });
+  });
   ipcMain.handle("device-care-status", (event) => {
     owner(event);
     return protection.status();

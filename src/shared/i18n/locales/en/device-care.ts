@@ -1,4 +1,17 @@
 export default {
+  cleanupSkillTitle: "Disk cleanup Skill",
+  cleanupSkillNote:
+    "Run the Registry Skill in the active profile: measure → select candidates → review → OS Trash → remeasure free space. Install the Skill if needed; cleanup always requires native confirmation.",
+  cleanupSkillScope:
+    "Executable cleanup covers Desktop-generated temporary media. Other folders support measurement and review; owner-native cache cleanup remains separate.",
+  runCleanupSkill: "Install / run cleanup Skill",
+  openCleanupSkill: "Open cleanup Skill",
+  cleanupSkillUnavailable:
+    "Desktop-enabled diskspace Skill is unavailable. Refresh Discover and install its latest version.",
+  cleanupSkillEmpty:
+    "Skill finished measuring. No eligible temporary files were found; nothing was moved.",
+  cleanupSkillReview:
+    "Skill measured cleanup candidates. Select exact items below to create a review plan.",
   indexReuse: "Index reused",
   indexFolders: "folder listings",
   indexFiles: "file measurements",

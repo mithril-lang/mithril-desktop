@@ -1,4 +1,17 @@
 export default {
+  cleanupSkillTitle: "ディスク cleanup Skill",
+  cleanupSkillNote:
+    "選択中のプロフィールで Registry Skill を実行します。計測 → 候補選択 → レビュー → OS のゴミ箱 → 空き容量の再計測。未導入ならインストールし、移動前にはネイティブ確認を行います。",
+  cleanupSkillScope:
+    "実行できる cleanup は Desktop が生成した一時メディアです。他のフォルダーは計測とレビューに対応し、アプリ固有のキャッシュ整理は別の実行経路です。",
+  runCleanupSkill: "cleanup Skill を導入・実行",
+  openCleanupSkill: "cleanup Skill を開く",
+  cleanupSkillUnavailable:
+    "Desktop 対応の diskspace Skill を利用できません。Discover を更新し、最新版を導入してください。",
+  cleanupSkillEmpty:
+    "Skill の計測が完了しました。対象の一時ファイルはなく、移動していません。",
+  cleanupSkillReview:
+    "Skill が候補を計測しました。以下で対象を選び、レビュー用の計画を作成してください。",
   indexReuse: "インデックスを再利用",
   indexFolders: "フォルダー一覧",
   indexFiles: "ファイルの計測値",

@@ -21,11 +21,16 @@ import type {
 } from "../../../../shared/device-care";
 import "./device-care.css";
 import StorageVisualization from "./StorageVisualization";
+import type { RegistryCatalog } from "../../../../shared/registry";
 
 import { formatBytes } from "./storage-format";
 export { formatBytes } from "./storage-format";
 
-export default function DeviceCare(): React.JSX.Element {
+export default function DeviceCare({
+  profile = "default",
+}: {
+  profile?: string;
+}): React.JSX.Element {
   const { t, locale } = useI18n();
   const text = (key: string): string => t(`deviceCare.${key}`);
   const [tab, setTab] = useState<
@@ -139,6 +144,35 @@ export default function DeviceCare(): React.JSX.Element {
         setReport(next);
         setTab("storage");
       }
+      await refresh();
+    });
+  };
+  const runStorageSkill = (): void => {
+    void perform("analysis", async () => {
+      setPlan(null);
+      setReceipt(null);
+      setSelected([]);
+      if (!(await api.storageSkillStatus(profile))) {
+        const catalog = (await window.hermesAPI.fetchRegistry(
+          true,
+        )) as RegistryCatalog;
+        const skill = catalog.skills.find(
+          (entry) =>
+            entry.id === "mithril-diskspace-management" &&
+            entry.registry === "mithril",
+        );
+        if (!skill) throw Error(text("cleanupSkillUnavailable"));
+        const installed = await window.hermesAPI.installRegistryItem(
+          "skills",
+          skill,
+          profile,
+        );
+        if (!installed.success)
+          throw Error(installed.error || text("cleanupSkillUnavailable"));
+      }
+      const next = await api.runStorageSkill(profile);
+      setReport(next);
+      setTab("storage");
       await refresh();
     });
   };
@@ -423,6 +457,21 @@ export default function DeviceCare(): React.JSX.Element {
         {text("storage")}
       </h2>
       <p>{text("cleanupNote")}</p>
+      <div className="device-care-result">
+        <h3>{text("cleanupSkillTitle")}</h3>
+        <p>{text("cleanupSkillNote")}</p>
+        <p>{text("cleanupSkillScope")}</p>
+        <code>mithril-diskspace-management</code>
+        <div className="device-care-actions">
+          <button
+            className="btn btn-primary"
+            disabled={locked}
+            onClick={runStorageSkill}
+          >
+            {text("runCleanupSkill")}
+          </button>
+        </div>
+      </div>
       <div className="device-care-actions">
         <button
           className="btn btn-primary"
@@ -462,6 +511,20 @@ export default function DeviceCare(): React.JSX.Element {
           <p>
             {text(`state.${report.status}`)} · {date(report.observedAt)}
           </p>
+          {report.workflow && (
+            <div role="status">
+              <strong>
+                {report.workflow.name} · {report.workflow.version}
+              </strong>
+              <p>
+                {text(
+                  report.workflow.state === "nothing-eligible"
+                    ? "cleanupSkillEmpty"
+                    : "cleanupSkillReview",
+                )}
+              </p>
+            </div>
+          )}
           <StorageVisualization
             key={report.observedAt}
             report={report}

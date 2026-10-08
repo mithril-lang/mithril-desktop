@@ -104,6 +104,22 @@ Restart reuses only validated directory listings, never persisted file measureme
 
 Unavailable watchers and expired leases always revalidate child metadata, even when directory modification times did not change.
 
+## Desktop cleanup Skill
+
+The installed Registry diskspace Skill runs through a fixed native Device care workflow, with audit, exact candidate selection, review, Trash and free-space receipts.
+
+[[src/main/device-care/storage-skill.ts#installedStorageSkill]] validates the selected local profile, strict installed Skill path, bounded real adapter/definition files, canonical schema/scope and matching versions. The descriptor selects the existing Desktop-generated-media capability; it cannot add paths or execute downloaded shell scripts. [[src/main/device-care/ipc.ts#registerDeviceCareIpc]] admits only the main owner frame and serializes the fresh native audit with other jobs. The first report identifies Skill/version and distinguishes nothing eligible from awaiting selection; it never deletes automatically.
+
+The shared Skills screen remains canonical, with a native wrapper link to Device care. The Storage card installs the Registry Skill into the active profile when requested and starts its native workflow. Existing candidate controls create the exact single-use plan and native Cancel-by-default confirmation; the executor rechecks identity/content, moves to OS Trash, preserves recovery and reports actual available-space measurements. Arbitrary application caches are review-only until independently supported native adapters exist. No cloud Agent local-filesystem authority or shell fallback is introduced.
+
+### Validates installed adapter without expanding authority
+
+Native execution requires a real matching installed Skill/adapter in the selected valid profile. Missing, symlinked, mismatched or broader-scope descriptors cannot authorize cleanup.
+
+### Runs audit before native review
+
+The owner-frame runner measures only the fixed native temporary-media root, records Skill identity and returns an empty or selection-required result. It never invokes Trash or approval merely by starting the Skill.
+
 First scope: Desktop-owned disposable media/temp files and verified regenerable caches, plus user-selected folders for analysis. Show filesystem capacity, measured allocated bytes where supported, unavailable areas, and estimate limitations for shared blocks, hard links, sparse files, and snapshots. Existing [[src/main/media.ts#cleanupTempMediaFiles]] is an internal temp-file cleanup implementation, not whole-device maintenance; migrate its applicable user-visible behavior through the new service without changing its scope implicitly.
 
 | Candidate class                                                         | Default behavior                                                                            |
@@ -246,6 +262,6 @@ The accessible treemap preserves measured logical area, offers breadcrumbs and p
 
 ### Cause investigation and Registry workflow
 
-The inspector separates path-based hypotheses from verified growth. Registry's mithril-diskspace-management 1.2.0 audits metadata, reuses validated directory listings, compares fresh complete same-scope observations and generates a review ledger.
+The inspector separates path-based hypotheses from verified growth. Registry's mithril-diskspace-management 1.3.0 adds the installed native Desktop cleanup adapter to metadata audits and fresh complete observation comparisons.
 
 Application data, sources, histories and recovery remain protected; only existing reviewed temporary-media cleanup executes here.

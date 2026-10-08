@@ -204,6 +204,10 @@ function historyFilesForOwner(owner: string): CloudChatAPI["historyFiles"] {
 
 const hermesAPI = {
   deviceCare: {
+    storageSkillStatus: (profile?: string) =>
+      ipcRenderer.invoke("device-care-storage-skill-status", profile),
+    runStorageSkill: (profile?: string) =>
+      ipcRenderer.invoke("device-care-run-storage-skill", profile),
     monitorStatus: () => ipcRenderer.invoke("device-care-monitor-status"),
     startMonitor: () => ipcRenderer.invoke("device-care-start-monitor"),
     stopMonitor: () => ipcRenderer.invoke("device-care-stop-monitor"),

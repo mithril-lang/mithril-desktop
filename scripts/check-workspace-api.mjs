@@ -14,7 +14,8 @@ export async function checkWorkspaceApi(request = fetch) {
     health?.ok !== true ||
     health.sessionInventoryProtocol !== "chat-inventory-keyset-v1" ||
     health.sidebarInventoryProtocol !== "sidebar-inventory-keyset-v1" ||
-    health.workspaceInventoryProtocol !== "workspace-inventory-keyset-v1"
+    health.workspaceInventoryProtocol !== "workspace-inventory-keyset-v1" ||
+    health.repositoryInventoryProtocol !== "repository-inventory-counted-v1"
   )
     throw Error(
       "Canonical Workspace inventory API must be published before this Desktop installer",

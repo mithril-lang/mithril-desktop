@@ -1373,3 +1373,13 @@ The immutable archive has 465 files and SHA256 `5f8c53e5f1dbe031db59cbc0a603e3fb
 This package does not complete immutable Repository pagination, monotonic restore generation, old-write fencing or chat cache restoration. Current API compatibility, current-main releases and the installed signed client's actual update/auth/data/synchronization remain separate gates. Earlier migration-separated descriptions above are historical; Jun's requested target is one original Desktop interface with automatic cloud data synchronization.
 
 Local qualification for preview.51 passed 44 selected compiled-consumer/cloud/updater tests, full main/renderer typecheck and Electron build, changed-file lint, packaging identity for 689 active runtime files, compiled notification layout and `lat check`. All 465 installed dependency bytes match the vendor archive. The live inventory preflight refused publication because its required protocol flags are still missing. No signed preview.51 release or change to `/Applications/Mithril.app` occurred.
+
+### Counted Repository consumer package (draft)
+
+Preview.52 pins Workspace 0.6.29-schedules.47, sharing the counted Repository boundary and complete canonical collection replacement with Web.
+
+All 465 producer/archive files match; archive SHA256 is `58dc58cb7ebca97a4bf48bf260fdc24009865dbf211ce7456cd534ae7383c142`. Per-page owner history cursor and collection count/anchor checks reject mixed ordinary reads before publishing. Verified counted collections replace missing IDs and lower revisions. Older unmarked transport merging is temporary compatibility.
+
+This is not monotonic archive generation or old-write fencing. API deployment, signed publication, installed update/restart/authentication and cross-device usability remain unproven. No cloud/device UI separation is introduced.
+
+Local preview.52 qualification passed 32 compiled-consumer/cloud tests, 13 updater tests, full Electron typecheck/build, 689-file packaging identity, compiled notification layout and API-preflight tests, changed-file lint and `lat check`. All 465 installed Workspace dependency bytes match the immutable vendor. The installer preflight now also requires the counted Repository protocol; it does not publish the API or upgrade the installed preview.35.

@@ -11,6 +11,12 @@ test("refuses old API and verifies the fixed no-token health route before instal
       sidebarInventoryProtocol: "sidebar-inventory-keyset-v1",
     },
     { ok: true, sessionInventoryProtocol: "chat-inventory-keyset-v1" },
+    {
+      ok: true,
+      sessionInventoryProtocol: "chat-inventory-keyset-v1",
+      sidebarInventoryProtocol: "sidebar-inventory-keyset-v1",
+      workspaceInventoryProtocol: "workspace-inventory-keyset-v1",
+    },
   ])
     await assert.rejects(
       checkWorkspaceApi(async () => Response.json(health)),
@@ -20,6 +26,12 @@ test("refuses old API and verifies the fixed no-token health route before instal
     checkWorkspaceApi(async () =>
       Response.json(
         { ok: true, sessionInventoryProtocol: "chat-inventory-keyset-v1" },
+        {
+          ok: true,
+          sessionInventoryProtocol: "chat-inventory-keyset-v1",
+          sidebarInventoryProtocol: "sidebar-inventory-keyset-v1",
+          workspaceInventoryProtocol: "workspace-inventory-keyset-v1",
+        },
         { status: 503 },
       ),
     ),
@@ -35,6 +47,7 @@ test("refuses old API and verifies the fixed no-token health route before instal
       sessionInventoryProtocol: "chat-inventory-keyset-v1",
       sidebarInventoryProtocol: "sidebar-inventory-keyset-v1",
       workspaceInventoryProtocol: "workspace-inventory-keyset-v1",
+      repositoryInventoryProtocol: "repository-inventory-counted-v1",
     });
   });
 });

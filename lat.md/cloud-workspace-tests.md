@@ -1261,3 +1261,7 @@ The compiled shared dependency loads 1,205 records, then replaces absent IDs and
 ## Packaged all-page Repository publication
 
 The compiled Repository consumer retains its prior display and cache when a later configured collection fails. Earlier pages cannot persist a partial mixed inventory or initiate queued writes.
+
+## Packaged counted Repository replacement
+
+The actual compiled vendor rejects a changed later page before cache publication. A coherent counted inventory then removes absent IDs and replaces lower revisions without dispatching queued writes.

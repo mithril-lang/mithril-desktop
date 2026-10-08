@@ -96,3 +96,53 @@ it("keeps the actual vendored repository cache unchanged after a later collectio
   expect(state.documents).toEqual([original]);
   expect(sync.state.documents).toEqual([original]);
 });
+
+// @lat: [[cloud-workspace-tests#Packaged counted Repository replacement]]
+it("replaces complete counted collections and rejects a changed later page without publishing mixed data", async () => {
+  const record = (id: string, revision: number): RepositoryDocument => ({
+    collection: "memory",
+    id,
+    revision,
+    body: { text: id },
+    deleted: false,
+    updatedAt: revision,
+  });
+  let state = {
+    ...emptyRepository(),
+    documents: [record("original", 9), record("removed", 9)],
+  };
+  let changed = true;
+  const transport: RepositoryTransport = {
+    page: async (_collection, after) => ({
+      schemaVersion: 1,
+      userId: "alice",
+      inventory: { cursor: after && changed ? 2 : 1, anchor: 2, total: 2 },
+      documents: [after ? record("second", 1) : record("original", 1)],
+      nextAfter: after ? null : "original",
+    }),
+    apply: async () => {
+      throw Error("Read must not write");
+    },
+  };
+  const sync = new RepositorySync(
+    "alice",
+    transport,
+    {
+      read: async () => structuredClone(state),
+      update: async (_owner, change) => {
+        state = change(structuredClone(state));
+        return structuredClone(state);
+      },
+    },
+    () => {},
+    ["memory"],
+  );
+  await expect(sync.sync()).rejects.toThrow("Repository inventory changed");
+  expect(state.documents).toEqual([
+    record("original", 9),
+    record("removed", 9),
+  ]);
+  changed = false;
+  await sync.sync();
+  expect(state.documents).toEqual([record("original", 1), record("second", 1)]);
+});

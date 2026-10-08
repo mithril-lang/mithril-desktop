@@ -438,9 +438,7 @@ export class ProjectFolderSync {
           const snapshot = await this.deps.snapshot(),
             pointer = snapshot.records.find(
               (r) =>
-                r.kind === "file_set" &&
-                r.data.projectId === link.projectId &&
-                !r.deleted,
+                r.kind === "file_set" && r.data.projectId === link.projectId,
             );
           if (
             !snapshot.records.some(
@@ -449,11 +447,12 @@ export class ProjectFolderSync {
             )
           )
             throw new Error("Project removed; folder sync paused");
-          const remote: FileManifest = pointer
-            ? await (
-                this.deps.files.forOwner?.(identity.userId) ?? this.deps.files
-              ).getManifest(link.projectId, String(pointer.data.manifest))
-            : { version: 1, projectId: link.projectId, files: [] };
+          const remote: FileManifest =
+            pointer && !pointer.deleted
+              ? await (
+                  this.deps.files.forOwner?.(identity.userId) ?? this.deps.files
+                ).getManifest(link.projectId, String(pointer.data.manifest))
+              : { version: 1, projectId: link.projectId, files: [] };
           const local = (await this.scan(link.root)).files,
             merged = mergeFiles(link.base, local, remote.files);
           const identityOf = (files: ProjectFile[]): string =>
@@ -521,12 +520,16 @@ export class ProjectFolderSync {
           const digest = await digestBytes(manifestBytes(manifest));
           await this.guard(identity, generation);
           await this.dataset(datasetGeneration);
-          if (digest !== pointer?.data.manifest)
+          // A remote tombstone is acknowledged as empty without resurrecting it.
+          const publish = pointer?.deleted
+            ? merged.files.length > 0
+            : digest !== pointer?.data.manifest;
+          if (publish)
             await (
               this.deps.files.forOwner?.(identity.userId) ?? this.deps.files
             ).putManifest(manifest);
           await this.guard(identity, generation);
-          if (digest !== pointer?.data.manifest) {
+          if (publish) {
             link.pending = {
               operationId: randomUUID(),
               datasetGeneration,

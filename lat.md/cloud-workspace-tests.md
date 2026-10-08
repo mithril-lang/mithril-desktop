@@ -1316,3 +1316,7 @@ Actual filesystem synchronization retains old saved operations and local edits a
 The main transport admits only a safe history cursor or exact validated review decision, keeps credentials in main, and verifies owner/schema and exact review receipts.
 
 Invalid decisions never reach transport. Restored review history is not execution permission.
+
+## Project folder remote tombstones
+
+Remote deletion retains the file-set revision and moves unchanged bytes to recovery storage. Restart preserves the tombstone; new work uses its revision and concurrent local edits remain intact.

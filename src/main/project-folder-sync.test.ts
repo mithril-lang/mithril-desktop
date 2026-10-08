@@ -33,6 +33,7 @@ interface Fixture {
   owner(userId: string): void;
   loseAck(): void;
   restore(): void;
+  removeRemote(): void;
   remote(text: string): Promise<void>;
 }
 async function fixture(): Promise<Fixture> {
@@ -116,6 +117,10 @@ async function fixture(): Promise<Fixture> {
     },
     restore: () => {
       datasetGeneration++;
+    },
+    removeRemote: () => {
+      if (!pointer) throw Error("Missing remote file pointer");
+      pointer = { ...pointer, revision: pointer.revision + 1, deleted: true };
     },
     remote: async (text: string) => {
       const bytes = new TextEncoder().encode(text),
@@ -346,4 +351,55 @@ it("refuses a delayed file replacement when restoration happens during download"
       name.startsWith(".mithril-sync-"),
     ),
   ).toEqual([]);
+});
+
+// @lat: [[cloud-workspace-tests#Project folder remote tombstones]]
+it("acknowledges remote deletion without recreating the file set, and uses its revision for a later new file", async () => {
+  const f = await fixture(),
+    a = new ProjectFolderSync(f.deps("state-a"));
+  await writeFile(join(f.root, "a", "hello.txt"), "original");
+  await a.connect("p", (await a.preview("p", join(f.root, "a"))).ticket);
+  await a.tick();
+  const writes = f.operations.length;
+  f.removeRemote();
+  await a.tick();
+  expect((await a.status("p")).error).toBeNull();
+  expect(f.operations).toHaveLength(writes);
+  await expect(readFile(join(f.root, "a", "hello.txt"))).rejects.toMatchObject({
+    code: "ENOENT",
+  });
+  const trash = await readdir(join(f.root, "a", ".mithril-sync-trash"));
+  expect(
+    await readFile(
+      join(f.root, "a", ".mithril-sync-trash", trash[0], "hello.txt"),
+      "utf8",
+    ),
+  ).toBe("original");
+  const restarted = new ProjectFolderSync(f.deps("state-a"));
+  await restarted.tick();
+  expect(f.operations).toHaveLength(writes);
+  expect((await restarted.status("p")).error).toBeNull();
+  await writeFile(join(f.root, "a", "new.txt"), "new work");
+  await restarted.tick();
+  expect(f.operations.at(-1)).toMatchObject({
+    baseRevision: 2,
+    deleted: false,
+  });
+  expect((await restarted.status("p")).error).toBeNull();
+});
+it("a remote file-set deletion cannot discard a concurrent local edit", async () => {
+  const f = await fixture(),
+    a = new ProjectFolderSync(f.deps("state-a"));
+  await writeFile(join(f.root, "a", "hello.txt"), "original");
+  await a.connect("p", (await a.preview("p", join(f.root, "a"))).ticket);
+  await a.tick();
+  const writes = f.operations.length;
+  await writeFile(join(f.root, "a", "hello.txt"), "local edit");
+  f.removeRemote();
+  await a.tick();
+  expect((await a.status("p")).error).toContain("Concurrent edits");
+  expect(await readFile(join(f.root, "a", "hello.txt"), "utf8")).toBe(
+    "local edit",
+  );
+  expect(f.operations).toHaveLength(writes);
 });

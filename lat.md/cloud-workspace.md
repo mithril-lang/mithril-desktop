@@ -1588,3 +1588,7 @@ The original Data screen uses main-only archive dialogs, fixed authenticated API
 [[src/main/cloud-archive.ts#NativeAccountArchive]] stages downloads and selected uploads privately, checks native owner context between I/O stages, and only clears export intent after file sync and destination replacement. Restoration requires an explicit confirmation; unknown responses retain the same operation identity. Production API/schema, installed dialogs, Windows directory sync behavior and cross-device restore remain separately qualified.
 
 Native archive candidate qualification: 47 focused archive/workspace/Data tests, Web 8 tests, shared controller/backup 9 tests, both consumers' typechecks and scoped lint passed locally. Producer, archive and Desktop dependency match across 481 files. Exact current main is included in both branches. Installer, real dialogs, cloud schema publication and cross-device QA remain pending.
+
+## File-set deletion convergence
+
+Selected folders retain file-set tombstones and revisions. Unchanged bytes move to recovery storage without a cloud write. Concurrent edits pause; later new files use the retained revision.

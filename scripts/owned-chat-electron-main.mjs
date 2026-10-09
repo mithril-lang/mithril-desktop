@@ -22,6 +22,8 @@ async function start() {
   );
   const state = {
     opened: [],
+    openCount: 0,
+    openedJson: "[]",
     nativeIntent: null,
     requests: 0,
     reviews: [],
@@ -55,6 +57,8 @@ async function start() {
   await auth.enable();
   const main = new CloudChat(auth, async (url) => {
     state.opened.push(url);
+    state.openCount++;
+    state.openedJson = JSON.stringify(state.opened);
   });
   const originalCreate = main.createNativeChildConsent.bind(main);
   main.createNativeChildConsent = (request, body) => {
@@ -63,11 +67,12 @@ async function start() {
   };
   const originalReview = main.reviewNativeChildConsent.bind(main);
   main.reviewNativeChildConsent = async (request) => {
-    const review = { state: "pending", reason: "" };
+    const review = { state: "pending", reason: "", openedAfter: -1 };
     state.reviews.push(review);
     try {
       await originalReview(request);
       review.state = "returned";
+      review.openedAfter = state.opened.length;
     } catch (error) {
       review.state = "failed";
       // Only fixed main error categories: never persist credentials or requests.

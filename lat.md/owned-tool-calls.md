@@ -19,13 +19,15 @@ The dashboard client advertises server requests on gateway.ready and routes capt
 
 The latest successful session attachment response restores original approval frames from its bounded open_requests snapshot. Session IDs must match, metadata never creates authority, and answered/cancelled IDs cannot revive. Restoring a pending card still requires a new explicit human choice.
 
-Desktop now vendors agency.19 built from Fund's candidate source. Its compiled snapshot parser validates partial/unknown effect declarations before dispatch; the archive, lock integrity and task dependency are matched. The SDK captures an optional partial local or selected-session todo target binding before asynchronous discovery and sends its original digest on tools.call; this digest does not itself grant human authority. Human native review displays declarations in Web's canonical card, not native status metadata.
+Desktop now vendors agency.20 built from Fund's candidate source. Its compiled snapshot parser validates partial/unknown effect declarations before dispatch; the archive, lock integrity and task dependency are matched. The SDK captures an optional partial local or selected-session todo/memory target binding before asynchronous discovery and sends its original digest on tools.call; this digest does not itself grant human authority. Human native review displays declarations in Web's canonical card, not native status metadata.
 
 [[src/renderer/src/screens/Chat/dashboardOwnedTools.ts#callDashboardOwnedTool]] resolves the host target on the selected attached context before dispatch, refuses supplied-target mismatch, and requires fresh discovery to retain that context/revision. Missing or malformed preview RPCs refuse dispatch; an explicit null target remains unknown. This does not grant effects or obtain a human choice. Multiple local targets carry content/entry resolution; every path and resolution must match, including both Move endpoints.
 
-The Cloud Browser runner and main adapter still consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or resolve targets. Candidate preview.49 is not a new installer or live qualification.
+The Cloud Browser runner and main adapter still consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or resolve targets. Candidate preview.50 is not a new installer or live qualification.
 
-The SDK19 candidate passes separate canonical inline24 and file27 network families using actual Web/Electron UI, JS/Python WASM, main/IPC, HTTP/D1 and Hermes handlers. Todo review pins the resolved store digest. Account/model/issuer/pairing/local D1 remain fixtures; these serial fresh runs do not establish real account whole boot, OS permissions, continuous stability, publication or installed behavior.
+The previous SDK19 candidate passed separate canonical inline32 and file27 network families using actual Web/Electron UI, JS/Python WASM, main/IPC, HTTP/D1 and Hermes handlers. Todo review pins the resolved store digest. Account/model/issuer/pairing/local D1 remain fixtures; these serial fresh runs do not establish real account whole boot, OS permissions, continuous stability, publication or installed behavior.
+
+The agency.20 memory consumer tests pass locally. Current-source network and installed behavior require separate verification. Memory target identity binds the actual store route and declared mirrors, not data revision CAS, staging authority or atomicity.
 
 ## Test specifications
 
@@ -82,3 +84,7 @@ A matching cancellation retires only its original approval. Foreign-session canc
 ### Shared approval retirement
 
 Compiled shared approval custody suppresses identical duplicate requests and withdraws conflicting presentation. Answered or cancelled peer IDs cannot recreate actionable cards on the same connection.
+
+### Memory store and mirror admission
+
+The consumer compares the reviewed memory store, session, profile owner, store identity and every mirror name and identity. Target changes refuse dispatch with the same outer digest; unchanged targets dispatch once.

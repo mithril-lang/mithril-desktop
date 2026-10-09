@@ -15582,8 +15582,11 @@ body:has(.shell-vibrant),
     0 8px 24px -12px rgba(0, 0, 0, 0.45);
 }
 
-/* Native-only window dragging stays in the Desktop adapter. */
-.active-sessions-bar {
+/* Native-only window dragging stays in the Desktop adapter. The shared
+   .mithril-chat-tabs rule uses z-index 10, so this native selector must keep
+   the interactive strip above the fixed macOS drag region regardless of
+   stylesheet load order. */
+.app .active-sessions-bar {
   -webkit-app-region: drag;
   z-index: 1001;
 }

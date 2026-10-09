@@ -1626,3 +1626,11 @@ Shared tests and source packaging checks are distinct from signed release and au
 Desktop pins immutable Workspace schedules.68 so transient inventory outages recover without replaying inference or tools.
 
 The shared renderer retires delayed reads on account changes, stops automatic recovery on explicit disconnect, and follows verified inventory availability for the connected indicator. Authorization failures do not automatically retry. All 481 package files match the producer and installed dependency byte-for-byte (SHA256 `04fadf89b6e5fd3169037adab379765acf73d2a6b893ca970983e64fd3eb291f`). Typechecks and lat checks pass. Source and package qualification do not prove installed-client updates or authenticated cross-device operation.
+
+## Owner-bound Project file upload candidate
+
+Desktop preview.71 adopts the shared files.69 package so uploaded immutable bytes are committed with the same owner boundary as Web. Source qualification and actual installed persistence remain separate gates.
+
+Fund PR #924/main 2dac26a fixes the shared upload path to pass the initiating workspace owner to applyOperations. Its real browser transport refuses a missing owner, so a successful R2 manifest upload alone previously left the Project file pointer uncommitted. The strengthened regression reproduced that failure; all 476 Workspace tests and the signed full App branch qualification passed. Desktop retains the exact same component rather than a platform-specific upload implementation.
+
+All 481 archive files match both the Fund producer and the installed Desktop dependency byte-for-byte. Archive SHA256: `7150e6457c0cfa37f8e8a07755cf4814e2c32fa1e1623fd1d1a4b0d1b67f9898`. Preview.70 remains reserved by an unrelated open change. Candidate verification passed 40 owner/custody/replication/history tests across five files, both TypeScript checks, Electron build, 715-file packaging admission and lat checks. Full native release qualification, signed installers, authenticated cross-device edit/delete/recovery, restart and updater read-back remain required.

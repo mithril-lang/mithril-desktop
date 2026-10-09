@@ -140,7 +140,7 @@ See `docs/self-hosted-mac-runner.md`. The readiness workflow checks native macOS
 
 ### Cross-platform preview
 
-The manual preview workflow builds Windows x64, Linux x64/ARM64, and both Mac architectures on native GitHub runners, then updates the existing prerelease only when every job succeeds.
+The manual preview workflow builds both Mac packages on the trusted Mac worker, with Windows and Linux still on hosted runners. Publication waits for every platform to succeed.
 
 Windows publishes NSIS and portable executables with `preview.yml`. Each Linux architecture publishes AppImage and Debian packages plus its architecture-specific preview feed. Both Mac architectures publish notarized DMG and ZIP packages. The publish job preserves existing assets and replaces the consolidated SHA-256 manifest.
 

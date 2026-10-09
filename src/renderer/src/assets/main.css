@@ -1206,6 +1206,179 @@ body:has(.shell-vibrant),
   margin-top: 32px;
 }
 
+/* Account sign-in: one primary action, with recovery and fallback below. */
+.mithril-connect-screen {
+  padding: 32px 20px;
+  overflow-y: auto;
+  justify-content: flex-start;
+}
+.mithril-connect-screen .onboard-particle {
+  display: none;
+}
+.mithril-connect-screen .onboard-hero {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 440px;
+  flex-shrink: 0;
+  padding: 32px;
+  border: 1px solid var(--border-bright);
+  border-radius: 24px;
+  background: linear-gradient(160deg, #191e2b, #11151f);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25);
+}
+.mithril-connect-screen .onboard-emblem,
+.mithril-connect-screen .onboard-emblem img {
+  width: 52px;
+  height: 52px;
+}
+.mithril-connect-screen .onboard-emblem-glow {
+  display: none;
+}
+.mithril-connect-screen .onboard-eyebrow {
+  margin-top: 16px;
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-indent: 0.24em;
+  color: var(--text-secondary);
+}
+.mithril-connect-screen .onboard-title {
+  margin-top: 12px;
+  font-size: 28px;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+}
+.mithril-connect-screen .onboard-body {
+  gap: 20px;
+}
+.mithril-connect-screen[data-phase="done"]
+  :is(.onboard-emblem, .onboard-eyebrow, .onboard-title, .onboard-body) {
+  animation: none;
+  opacity: 1;
+}
+.mithril-connect-screen .onboard-subtitle {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+.mithril-connect-screen .onboard-cta-row {
+  width: 100%;
+  gap: 12px;
+  margin: 4px 0 0;
+}
+.mithril-connect-screen .onboard-btn {
+  min-height: 44px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.mithril-connect-screen .onboard-btn-primary {
+  width: 100%;
+  padding: 13px 20px;
+  background: #4167ce;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 4px 16px rgba(35, 66, 150, 0.18);
+}
+.mithril-connect-screen .onboard-btn-primary:hover:not(:disabled) {
+  background: #4c73dc;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 4px 16px rgba(35, 66, 150, 0.24);
+}
+.mithril-connect-screen .onboard-btn-text {
+  padding: 8px 10px;
+  color: var(--text-secondary);
+}
+.mithril-connect-screen :is(button, input, summary):focus-visible {
+  outline: 2px solid #a2baff;
+  outline-offset: 4px;
+}
+.mithril-connect-token {
+  width: 100%;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+  text-align: left;
+}
+.mithril-connect-token summary {
+  padding: 4px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.mithril-connect-token[open] summary {
+  margin-bottom: 14px;
+}
+.mithril-connect-token .welcome-remote-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  border-radius: 10px;
+}
+.mithril-connect-links {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  width: 100%;
+}
+.mithril-connect-links .onboard-btn {
+  font-size: 12px;
+}
+.mithril-connect-protection {
+  width: 100%;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.mithril-connect-protection p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.mithril-connect-status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-bright);
+  border-radius: 12px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.mithril-connect-status p {
+  width: 100%;
+  margin: 0 0 8px;
+}
+.mithril-connect-code {
+  display: block;
+  margin-top: 12px;
+  color: var(--text-primary);
+  font-size: 22px;
+  letter-spacing: 0.12em;
+}
+.mithril-connect-screen .welcome-remote-error {
+  margin: 0;
+  width: 100%;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+@media (max-width: 480px) {
+  .mithril-connect-screen {
+    padding: 20px 12px;
+  }
+  .mithril-connect-screen .onboard-hero {
+    padding: 24px 20px;
+    border-radius: 18px;
+  }
+  .mithril-connect-screen .onboard-title {
+    font-size: 25px;
+  }
+}
+
 /* ---- Field + info card (Install / Setup) ---- */
 .onboard-field-label {
   align-self: flex-start;

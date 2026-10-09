@@ -34,6 +34,8 @@ interface OnboardHeroProps {
   intro?: boolean;
   // Widen the content column (installing progress / terminal log).
   wide?: boolean;
+  // Compact, immediately available account sign-in card.
+  variant?: "cinematic" | "connect";
 }
 
 /**
@@ -47,10 +49,11 @@ function OnboardHero({
   children,
   intro = false,
   wide = false,
+  variant = "cinematic",
 }: OnboardHeroProps): React.JSX.Element {
   const emblemRef = useRef<HTMLDivElement>(null);
   const reduced = useRef(prefersReducedMotion()).current;
-  const runIntro = intro && !reduced;
+  const runIntro = intro && !reduced && variant !== "connect";
 
   const [phase, setPhase] = useState<Phase>(runIntro ? "draw" : "done");
   // Transform applied to the flying logo once we know where its slot is.
@@ -83,7 +86,10 @@ function OnboardHero({
   }, [runIntro]);
 
   return (
-    <div className="screen onboard-screen" data-phase={phase}>
+    <div
+      className={`screen onboard-screen${variant === "connect" ? " mithril-connect-screen" : ""}`}
+      data-phase={phase}
+    >
       <div className="onboard-fx" aria-hidden="true">
         <div className="onboard-aurora" />
         <div className="onboard-vignette" />

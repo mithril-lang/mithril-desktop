@@ -55,3 +55,9 @@ The running effect is keyed only by its phase. A current translation reference s
 ## Startup splash
 
 The very first frame on launch is still [[src/renderer/src/screens/SplashScreen/SplashScreen.tsx]], shown by [[src/renderer/src/App.tsx#App]] while `runInstallCheck` runs. It is separate from the onboarding chrome above — see [[main-process]] for its "Switch to local mode" escape hatch.
+
+## Mithril account sign-in
+
+The disconnected account screen uses OnboardHero's `connect` variant: a compact, immediately visible card with the canonical Mithril mark and one full-width browser sign-in action.
+
+[[src/renderer/src/screens/MithrilStart/MithrilStart.tsx#MithrilStart]] keeps token entry in a keyboard-accessible disclosure, recovery and Console access as quieter links, and device protection in a separate footer. Waiting, code, cancellation and errors stay inside the card. Scoped styles allow vertical scrolling on short windows and wrap secondary actions on narrow windows. The cinematic Welcome and Install variants retain their existing layout and animation.

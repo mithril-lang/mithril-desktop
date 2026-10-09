@@ -14,6 +14,8 @@ The `package` command can prepare signed-only artifacts when notarization creden
 
 Each ZIP and DMG requires an actual Accepted Apple submission. The app and DMG are stapled and validated, Gatekeeper and disk-image inspection must pass, and the final ZIP is rebuilt from the stapled app. A temporary empty profile verifies the packaged login window and captures a screenshot without importing the user's profile or launching a configured agent.
 
+Native launch preserves the real OS home for macOS Keychain resolution, while explicitly isolating both Hermes profiles and Electron user data. Replacing the OS home with an empty directory blocked preview.74 in Keychain creation. First-window, login-heading, screenshot and shutdown waits are bounded; a failed shutdown terminates only the exact owned child and cannot produce a qualification receipt. `scripts/independent-macos/launch.test.mjs` covers isolation, failed-window custody and successful login proof.
+
 The disk image explicitly enables Developer ID signing with `dmg.sign: true`. The preview.73 qualification stopped because its stapled DMG had no usable signature, although the app passed Gatekeeper. Preview.74 must pass the same unchanged native Gatekeeper checks before qualification can succeed.
 
 ## Receipt validation

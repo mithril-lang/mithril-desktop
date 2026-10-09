@@ -16,6 +16,7 @@ import {
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import { launchEnvironment, verifyLaunch } from "./launch.mjs";
 import {
   ARCHITECTURES,
   IDENTITY,
@@ -154,9 +155,17 @@ async function qualify(arch, state, identity, packageOnly = false) {
     console.log(`npm run ${name}`);
     run("npm", ["run", name], { env });
   }
-  run(process.execPath, ["--test", "scripts/independent-macos/core.test.mjs"], {
-    env,
-  });
+  run(
+    process.execPath,
+    [
+      "--test",
+      "scripts/independent-macos/core.test.mjs",
+      "scripts/independent-macos/launch.test.mjs",
+    ],
+    {
+      env,
+    },
+  );
   const cli = join(checkout, "node_modules/electron-builder/out/cli/cli.js");
   run(process.execPath, [cli, "install-app-deps", `--arch=${arch}`], { env });
   run(
@@ -277,24 +286,10 @@ async function qualify(arch, state, identity, packageOnly = false) {
     const application = await _electron.launch({
       executablePath: join(app, "Contents/MacOS/Mithril"),
       args: [`--user-data-dir=${join(launchHome, "userdata")}`],
-      env: {
-        PATH: env.PATH,
-        HOME: launchHome,
-        TMPDIR: launchHome,
-        HERMES_HOME: join(launchHome, "profile"),
-        LANG: "en_US.UTF-8",
-      },
+      env: launchEnvironment(env, launchHome),
       timeout: 60000,
     });
-    try {
-      const window = await application.firstWindow();
-      await window
-        .getByRole("heading", { name: "Welcome to Mithril" })
-        .waitFor({ timeout: 60000 });
-      await window.screenshot({ path: join(state, `launch-${arch}.png`) });
-    } finally {
-      await application.close();
-    }
+    await verifyLaunch(application, join(state, `launch-${arch}.png`));
   } finally {
     rmSync(launchHome, { recursive: true, force: true });
   }

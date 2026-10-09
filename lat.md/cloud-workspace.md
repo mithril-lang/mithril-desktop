@@ -1614,3 +1614,9 @@ Closed, synced archive files replace their selected destination in the same dire
 [[src/main/archive-save.ts#replaceArchiveDestination]] keeps selected paths as JSON stdin data, checks owner context before and after replacement, and rejects failures before export acknowledgement. The temporary file closes before cleanup. The native-platform file test exercises real replacement; Windows runtime qualification requires that test on Windows and is not established by the mocked adapter test.
 
 The preview Windows packaging job runs the actual destination replacement test before building installers. Local macOS qualification passed eight save/archive tests, Node typechecking, scoped lint, lat checks and Electron compilation; the Windows job and installed behavior remain pending.
+
+## Current-main Workspace package parity — 2026-10-09
+
+Desktop pins immutable Workspace `.66` with the current Fund Code UI and styles. Every packed file matches the producer and installed consumer.
+
+Shared tests and source packaging checks are distinct from signed release and authenticated installed cross-device QA.

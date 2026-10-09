@@ -1,4 +1,3 @@
-import React from "react";
 import { createRoot } from "react-dom/client";
 import MithrilChat from "../../src/renderer/src/screens/CloudWorkspace/MithrilChat";
 

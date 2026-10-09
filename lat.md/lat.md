@@ -58,3 +58,5 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[endpoint-protection]] — local endpoint monitoring, bounded detection and signed definition delivery.
 
 - [[mithril-client-days-tests]] — Explicit consent, fixed endpoint and UTC-day reporting tests.
+
+- [[independent-macos]] — independent Apple package signing, notarization, native launch qualification and release-held receipts.

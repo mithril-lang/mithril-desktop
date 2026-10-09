@@ -187,7 +187,10 @@ export class CloudChat implements SessionTransport {
       throw Error("Invalid tool checkpoint");
     const { value } = await this.auth.authorizedRequest(
       `/v1/chat/sessions/${encodeURIComponent(id)}/browser`,
-      { ...body, toolProtocol: "mithril-language-v1" },
+      // The first round fixes the API's protocol for the entire turn. The
+      // shared JS/Python runner brokers bounded child calls, so it must open
+      // the v2 bridge rather than the language-only checkpoint protocol.
+      { ...body, toolProtocol: "mithril-browser-tools-v2" },
       "inference",
       // The API bounds model completion to 60 seconds and child calls to 20.
       // Keep transport alive through that operation, without replaying it.

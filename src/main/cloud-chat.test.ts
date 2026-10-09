@@ -238,7 +238,7 @@ describe("Canonical Desktop chat transport", () => {
     expect(checkpoints).toHaveLength(1);
     expect(JSON.parse(String(checkpoints[0]?.[1]?.body))).toEqual({
       ...body,
-      toolProtocol: "mithril-language-v1",
+      toolProtocol: "mithril-browser-tools-v2",
     });
   });
   // @lat: [[lat.md/cloud-workspace#Cloud workspace#Interpreter child tool checkpoints]]
@@ -280,7 +280,7 @@ describe("Canonical Desktop chat transport", () => {
             ?.body,
         ),
       ),
-    ).toEqual({ ...body, toolProtocol: "mithril-language-v1" });
+    ).toEqual({ ...body, toolProtocol: "mithril-browser-tools-v2" });
     for (const invalid of [
       { ...body, name: "execute_shell" },
       { ...body, parentCallId: "../escape" },
@@ -327,6 +327,9 @@ describe("Canonical Desktop chat transport", () => {
           scopes: ["chat:read", "chat:write", "inference"],
         });
       const body = JSON.parse(String(init?.body));
+      // Real API v2 checkpoints bind the first round to the code bridge marker.
+      // A language-only first round cannot admit child tools later in the turn.
+      expect(body.toolProtocol).toBe("mithril-browser-tools-v2");
       checkpoints.push(body);
       return f.response({
         schemaVersion: 1,
@@ -392,7 +395,7 @@ describe("Canonical Desktop chat transport", () => {
       parentCallId: "parent",
       name: "tool_catalog",
       turnId: "parent-turn",
-      toolProtocol: "mithril-language-v1",
+      toolProtocol: "mithril-browser-tools-v2",
     });
     runner.stop();
   });

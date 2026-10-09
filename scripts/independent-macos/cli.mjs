@@ -139,12 +139,20 @@ async function qualify(arch, state, identity, packageOnly = false) {
     ["run", "audit:prod"],
     ["run", "lint"],
     ["run", "build"],
-    ["test", "--", "--maxWorkers=2"],
-    ["run", "check:packaging"],
-    ["run", "lat:check"],
   ]) {
     console.log(`npm ${args.join(" ")}`);
     run("npm", args, { env });
+  }
+  // npm test already pins four workers; repeated scalar flags are rejected.
+  console.log("vitest run --maxWorkers=2");
+  run(
+    process.execPath,
+    ["node_modules/vitest/vitest.mjs", "run", "--maxWorkers=2"],
+    { env },
+  );
+  for (const name of ["check:packaging", "lat:check"]) {
+    console.log(`npm run ${name}`);
+    run("npm", ["run", name], { env });
   }
   run(process.execPath, ["--test", "scripts/independent-macos/core.test.mjs"], {
     env,

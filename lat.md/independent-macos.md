@@ -6,6 +6,8 @@ The entrypoint is `scripts/independent-macos/cli.mjs`. Its preflight requires a 
 
 ## Native package verification
 
+Build/test children receive only the necessary host environment and no inherited provider or notarization credentials; source tests use two workers to bound native-host memory pressure.
+
 Qualification builds and tests locked source, packages each Mac architecture, verifies the SQLite native module and executable architecture, and checks the Developer ID chain, hardened runtime and secure timestamp.
 
 The `package` command can prepare signed-only artifacts when notarization credentials are unavailable. Its pending receipt cannot pass qualification or release verification.

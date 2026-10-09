@@ -14,6 +14,7 @@ import {
   TEAM,
   sha256,
   assertSource,
+  buildEnvironment,
   notarizationArgs,
   verifySignatureMetadata,
   artifactRecord,
@@ -25,6 +26,32 @@ const sha = "a".repeat(40),
   lockSha256 = "b".repeat(64);
 const now = Date.parse("2026-10-09T12:00:00Z");
 const signature = `Authority=${IDENTITY}\nAuthority=Developer ID Certification Authority\nAuthority=Apple Root CA\nTeamIdentifier=${TEAM}\nflags=0x10000(runtime)\nTimestamp=Oct 9, 2026`;
+
+test("keeps provider and notarization credentials out of build/test children", () => {
+  const env = buildEnvironment(
+    {
+      HOME: "/fixture/home",
+      PATH: "/usr/bin",
+      OPENROUTER_API_KEY: "fixture-provider",
+      APPLE_API_KEY: "/private/key.p8",
+      CSC_LINK: "fixture-p12",
+      CSC_KEY_PASSWORD: "fixture-password",
+      NODE_OPTIONS: "--require=/unexpected/module",
+    },
+    "/fixture/node/bin/node",
+  );
+  assert.equal(env.HOME, "/fixture/home");
+  assert.equal(env.PATH, "/fixture/node/bin:/usr/bin");
+  for (const key of [
+    "OPENROUTER_API_KEY",
+    "APPLE_API_KEY",
+    "CSC_LINK",
+    "CSC_KEY_PASSWORD",
+    "NODE_OPTIONS",
+  ])
+    assert.equal(env[key], undefined);
+  assert.equal(env.CSC_NAME, IDENTITY);
+});
 
 test("refuses a dirty, stale, invalid-version or unqualified-runtime source", () => {
   const source = {

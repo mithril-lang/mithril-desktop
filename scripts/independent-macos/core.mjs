@@ -1,13 +1,35 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Independent JavaScript verification helpers. */
 import { createHash } from "node:crypto";
 import { readFileSync, lstatSync, realpathSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, basename, dirname } from "node:path";
 
 export const ARCHITECTURES = ["arm64", "x64"];
 export const TEAM = "3A5CBTEBFP";
 export const IDENTITY = `Developer ID Application: Jun Kawasaki (${TEAM})`;
 export const sha256 = (bytes) =>
   createHash("sha256").update(bytes).digest("hex");
+
+export function buildEnvironment(env, nodePath) {
+  const allowed = [
+    "HOME",
+    "PATH",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+    "SSH_AUTH_SOCK",
+    "ELECTRON_CACHE",
+    "ELECTRON_BUILDER_CACHE",
+    "CSC_KEYCHAIN",
+  ];
+  return {
+    ...Object.fromEntries(
+      allowed.filter((name) => env[name]).map((name) => [name, env[name]]),
+    ),
+    PATH: `${dirname(nodePath)}:${env.PATH || "/usr/bin:/bin"}`,
+    CSC_NAME: IDENTITY,
+    CSC_IDENTITY_AUTO_DISCOVERY: "true",
+  };
+}
 
 export function assertSource({ sha, remoteMain, dirty, version, nodeVersion }) {
   if (!/^[a-f0-9]{40}$/.test(sha) || sha !== remoteMain || dirty)

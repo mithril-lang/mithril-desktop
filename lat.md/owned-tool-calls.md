@@ -18,7 +18,7 @@ The dashboard client advertises server requests on gateway.ready and routes capt
 
 The latest successful session attachment response restores original approval frames from its bounded open_requests snapshot. Session IDs must match, metadata never creates authority, and answered/cancelled IDs cannot revive. Restoring a pending card still requires a new explicit human choice.
 
-Desktop now vendors agency.14 from Fund's qualified source. Its compiled snapshot parser validates partial/unknown effect declarations before dispatch; the archive, lock integrity and installed dependency are matched. Human native review displays declarations in Web's canonical card, not native status metadata.
+Desktop now vendors agency.15 from Fund's qualified source. Its compiled snapshot parser validates partial/unknown effect declarations before dispatch; the archive, lock integrity and task dependency are matched. The SDK captures an optional partial local target binding before asynchronous discovery and sends its original digest on tools.call; this digest does not itself grant human authority. Human native review displays declarations in Web's canonical card, not native status metadata.
 
 The Cloud Browser runner and main adapter still consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or resolve targets. Candidate preview.48 is not a new installer or live qualification.
 
@@ -36,7 +36,7 @@ Only the latest attachment response restores its matching original peer frames. 
 
 ### Mounted owned call lifecycle
 
-Reject missing or busy authority, capture arguments before discovery, dispatch exactly once on the attached session, and discard responses after model/provider, connection/session, cancellation, disconnect or unmount changes.
+Reject missing or busy authority, capture arguments and target binding before discovery, dispatch exactly once on the attached session, and discard responses after model/provider, connection/session, cancellation, disconnect or unmount changes.
 
 ### Actual client wire
 

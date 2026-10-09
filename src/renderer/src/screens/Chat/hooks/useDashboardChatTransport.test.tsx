@@ -278,6 +278,14 @@ describe("useDashboardChatTransport recovery", () => {
       name: "write_file",
       arguments: { content: "once" },
       timeoutMs: 1000,
+      targetBinding: {
+        coverage: "partial" as const,
+        digest: "c".repeat(64),
+        target: {
+          namespace: "selected-local-terminal" as const,
+          path: "/owned/once.txt",
+        },
+      },
     };
     await expect(api.callTool!(request)).rejects.toMatchObject({
       outcome: "not-dispatched",
@@ -330,6 +338,8 @@ describe("useDashboardChatTransport recovery", () => {
       (error) => error,
     );
     request.arguments.content = "changed";
+    request.targetBinding.digest = "d".repeat(64);
+    request.targetBinding.target.path = "/foreign/changed.txt";
     await waitFor(() => expect(finish).toBeTypeOf("function"));
     expect(dashboardMock.request.mock.calls).toEqual([
       ["tools.show", { session_id: "live" }],
@@ -343,6 +353,7 @@ describe("useDashboardChatTransport recovery", () => {
           context_id: "a".repeat(32),
           revision: "b".repeat(64),
           timeout_ms: 1000,
+          target_digest: "c".repeat(64),
         },
         4000,
       ],

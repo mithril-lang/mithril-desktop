@@ -17,6 +17,7 @@ files:
   - "!src/**"
   - "!tests/**"
   - "!lat.md/**"
+  - "!vendor/**"
   - "!scripts/**"
   - "!.github/**"
   - "!AGENTS.md"
@@ -63,6 +64,7 @@ mac:
   identity: "Jun Kawasaki (3A5CBTEBFP)"
   notarize: true
 dmg:
+  sign: true
   artifactName: ${name}-${version}-${arch}.${ext}
 linux:
   # snap / rpm need snapcraft / rpmbuild, which the macOS build hosts

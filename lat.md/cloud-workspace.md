@@ -617,3 +617,12 @@ The shared runner checks the signal after a late child response. This is local l
 Workspace agency.18 passes the exact API codeDeadline from the captured parent checkpoint through this screen to Kuro. A bridged parent uses that absolute wall deadline, capped at45 seconds, while host-clock initialization/execution retain a30-second budget excluding pending broker wait. This is phase accounting, not CPU attestation. Worker markers or model arguments cannot renew the wall deadline. The shared runner retires the parent signal at expiry, so pending native approval cannot release a new effect afterward; late outcomes remain unknown and never retry.
 
 The frame must advertise the parent-deadline protocol before this path starts. Older assets refuse execution and require an update. Unbridged/legacy calls retain their30-second host timeout and35-second outer wait. Latest SDK17 Electron failures and local API timings remain preserved as the baseline; SDK18 whole-screen, stability, publication and installed evidence must be qualified separately.
+
+
+## Isolated multi-target patch qualification
+
+Actual Electron Chat, main, SDK18 and Hermes patch are locally qualified through Web consent for JS/Python allow/deny across five content/entry targets. Installed and authenticated whole-app behavior remain unverified.
+
+One V4A request covers Add/Update/Delete/Move. The canonical human card must show all five exact resolved targets; files remain unchanged before approval and on denial, while accepted handlers perform all expected file dispositions. Actual main rejects duplicate release/retired parent requests. The canonical cross-runtime run passes Web12/Electron12/native3,18 returned attempts, other-profile0 and unchanged schema/history, retry0 (runner454.2s; testcase449.091s). API45s, host active30s, Web/Desktop function180s, native90s/process210s bounds remain. This Desktop increment changes documentation only; SDK18 runtime/archive and preview.48 remain unchanged.
+
+Account/model/issuer/pairing/local D1 are fixtures, Web parent creation is seeded, and browser opening is captured. Remote/atomic targets, cancellation/result-loss recovery, all operations/providers, real account settings/whole boot/native permissions, continuing stability, signing/publication, installed Desktop and original Chat require further evidence. Prior SDK18 whole19 success and earlier timeout failures remain recorded separately.

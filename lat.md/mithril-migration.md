@@ -118,6 +118,12 @@ Before each dashboard send, the Desktop compares the requested model with the li
 
 It clears the entered bearer after success. The old Kotoba sign-in and gateway controls, preload methods, and IPC handlers are removed. The unused device grant and hosted gateway modules are gone; legacy agent sync and inference internals remain pending migration. No inference or gateway capability is claimed for this new token.
 
+## Independent CI adoption
+
+Desktop registers a commit-pinned organization CI controller through `.github/independent-actions.json`; native runtime and publication remain held during initial preparation.
+
+See `.github/INDEPENDENT_CI.md` for the shared entrypoint and its verification scope. This configuration is excluded from the app bundle. It does not qualify a Linux source check as a native installer release or retire existing workflows. Independent activation requires the pinned Electron/native closure, production dependency audit, native platform matrix, macOS signing/notarization/launch, Windows signing, and installer/update verification. Preserve the existing stable/beta false gates and the release requirements below until the equivalent independent native path is verified.
+
 ## Desktop release gate
 
 GitHub Actions now build preview installers on current main. The cross-platform workflow publishes the prerelease assets only after every platform passes packaging checks and both Mac packages pass Apple notarization.

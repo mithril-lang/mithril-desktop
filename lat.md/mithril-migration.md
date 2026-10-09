@@ -203,3 +203,9 @@ Shared Chat dependency for this repair is workspace 0.6.24-auth.1, SHA256 `80805
 Desktop pins Workspace `0.6.31-sync.71`, including Fund's creation polling repair, and shows account verification while identity is pending.
 
 The archive SHA256 is `0f68a403ea427a146887c6b048cd9a76e3aadbb02b60387699b577ecd5d91b17`. All 481 archive files match the Fund producer build and the installed candidate dependency byte for byte. Both Desktop type checks, 33 selected Chat/replication tests, Electron compilation and 715 active packaging-file checks pass. Three real Chromium checks cover compiled notices, pinned/project sidebar layout and composer visibility with empty/long transcripts. The dependency overlay used for focused source checks is not a clean installer qualification. Fund integration, exact-main App qualification/publication, native packaging/signing and installed automatic-update verification remain separate release gates. Preview.74's earlier native receipt cannot qualify preview.75.
+
+## Shared file recovery package (candidate preview.76)
+
+Desktop pins Workspace `0.6.31-sync.72` from Fund's merged ProjectFiles repair, retaining the same cloud component and owner/generation fences as Web.
+
+All 481 archive files match the producer and installed candidate dependency. Both typechecks, 16 Chat/folder synchronization tests, Electron compilation and 715 runtime packaging-file checks pass. Chromium verifies notice layout at narrow/wide widths in both themes and composer visibility with empty/long transcripts. Its first invocation lacked the configured browser-cache path; the unchanged checks passed using the existing pinned Chromium revision. This dependency overlay is source qualification only. Preview.75 native receipts cannot qualify preview.76; complete native qualification, public feeds, actual installation and automatic-update read-back remain required.

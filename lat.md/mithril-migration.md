@@ -197,3 +197,9 @@ A valid account is labeled Signed in independently of Chat and Workspace access.
 Chat shows account verification while its main-process identity read is pending, including a reconnect after invalidation. Until the check resolves, no old-owner Chat is rendered and no sign-in action is offered. Existing refusal, scope approval and network retry behavior remains authoritative.
 
 Shared Chat dependency for this repair is workspace 0.6.24-auth.1, SHA256 `808053fad14f293ef5c5cc325705fee6032993dead6db1a5994e313f51dcf753`. It adds a consumer authorization action label to the original welcome. Native keeps its explicit passkey device flow and distinguishes scoped approval from network retry.
+
+## Shared creation polling package (candidate preview.75)
+
+Desktop pins Workspace `0.6.31-sync.71`, including Fund's creation polling repair, and shows account verification while identity is pending.
+
+The archive SHA256 is `0f68a403ea427a146887c6b048cd9a76e3aadbb02b60387699b577ecd5d91b17`. All 481 archive files match the Fund producer build and the installed candidate dependency byte for byte. Both Desktop type checks, 33 selected Chat/replication tests, Electron compilation and 715 active packaging-file checks pass. Three real Chromium checks cover compiled notices, pinned/project sidebar layout and composer visibility with empty/long transcripts. The dependency overlay used for focused source checks is not a clean installer qualification. Fund integration, exact-main App qualification/publication, native packaging/signing and installed automatic-update verification remain separate release gates. Preview.74's earlier native receipt cannot qualify preview.75.

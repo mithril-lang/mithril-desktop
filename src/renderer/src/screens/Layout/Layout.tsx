@@ -218,6 +218,8 @@ function Layout({
   const paneStyle = (target: View): React.CSSProperties => ({
     display: view === target ? "flex" : "none",
     flex: 1,
+    minHeight: 0,
+    minWidth: 0,
     flexDirection: "column",
     overflow: "hidden",
   });

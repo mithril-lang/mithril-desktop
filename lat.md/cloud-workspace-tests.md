@@ -7,6 +7,14 @@ lat:
 
 The main-process adapter enforces account-bound consent and a narrow portable-data boundary even when the renderer or network supplies invalid input.
 
+## Chat composer remains inside the viewport
+
+Render the actual Desktop adapter and shared Chat in Chromium at narrow and wide window sizes, with empty and long histories, and verify the complete composer and footer remain visible while only the transcript scrolls.
+
+## Transient history error presentation
+
+A transient server error displays readable synchronization status instead of a raw IPC method name and clears after a successful poll without resubmitting any chat work.
+
 ## Dedicated authorization scopes
 
 Cloud Workspace requires explicit workspace read and write scopes; inference and billing credentials are not upgraded or sent to a credential-issuance route.

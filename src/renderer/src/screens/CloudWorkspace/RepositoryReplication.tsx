@@ -129,11 +129,7 @@ export default function RepositoryReplication({
         }
       } catch (error) {
         if (active)
-          setHistoryNotice(
-            error instanceof Error
-              ? error.message
-              : "History synchronization unavailable",
-          );
+          setHistoryNotice(describeConnectionFailure(error, locale).message);
       } finally {
         busy = false;
       }
@@ -227,11 +223,16 @@ export default function RepositoryReplication({
           ? "表示"
           : "Visible"
       : value;
-  const notice =
+  const rawNotice =
     connectionNotice ||
     replication.notice ||
     presentation.notice ||
     historyNotice;
+  const notice = /Error invoking remote method|Workspace request failed/.test(
+    rawNotice,
+  )
+    ? describeConnectionFailure(new Error(rawNotice), locale).message
+    : rawNotice;
   if (
     !enabled ||
     (!notice &&

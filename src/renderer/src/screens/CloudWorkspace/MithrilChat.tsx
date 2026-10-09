@@ -188,7 +188,7 @@ export default function MithrilChat({
     [toolRunner],
   );
   return (
-    <div>
+    <div className="mithril-chat-host">
       {identityChecked &&
         !accountId &&
         !connectionError &&

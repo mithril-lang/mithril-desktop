@@ -8,6 +8,7 @@ node_modules/
 dist/
 out/
 artifacts/layout-visual/
+artifacts/chat-viewport/
 
 # TypeScript incremental build info
 *.tsbuildinfo

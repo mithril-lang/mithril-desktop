@@ -14,6 +14,14 @@ Workspace access requires explicit `workspace:read` and `workspace:write` scopes
 
 The shared workspace package supplies Discover, Office, Kanban, Projects, Capabilities, Memory, Settings and Profile through one source; Discover, Office and Kanban navigation now mounts this renderer directly in both clients.
 
+### Chat viewport containment
+
+The Desktop host constrains the shared conversation to the available pane height so long histories scroll inside the transcript and keep the composer and status visible.
+
+`MithrilChat` mounts a flexible, shrinkable host. The content pane and retained screen panes allow both dimensions to shrink; the shared conversation occupies remaining height instead of resolving percentage height against an unconstrained wrapper.
+
+The Chromium viewport test is required by CI after browser installation. Transient server failures use readable synchronization guidance while retaining pending changes and existing account access; IPC implementation names are not shown as the primary status.
+
 The old native records remain available through reviewed import, without scanning or overwriting local files.
 
 Discover projects the official Mithril Registry into safe catalog links. Portable projects, tasks, workrooms, notes, profile and preferences use the owner-scoped workspace API. Actual native runtime views are separately inspected and linked; portable records do not substitute for native Office or tool execution. Capability preferences express intent without installing a plugin or granting device permission.
@@ -1597,7 +1605,7 @@ Selected folders retain file-set tombstones and revisions. Unchanged bytes move 
 
 Archive intents use the Electron runtime's built-in SQLite with FULL-synchronous transactions. Private legacy JSON entries remain readable until replaced, and durable empty rows suppress old acknowledged intents without deleting recovery files.
 
-Electron 44.1.1's actual Node 24.19 runtime was checked for node:sqlite availability. The journal contains only owner-bound operation metadata, not account source data or credentials; api.mithril.fund remains the canonical backend. Installed and Windows destination-save qualification remain pending.
+Electron 44.1.1's actual Node 24.19 runtime was checked for node:sqlite availability. CI and installer builds use Node 24, and native archive tests run in the Node environment so Vite never attempts to bundle the built-in SQLite module for a browser. The journal contains only owner-bound operation metadata, not account source data or credentials; api.mithril.fund remains the canonical backend. Installed and Windows destination-save qualification remain pending.
 
 ## Archive destination replacement
 

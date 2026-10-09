@@ -312,7 +312,15 @@ export class DashboardGatewayClient {
         typeof response.error === "string"
           ? response.error
           : response.error.message || "Hermes dashboard request failed";
-      pending.reject(new Error(message));
+      const error = new Error(message);
+      // Keep structured RPC identity; text alone cannot authorize rerouting.
+      if (
+        typeof response.error === "object" &&
+        typeof response.error.code === "number"
+      ) {
+        Object.assign(error, { code: response.error.code });
+      }
+      pending.reject(error);
       return;
     }
 

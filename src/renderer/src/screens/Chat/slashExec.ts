@@ -95,8 +95,18 @@ export async function executeSlash(
     const body = r?.output || `/${name}: no output`;
     sys(r?.warning ? `warning: ${r.warning}\n${body}` : body);
     return { kind: "done" };
-  } catch {
-    /* fall through to command.dispatch */
+  } catch (error) {
+    // Only a structured, pre-execution ownership refusal admits another route.
+    // A lost result may already have changed state; never redispatch it.
+    const code =
+      error instanceof Error && "code" in error ? error.code : undefined;
+    const message = error instanceof Error ? error.message : String(error);
+    const refused =
+      code === 4018 &&
+      (/^skill command: use command\.dispatch for \/[^\s/]+$/.test(message) ||
+        message ===
+          "snapshot restore mutates live config/state; use command.dispatch for /snapshot restore");
+    if (!refused) return { kind: "error", message };
   }
 
   // Fallback: resolve client-side directives (alias / plugin / skill / send).

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardGatewayClient } from "./dashboardGatewayClient";
+import { executeSlash } from "./slashExec";
 
 // A controllable WebSocket stand-in: it never opens, errors, or closes on its
 // own, so each test drives the readyState transition explicitly. This lets us
@@ -330,3 +331,94 @@ it("uses compiled shared approval custody to retire repeated and conflicting pee
   client.close();
   expect(vi.getTimerCount()).toBe(0);
 });
+
+// @lat: [[chat-commands#Slash command execution#Routing pipeline#Structured refusal preserves its code]]
+it("preserves the server RPC code without inferring it from error text", async () => {
+  const client = new DashboardGatewayClient();
+  const opening = client.connect("ws://localhost/api/ws");
+  const socket = FakeWebSocket.last!;
+  const send = vi.fn();
+  Object.assign(socket, { send });
+  socket.readyState = FakeWebSocket.OPEN;
+  socket.emit("open");
+  await opening;
+  const reply = client.request("slash.exec", {
+    command: "deploy",
+    session_id: "owned",
+  });
+  const check = expect(reply).rejects.toMatchObject({
+    code: 4018,
+    message: "skill command: use command.dispatch for /deploy",
+  });
+  socket.emit("message", {
+    data: JSON.stringify({
+      id: JSON.parse(send.mock.calls[0][0]).id,
+      error: {
+        code: 4018,
+        message: "skill command: use command.dispatch for /deploy",
+      },
+    }),
+  });
+  await check;
+  client.close();
+});
+
+// @lat: [[chat-commands#Slash command execution#Routing pipeline#Socket execution and routing qualification]]
+it.each(["lost-result", "explicit-refusal"] as const)(
+  "qualifies slash routing through the actual client: %s",
+  async (mode) => {
+    const client = new DashboardGatewayClient({ requestTimeoutMs: 10 });
+    const opening = client.connect("ws://localhost/api/ws");
+    const socket = FakeWebSocket.last!;
+    let effects = 0;
+    const methods: string[] = [];
+    Object.assign(socket, {
+      send: (data: string) => {
+        const frame = JSON.parse(data);
+        methods.push(frame.method);
+        if (mode === "lost-result") {
+          effects += 1;
+          return;
+        }
+        const response =
+          frame.method === "slash.exec"
+            ? {
+                error: {
+                  code: 4018,
+                  message:
+                    "snapshot restore mutates live config/state; use command.dispatch for /snapshot restore",
+                },
+              }
+            : { result: { type: "exec", output: "restored once" } };
+        if (frame.method === "command.dispatch") effects += 1;
+        queueMicrotask(() =>
+          socket.emit("message", {
+            data: JSON.stringify({ id: frame.id, ...response }),
+          }),
+        );
+      },
+    });
+    socket.readyState = FakeWebSocket.OPEN;
+    socket.emit("open");
+    await opening;
+    const sys = vi.fn();
+    const outcome = executeSlash({
+      command: "/snapshot restore",
+      sessionId: "owned",
+      request: (method, params) => client.request(method, params),
+      sys,
+    });
+    if (mode === "lost-result") await vi.advanceTimersByTimeAsync(10);
+    const result = await outcome;
+    expect(effects).toBe(1);
+    expect(methods).toEqual(
+      mode === "lost-result"
+        ? ["slash.exec"]
+        : ["slash.exec", "command.dispatch"],
+    );
+    expect(result.kind).toBe(mode === "lost-result" ? "error" : "done");
+    if (mode === "lost-result") expect(sys).not.toHaveBeenCalled();
+    else expect(sys).toHaveBeenCalledWith("restored once");
+    client.close();
+  },
+);

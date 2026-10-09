@@ -8,11 +8,23 @@ The desktop talks to the hermes-agent gateway over JSON-RPC. A normal message go
 
 ## Routing pipeline
 
-The pure routing logic lives in [[src/renderer/src/screens/Chat/slashExec.ts#executeSlash]]: try `slash.exec`, accept either rendered output or a structured dispatch result, and on rejection fall back to `command.dispatch`, returning `done`, `send`, or `error`.
+The pure routing logic lives in [[src/renderer/src/screens/Chat/slashExec.ts#executeSlash]]: try `slash.exec`, accept either rendered output or a structured dispatch result, and only on a structured pre-execution ownership refusal fall back to `command.dispatch`, returning `done`, `send`, or `error`.
 
 The name/argument split is done by [[src/renderer/src/screens/Chat/slashExec.ts#parseSlash]], which matches with the dotAll flag so a command's argument may span multiple lines (e.g. a multi-line `/remember` note) — an empty name is what `executeSlash` rejects as an empty command, so a multi-line body must not collapse the match.
 
 It mirrors hermes-agent's reference client (`web/src/lib/slashExec.ts`) so every front-end implements the same contract. Pending-input commands such as `/learn` can return `{type: "send"}` directly from `slash.exec`; that prompt still passes through the central model-submission path.
+
+### Unknown outcome is never redispatched
+
+Timeout, disconnect, worker failure, generic 4018, and code-less errors return the original failure without another execution request. Only code 4018 with the exact skill-ownership or snapshot-restore refusal admits dispatch.
+
+### Structured refusal preserves its code
+
+The dashboard client preserves numeric server RPC error codes. It never extracts routing authority from error text. A structured directive returned by slash.exec still follows its intended route without a fallback request.
+
+### Socket execution and routing qualification
+
+The actual dashboard client and slash router use controlled socket frames. A committed effect with a lost response remains single; a structured snapshot refusal dispatches once. This qualifies local code, not a live backend.
 
 ## Local vs gateway commands
 

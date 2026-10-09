@@ -23,6 +23,35 @@ describe("parseSlash", () => {
 });
 
 describe("executeSlash", () => {
+  // @lat: [[chat-commands#Slash command execution#Routing pipeline#Unknown outcome is never redispatched]]
+  it.each([
+    new Error("socket closed after execution"),
+    new Error("request timed out"),
+    Object.assign(new Error("worker failed after execution"), { code: 5030 }),
+    Object.assign(new Error("quick command failed with exit code 1"), {
+      code: 4018,
+    }),
+    new Error("skill command: use command.dispatch for /deploy"),
+  ])(
+    "does not redispatch an unknown execution outcome: %s",
+    async (failure) => {
+      let effects = 0;
+      const request = vi.fn(async () => {
+        effects += 1;
+        throw failure;
+      });
+      const outcome = await executeSlash({
+        command: "/deploy",
+        sessionId: "owned",
+        request,
+        sys: vi.fn(),
+      });
+      expect(outcome).toEqual({ kind: "error", message: failure.message });
+      expect(effects).toBe(1);
+      expect(request).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it("renders slash.exec output and reports done", async () => {
     const request = vi.fn().mockResolvedValue({ output: "compacted 12 turns" });
     const sys = vi.fn();
@@ -54,9 +83,13 @@ describe("executeSlash", () => {
     expect(sys).toHaveBeenCalledWith("warning: session rotated\ndone");
   });
 
-  it("falls back to command.dispatch when slash.exec rejects", async () => {
+  it("falls back only on a structured pre-execution ownership refusal", async () => {
     const request = vi.fn(async (method: string) => {
-      if (method === "slash.exec") throw new Error("4018 use command.dispatch");
+      if (method === "slash.exec")
+        throw Object.assign(
+          new Error("skill command: use command.dispatch for /deploy"),
+          { code: 4018 },
+        );
       return { type: "exec", output: "ran quick command" };
     });
     const sys = vi.fn();
@@ -79,7 +112,11 @@ describe("executeSlash", () => {
 
   it("returns a send directive for commands that resolve to an agent prompt", async () => {
     const request = vi.fn(async (method: string) => {
-      if (method === "slash.exec") throw new Error("not a worker command");
+      if (method === "slash.exec")
+        throw Object.assign(
+          new Error("skill command: use command.dispatch for /web"),
+          { code: 4018 },
+        );
       return { type: "send", message: "search the web for otters" };
     });
     const sys = vi.fn();
@@ -127,7 +164,11 @@ describe("executeSlash", () => {
 
   it("announces a skill load and forwards its message as a send", async () => {
     const request = vi.fn(async (method: string) => {
-      if (method === "slash.exec") throw new Error("skill command");
+      if (method === "slash.exec")
+        throw Object.assign(
+          new Error("skill command: use command.dispatch for /pdf"),
+          { code: 4018 },
+        );
       return { type: "skill", name: "pdf", message: "use the pdf skill" };
     });
     const sys = vi.fn();
@@ -151,7 +192,8 @@ describe("executeSlash", () => {
     const request = vi.fn(
       async (method: string, params: { command?: string }) => {
         if (method === "slash.exec") {
-          if (params.command === "c") throw new Error("unknown");
+          if (params.command === "c")
+            return { type: "alias", target: "compact" };
           return { output: "compacted" }; // resolved target succeeds
         }
         return { type: "alias", target: "compact" };

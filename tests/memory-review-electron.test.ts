@@ -12,6 +12,7 @@ interface Proposal {
   target: string;
   decision: string;
   lost?: boolean;
+  recorded?: boolean;
 }
 interface Fixture {
   origin: string;
@@ -112,6 +113,11 @@ it.skipIf(!fixture)(
                 .getByRole("button", { name: "Approve this memory change" })
                 .count(),
             ).toBe(0);
+            if (row.recorded)
+              expect(await full.textContent()).toContain(
+                "Previously recorded assessment: " +
+                  row.decision.replace("resolve-", ""),
+              );
           }
           await page
             .getByRole("button", {

@@ -118,3 +118,5 @@ Uncertain memory outcomes require full proposal, receipt and saved-data review. 
 The attached adapter permits the fixed digest-bound closure verbs under the same current profile/session/generation guard. Relay custody additionally matches the review decision mode. Backend closure records the human assessment without running a memory write.
 
 The current local fixture qualifies seven explicit closures in isolated Electron and six through the real Web relay, across A/B/A. Full saved state is unchanged by closure. Lost closure replies reconnect without a second decision; partial closure failure and installed/whole/native/provider stability remain unqualified.
+
+A persisted terminal assessment with a residual queue record is reviewable again. Explicit confirmation of the same assessment removes only that queue entry; a different choice is refused. Local Electron/Web fixtures verify full store state and original receipt bytes remain unchanged during this cleanup. Power loss, arbitrary filesystem writers and installed/whole clients remain unqualified.

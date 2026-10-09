@@ -24,6 +24,7 @@ async function start() {
     opened: [],
     nativeIntent: null,
     requests: 0,
+    reviews: [],
     secondary: null,
   };
   const auth = new CloudWorkspace({
@@ -59,6 +60,26 @@ async function start() {
   main.createNativeChildConsent = (request, body) => {
     state.nativeIntent = structuredClone(body);
     return originalCreate(request, body);
+  };
+  const originalReview = main.reviewNativeChildConsent.bind(main);
+  main.reviewNativeChildConsent = async (request) => {
+    const review = { state: "pending", reason: "" };
+    state.reviews.push(review);
+    try {
+      await originalReview(request);
+      review.state = "returned";
+    } catch (error) {
+      review.state = "failed";
+      // Only fixed main error categories: never persist credentials or requests.
+      const message = error instanceof Error ? error.message : "";
+      review.reason =
+        /^(Native approval (?:retired|unavailable|context changed|scope retired|response changed|deadline changed)|Workspace request failed \(\d{3}\))$/.test(
+          message,
+        )
+          ? message
+          : "other main review refusal";
+      throw error;
+    }
   };
   const options = {
     show: false,

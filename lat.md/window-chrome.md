@@ -36,6 +36,8 @@ A native system strip pinned full-width beneath the sidebar+content row surfaces
 
 [[src/renderer/src/screens/Layout/ActiveSessionsBar.tsx#ActiveSessionsBar]] is the content column's title bar. It owns the top band browser-style: empty space drags, the chips stay clickable.
 
+The Desktop adapter uses `.app .active-sessions-bar` so its z-index 1001 wins over the shared `.mithril-chat-tabs` z-index 10 regardless of stylesheet load order. In installed preview.72, tab-center clicks were captured by the fixed drag band while clicks below that band selected the same tab. Web selected it normally. The shared component and transports stay unchanged; source and installed hit-area validation remain separate gates. Preview.73 source validation passed 11 native/shared Chat tests, both TypeScript checks, Electron compilation, 715 runtime-file packaging checks and lat check. Installed tab-center click validation remains required.
+
 - The bar itself is `-webkit-app-region: drag` with `position: relative; z-index: 1001`, so it stacks above the global `.drag-region` (z 1000) and is the drag handle for the content column.
 - Each `.active-session-chip` opts back out with `-webkit-app-region: no-drag`, keeping select/close clickable above the drag layer — the same priority model browsers use for tabs over a draggable tab strip.
 - `min-height: 34px` (= the 34px global drag strip) means content rendered after the bar clears the fixed drag layer, so the old `.is-mac .content { padding-top: 28px }` offset is no longer needed.

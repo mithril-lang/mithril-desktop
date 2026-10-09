@@ -1634,3 +1634,11 @@ Desktop preview.71 adopts the shared files.69 package so uploaded immutable byte
 Fund PR #924/main 2dac26a fixes the shared upload path to pass the initiating workspace owner to applyOperations. Its real browser transport refuses a missing owner, so a successful R2 manifest upload alone previously left the Project file pointer uncommitted. The strengthened regression reproduced that failure; all 476 Workspace tests and the signed full App branch qualification passed. Desktop retains the exact same component rather than a platform-specific upload implementation.
 
 All 481 archive files match both the Fund producer and the installed Desktop dependency byte-for-byte. Archive SHA256: `7150e6457c0cfa37f8e8a07755cf4814e2c32fa1e1623fd1d1a4b0d1b67f9898`. Preview.70 remains reserved by an unrelated open change. Candidate verification passed 40 owner/custody/replication/history tests across five files, both TypeScript checks, Electron build, 715-file packaging admission and lat checks. Full native release qualification, signed installers, authenticated cross-device edit/delete/recovery, restart and updater read-back remain required.
+
+## Installer source archive exclusion
+
+Installers omit historical Workspace npm archives while retaining the installed shared dependency, compiled renderer and runtime resources.
+
+The electron-builder file filter excludes only `vendor/mithril-workspace-*.tgz`. These immutable archives remain in the repository for dependency installation and package provenance. Runtime source and resources have no vendor archive references.
+
+Actual ARM64 unpacked package inspection removed 102 archives totaling 697,396,778 bytes. ASAR size decreased from 1,005,058,087 to 307,625,493 bytes; all 264 packaged shared Workspace files remained byte-identical to the signed preview.71 candidate. Compiled main and renderer entrypoints, file UI and runtime icon remain present. Node 24 typechecks, Electron build and lat checks passed. This inspection package is ad-hoc signed and unpublished; Developer ID signing, notarization, installed launch and updater verification remain separate gates.

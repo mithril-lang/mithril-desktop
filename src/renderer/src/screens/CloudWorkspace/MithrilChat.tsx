@@ -43,6 +43,20 @@ export default function MithrilChat({
   > | null>(null);
   const [epoch, setEpoch] = useState(0);
   const [accountId, setAccountId] = useState<string | null>(null);
+  const [selection, setSelection] = useState<{
+    userId: string;
+    profile: string;
+    sessionId: string;
+    initialSessionId?: string;
+  } | null>(null);
+  // Restore navigation only after the same owner is checked again. Reopening
+  // uses saved checkpoints; it must never recreate a turn or tool operation.
+  const selectedSessionId =
+    selection?.userId === accountId &&
+    selection.profile === profile &&
+    selection.initialSessionId === initialSessionId
+      ? selection.sessionId || undefined
+      : initialSessionId;
   useEffect(
     () =>
       window.hermesAPI.onCloudChatAccountChanged(() => {
@@ -219,8 +233,17 @@ export default function MithrilChat({
         }
         connectionRequiredLabel={connectionError?.action}
         onSidebarProjects={onSidebarProjects}
-        key={`${profile}:${initialSessionId ?? ""}`}
-        initialSessionId={initialSessionId}
+        key={`${profile}:${initialSessionId ?? ""}:${epoch}`}
+        initialSessionId={selectedSessionId}
+        onSessionSelected={(sessionId) => {
+          if (accountId)
+            setSelection({
+              userId: accountId,
+              profile,
+              sessionId,
+              initialSessionId,
+            });
+        }}
         autoConnect
         browserTools
         onOpenCodeProject={onOpenCodeProject}

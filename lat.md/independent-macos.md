@@ -14,6 +14,8 @@ The `package` command can prepare signed-only artifacts when notarization creden
 
 Each ZIP and DMG requires an actual Accepted Apple submission. The app and DMG are stapled and validated, Gatekeeper and disk-image inspection must pass, and the final ZIP is rebuilt from the stapled app. A temporary empty profile verifies the packaged login window and captures a screenshot without importing the user's profile or launching a configured agent.
 
+The disk image explicitly enables Developer ID signing with `dmg.sign: true`. The preview.73 qualification stopped because its stapled DMG had no usable signature, although the app passed Gatekeeper. Preview.74 must pass the same unchanged native Gatekeeper checks before qualification can succeed.
+
 ## Receipt validation
 
 A success receipt binds source, version, dependency lock, runtime hashes, Apple submission and final artifact hashes to completed native signature, staple, Gatekeeper and launch checks.

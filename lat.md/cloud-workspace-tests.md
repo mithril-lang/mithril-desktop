@@ -1339,3 +1339,15 @@ Native replacement preserves new bytes and removes the temporary file. Windows p
 ## Cloud Data modal account custody
 
 Original Settings tabs use account-bound archive actions, re-read the same prepared restore intent after tab changes, and never replay export/import/restore or legacy profile migration handlers on mount.
+
+## Selected conversation reconnect
+
+The real shared Chat retains the selected conversation after the same checked owner reconnects without issuing inference or tool operations.
+
+### New Chat clears remembered selection
+
+Opening New Chat clears remembered selection, including a conversation opened through an initial session link, so reconnection leaves a fresh composer.
+
+### Different owners do not inherit selection
+
+An account change never selects the prior owner's remembered conversation, even if the new owner's inventory has the same session ID.

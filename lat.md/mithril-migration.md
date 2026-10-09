@@ -209,3 +209,9 @@ The archive SHA256 is `0f68a403ea427a146887c6b048cd9a76e3aadbb02b60387699b577ecd
 Desktop pins Workspace `0.6.31-sync.72` from Fund's merged ProjectFiles repair, retaining the same cloud component and owner/generation fences as Web.
 
 All 481 archive files match the producer and installed candidate dependency. Both typechecks, 16 Chat/folder synchronization tests, Electron compilation and 715 runtime packaging-file checks pass. Chromium verifies notice layout at narrow/wide widths in both themes and composer visibility with empty/long transcripts. Its first invocation lacked the configured browser-cache path; the unchanged checks passed using the existing pinned Chromium revision. This dependency overlay is source qualification only. Preview.75 native receipts cannot qualify preview.76; complete native qualification, public feeds, actual installation and automatic-update read-back remain required.
+
+## Shared inventory fence package (candidate preview.78)
+
+Desktop pins Workspace `0.6.31-sync.73`, preserving newly acknowledged chats when a delayed inventory from before their creation arrives.
+
+The archive SHA256 is `b95eb6b617366f7c835f01024a417ab6d78b538134dd092d8a1e4b106902a124`; all 481 files match the installed dependency. A newer acknowledged session invalidates older inventory readers. A future complete inventory can still remove deleted records or apply restored-generation changes. Desktop's authenticated tool adapter also offers browser-tools-v2 from the first checkpoint, enabling the API's existing bounded child bridge. Existing uncertain turns are not replayed. These are candidate source changes; previous native receipts, installer feeds and installed preview.77 do not qualify preview.78.

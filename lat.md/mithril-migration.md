@@ -142,7 +142,7 @@ The preview gate verifies packaging, type safety, the DMG, the app bundle signat
 
 GitHub Actions can coordinate Tailscale-connected native Mac workers without Kubernetes. A pre-job hook limits repository-scoped workers to designated manual main workflows. Readiness and publication remain separate gates.
 
-Runner admission has seven regression fixtures in PR CI. The headless Mac uses a LaunchDaemon that runs as its ordinary user. See `docs/self-hosted-mac-runner.md`. The readiness workflow checks native macOS and exact source without signing credentials. PR CI cannot use the trusted worker. Existing cross-platform installer gates remain in force until each native platform is migrated.
+Runner admission has seven regression fixtures in PR CI. The headless Mac uses a LaunchDaemon that runs as its ordinary user with a dedicated security audit session (`SessionCreate=true`). See `docs/self-hosted-mac-runner.md`. The readiness workflow checks native macOS and exact source without signing credentials. PR CI cannot use the trusted worker. Existing cross-platform installer gates remain in force until each native platform is migrated.
 
 ### Cross-platform preview
 

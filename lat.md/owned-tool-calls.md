@@ -5,7 +5,9 @@ lat:
 
 # Owned tool calls
 
-Desktop's existing dashboard Chat hook resolves host targets before explicit tool calls on its attached idle session through the shared workspace SDK. This hook API does not yet wire Browser JS/Python or a user-facing tool router.
+Desktop's dashboard Chat hook resolves host targets on its attached idle session through the shared SDK. Cloud Browser JS/Python uses a separate session and admission adapter.
+
+Provider database targets use [[provider-memory-target#Provider memory targets]] for selected database/operation/revision custody through the compiled shared SDK.
 
 [[src/renderer/src/screens/Chat/hooks/useDashboardChatTransport.ts#useDashboardChatTransport]] retains the native IPC connection acquisition and existing WebSocket client. The SDK uses a fresh built model-visible snapshot, explicit request ID and bounded arguments, with no automatic create/resume/prompt or retry.
 
@@ -23,7 +25,7 @@ Desktop now vendors agency.21 built from Fund's candidate source. Its compiled s
 
 [[src/renderer/src/screens/Chat/dashboardOwnedTools.ts#callDashboardOwnedTool]] resolves the host target on the selected attached context before dispatch, refuses supplied-target mismatch, and requires fresh discovery to retain that context/revision. Missing or malformed preview RPCs refuse dispatch; an explicit null target remains unknown. This does not grant effects or obtain a human choice. Multiple local targets carry content/entry resolution; every path and resolution must match, including both Move endpoints.
 
-The Cloud Browser runner and main adapter still consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or resolve targets. Candidate preview.50 is not a new installer or live qualification.
+The Cloud Browser runner and main adapter still consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. The Cloud Chat path resolves target previews through its host-bound API adapter; the dashboard hook remains separately attached. Candidate preview.51 is not a new installer.
 
 The previous SDK19 candidate passed separate canonical inline32 and file27 network families using actual Web/Electron UI, JS/Python WASM, main/IPC, HTTP/D1 and Hermes handlers. Todo review pins the resolved store digest. Account/model/issuer/pairing/local D1 remain fixtures; these serial fresh runs do not establish real account whole boot, OS permissions, continuous stability, publication or installed behavior.
 

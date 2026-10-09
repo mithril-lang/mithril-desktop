@@ -61,3 +61,5 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[gateway-tool-schemas]] — ephemeral, attached-turn schema observations use the common SDK hash and remain separate from execution admission and receipts.
 - [[owned-tool-calls]] — shared SDK owned calls on an attached idle Chat session, lifecycle fences and actual client wire verification.
 - [[tool-attempts]] — explicit attached-dashboard attempt metadata reads, unknown outcomes, bounded lifetime and mounted consumer verification.
+
+- [[provider-memory-target]] — shared provider database, operation, fact and SQLite revision custody before owned execution.

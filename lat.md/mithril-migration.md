@@ -148,6 +148,8 @@ Runner admission has seven regression fixtures in PR CI. The headless Mac uses a
 
 The previous manual preview used trusted Mac workers and hosted Windows/Linux runners. Independent publication must retain that platform coverage and wait for every platform to qualify.
 
+Before Node dependency caching, each Mac release job clears skip-worktree flags for every tracked file and restores the complete checkout. The readiness workflow can leave sparse state on this persistent worker; restoring only the manifests would still omit source and vendored dependencies. Both manifests must exist before setup continues.
+
 Windows publishes NSIS and portable executables with `preview.yml`. Each Linux architecture publishes AppImage and Debian packages plus its architecture-specific preview feed. Both Mac architectures publish notarized DMG and ZIP packages. The publish job preserves existing assets and replaces the consolidated SHA-256 manifest.
 
 ## Legacy installation continuity

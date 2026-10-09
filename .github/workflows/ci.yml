@@ -39,6 +39,9 @@ jobs:
       - name: Test installer API compatibility gate
         run: node --test scripts/check-workspace-api.test.mjs
 
+      - name: Test trusted Mac runner admission
+        run: node --test scripts/trusted-runner-job-start.test.mjs
+
       - name: Test
         run: npm test
 

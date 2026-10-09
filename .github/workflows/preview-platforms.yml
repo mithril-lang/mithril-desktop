@@ -51,7 +51,7 @@ jobs:
   mac_intel:
     name: Build Intel Mac
     needs: prepare
-    runs-on: macos-latest
+    runs-on: [self-hosted, macOS, ARM64, mithril-desktop-trusted]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -120,7 +120,7 @@ jobs:
   mac_arm64:
     name: Build Apple silicon Mac
     needs: prepare
-    runs-on: macos-latest
+    runs-on: [self-hosted, macOS, ARM64, mithril-desktop-trusted]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

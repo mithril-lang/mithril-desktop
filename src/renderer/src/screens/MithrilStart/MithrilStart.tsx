@@ -249,14 +249,14 @@ function MithrilStart({
   if (!connected) {
     return (
       <OnboardHero
-        intro
+        variant="connect"
         eyebrow="MITHRIL"
-        title={l("Connect your Mithril account", "Mithril アカウントに接続")}
+        title={l("Welcome to Mithril", "Mithril へようこそ")}
       >
         <p className="onboard-subtitle">
           {l(
-            "Sign in with your passkey and approve Chat and Workspace access. Desktop connects after approval.",
-            "パスキーでサインインし、Chat・Workspace へのアクセスを承認してください。承認後、Desktop が接続します。",
+            "Sign in with your passkey to connect Chat and Workspace.",
+            "パスキーでサインインし、Chat・Workspace への接続を承認してください。",
           )}
         </p>
         {protection === "reduced" && (
@@ -287,16 +287,8 @@ function MithrilStart({
             )}
           </button>
         </div>
-        <button
-          type="button"
-          className="onboard-btn onboard-btn-glass"
-          disabled={busy}
-          onClick={onOpenWorkspace}
-        >
-          {l("Retry connection", "接続を再確認")}
-        </button>
         {busy && deviceAttempt.current && (
-          <div role="status" className="onboard-subtitle">
+          <div role="status" className="mithril-connect-status">
             {deviceCode ? (
               <>
                 <p>
@@ -304,7 +296,9 @@ function MithrilStart({
                     "Approve this code in your browser:",
                     "ブラウザーでこのコードを確認して承認してください：",
                   )}{" "}
-                  <strong>{deviceCode.userCode}</strong>
+                  <strong data-selectable className="mithril-connect-code">
+                    {deviceCode.userCode}
+                  </strong>
                 </p>
                 <button
                   type="button"
@@ -330,7 +324,7 @@ function MithrilStart({
             </button>
           </div>
         )}
-        <details>
+        <details className="mithril-connect-token">
           <summary>
             {l("Use a connection token instead", "接続トークンを使用する")}
           </summary>
@@ -372,24 +366,36 @@ function MithrilStart({
             {issueText(error, ja)}
           </p>
         )}
-        <button
-          type="button"
-          className="onboard-btn onboard-btn-glass"
-          onClick={() => void window.hermesAPI.openExternal(CONSOLE_TOKEN_URL)}
-        >
-          {l("Open Mithril Console", "Mithril Console を開く")}
-        </button>
-        {onOpenProtection && (
+        <div className="mithril-connect-links">
           <button
             type="button"
-            className="onboard-btn onboard-btn-glass"
-            onClick={onOpenProtection}
+            className="onboard-btn onboard-btn-text"
+            disabled={busy}
+            onClick={onOpenWorkspace}
           >
-            {l(
-              "Protect this device (no sign-in required)",
-              "この端末を保護（ログイン不要）",
-            )}
+            {l("Retry connection", "接続を再確認")}
           </button>
+          <button
+            type="button"
+            className="onboard-btn onboard-btn-text"
+            onClick={() =>
+              void window.hermesAPI.openExternal(CONSOLE_TOKEN_URL)
+            }
+          >
+            {l("Open Mithril Console", "Mithril Console を開く")}
+          </button>
+        </div>
+        {onOpenProtection && (
+          <div className="mithril-connect-protection">
+            <button
+              type="button"
+              className="onboard-btn onboard-btn-text"
+              onClick={onOpenProtection}
+            >
+              {l("Protect this device", "この端末を保護")}
+            </button>
+            <p>{l("No sign-in required", "ログイン不要")}</p>
+          </div>
         )}
       </OnboardHero>
     );

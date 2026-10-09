@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ChatGatewayConnection } from "./ChatGatewayConnection";
 import { connectionNotice } from "./connection-notice";
 import { ChatSessions } from "@mithril/workspace/session-react";
 import "@mithril/workspace/styles.css";
@@ -33,6 +34,7 @@ export default function MithrilChat({
   visible?: boolean;
   locale?: string;
 }): React.JSX.Element {
+  const [selectedSessionId, setSelectedSessionId] = useState(initialSessionId);
   const [sidebarTarget, setSidebarTarget] = useState<HTMLElement | null>(null);
   useEffect(() => {
     setSidebarTarget(document.getElementById("cloud-session-sidebar"));
@@ -42,6 +44,10 @@ export default function MithrilChat({
     typeof connectionNotice
   > | null>(null);
   const [epoch, setEpoch] = useState(0);
+  useEffect(
+    () => setSelectedSessionId(initialSessionId),
+    [initialSessionId, profile, epoch],
+  );
   const [accountId, setAccountId] = useState<string | null>(null);
   useEffect(
     () =>
@@ -228,6 +234,15 @@ export default function MithrilChat({
           <p>{connectionError.message}</p>
         </div>
       )}
+      {visible && accountId && selectedSessionId && (
+        <ChatGatewayConnection
+          key={JSON.stringify([profile, epoch, accountId, selectedSessionId])}
+          userId={accountId}
+          profile={profile}
+          sessionId={selectedSessionId}
+          locale={locale}
+        />
+      )}
       <ChatSessions
         sidebarTarget={sidebarTarget}
         sidebarNavigation={sidebarNavigation}
@@ -244,6 +259,7 @@ export default function MithrilChat({
         key={`${profile}:${initialSessionId ?? ""}`}
         initialSessionId={initialSessionId}
         onSessionSelected={(id) => {
+          setSelectedSessionId(id);
           if (toolAuthority.sessionId !== id) {
             toolAuthority.sessionId = id;
             toolAuthority.revision++;

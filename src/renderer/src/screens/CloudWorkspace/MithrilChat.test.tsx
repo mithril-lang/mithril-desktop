@@ -25,6 +25,12 @@ beforeEach(() => {
     configurable: true,
     value: {
       cloudChat: {
+        gatewaySelection: vi.fn(async (request) => ({
+          userId: request.userId,
+          sessionId: request.sessionId,
+          binding: null,
+        })),
+        reviewGateway: vi.fn(async () => {}),
         nativeHistoryInventory: vi.fn(async () => ({
           userId: "owner",
           profile: "default",
@@ -239,4 +245,28 @@ it("retries transient failures without asking for another sign-in", async () => 
   );
   await screen.findByRole("combobox", { name: /Mithril model/ });
   expect(connect).not.toHaveBeenCalled();
+});
+
+// @lat: [[mithril-code#Mithril Code#Native tool connection Chat mounting]]
+it("mounts selection review for the actual selected Chat and removes it when hidden", async () => {
+  const view = render(
+    <MithrilChat profile="default" initialSessionId="selected-chat" />,
+  );
+  await screen.findByText("No Hermes conversation is selected.");
+  expect(window.hermesAPI.cloudChat.gatewaySelection).toHaveBeenCalledWith({
+    userId: "owner",
+    profile: "default",
+    sessionId: "selected-chat",
+  });
+  expect(window.hermesAPI.cloudChat.reviewGateway).not.toHaveBeenCalled();
+  view.rerender(
+    <MithrilChat
+      profile="default"
+      initialSessionId="selected-chat"
+      visible={false}
+    />,
+  );
+  expect(
+    screen.queryByRole("button", { name: "Review tool connection in browser" }),
+  ).toBeNull();
 });

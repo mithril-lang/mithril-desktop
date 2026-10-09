@@ -1343,6 +1343,14 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudChat.apply(id, operation);
   });
+  ipcMain.handle("cloud-chat-gateway-selection", (event, request) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.gatewaySelection(request);
+  });
+  ipcMain.handle("cloud-chat-gateway-review", (event, request) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.reviewGateway(request);
+  });
   ipcMain.handle("cloud-chat-browser-step", (event, id, body) => {
     trustedWorkspaceSender(event);
     return cloudChat.browserStep(id, body);

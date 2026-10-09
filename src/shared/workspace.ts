@@ -45,7 +45,23 @@ import type {
   ChatRuntimeAvailability,
   SessionNativeImportAdapter,
 } from "@mithril/workspace/sessions";
+export type ChatGatewayRequest = {
+  userId: string;
+  profile: string;
+  sessionId: string;
+};
+export type ChatGatewaySelection = {
+  userId: string;
+  sessionId: string;
+  binding: {
+    storedSessionId: string;
+    revision: number;
+    active: boolean;
+  } | null;
+};
 export interface CloudChatAPI extends SessionTransport {
+  gatewaySelection(request: ChatGatewayRequest): Promise<ChatGatewaySelection>;
+  reviewGateway(request: ChatGatewayRequest): Promise<void>;
   browserStep(
     id: string,
     body: Record<string, unknown>,

@@ -1,4 +1,5 @@
 import { statSync } from "fs";
+import { shell } from "electron";
 import { profilePaths } from "./utils";
 import { legacyProviderSnapshot } from "./legacy-provider-snapshot";
 import type { LegacyProviderSnapshot } from "../shared/legacy-provider";
@@ -20,6 +21,7 @@ export const cloudChat = new CloudChat(
     readScope: "chat:read",
     writeScope: "chat:write",
   }),
+  (url) => shell.openExternal(url),
 );
 onCloudWorkspaceInvalidated(() => cloudChat.auth.reset());
 export function onCloudChatAccountChanged(listener: () => void): () => void {

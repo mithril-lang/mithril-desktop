@@ -3,6 +3,10 @@ import {
   type HistoryFileTransport,
 } from "@mithril/workspace/history";
 import { CloudWorkspace } from "./cloud-workspace";
+import type {
+  ChatGatewayRequest,
+  ChatGatewaySelection,
+} from "../shared/workspace";
 import {
   chatId,
   validateChatSession,
@@ -36,10 +40,100 @@ export class CloudChat implements SessionTransport {
       expires?: number;
     }
   >();
-  constructor(readonly auth: CloudWorkspace) {
+  constructor(
+    readonly auth: CloudWorkspace,
+    private readonly openGatewayReview?: (url: string) => Promise<void>,
+  ) {
     this.historyFiles = createHistoryFileTransport((path, init) =>
       auth.authorizedBinaryRequest(path, init),
     );
+  }
+  /** Fixed owner-scoped metadata only; selection and human grants remain Web-session operations. */
+  async gatewaySelection(
+    request: ChatGatewayRequest,
+  ): Promise<ChatGatewaySelection> {
+    const { selection } = await this.readGatewaySelection(request);
+    return selection;
+  }
+  private async readGatewaySelection(request: ChatGatewayRequest): Promise<{
+    selection: ChatGatewaySelection;
+    context: Awaited<ReturnType<CloudWorkspace["nativeContext"]>>;
+  }> {
+    if (
+      !request ||
+      !chatId(request.sessionId) ||
+      !chatId(request.userId) ||
+      typeof request.profile !== "string" ||
+      !request.profile ||
+      Object.keys(request).some(
+        (key) => !["userId", "profile", "sessionId"].includes(key),
+      )
+    )
+      throw Error("Invalid tool connection request");
+    request = structuredClone(request);
+    const context = await this.auth.nativeContext();
+    if (
+      context.userId !== request.userId ||
+      context.profile !== request.profile
+    )
+      throw Error("Tool connection owner or profile changed");
+    const { value } = await this.auth.authorizedRequest(
+      `/v1/chat/sessions/${encodeURIComponent(request.sessionId)}/gateway`,
+      undefined,
+      "chat:read",
+      context,
+    );
+    const result = value as { sessionId?: unknown; binding?: unknown };
+    if (
+      !result ||
+      result.sessionId !== request.sessionId ||
+      !("binding" in result)
+    )
+      throw Error("Invalid tool connection response");
+    const binding = result.binding as {
+      stored_session_id?: unknown;
+      revision?: unknown;
+      active?: unknown;
+    } | null;
+    if (
+      binding !== null &&
+      (!binding ||
+        typeof binding.stored_session_id !== "string" ||
+        !/^[A-Za-z0-9_-]{1,200}$/.test(binding.stored_session_id) ||
+        !Number.isSafeInteger(binding.revision) ||
+        (binding.revision as number) < 1 ||
+        ![0, 1].includes(binding.active as number))
+    )
+      throw Error("Invalid tool connection response");
+    const selection: ChatGatewaySelection = {
+      userId: context.userId,
+      sessionId: request.sessionId,
+      binding:
+        binding === null
+          ? null
+          : {
+              storedSessionId: binding.stored_session_id as string,
+              revision: binding.revision as number,
+              active: binding.active === 1,
+            },
+    };
+    return { selection, context };
+  }
+  async reviewGateway(request: ChatGatewayRequest): Promise<void> {
+    const { selection, context } = await this.readGatewaySelection(request);
+    const current = await this.auth.nativeContext();
+    if (
+      context.userId !== current.userId ||
+      context.profile !== current.profile ||
+      context.epoch !== current.epoch ||
+      context.actor !== current.actor
+    )
+      throw Error("Tool connection context changed");
+    if (!this.openGatewayReview)
+      throw Error("Tool connection review unavailable");
+    const url = new URL("https://app.mithril.fund/");
+    url.searchParams.set("session", selection.sessionId);
+    await this.openGatewayReview(url.toString());
   }
   async list(): Promise<ChatSessionList> {
     const { value } = await this.auth.authorizedRequest("/v1/chat/sessions");

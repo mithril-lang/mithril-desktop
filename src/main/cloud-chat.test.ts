@@ -577,3 +577,120 @@ it("never sends a Browser checkpoint after context capture is retired and re-ena
   ).rejects.toThrow("Native request context changed");
   expect(f.fetcher.mock.calls.some((call) => call[1]?.body)).toBe(false);
 });
+
+describe("Owned conversation selection review", () => {
+  function reply(
+    f: ReturnType<typeof fixture>,
+    response: () => Response,
+  ): void {
+    const original = f.fetcher.getMockImplementation() as (
+      url: string,
+      init?: RequestInit,
+    ) => Promise<Response>;
+    f.fetcher.mockImplementation(async (url, init) =>
+      url.endsWith("/gateway") ? response() : original(url, init),
+    );
+  }
+  const request = { userId: "a", profile: "default", sessionId: "s1" };
+  // @lat: [[mithril-code#Mithril Code#Native tool connection review]]
+  it("reads the fixed owner envelope, projects metadata and opens only the matching Web conversation", async () => {
+    const f = fixture(),
+      open = vi.fn(async () => {}),
+      client = new CloudChat(f.auth, open);
+    await f.auth.enable();
+    reply(f, () =>
+      f.response({
+        schemaVersion: 1,
+        userId: "a",
+        sessionId: "s1",
+        binding: {
+          stored_session_id: "stored",
+          revision: 2,
+          active: 1,
+          secret: "not-forwarded",
+        },
+      }),
+    );
+    expect(await client.gatewaySelection(request)).toEqual({
+      userId: "a",
+      sessionId: "s1",
+      binding: { storedSessionId: "stored", revision: 2, active: true },
+    });
+    await client.reviewGateway(request);
+    expect(open).toHaveBeenCalledExactlyOnceWith(
+      "https://app.mithril.fund/?session=s1",
+    );
+    expect(
+      f.fetcher.mock.calls.every(
+        ([url, init]) =>
+          (url.endsWith("/v1/me") ||
+            url === "https://api.mithril.fund/v1/chat/sessions/s1/gateway") &&
+          !init?.body,
+      ),
+    ).toBe(true);
+  });
+  // @lat: [[mithril-code#Mithril Code#Native tool connection refusal]]
+  it.each([
+    { schemaVersion: 1, userId: "b", sessionId: "s1", binding: null },
+    { schemaVersion: 1, userId: "a", sessionId: "other", binding: null },
+    { schemaVersion: 1, userId: "a", sessionId: "s1" },
+    {
+      schemaVersion: 1,
+      userId: "a",
+      sessionId: "s1",
+      binding: { stored_session_id: "stored", revision: 0, active: 1 },
+    },
+    {
+      schemaVersion: 1,
+      userId: "a",
+      sessionId: "s1",
+      binding: { stored_session_id: "stored", revision: 1, active: true },
+    },
+  ])(
+    "refuses foreign or malformed responses before opening the browser (%j)",
+    async (body) => {
+      const f = fixture(),
+        open = vi.fn(async () => {}),
+        client = new CloudChat(f.auth, open);
+      await f.auth.enable();
+      reply(f, () => f.response(body));
+      await expect(client.reviewGateway(request)).rejects.toThrow();
+      expect(open).not.toHaveBeenCalled();
+    },
+  );
+  // @lat: [[mithril-code#Mithril Code#Native tool connection retirement]]
+  it("refuses a late selection read after account retirement without opening Web", async () => {
+    const f = fixture(),
+      open = vi.fn(async () => {}),
+      client = new CloudChat(f.auth, open);
+    await f.auth.enable();
+    reply(f, () => {
+      f.change();
+      return f.response({
+        schemaVersion: 1,
+        userId: "a",
+        sessionId: "s1",
+        binding: null,
+      });
+    });
+    await expect(client.reviewGateway(request)).rejects.toThrow(/changed/);
+    expect(open).not.toHaveBeenCalled();
+  });
+  // @lat: [[mithril-code#Mithril Code#Native tool connection input]]
+  it("rejects owner/profile/path substitution before requesting selection", async () => {
+    for (const input of [
+      { ...request, userId: "b" },
+      { ...request, profile: "other" },
+      { ...request, sessionId: "../s1" },
+      { ...request, url: "https://evil.test" },
+    ]) {
+      const f = fixture();
+      await f.auth.enable();
+      f.fetcher.mockClear();
+      await expect(f.client.gatewaySelection(input)).rejects.toThrow();
+      expect(
+        f.fetcher.mock.calls.every(([url]) => url.endsWith("/v1/me")),
+      ).toBe(true);
+    }
+  });
+});

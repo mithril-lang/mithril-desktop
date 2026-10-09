@@ -77,3 +77,36 @@ Browser commands retain their captured main owner, profile, credential fingerpri
 Cloud Chat retains a committed execution scope through IPC acknowledgement. Hidden, owner, epoch, profile, initial-session and unmount changes retire it; conversation selection also retires active runners and delayed acknowledgements.
 
 The main pre-dispatch identity fence remains independent. The renderer stops the shared runner and refuses new applies from retired scope; already-sent operations return their acknowledgement without starting local execution after retirement. Claimed IDs remain consumed. Abort withdraws future child authority; it does not prove an already-dispatched remote effect stopped. Native human grant integration and installed execution remain separate work.
+
+
+## Native tool connection review
+
+Cloud Chat reads the selected Hermes conversation through main's fixed, owner-scoped gateway route. The explicit review button opens the same Chat in App; only a Web session can select a conversation or grant a child call.
+
+[[src/main/cloud-chat.ts#CloudChat#gatewaySelection]] validates the API owner/session envelope and projects only bounded selection metadata. [[src/main/cloud-chat.ts#CloudChat#reviewGateway]] rechecks native identity before opening a fixed App URL containing only the Chat ID. [[src/renderer/src/screens/CloudWorkspace/ChatGatewayConnection.tsx#ChatGatewayConnection]] retires late reads with its committed consumer scope. Selection is not readiness or human consent; native one-call approval, real Electron/network and installed qualification remain pending.
+
+## Native tool connection refusal
+
+Foreign owner/session and malformed metadata must not open a review page or expose runtime data. Missing identity envelopes are refused rather than accepted as legacy responses.
+
+## Native tool connection retirement
+
+An account change while a selection request is pending discards its response and refuses the browser open. Native credentials and execution tokens never enter the review URL.
+
+## Native tool connection input
+
+Renderer input contains only the expected owner, profile and Chat ID. Substituted paths, owners, profiles and extra endpoint fields are refused before the fixed metadata request.
+
+
+## Native tool connection consumer
+
+The mounted native connection control reads only its selected owner/profile/Chat scope. Opening the matching Web review is an explicit button action, never an automatic effect of metadata discovery.
+
+## Native tool connection consumer isolation
+
+Changing the selected Chat retires the old control and discards late reads. Responses for another owner or Chat are not rendered as selected, and discovery never opens a review page.
+
+
+## Native tool connection Chat mounting
+
+The actual MithrilChat consumer mounts selection review for its selected Chat and authenticated owner. Hiding the consumer unmounts the review control and retires pending metadata reads.

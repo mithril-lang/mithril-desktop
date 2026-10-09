@@ -607,3 +607,9 @@ The installer candidate pins immutable workspace `0.6.24-chat.4`, SHA256 `2e32c3
 Preview.34 preserves the shared editor compile action approved in preview.33, and the Web URL history fix. The producer passed 228 workspace tests; Web consumer results are tracked independently.
 
 Desktop preview.39 requires a live Mithril account identity before mounting the workspace or device setup. Stored-token presence alone never admits the app. Sign-out closes the workspace; focus, network recovery and serialized one-minute checks revalidate the session. Successful sign-in enters the app; Retry connection verifies retained credentials without a new browser login. Source qualification is separate from signed release and installed-client evidence.
+
+## Interpreter parent lifetime
+
+Workspace agency.16 retires each JS/Python parent's signal and pending child approval when that parent completes, times out or fails, while retaining the turn signal for its receipt acknowledgement. Turn retirement also aborts the current parent.
+
+The shared runner checks the signal after a late child response. This is local lifetime narrowing; it cannot undo a dispatched effect or certify remote cancellation. Shared controlled-executor tests reproduce the old JS/Python leak and verify retirement. Consumer checks use this compiled vendored candidate; whole Electron/runtime qualification and the previous Python exit124 cause remain separate and unresolved. Kuro's existing interpreter deadline and human grant/checkpoint deadlines are unchanged. No installer publication, Actions dispatch or production deployment is claimed.

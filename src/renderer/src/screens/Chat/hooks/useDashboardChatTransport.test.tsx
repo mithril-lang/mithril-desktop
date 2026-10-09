@@ -286,87 +286,101 @@ describe("useDashboardChatTransport recovery", () => {
     });
   });
 
+  const verifyMemoryDecision = async (decision: string): Promise<void> => {
+    const api: HarnessApi = {};
+    await attachOwnedHarness(api);
+    const protocol = "hermes-pending-memory-review-v1";
+    const pendingId = "1234abcd",
+      digest = "a".repeat(64);
+    dashboardMock.request.mockImplementation(async (_method, params) => {
+      if (params.command === "/memory review")
+        return {
+          output: JSON.stringify({
+            protocol,
+            pending: [{ pending_id: pendingId, summary: "review entry" }],
+            remaining_count: 0,
+          }),
+        };
+      if (params.command === `/memory review ${pendingId}`)
+        return {
+          output: JSON.stringify({
+            protocol,
+            pending_id: pendingId,
+            review_digest: digest,
+            decision_mode: decision.startsWith("resolve-")
+              ? "resolve"
+              : undefined,
+            review: [
+              "Target: MEMORY.md",
+              "Complete new entry: 全文 <script>not executed</script>",
+            ],
+          }),
+        };
+      if (decision.endsWith("lost")) throw Error("lost result after commit");
+      return { output: "Decision returned" };
+    });
+    await expect(
+      api.memoryReview!.client.request("prompt.submit", {
+        session_id: "live",
+        command: "/memory review",
+      }),
+    ).rejects.toThrow(/retired/);
+    await expect(
+      api.memoryReview!.client.request("slash.exec", {
+        session_id: "foreign",
+        command: "/memory review",
+      }),
+    ).rejects.toThrow(/retired/);
+    api.activeTurnRef!.current = { ...activeBadTurn };
+    await expect(
+      api.memoryReview!.client.request("slash.exec", {
+        session_id: "live",
+        command: "/memory review",
+      }),
+    ).rejects.toThrow(/retired/);
+    api.activeTurnRef!.current = null;
+    expect(dashboardMock.request).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Inspect pending memory" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Review proposal/ }),
+    );
+    const button = await screen.findByRole("button", {
+      name: decision.startsWith("resolve-")
+        ? decision === "resolve-unsaved"
+          ? "I confirmed it was not saved"
+          : "I confirmed it was saved"
+        : decision === "reject"
+          ? "Reject this memory change"
+          : "Approve this memory change",
+    });
+    expect(screen.getByText(/全文/).querySelector("script")).toBeNull();
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await screen.findByText(
+      decision.endsWith("lost") ? /Outcome unknown/ : "Decision returned",
+    );
+    expect(dashboardMock.request).toHaveBeenCalledTimes(3);
+    expect(dashboardMock.request).toHaveBeenLastCalledWith("slash.exec", {
+      session_id: "live",
+      command: `/memory ${decision === "resolve-lost" ? "resolve-saved" : decision === "lost" ? "approve" : decision} ${pendingId} ${digest}`,
+    });
+    expect(
+      screen.queryByRole("button", { name: "Approve this memory change" }),
+    ).toBeNull();
+  };
+
   // @lat: [[owned-tool-calls#Pending memory human review#Explicit decision and unknown outcome]]
   it.each(["approve", "reject", "lost"])(
     "mounted memory review requires human %s and never redispatches",
-    async (decision) => {
-      const api: HarnessApi = {};
-      await attachOwnedHarness(api);
-      const protocol = "hermes-pending-memory-review-v1";
-      const pendingId = "1234abcd",
-        digest = "a".repeat(64);
-      dashboardMock.request.mockImplementation(async (_method, params) => {
-        if (params.command === "/memory review")
-          return {
-            output: JSON.stringify({
-              protocol,
-              pending: [{ pending_id: pendingId, summary: "review entry" }],
-              remaining_count: 0,
-            }),
-          };
-        if (params.command === `/memory review ${pendingId}`)
-          return {
-            output: JSON.stringify({
-              protocol,
-              pending_id: pendingId,
-              review_digest: digest,
-              review: [
-                "Target: MEMORY.md",
-                "Complete new entry: 全文 <script>not executed</script>",
-              ],
-            }),
-          };
-        if (decision === "lost") throw Error("lost result after commit");
-        return { output: "Decision returned" };
-      });
-      await expect(
-        api.memoryReview!.client.request("prompt.submit", {
-          session_id: "live",
-          command: "/memory review",
-        }),
-      ).rejects.toThrow(/retired/);
-      await expect(
-        api.memoryReview!.client.request("slash.exec", {
-          session_id: "foreign",
-          command: "/memory review",
-        }),
-      ).rejects.toThrow(/retired/);
-      api.activeTurnRef!.current = { ...activeBadTurn };
-      await expect(
-        api.memoryReview!.client.request("slash.exec", {
-          session_id: "live",
-          command: "/memory review",
-        }),
-      ).rejects.toThrow(/retired/);
-      api.activeTurnRef!.current = null;
-      expect(dashboardMock.request).not.toHaveBeenCalled();
-      fireEvent.click(
-        screen.getByRole("button", { name: "Inspect pending memory" }),
-      );
-      fireEvent.click(
-        await screen.findByRole("button", { name: /Review proposal/ }),
-      );
-      const button = await screen.findByRole("button", {
-        name:
-          decision === "reject"
-            ? "Reject this memory change"
-            : "Approve this memory change",
-      });
-      expect(screen.getByText(/全文/).querySelector("script")).toBeNull();
-      fireEvent.click(button);
-      fireEvent.click(button);
-      await screen.findByText(
-        decision === "lost" ? /Outcome unknown/ : "Decision returned",
-      );
-      expect(dashboardMock.request).toHaveBeenCalledTimes(3);
-      expect(dashboardMock.request).toHaveBeenLastCalledWith("slash.exec", {
-        session_id: "live",
-        command: `/memory ${decision === "reject" ? "reject" : "approve"} ${pendingId} ${digest}`,
-      });
-      expect(
-        screen.queryByRole("button", { name: "Approve this memory change" }),
-      ).toBeNull();
-    },
+    verifyMemoryDecision,
+  );
+
+  // @lat: [[owned-tool-calls#Pending memory human review#Explicit saved-result closure]]
+  it.each(["resolve-saved", "resolve-unsaved", "resolve-lost"])(
+    "mounted memory outcome closure requires human %s without replay",
+    verifyMemoryDecision,
   );
 
   // @lat: [[owned-tool-calls#Pending memory human review#Retired review has no authority]]

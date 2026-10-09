@@ -2360,7 +2360,7 @@ export function useDashboardChatTransport({
           method !== "slash.exec" ||
           params.session_id !== reviewSessionId ||
           typeof params.command !== "string" ||
-          !/^\/memory (review(?: [a-f0-9]{8})?|(?:approve|reject) [a-f0-9]{8} [a-f0-9]{64})$/.test(
+          !/^\/memory (review(?: [a-f0-9]{8})?|(?:approve|reject|resolve-saved|resolve-unsaved) [a-f0-9]{8} [a-f0-9]{64})$/.test(
             params.command,
           )
         ) {

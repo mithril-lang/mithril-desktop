@@ -72,6 +72,11 @@ it.skipIf(!fixture)(
           .getByRole("button", { name: "Approve this memory change" })
           .count(),
       ).toBe(0);
+      expect(
+        await page
+          .getByRole("button", { name: "I confirmed it was saved" })
+          .count(),
+      ).toBe(0);
       expect(await page.locator("pre").count()).toBe(0);
       for (const cycle of [0, 1, 2]) {
         const owner = cycle === 1 ? "b" : "a";
@@ -95,10 +100,26 @@ it.skipIf(!fixture)(
             row.target === "user" ? "USER.md" : "MEMORY.md",
           );
           expect(await full.locator("script").count()).toBe(0);
+          if (row.decision.startsWith("resolve-")) {
+            expect(await full.textContent()).toContain(
+              "Recorded decision receipt:",
+            );
+            expect(await full.textContent()).toContain(
+              "Current saved entries:",
+            );
+            expect(
+              await page
+                .getByRole("button", { name: "Approve this memory change" })
+                .count(),
+            ).toBe(0);
+          }
           await page
             .getByRole("button", {
-              name:
-                row.decision === "approve"
+              name: row.decision.startsWith("resolve-")
+                ? row.decision === "resolve-saved"
+                  ? "I confirmed it was saved"
+                  : "I confirmed it was not saved"
+                : row.decision === "approve"
                   ? "Approve this memory change"
                   : "Reject this memory change",
             })
@@ -111,7 +132,7 @@ it.skipIf(!fixture)(
           } else {
             await page.locator(".memory-review-panel [role=status]").waitFor();
             expect(await page.locator("body").innerText()).toMatch(
-              /Approved 1 memory write|Rejected pending memory write/,
+              /Approved 1 memory write|Rejected pending memory write|Closed the recorded memory decision/,
             );
           }
           expect(
@@ -121,7 +142,7 @@ it.skipIf(!fixture)(
           ).toBe(0);
         }
       }
-      // The retired response did not decide; require a new full review and explicit reject.
+      // The retired outcome response did not close; require a new full review and explicit assessment.
       await inspect.click();
       await page
         .getByRole("button", {
@@ -129,14 +150,14 @@ it.skipIf(!fixture)(
         })
         .click();
       await page
-        .getByRole("button", { name: "Reject this memory change" })
+        .getByRole("button", { name: "I confirmed it was not saved" })
         .click();
       await page.locator(".memory-review-panel [role=status]").waitFor();
       await inspect.click();
       await page.getByText("No pending memory changes.").waitFor();
       expect(errors).toEqual([]);
       console.log(
-        "real isolated Electron memory review qualified: 7 decisions, retired review, committed reply loss",
+        "real isolated Electron memory review qualified: 6 normal decisions, 7 outcome closures, retired review, committed reply loss",
       );
     } finally {
       await app.close();

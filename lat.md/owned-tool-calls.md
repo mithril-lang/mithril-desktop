@@ -110,3 +110,11 @@ A delayed full review cannot restore decision controls after model, provider, co
 A sandboxed Electron window uses production preload, dashboard client, Chat hook and shared panel. Real ticket WS and persistent workers qualify human review, A/B/A custody, retired review and committed reply loss.
 
 Launch/profile URL issuance and the surrounding screen are fixtures; no real account, installed app or whole boot is claimed. The renderer must apply the packaged review stylesheet. The backend independently checks disk, queues, frozen prompts and history.
+
+### Explicit saved-result closure
+
+Uncertain memory outcomes require full proposal, receipt and saved-data review. Saved/unsaved confirmation sends one fixed closure command; this mode never becomes approve/reject and lost results never retry.
+
+The attached adapter permits the fixed digest-bound closure verbs under the same current profile/session/generation guard. Relay custody additionally matches the review decision mode. Backend closure records the human assessment without running a memory write.
+
+The current local fixture qualifies seven explicit closures in isolated Electron and six through the real Web relay, across A/B/A. Full saved state is unchanged by closure. Lost closure replies reconnect without a second decision; partial closure failure and installed/whole/native/provider stability remain unqualified.

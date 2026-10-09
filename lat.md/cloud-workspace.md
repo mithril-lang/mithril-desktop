@@ -52,7 +52,6 @@ Workspace 0.6.25-agency.1 adds fourteen contact templates across eleven agency s
 
 Desktop preview.36 pins the tarball built from Fund main `ed3698c1990715cf147d35ae4b5a54c92961eb30`, SHA256 `eb8095215b95d9321e49c7b692e6bc3f4a6ffcfc4cfb912e81b292727764763f`. The Registry catalog is pinned to `99b65915095b2d765aa0a595cd24db5224694527`. Instructions distinguish local JSON evaluation from planned video, traffic, financial and maritime modules. Templates grant no credentials, official identity or executor authority. Native installer publication and configured bot replies require separate receipts.
 
-
 ## Canonical catalog
 
 [[src/main/cloud-workspace.ts#CloudWorkspace#catalog]] reads public release-pinned catalog metadata only through api.mithril.fund. Both clients receive the same Mithril and Hermes registry entries, category tabs and cards. No metadata action installs code or grants permissions.
@@ -371,7 +370,6 @@ The checked-in schema fixture contains only upstream DDL and its MIT attribution
 
 The task and run projections also exclude device claims, process IDs/fingerprints, heartbeats and current-run pointers. Native SQL updates never write these fields from cloud records. Source-version hashes still cover the complete raw rows, so execution changes invalidate stale metadata writes.
 
-
 ## Original Kanban attachment capture (draft)
 
 Original registered task files now produce private, verified chunk captures for the task repository. The original attachment metadata and SQLite rows remain intact; device paths are omitted from the cloud projection.
@@ -389,7 +387,6 @@ The original shared Kanban detail drawer lists registered files and explicitly s
 [[src/main/task-attachment-ipc.ts#registerTaskAttachmentIPC]] exposes owner-pinned chunk reads, metadata checks and bounded staging writes after trusted-sender validation. Main retains credentials and rejects stale accounts during requests. The shared repository adapter validates retained task/attachment identities, canonical chunk pointers and complete file hashes before saving. Account switches, deletion, attachment replacement or board changes during a read cancel the save. Both Chromium consumers use an octet-stream Blob download, never a HTML preview or native path navigation.
 
 This adds explicit download reachability to the same original drawer. Original-directory restoration now uses the native writeback adapter. Replacement controls, Windows capture and installed attachment behavior still require implementation or live qualification. Draft artifact 0.6.13 and Desktop preview.28 are unpublished.
-
 
 ## Kanban attachment editing (draft)
 
@@ -434,7 +431,6 @@ A new device can initialize its missing default Kanban database from the canonic
 [[src/main/kanban-board-replica.ts#restoreKanbanBoard]] admits a default board only when its portable metadata exactly matches the current original display projection. The complete empty original schema and owner-bound retained receipt are staged privately, then published with a no-replace hard link through directory descriptors. An existing or concurrently created database is never replaced. The original board.json and kanban/current remain byte-for-byte unchanged; later tasks use the ordinary task restoration route. Reading alone still creates no database.
 
 Custom cloud metadata that differs from original metadata still requires the pending file/SQLite transaction protocol. Existing-board edits, graph reconstruction, Windows publication and installed/offline/multi-device qualification remain unfinished.
-
 
 ## Recoverable original board metadata adoption (draft)
 
@@ -490,7 +486,6 @@ The native working-copy adapter now restores missing connected tasks together ra
 
 Connected-component local qualification: 2,624 Desktop tests / 281 files passed with the missing-credential fixture isolated from OPENROUTER_API_KEY. The final 30-test storage/attachment rerun includes interrupted admission, absent endpoints, execution-state refusal, exact source/receipt equality and repeat cloud owner/revision reads. Node/web types, full lint, production build and lat check passed. Previous head 5749324 passed GitHub CI run 37514655442; this new component head needs its own CI and installed qualification.
 
-
 ## Connected task attachment plans (draft)
 
 Missing connected tasks now prepare owner-pinned, verified file plans before restoring the original Kanban records and relationships.
@@ -500,7 +495,6 @@ The main process selects missing nodes read-only, verifies each selected task fi
 Refused groups roll back database rows and retain existing file bytes. Immutable unregistered files may remain after a transaction refusal; they never overwrite original files. Retained receipts replay without downloading again. The real-schema main-route invariant is [[cloud-workspace-tests#Cloud workspace tests#Connected component attachment restoration]].
 
 Local qualification: 2,625 Desktop tests / 281 files, including 31 targeted storage/attachment tests, passed. Node/web types, full lint, production build and lat check passed. The missing-credential fixture ran without OPENROUTER_API_KEY. Prior Desktop head 2881575 passed CI run 37515852708. This follow-up requires new-head CI, publication and installed multi-device qualification.
-
 
 ## Attachment identity aliases (draft)
 
@@ -512,7 +506,6 @@ The collision, later alias overlap, replacement and removal invariant is [[cloud
 
 Local alias qualification: 2,626 Desktop tests / 281 files and 32 targeted storage/attachment tests passed. Node/web types, production build and lat check passed. Missing-credential fixture isolated from OPENROUTER_API_KEY. Previous head ac92654 passed GitHub CI run 37516920103. New-head CI, publication and installed qualification remain outstanding.
 
-
 ## Custom default board initialization (draft)
 
 The original default Kanban database can now initialize with cloud display metadata through a durable recovery preparation.
@@ -522,7 +515,6 @@ A privately staged full-schema database contains the owner/replica-bound prepara
 [[cloud-workspace-tests#Cloud workspace tests#Custom default board initialization]] and [[cloud-workspace-tests#Cloud workspace tests#Custom default board recovery]] cover original schema, exact projections, interruptions before and after metadata publication, lost acknowledgement and concurrent native edits. Source snapshots report pending recovery rather than partial completion. No Agent command, dispatch or board switch occurs.
 
 Custom default qualification: 2,628 Desktop tests / 281 files and 34 targeted board/storage tests passed. Node/web types, full lint and production build passed. The missing-credential fixture ran without OPENROUTER_API_KEY. Previous head 3aaf9c7 passed CI run 37517609935. New-head CI, publication and installed multi-device qualification remain outstanding.
-
 
 ## Archived chat model reconciliation (draft)
 
@@ -617,7 +609,6 @@ The shared runner checks the signal after a late child response. This is local l
 Workspace agency.18 passes the exact API codeDeadline from the captured parent checkpoint through this screen to Kuro. A bridged parent uses that absolute wall deadline, capped at45 seconds, while host-clock initialization/execution retain a30-second budget excluding pending broker wait. This is phase accounting, not CPU attestation. Worker markers or model arguments cannot renew the wall deadline. The shared runner retires the parent signal at expiry, so pending native approval cannot release a new effect afterward; late outcomes remain unknown and never retry.
 
 The frame must advertise the parent-deadline protocol before this path starts. Older assets refuse execution and require an update. Unbridged/legacy calls retain their30-second host timeout and35-second outer wait. Latest SDK17 Electron failures and local API timings remain preserved as the baseline; SDK18 whole-screen, stability, publication and installed evidence must be qualified separately.
-
 
 ## Isolated multi-target patch qualification
 

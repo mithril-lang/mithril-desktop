@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import http from "http";
+import https from "https";
 import type { AddressInfo } from "net";
 
 /**
@@ -359,24 +360,39 @@ describe("model-discovery", () => {
     await listen();
     writeFileSync(join(testHome, ".env"), "DEEPSEEK_API_KEY=sk-from-dotenv\n");
 
-    const { discoverProviderModels } = await loadDiscovery();
-    const result = await discoverProviderModels(
-      "custom",
-      "https://api.deepseek.com/v1",
-      undefined,
-      undefined,
-    );
-    // The fetch shouldn't reach our server because the canonical URL
-    // isn't loopback — but the resolver should still produce the right
-    // shape.  Since the canonical URL is unreachable in tests, status
-    // ends up "ok" with an empty list (network failure → empty).
-    // What we *do* care about is that the resolver picked up the .env
-    // key (not that the request succeeded against the real DeepSeek).
-    expect(["ok"]).toContain(result.status);
-    // No assertion on receivedAuth — the real call goes to the canonical
-    // URL which isn't our loopback server.  Sanity check the .env load
-    // path separately:
-    expect(receivedAuth).toBe(""); // confirms the canonical URL was used, not our test server
+    // @lat: [[provider-setup#Hermetic discovery key test]]
+    const transport = vi.spyOn(https, "request").mockImplementation(((
+      options: https.RequestOptions,
+      callback?: (response: http.IncomingMessage) => void,
+    ) => {
+      expect(options.hostname).toBe("api.deepseek.com");
+      expect(options.path).toBe("/v1/models");
+      const fixture = new URL(baseUrl);
+      return http.request(
+        {
+          ...options,
+          protocol: "http:",
+          hostname: fixture.hostname,
+          port: fixture.port,
+        },
+        callback,
+      );
+    }) as typeof https.request);
+    try {
+      const { discoverProviderModels } = await loadDiscovery();
+      const result = await discoverProviderModels(
+        "custom",
+        "https://api.deepseek.com/v1",
+        undefined,
+        undefined,
+      );
+      expect(result.status).toBe("ok");
+      expect(result.models).toEqual(["m"]);
+      expect(transport).toHaveBeenCalledTimes(1);
+      expect(receivedAuth).toBe("Bearer sk-from-dotenv");
+    } finally {
+      transport.mockRestore();
+    }
   });
 
   // Issue #367 — Nous Portal model discovery routes through the

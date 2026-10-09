@@ -31,3 +31,11 @@ Screen navigation is tracked via `captureScreenView` from [[src/renderer/src/App
 The `VITE_ANALYTICS_BASE_URL` and `VITE_ANALYTICS_API_KEY` secrets are injected into every `npm run build` step of the release workflow (`.github/workflows/release.yml`).
 
 The Content-Security-Policy in [[src/main/app/start.ts]] and `src/renderer/index.html` allows `connect-src` to reach the analytics host (`https://*.hermesone.org`); the former PostHog `script-src`/`connect-src` allowances were removed.
+
+## Mithril account usage days
+
+Authenticated client usage days require a separate explicit opt-in, disabled by default. They do not reuse legacy Hermes analytics consent or identify an installed binary.
+
+[[src/main/mithril-client-day.ts#recordMithrilClientDay]] sends only client type and consent to the fixed Mithril endpoint, using the encrypted active-profile token solely in main. [[src/renderer/src/utils/mithril-client-days.ts#startMithrilClientDays]] reports foreground use once per successful UTC day; failures remain nonblocking. Privacy Settings allows revocation. No chat content, device identifier, credential, file path or installation proof is submitted.
+
+The boundary is covered by [[mithril-client-days-tests#Mithril usage day tests]].

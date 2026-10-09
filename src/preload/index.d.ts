@@ -327,6 +327,10 @@ interface HermesAPI {
   ) => Promise<Record<string, boolean>>;
   onOAuthLoginProgress: (callback: (chunk: string) => void) => () => void;
 
+  recordMithrilClientDay: (
+    consented: boolean,
+    profile?: string,
+  ) => Promise<boolean>;
   getMithrilAccount: (profile?: string) => Promise<MithrilAccount | null>;
   connectMithrilAccount: (
     token: string,

@@ -1,3 +1,4 @@
+import { startMithrilClientDays } from "./utils/mithril-client-days";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "./components/ThemeProvider";
@@ -51,6 +52,10 @@ function App(): React.JSX.Element {
   // Account admission requires API verification, not merely a stored token.
   const [mithrilConnected, setMithrilConnected] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  useEffect(() => {
+    if (!mithrilConnected || !authenticated) return;
+    return startMithrilClientDays(setupProfile);
+  }, [mithrilConnected, authenticated, setupProfile]);
   const accountCheck = useRef(0);
   const isMac = window.electron?.process?.platform === "darwin";
   // Bumped on every runInstallCheck so a superseded run (e.g. the user hit

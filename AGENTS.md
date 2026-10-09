@@ -121,7 +121,7 @@ A change that ships inside the desktop app is done only when it is on `main` and
 1. If `package.json`'s version already has a GitHub release, bump it to the next `0.8.0-preview.N` and the matching `package-lock.json` version fields. Never reuse a tag that already has installers.
 2. Commit and push to `main`.
 3. Create the prerelease with `gh release create v<version> --prerelease`. The tag must equal `v` plus the version in `package.json`.
-4. Run **Publish Preview Platforms** (`gh workflow run "Publish Preview Platforms" --ref main -f tag=v<version>`). It builds Windows x64, Linux x64/ARM64, and both Mac architectures, notarizes the Mac packages, and uploads them onto that prerelease. Wait until the run succeeds, then confirm the release assets.
+4. Jun requested Mithril-wide operation without a GitHub Actions dependency on 2026-10-09. This supersedes the inherited workflow-dispatch instruction: qualify and package through the independent owner on the appropriate native hosts. Preserve Windows x64, Linux x64/ARM64 and both Mac architectures, Mac notarization, package inspection, checksums and installer/update read-back. Do not dispatch **Publish Preview Platforms** to close this task. The adapter is currently runtime-required and release-held; an independent source check is not a native release. Publish installers only after equivalent native receipts exist. Missing hosts or signing references remain explicit release gates.
 5. https://app.mithril.fund/download/ lists the GitHub prerelease. Confirm the new version is on that page.
 
 ## Not a new installer

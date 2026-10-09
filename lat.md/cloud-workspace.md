@@ -2,6 +2,16 @@
 
 Desktop and Web should preserve the original Desktop UI through one account-scoped cloud data repository; the current shared cloud screens and native dialogs are transitional.
 
+## Interpreter child tool checkpoints
+
+Desktop forwards bounded JS/Python child calls to the canonical authenticated API and binds returned receipts to the initiating child ID and round.
+
+[[src/main/cloud-chat.ts#CloudChat#browserStep]] accepts only catalog, account tool, search and extraction child requests. It retains scoped credentials in the main process and rejects mixed checkpoint fields, oversized arguments and unrelated child receipts. The API remains responsible for owner, parent lease, argument and dataset-generation validation. This makes the Desktop adapter support the shared client runner's existing child protocol without adding a native execution escape.
+
+[[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx#MithrilChat]] passes the initiating runner's broker into the isolated Kuro host. Renderer regression coverage checks the broker remains attached until the parent execution finishes and the host is disposed.
+
+Checkpoint transport deadlines follow the API operation limits: model completion has a 65-second connection budget for its 60-second server deadline, and child execution has 25 seconds for its 20-second server deadline. Ordinary requests retain 15 seconds. Delayed checkpoint coverage verifies a single response without an automatic retry or identity reset.
+
 ## Main process boundary
 
 [[src/main/cloud-workspace.ts#CloudWorkspace]] verifies the active secure-store bearer and owner before each fixed Mithril API request; renderer IPC never receives the credential.

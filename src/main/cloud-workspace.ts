@@ -686,7 +686,10 @@ export class CloudWorkspace {
     path: string,
     body?: unknown,
     extraScope?: string | readonly string[],
+    timeoutMs = 15000,
   ): Promise<{ value: unknown; userId: string }> {
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 65000)
+      throw Error("Invalid workspace request deadline");
     const session = await this.session();
     const generation = this.generation;
     if (
@@ -705,6 +708,7 @@ export class CloudWorkspace {
       session.token,
       session.profile,
       body,
+      timeoutMs,
     );
     this.checkOwner(
       value as { schemaVersion?: unknown; userId?: unknown },

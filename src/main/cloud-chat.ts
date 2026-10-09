@@ -140,6 +140,7 @@ export class CloudChat implements SessionTransport {
     phase: string;
     round: number;
     calls: import("@mithril/workspace/client-tool-turn").ClientToolCall[];
+    childResult?: import("@mithril/workspace/client-tool-turn").ClientToolResult;
   }> {
     if (
       !chatId(id) ||
@@ -148,16 +149,39 @@ export class CloudChat implements SessionTransport {
       Array.isArray(body) ||
       Object.keys(body).some(
         (k) =>
-          !["action", "turnId", "executionToken", "round", "results"].includes(
-            k,
-          ),
+          ![
+            "action",
+            "turnId",
+            "executionToken",
+            "round",
+            "results",
+            "parentCallId",
+            "childId",
+            "name",
+            "args",
+          ].includes(k),
       ) ||
       !chatId(body.turnId) ||
       typeof body.executionToken !== "string" ||
       !/^[a-f0-9]{64}$/.test(body.executionToken) ||
       !Number.isSafeInteger(body.round) ||
       (body.round as number) < 0 ||
-      !["next", "result", "failed"].includes(String(body.action)) ||
+      !["next", "result", "failed", "child"].includes(String(body.action)) ||
+      (body.action === "child"
+        ? body.results !== undefined ||
+          !chatId(body.parentCallId) ||
+          !chatId(body.childId) ||
+          ![
+            "tool_catalog",
+            "mithril_tool",
+            "web_search",
+            "web_extract",
+          ].includes(String(body.name)) ||
+          body.args === undefined ||
+          JSON.stringify(body.args).length > 16000
+        : ["parentCallId", "childId", "name", "args"].some(
+            (key) => body[key] !== undefined,
+          )) ||
       JSON.stringify(body).length > 524288
     )
       throw Error("Invalid tool checkpoint");
@@ -165,17 +189,31 @@ export class CloudChat implements SessionTransport {
       `/v1/chat/sessions/${encodeURIComponent(id)}/browser`,
       { ...body, toolProtocol: "mithril-language-v1" },
       "inference",
+      // The API bounds model completion to 60 seconds and child calls to 20.
+      // Keep transport alive through that operation, without replaying it.
+      body.action === "next" ? 65000 : body.action === "child" ? 25000 : 15000,
     );
     const result = value as {
       phase: string;
       round: number;
       calls: import("@mithril/workspace/client-tool-turn").ClientToolCall[];
+      childResult?: import("@mithril/workspace/client-tool-turn").ClientToolResult;
     };
     if (
-      !["ready", "tools_wait", "completed", "uncertain"].includes(
-        result.phase,
-      ) ||
+      ![
+        "ready",
+        "tools_wait",
+        "completed",
+        "uncertain",
+        "child_result",
+      ].includes(result.phase) ||
       !Number.isSafeInteger(result.round) ||
+      (body.action === "child"
+        ? result.phase !== "child_result" ||
+          result.round !== body.round ||
+          result.childResult?.id !== body.childId
+        : result.phase === "child_result" ||
+          result.childResult !== undefined) ||
       (result.calls !== undefined &&
         (!Array.isArray(result.calls) || result.calls.length > 2))
     )

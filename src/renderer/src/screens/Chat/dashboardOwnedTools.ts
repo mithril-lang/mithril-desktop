@@ -3,6 +3,7 @@ import {
   finiteToolJson,
   ownedToolSnapshot,
   ownedToolTargetBinding,
+  ownedToolTargetsEqual,
   previewOwnedToolTarget,
   OwnedToolCallError,
   type OwnedToolCall,
@@ -65,8 +66,7 @@ export async function callDashboardOwnedTool(
         ? target === null
         : target !== null &&
           expected.digest === target.digest &&
-          expected.target.namespace === target.target.namespace &&
-          expected.target.path === target.target.path;
+          ownedToolTargetsEqual(expected.target, target.target);
     if (
       !current() ||
       Date.now() - started >= 30_000 ||

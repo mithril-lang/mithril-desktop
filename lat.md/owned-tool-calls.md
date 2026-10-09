@@ -18,9 +18,9 @@ The dashboard client advertises server requests on gateway.ready and routes capt
 
 The latest successful session attachment response restores original approval frames from its bounded open_requests snapshot. Session IDs must match, metadata never creates authority, and answered/cancelled IDs cannot revive. Restoring a pending card still requires a new explicit human choice.
 
-Desktop now vendors agency.16 from Fund's qualified source. Its compiled snapshot parser validates partial/unknown effect declarations before dispatch; the archive, lock integrity and task dependency are matched. The SDK captures an optional partial local target binding before asynchronous discovery and sends its original digest on tools.call; this digest does not itself grant human authority. Human native review displays declarations in Web's canonical card, not native status metadata.
+Desktop now vendors agency.17 built from Fund's candidate source. Its compiled snapshot parser validates partial/unknown effect declarations before dispatch; the archive, lock integrity and task dependency are matched. The SDK captures an optional partial local target binding before asynchronous discovery and sends its original digest on tools.call; this digest does not itself grant human authority. Human native review displays declarations in Web's canonical card, not native status metadata.
 
-[[src/renderer/src/screens/Chat/dashboardOwnedTools.ts#callDashboardOwnedTool]] resolves the host target on the selected attached context before dispatch, refuses supplied-target mismatch, and requires fresh discovery to retain that context/revision. Missing or malformed preview RPCs refuse dispatch; an explicit null target remains unknown. This does not grant effects or obtain a human choice.
+[[src/renderer/src/screens/Chat/dashboardOwnedTools.ts#callDashboardOwnedTool]] resolves the host target on the selected attached context before dispatch, refuses supplied-target mismatch, and requires fresh discovery to retain that context/revision. Missing or malformed preview RPCs refuse dispatch; an explicit null target remains unknown. This does not grant effects or obtain a human choice. Multiple local targets carry content/entry resolution; every path and resolution must match, including both Move endpoints.
 
 The Cloud Browser runner and main adapter still consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or resolve targets. Candidate preview.48 is not a new installer or live qualification.
 
@@ -35,6 +35,10 @@ The actual mounted dashboard hook and vendored compiled SDK reject a complete-co
 ### Host target preview admission
 
 The actual hook resolves the selected host target before dispatch. Explicit null remains unknown; missing/malformed RPC, caller-target mismatch or a changed context/revision before dispatch is refused. Presentation key order does not alter identity.
+
+### Multi-file target admission
+
+The adapter compares every path and content/entry resolution against the reviewed target. Changed or missing endpoints refuse dispatch even with an unchanged digest. The same complete identity dispatches once.
 
 ### Retired preview cannot dispatch
 

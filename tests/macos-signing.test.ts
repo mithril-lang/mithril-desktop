@@ -87,7 +87,7 @@ fi
     expect(
       existsSync(join(runnerTemp, "hermes-macos-signing/developer-id.p12")),
     ).toBe(false);
-    const intermediate = join(ROOT, "scripts/certificates/developer-id-g2.cer");
+    const intermediate = join(ROOT, "scripts/certificates/developer-id-g1.cer");
     expect(log).toContain(`verify-cert -c ${intermediate} -p basic`);
     if (failure) {
       expect(result.status).not.toBe(0);
@@ -100,6 +100,9 @@ fi
     }
     expect(result.status, result.stderr).toBe(0);
     expect(log).toContain(`import ${intermediate} -k ${keychain}`);
+    const g2 = join(ROOT, "scripts/certificates/developer-id-g2.cer");
+    expect(log).toContain(`verify-cert -c ${g2} -p basic`);
+    expect(log).toContain(`import ${g2} -k ${keychain}`);
     expect(log).not.toContain("add-trusted-cert");
 
     expect(log).toContain(

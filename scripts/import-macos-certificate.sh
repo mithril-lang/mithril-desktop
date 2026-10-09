@@ -12,7 +12,6 @@ certificate_path="$signing_dir/developer-id.p12"
 keychain_path="$signing_dir/hermes-signing.keychain"
 keychain_password="${MACOS_KEYCHAIN_PASSWORD:-$(openssl rand -hex 32)}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-intermediate_path="$script_dir/certificates/developer-id-g2.cer"
 keychain_created=false
 
 mkdir -p "$signing_dir"
@@ -37,13 +36,16 @@ keychain_created=true
 security unlock-keychain -p "$keychain_password" "$keychain_path"
 security set-keychain-settings -lut 21600 "$keychain_path"
 
-# Headless workers may lack Xcode's automatically installed G2 intermediate.
+# Headless workers may lack Xcode's automatically installed intermediates.
 # Verify Apple's pinned public certificate without changing system trust.
-printf '%s  %s\n' \
-  f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a \
-  "$intermediate_path" | shasum -a 256 -c - >/dev/null
-security verify-cert -c "$intermediate_path" -p basic >/dev/null
-security import "$intermediate_path" -k "$keychain_path"
+for intermediate in \
+  developer-id-g1:7afc9d01a62f03a2de9637936d4afe68090d2de18d03f29c88cfb0b1ba63587f \
+  developer-id-g2:f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a; do
+  intermediate_path="$script_dir/certificates/${intermediate%%:*}.cer"
+  printf '%s  %s\n' "${intermediate#*:}" "$intermediate_path" | shasum -a 256 -c - >/dev/null
+  security verify-cert -c "$intermediate_path" -p basic >/dev/null
+  security import "$intermediate_path" -k "$keychain_path"
+done
 
 # Keep the temporary keychain in the user search list. On macOS 26.6,
 # `security find-identity <keychain>` can see an imported identity while
@@ -80,6 +82,10 @@ security set-key-partition-list \
 # Consume the full identity list: grep -q can close the pipe early, causing
 # security to exit with SIGPIPE and pipefail to reject a valid identity.
 if ! security find-identity -v -p codesigning "$keychain_path" | grep "Developer ID Application" > /dev/null; then
+  # Public certificate metadata only; never print private key or .p12 content.
+  security find-identity -p codesigning "$keychain_path" >&2 || true
+  security find-certificate -c "Developer ID Application" -p "$keychain_path" |
+    openssl x509 -noout -issuer -dates >&2 || true
   echo "No Developer ID Application identity was imported." >&2
   exit 1
 fi

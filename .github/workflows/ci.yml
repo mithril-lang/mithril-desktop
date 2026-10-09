@@ -65,6 +65,17 @@ jobs:
       - name: Verify compiled sidebar layout
         run: node --test scripts/sidebar-visual.test.mjs
 
+      - name: Verify shared chat composer stays inside the window
+        run: npm run test:chat-viewport
+
+      - name: Retain chat viewport screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-chat-viewport-${{ github.sha }}
+          path: artifacts/chat-viewport/
+          if-no-files-found: error
+
   verify-store-automation:
     runs-on: ubuntu-latest
     env:

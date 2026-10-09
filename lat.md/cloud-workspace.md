@@ -14,6 +14,14 @@ Workspace access requires explicit `workspace:read` and `workspace:write` scopes
 
 The shared workspace package supplies Discover, Office, Kanban, Projects, Capabilities, Memory, Settings and Profile through one source; Discover, Office and Kanban navigation now mounts this renderer directly in both clients.
 
+### Chat viewport containment
+
+The Desktop host constrains the shared conversation to the available pane height so long histories scroll inside the transcript and keep the composer and status visible.
+
+`MithrilChat` mounts a flexible, shrinkable host. The content pane and retained screen panes allow both dimensions to shrink; the shared conversation occupies remaining height instead of resolving percentage height against an unconstrained wrapper.
+
+The Chromium viewport test is required by CI after browser installation. Transient server failures use readable synchronization guidance while retaining pending changes and existing account access; IPC implementation names are not shown as the primary status.
+
 The old native records remain available through reviewed import, without scanning or overwriting local files.
 
 Discover projects the official Mithril Registry into safe catalog links. Portable projects, tasks, workrooms, notes, profile and preferences use the owner-scoped workspace API. Actual native runtime views are separately inspected and linked; portable records do not substitute for native Office or tool execution. Capability preferences express intent without installing a plugin or granting device permission.

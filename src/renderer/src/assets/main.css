@@ -3145,6 +3145,8 @@ body:has(.shell-vibrant),
 
 .content {
   flex: 1;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -3156,6 +3158,21 @@ body:has(.shell-vibrant),
 /* ========================================================================
    CHAT
    ======================================================================== */
+.mithril-chat-host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mithril-chat-host > .session-desktop {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
 .chat-container {
   display: flex;
   flex-direction: column;

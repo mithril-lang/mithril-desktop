@@ -83,6 +83,39 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// @lat: [[cloud-workspace-tests#Cloud workspace tests#Transient history error presentation]]
+it("clears a readable transient history failure on recovery without submitting work", async () => {
+  vi.useFakeTimers();
+  sync.mockRejectedValueOnce(
+    Error(
+      "Error invoking remote method 'cloud-chat-native-history-sync': Error: Workspace request failed (500)",
+    ),
+  );
+  render(<RepositoryReplication profile="default" locale="en" enabled />);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1);
+  });
+  expect(
+    screen.getByText(
+      "Synchronization is temporarily unavailable. Your changes are retained.",
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/Error invoking remote method/)).toBeNull();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(20000);
+  });
+  expect(
+    screen.queryByText(
+      "Synchronization is temporarily unavailable. Your changes are retained.",
+    ),
+  ).toBeNull();
+  expect(sync).toHaveBeenCalledTimes(2);
+  expect(resolve).not.toHaveBeenCalled();
+  expect(
+    window.hermesAPI.cloudWorkspace.repository.apply,
+  ).not.toHaveBeenCalled();
+});
+
 // @lat: [[cloud-workspace-tests#Automatic background connection recovery]]
 it("resumes background synchronization after transient startup failure without another sign-in", async () => {
   vi.useFakeTimers();

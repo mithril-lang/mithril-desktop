@@ -6,6 +6,14 @@ export function connectionNotice(
 ): { message: string; action: string; retry: boolean } {
   const message = error instanceof Error ? error.message : "";
   const ja = locale.startsWith("ja");
+  if (/request failed \((500|502|503|504)\)/i.test(message))
+    return {
+      message: ja
+        ? "同期先に一時的に接続できません。変更は保持されています。"
+        : "Synchronization is temporarily unavailable. Your changes are retained.",
+      action: ja ? "再接続" : "Reconnect",
+      retry: true,
+    };
   if (/Cloud connection requires explicit/.test(message))
     return {
       message: ja

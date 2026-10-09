@@ -201,6 +201,18 @@ export default function MithrilChat({
     }),
     [toolRunner],
   );
+  // An unresolved identity is not a signed-out identity. Do not expose the
+  // welcome sign-in action or any former owner's data during revalidation.
+  if (!identityChecked)
+    return (
+      <div className="mithril-chat-host" aria-busy="true">
+        <div className="session-notice" role="status">
+          {locale.startsWith("ja")
+            ? "Mithril アカウントを確認中…"
+            : "Checking Mithril account…"}
+        </div>
+      </div>
+    );
   return (
     <div className="mithril-chat-host">
       {identityChecked &&

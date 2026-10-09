@@ -1,3 +1,5 @@
+import { MemoryReviewPanel } from "@mithril/workspace/memory-review-react";
+import "@mithril/workspace/memory-review.css";
 import { ToolAttemptsPanel } from "./ToolAttemptsPanel";
 import { ChatSurface } from "@mithril/design-system/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -140,7 +142,7 @@ function Chat({
   onTitleChange,
   agentAppearance,
 }: ChatProps): React.JSX.Element {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { completionSoundEnabled } = useChatPreferences();
   // Identity + appearance of the agent this conversation is with. Passed to the
   // transcript so idle avatars render the agent's profile picture (the loading
@@ -1072,6 +1074,14 @@ function Chat({
       <div className="chat-input-area">
         {dashboardTransport.enabled && (
           <ToolAttemptsPanel reader={dashboardTransport.toolAttempts} />
+        )}
+        {dashboardTransport.memoryReview && (
+          <MemoryReviewPanel
+            {...dashboardTransport.memoryReview}
+            ja={locale === "ja"}
+            disabled={isLoading}
+            buttonStyle="chat-approval-btn"
+          />
         )}
         <QueuedMessages
           messages={queuedMessages}

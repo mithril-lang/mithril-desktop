@@ -1,3 +1,4 @@
+import { MemoryReviewPanel } from "@mithril/workspace/memory-review-react";
 import { ToolAttemptsPanel } from "../ToolAttemptsPanel";
 import {
   act,
@@ -66,6 +67,7 @@ vi.mock("../dashboardGatewayClient", () => ({
 }));
 
 interface HarnessApi {
+  memoryReview?: ReturnType<typeof useDashboardChatTransport>["memoryReview"];
   isLoading?: boolean;
   activeTurnRef?: MutableRefObject<ActiveTurn | null>;
   abort?: () => void;
@@ -102,6 +104,7 @@ function Harness({
   api,
   connectionId,
   connectionRevision,
+  storedSessionId = null,
   fallbackOnUnavailable = false,
   initialConnectionMode = "local",
   onDashboardUnavailable,
@@ -110,6 +113,7 @@ function Harness({
   api: HarnessApi;
   connectionId?: string;
   connectionRevision?: number;
+  storedSessionId?: string | null;
   fallbackOnUnavailable?: boolean;
   initialConnectionMode?: "local" | "remote" | "ssh";
   onDashboardUnavailable?: (reason: string) => void;
@@ -140,7 +144,7 @@ function Harness({
     connectionMode,
     enabled: true,
     fallbackOnUnavailable,
-    hermesSessionId: null,
+    hermesSessionId: storedSessionId,
     messagesRef,
     model,
     profile: undefined,
@@ -162,6 +166,7 @@ function Harness({
       activeTurnRef,
       abort: transport.abort,
       callTool: transport.callTool,
+      memoryReview: transport.memoryReview,
       messages,
       respondApproval: transport.respondApproval,
       respondClarify: transport.respondClarify,
@@ -183,9 +188,22 @@ function Harness({
     transport.respondClarify,
     transport.abort,
     transport.callTool,
+    transport.memoryReview,
   ]);
 
-  return <ToolAttemptsPanel reader={transport.toolAttempts} />;
+  return (
+    <>
+      <ToolAttemptsPanel reader={transport.toolAttempts} />
+      {transport.memoryReview && (
+        <MemoryReviewPanel
+          {...transport.memoryReview}
+          ja={false}
+          disabled={false}
+          buttonStyle=""
+        />
+      )}
+    </>
+  );
 }
 
 const targetPreviewSnapshot = (): {
@@ -266,6 +284,165 @@ describe("useDashboardChatTransport recovery", () => {
         })),
       },
     });
+  });
+
+  // @lat: [[owned-tool-calls#Pending memory human review#Explicit decision and unknown outcome]]
+  it.each(["approve", "reject", "lost"])(
+    "mounted memory review requires human %s and never redispatches",
+    async (decision) => {
+      const api: HarnessApi = {};
+      await attachOwnedHarness(api);
+      const protocol = "hermes-pending-memory-review-v1";
+      const pendingId = "1234abcd",
+        digest = "a".repeat(64);
+      dashboardMock.request.mockImplementation(async (_method, params) => {
+        if (params.command === "/memory review")
+          return {
+            output: JSON.stringify({
+              protocol,
+              pending: [{ pending_id: pendingId, summary: "review entry" }],
+              remaining_count: 0,
+            }),
+          };
+        if (params.command === `/memory review ${pendingId}`)
+          return {
+            output: JSON.stringify({
+              protocol,
+              pending_id: pendingId,
+              review_digest: digest,
+              review: [
+                "Target: MEMORY.md",
+                "Complete new entry: 全文 <script>not executed</script>",
+              ],
+            }),
+          };
+        if (decision === "lost") throw Error("lost result after commit");
+        return { output: "Decision returned" };
+      });
+      await expect(
+        api.memoryReview!.client.request("prompt.submit", {
+          session_id: "live",
+          command: "/memory review",
+        }),
+      ).rejects.toThrow(/retired/);
+      await expect(
+        api.memoryReview!.client.request("slash.exec", {
+          session_id: "foreign",
+          command: "/memory review",
+        }),
+      ).rejects.toThrow(/retired/);
+      api.activeTurnRef!.current = { ...activeBadTurn };
+      await expect(
+        api.memoryReview!.client.request("slash.exec", {
+          session_id: "live",
+          command: "/memory review",
+        }),
+      ).rejects.toThrow(/retired/);
+      api.activeTurnRef!.current = null;
+      expect(dashboardMock.request).not.toHaveBeenCalled();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Inspect pending memory" }),
+      );
+      fireEvent.click(
+        await screen.findByRole("button", { name: /Review proposal/ }),
+      );
+      const button = await screen.findByRole("button", {
+        name:
+          decision === "reject"
+            ? "Reject this memory change"
+            : "Approve this memory change",
+      });
+      expect(screen.getByText(/全文/).querySelector("script")).toBeNull();
+      fireEvent.click(button);
+      fireEvent.click(button);
+      await screen.findByText(
+        decision === "lost" ? /Outcome unknown/ : "Decision returned",
+      );
+      expect(dashboardMock.request).toHaveBeenCalledTimes(3);
+      expect(dashboardMock.request).toHaveBeenLastCalledWith("slash.exec", {
+        session_id: "live",
+        command: `/memory ${decision === "reject" ? "reject" : "approve"} ${pendingId} ${digest}`,
+      });
+      expect(
+        screen.queryByRole("button", { name: "Approve this memory change" }),
+      ).toBeNull();
+    },
+  );
+
+  // @lat: [[owned-tool-calls#Pending memory human review#Retired review has no authority]]
+  it.each([
+    "model",
+    "provider",
+    "connection",
+    "session",
+    "abort",
+    "disconnect",
+    "unmount",
+  ])("retires pending full memory review on %s", async (mode) => {
+    const api: HarnessApi = {};
+    const view = await attachOwnedHarness(api);
+    const previous = api.memoryReview!;
+    let complete!: (value: unknown) => void;
+    dashboardMock.request.mockImplementationOnce(async () => ({
+      output: JSON.stringify({
+        protocol: "hermes-pending-memory-review-v1",
+        pending: [{ pending_id: "1234abcd", summary: "late proposal" }],
+        remaining_count: 0,
+      }),
+    }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Inspect pending memory" }),
+    );
+    const proposal = await screen.findByRole("button", {
+      name: /Review proposal/,
+    });
+    dashboardMock.request.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        }),
+    );
+    fireEvent.click(proposal);
+    await act(async () => {
+      if (mode === "model") api.setModel!("new-model");
+      if (mode === "provider") api.setProvider!("new-provider");
+      if (mode === "connection")
+        view.rerender(
+          <Harness api={api} connectionId="b" connectionRevision={2} />,
+        );
+      if (mode === "session")
+        view.rerender(
+          <Harness
+            api={api}
+            connectionId="a"
+            connectionRevision={1}
+            storedSessionId="other"
+          />,
+        );
+      if (mode === "abort") api.abort!();
+      if (mode === "disconnect") dashboardMock.onClose!();
+      if (mode === "unmount") view.unmount();
+      complete({
+        output: JSON.stringify({
+          protocol: "hermes-pending-memory-review-v1",
+          pending_id: "1234abcd",
+          review_digest: "a".repeat(64),
+          review: ["Late full memory body"],
+        }),
+      });
+    });
+    expect(
+      screen.queryByRole("button", { name: "Approve this memory change" }),
+    ).toBeNull();
+    expect(screen.queryByText("Late full memory body")).toBeNull();
+    const before = dashboardMock.request.mock.calls.length;
+    await expect(
+      previous.client.request("slash.exec", {
+        session_id: previous.sessionId,
+        command: `/memory approve 1234abcd ${"a".repeat(64)}`,
+      }),
+    ).rejects.toThrow(/retired/);
+    expect(dashboardMock.request).toHaveBeenCalledTimes(before);
   });
 
   // @lat: [[owned-tool-calls#Test specifications#Malformed declared effects]]

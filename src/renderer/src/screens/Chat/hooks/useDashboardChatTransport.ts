@@ -1,3 +1,4 @@
+import type { MemoryReviewClient } from "@mithril/workspace/memory-review-react";
 import {
   OwnedToolCallError,
   type OwnedToolCall,
@@ -5,7 +6,7 @@ import {
 } from "@mithril/workspace/owned-gateway-tools";
 import { callDashboardOwnedTool } from "../dashboardOwnedTools";
 import { ToolAttemptReader } from "../toolAttemptReader";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LOCAL_PRESETS } from "../../../constants";
 import {
   isBubbleMessage,
@@ -125,6 +126,7 @@ interface UseDashboardChatTransportArgs {
 }
 
 interface UseDashboardChatTransportResult {
+  memoryReview: { client: MemoryReviewClient; sessionId: string } | null;
   toolAttempts: ToolAttemptReader;
   callTool: (
     request: Omit<OwnedToolCall, "sessionId" | "current">,
@@ -969,6 +971,21 @@ export function useDashboardChatTransport({
   const connectingRef = useRef<Promise<DashboardGatewayClient> | null>(null);
   const clientGenerationRef = useRef(0);
   const toolCallEpochRef = useRef(0);
+  const [memoryReviewEpoch, setMemoryReviewEpoch] = useState(0);
+  const memoryReviewScope = JSON.stringify([
+    enabled,
+    connectionId,
+    connectionRevision,
+    connectionMode,
+    profile,
+    hermesSessionId,
+    model,
+    modelBaseUrl,
+    provider,
+    contextFolder,
+  ]);
+  const memoryReviewScopeRef = useRef(memoryReviewScope);
+  memoryReviewScopeRef.current = memoryReviewScope;
   // Sticky "dashboard transport can't connect on this remote/SSH connection"
   // flag. The dashboard WebSocket (`/api/ws`) never connects against a tunneled
   // `hermes gateway` (issue #667), so once we've learned it's unavailable we
@@ -993,6 +1010,7 @@ export function useDashboardChatTransport({
     attemptEnabledRef.current = enabled;
     if (!enabled) {
       toolCallEpochRef.current++;
+      setMemoryReviewEpoch(toolCallEpochRef.current);
       toolAttempts.invalidate();
     }
   }, [enabled, toolAttempts]);
@@ -1137,6 +1155,7 @@ export function useDashboardChatTransport({
     expirePendingApprovalsRef.current();
     storedSessionIdRef.current = hermesSessionId;
     toolCallEpochRef.current++;
+    setMemoryReviewEpoch(toolCallEpochRef.current);
     toolAttempts.invalidate();
     runtimeSessionIdRef.current = null;
     reasoningSegmentClosedRef.current = false;
@@ -1150,6 +1169,7 @@ export function useDashboardChatTransport({
   useEffect(() => {
     appliedModelRef.current = null;
     toolCallEpochRef.current++;
+    setMemoryReviewEpoch(toolCallEpochRef.current);
     toolAttempts.invalidate();
   }, [model, provider, toolAttempts]);
 
@@ -1161,6 +1181,7 @@ export function useDashboardChatTransport({
     clientRef.current = null;
     connectingRef.current = null;
     toolCallEpochRef.current++;
+    setMemoryReviewEpoch(toolCallEpochRef.current);
     toolAttempts.invalidate();
     runtimeSessionIdRef.current = null;
     reasoningSegmentClosedRef.current = false;
@@ -1210,6 +1231,7 @@ export function useDashboardChatTransport({
 
       if (event.type === "session.info") {
         toolCallEpochRef.current++;
+        setMemoryReviewEpoch(toolCallEpochRef.current);
         toolAttempts.invalidate();
         const recordRuntimeInfo = window.hermesAPI.recordAgentRuntimeInfo;
         if (typeof recordRuntimeInfo === "function") {
@@ -1523,6 +1545,7 @@ export function useDashboardChatTransport({
                 // process-local runtime id. Preserve the stored id so the next
                 // connection resumes it before model.options or prompt.submit.
                 toolCallEpochRef.current++;
+                setMemoryReviewEpoch(toolCallEpochRef.current);
                 toolAttempts.invalidate();
                 runtimeSessionIdRef.current = null;
                 appliedModelRef.current = null;
@@ -1629,6 +1652,7 @@ export function useDashboardChatTransport({
 
         targetSessionId = response.runtimeSessionId;
         toolCallEpochRef.current++;
+        setMemoryReviewEpoch(toolCallEpochRef.current);
         toolAttempts.invalidate();
         runtimeSessionIdRef.current = targetSessionId;
         lastRuntimeSessionWasCreatedRef.current = response.created;
@@ -1687,6 +1711,7 @@ export function useDashboardChatTransport({
           .request("session.close", { session_id: targetSessionId })
           .catch(() => undefined);
         toolCallEpochRef.current++;
+        setMemoryReviewEpoch(toolCallEpochRef.current);
         toolAttempts.invalidate();
         runtimeSessionIdRef.current = null;
         pendingApprovalsRef.current = [];
@@ -1940,6 +1965,7 @@ export function useDashboardChatTransport({
       };
       const failActiveTurn = (message: string): true => {
         toolCallEpochRef.current++;
+        setMemoryReviewEpoch(toolCallEpochRef.current);
         toolAttempts.invalidate();
         const activeTurn = activeTurnRef.current;
         if (activeTurn) activeTurn.status = "failed";
@@ -1977,6 +2003,7 @@ export function useDashboardChatTransport({
       if (dashboardText === null) {
         if (fallbackOnUnavailable) {
           toolCallEpochRef.current++;
+          setMemoryReviewEpoch(toolCallEpochRef.current);
           toolAttempts.invalidate();
           return false;
         }
@@ -2001,6 +2028,7 @@ export function useDashboardChatTransport({
         if (fallbackOnUnavailable) {
           console.warn("Falling back to legacy chat transport.", err);
           toolCallEpochRef.current++;
+          setMemoryReviewEpoch(toolCallEpochRef.current);
           toolAttempts.invalidate();
           return false;
         }
@@ -2023,6 +2051,7 @@ export function useDashboardChatTransport({
               .catch(() => undefined);
           }
           toolCallEpochRef.current++;
+          setMemoryReviewEpoch(toolCallEpochRef.current);
           toolAttempts.invalidate();
           runtimeSessionIdRef.current = null;
           pendingApprovalsRef.current = [];
@@ -2055,6 +2084,7 @@ export function useDashboardChatTransport({
         if (!syncedAttachments.handled) {
           if (fallbackOnUnavailable) {
             toolCallEpochRef.current++;
+            setMemoryReviewEpoch(toolCallEpochRef.current);
             toolAttempts.invalidate();
             return false;
           }
@@ -2076,6 +2106,7 @@ export function useDashboardChatTransport({
           profile,
           onRecoveredSessionId: (recoveredSessionId) => {
             toolCallEpochRef.current++;
+            setMemoryReviewEpoch(toolCallEpochRef.current);
             toolAttempts.invalidate();
             runtimeSessionIdRef.current = recoveredSessionId;
           },
@@ -2280,6 +2311,7 @@ export function useDashboardChatTransport({
 
   const abort = useCallback(() => {
     toolCallEpochRef.current++;
+    setMemoryReviewEpoch(toolCallEpochRef.current);
     toolAttempts.invalidate();
     expirePendingClarifyRef.current();
     expirePendingApprovalsRef.current();
@@ -2305,7 +2337,52 @@ export function useDashboardChatTransport({
     [toolAttempts],
   );
 
+  const reviewClient = clientRef.current;
+  const reviewSessionId = runtimeSessionIdRef.current;
+  // @lat: [[owned-tool-calls#Pending memory human review#Attached conversation custody]]
+  const memoryReview = useMemo(() => {
+    if (!enabled || !reviewClient?.connected || !reviewSessionId) return null;
+    const generation = clientGenerationRef.current;
+    const epoch = memoryReviewEpoch;
+    const current = (): boolean =>
+      activeTurnRef.current?.status !== "running" &&
+      memoryReviewScopeRef.current === memoryReviewScope &&
+      clientRef.current === reviewClient &&
+      reviewClient.connected &&
+      runtimeSessionIdRef.current === reviewSessionId &&
+      clientGenerationRef.current === generation &&
+      toolCallEpochRef.current === epoch;
+    const client: MemoryReviewClient = {
+      current,
+      request: (method, params) => {
+        if (
+          !current() ||
+          method !== "slash.exec" ||
+          params.session_id !== reviewSessionId ||
+          typeof params.command !== "string" ||
+          !/^\/memory (review(?: [a-f0-9]{8})?|(?:approve|reject) [a-f0-9]{8} [a-f0-9]{64})$/.test(
+            params.command,
+          )
+        ) {
+          return Promise.reject(
+            new Error("Memory review conversation retired"),
+          );
+        }
+        return reviewClient.request(method, params);
+      },
+    };
+    return { client, sessionId: reviewSessionId };
+  }, [
+    activeTurnRef,
+    enabled,
+    reviewClient,
+    reviewSessionId,
+    memoryReviewEpoch,
+    memoryReviewScope,
+  ]);
+
   return {
+    memoryReview,
     toolAttempts,
     callTool,
     abort,

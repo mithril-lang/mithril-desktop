@@ -122,11 +122,11 @@ It clears the entered bearer after success. The old Kotoba sign-in and gateway c
 
 Desktop registers a commit-pinned organization CI controller through `.github/independent-actions.json`; native runtime and publication remain held during initial preparation.
 
-See `.github/INDEPENDENT_CI.md` for the shared entrypoint and its verification scope. This configuration is excluded from the app bundle. It does not qualify a Linux source check as a native installer release or retire existing workflows. Independent activation requires the pinned Electron/native closure, production dependency audit, native platform matrix, macOS signing/notarization/launch, Windows signing, and installer/update verification. Preserve the existing stable/beta false gates and the release requirements below until the equivalent independent native path is verified.
+See `.github/INDEPENDENT_CI.md` for the shared entrypoint and its verification scope. This configuration is excluded from the app bundle. It does not qualify a Linux source check as a native installer release or retire existing workflows. Independent activation requires the pinned Electron/native closure, production dependency audit, native platform matrix, macOS signing/notarization/launch, Windows signing, and installer/update verification. Preserve the existing stable/beta false gates and the release requirements below until the equivalent independent native path is verified. The human instruction supersedes the old Actions dispatch requirement in AGENTS.md; neither adapter registration nor a source receipt activates a native publisher.
 
 ## Desktop release gate
 
-GitHub Actions now build preview installers on current main. The cross-platform workflow publishes the prerelease assets only after every platform passes packaging checks and both Mac packages pass Apple notarization.
+Jun requires independent CI/CD execution as of 2026-10-09. The inherited Actions preview path is historical; its native checks must be preserved in the independent path before installer publication.
 
 An Apple agreement HTTP403 leaves publication pending; source merge is not installer publication.
 
@@ -146,7 +146,7 @@ Runner admission has seven regression fixtures in PR CI. The headless Mac uses a
 
 ### Cross-platform preview
 
-The manual preview workflow builds both Mac packages on the trusted Mac worker, with Windows and Linux still on hosted runners. Publication waits for every platform to succeed.
+The previous manual preview used trusted Mac workers and hosted Windows/Linux runners. Independent publication must retain that platform coverage and wait for every platform to qualify.
 
 Windows publishes NSIS and portable executables with `preview.yml`. Each Linux architecture publishes AppImage and Debian packages plus its architecture-specific preview feed. Both Mac architectures publish notarized DMG and ZIP packages. The publish job preserves existing assets and replaces the consolidated SHA-256 manifest.
 

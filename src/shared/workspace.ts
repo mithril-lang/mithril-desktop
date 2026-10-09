@@ -59,7 +59,35 @@ export type ChatGatewaySelection = {
     active: boolean;
   } | null;
 };
+export type NativeChildConsentRequest = ChatGatewayRequest & {
+  requestId: string;
+};
+export type NativeChildConsent = {
+  userId: string;
+  sessionId: string;
+  requestId: string;
+  state:
+    | "pending"
+    | "approving"
+    | "allowed"
+    | "denied"
+    | "cancelled"
+    | "retired";
+  expiresAt: number;
+};
 export interface CloudChatAPI extends SessionTransport {
+  createNativeChildConsent(
+    request: ChatGatewayRequest,
+    body: Record<string, unknown>,
+  ): Promise<NativeChildConsent>;
+  pollNativeChildConsent(
+    request: NativeChildConsentRequest,
+  ): Promise<NativeChildConsent>;
+  reviewNativeChildConsent(request: NativeChildConsentRequest): Promise<void>;
+  cancelNativeChildConsent(request: NativeChildConsentRequest): Promise<void>;
+  executeNativeChildConsent(
+    request: NativeChildConsentRequest,
+  ): ReturnType<CloudChatAPI["browserStep"]>;
   gatewaySelection(request: ChatGatewayRequest): Promise<ChatGatewaySelection>;
   reviewGateway(request: ChatGatewayRequest): Promise<void>;
   browserStep(

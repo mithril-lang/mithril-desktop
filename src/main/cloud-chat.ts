@@ -1,3 +1,4 @@
+import { NativeChildConsents } from "./native-child-consents";
 import {
   createHistoryFileTransport,
   type HistoryFileTransport,
@@ -6,6 +7,8 @@ import { CloudWorkspace } from "./cloud-workspace";
 import type {
   ChatGatewayRequest,
   ChatGatewaySelection,
+  NativeChildConsentRequest,
+  NativeChildConsent,
 } from "../shared/workspace";
 import {
   chatId,
@@ -40,12 +43,51 @@ export class CloudChat implements SessionTransport {
       expires?: number;
     }
   >();
+  private nativeConsents: NativeChildConsents;
   constructor(
     readonly auth: CloudWorkspace,
     private readonly openGatewayReview?: (url: string) => Promise<void>,
   ) {
+    this.nativeConsents = new NativeChildConsents(auth, openGatewayReview);
     this.historyFiles = createHistoryFileTransport((path, init) =>
       auth.authorizedBinaryRequest(path, init),
+    );
+  }
+  async createNativeChildConsent(
+    request: ChatGatewayRequest,
+    body: Record<string, unknown>,
+  ): Promise<NativeChildConsent> {
+    const context = await this.auth.nativeContext();
+    const inventory = this.browserInventories.get(
+      JSON.stringify([context, request?.sessionId]),
+    );
+    if (
+      !inventory?.tools?.has(String(body?.name)) ||
+      inventory.turnId !== body?.turnId ||
+      inventory.executionToken !== body?.executionToken ||
+      inventory.round !== body?.round ||
+      !inventory.parents?.has(String(body?.parentCallId)) ||
+      (inventory.expires ?? 0) <= Date.now()
+    )
+      throw Error("Native child inventory retired");
+    return this.nativeConsents.create(request, body, context);
+  }
+  pollNativeChildConsent(
+    request: NativeChildConsentRequest,
+  ): Promise<NativeChildConsent> {
+    return this.nativeConsents.poll(request);
+  }
+  reviewNativeChildConsent(request: NativeChildConsentRequest): Promise<void> {
+    return this.nativeConsents.review(request);
+  }
+  cancelNativeChildConsent(request: NativeChildConsentRequest): Promise<void> {
+    return this.nativeConsents.cancel(request);
+  }
+  executeNativeChildConsent(
+    request: NativeChildConsentRequest,
+  ): ReturnType<CloudChat["browserStep"]> {
+    return this.nativeConsents.execute(request, (id, body, context) =>
+      this.browserStep(id, body, context),
     );
   }
   /** Fixed owner-scoped metadata only; selection and human grants remain Web-session operations. */
@@ -238,6 +280,7 @@ export class CloudChat implements SessionTransport {
   async browserStep(
     id: string,
     body: Record<string, unknown>,
+    expectedContext?: Awaited<ReturnType<CloudWorkspace["nativeContext"]>>,
   ): Promise<{
     phase: string;
     round: number;
@@ -274,7 +317,7 @@ export class CloudChat implements SessionTransport {
     )
       throw Error("Invalid tool checkpoint");
     body = structuredClone(body);
-    const context = await this.auth.nativeContext();
+    const context = expectedContext ?? (await this.auth.nativeContext());
     const inventoryKey = JSON.stringify([context, id]);
     // Context fingerprints stay in main; bound memory across accounts/sessions.
     for (const [key, value] of this.browserInventories)
@@ -306,6 +349,14 @@ export class CloudChat implements SessionTransport {
         "results" in body
       )
         throw Error("Invalid child tool checkpoint");
+      if (
+        dynamicChild &&
+        !expectedContext &&
+        !["tool_catalog", "mithril_tool", "web_search", "web_extract"].includes(
+          String(body.name),
+        )
+      )
+        throw Error("Native child approval required");
     } else if (
       ["parentCallId", "childId", "name", "args"].some((key) => key in body)
     )
@@ -331,6 +382,7 @@ export class CloudChat implements SessionTransport {
       context,
     );
     const result = value as {
+      sessionId?: unknown;
       phase: string;
       round: number;
       calls: import("@mithril/workspace/client-tool-turn").ClientToolCall[];
@@ -338,6 +390,7 @@ export class CloudChat implements SessionTransport {
       childTools?: string[];
     };
     if (
+      result.sessionId !== id ||
       ![
         "ready",
         "tools_wait",

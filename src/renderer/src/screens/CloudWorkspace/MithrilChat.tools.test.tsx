@@ -1,3 +1,4 @@
+import type { NativeChildConsent } from "../../../../shared/workspace";
 import {
   act,
   cleanup,
@@ -35,6 +36,25 @@ let signal: AbortSignal;
 let resolveExecution: (value: unknown) => void;
 const apply = vi.fn();
 const step = vi.fn();
+const createConsent = vi.fn(),
+  pollConsent = vi.fn(),
+  reviewConsent = vi.fn(),
+  cancelConsent = vi.fn(),
+  executeConsent = vi.fn();
+let nativeBody: Record<string, unknown>;
+const consentId = "b".repeat(64);
+function consent(
+  state: NativeChildConsent["state"] = "allowed",
+): NativeChildConsent {
+  return {
+    userId: "owner",
+    sessionId: "s1",
+    requestId: consentId,
+    expiresAt: Date.now() + 40000,
+    state,
+  };
+}
+
 function ack(): ChatOperationResponse {
   return {
     schemaVersion: 1,
@@ -62,6 +82,16 @@ beforeEach(() => {
       resolveExecution = resolve;
     });
   });
+  createConsent.mockImplementation(async (_scope, body) => {
+    nativeBody = body;
+    return consent();
+  });
+  pollConsent.mockImplementation(async () => consent());
+  reviewConsent.mockResolvedValue(undefined);
+  cancelConsent.mockResolvedValue(undefined);
+  executeConsent.mockImplementation(async () =>
+    step("s1", { ...nativeBody, action: "child" }),
+  );
   apply.mockImplementation((_sid, op) => {
     operation = op;
     return new Promise<ChatOperationResponse>((resolve) => {
@@ -122,6 +152,11 @@ beforeEach(() => {
         models: vi.fn(async () => [{ id: "model", available: true }]),
         apply,
         browserStep: step,
+        createNativeChildConsent: createConsent,
+        pollNativeChildConsent: pollConsent,
+        reviewNativeChildConsent: reviewConsent,
+        cancelNativeChildConsent: cancelConsent,
+        executeNativeChildConsent: executeConsent,
       },
       cloudWorkspace: {},
       onCloudChatAccountChanged: (callback: () => void) => {
@@ -263,3 +298,100 @@ it("retires active child authority when the actual shared UI opens a new convers
   });
   expect(step).toHaveBeenCalledTimes(before);
 });
+
+// @lat: [[mithril-code#Mithril Code#Mounted native approval release]]
+it("shows a pending exact call, requires an explicit browser review, then releases the real runner child once", async () => {
+  let allowed = false;
+  const expiry = Date.now() + 40000;
+  const pending = (): NativeChildConsent => ({
+    ...consent(allowed ? "allowed" : "pending"),
+    expiresAt: expiry,
+  });
+  createConsent.mockImplementation(async (_scope, body) => {
+    nativeBody = body;
+    return pending();
+  });
+  pollConsent.mockImplementation(async () => pending());
+  reviewConsent.mockImplementation(async () => {
+    allowed = true;
+  });
+  render(<MithrilChat profile="default" initialSessionId="s1" />);
+  await submit();
+  await act(async () => {
+    resolveAck(ack());
+  });
+  await waitFor(() => expect(host.call).toHaveBeenCalledOnce());
+  const child = broker("read_file", { path: "owned.txt" });
+  expect(
+    await screen.findByText("Waiting for approval of read_file."),
+  ).toBeInTheDocument();
+  expect(executeConsent).not.toHaveBeenCalled();
+  expect(reviewConsent).not.toHaveBeenCalled();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review call in browser" }),
+  );
+  await expect(child).resolves.toMatchObject({ result: "owned" });
+  expect(createConsent).toHaveBeenCalledWith(
+    { userId: "owner", profile: "default", sessionId: "s1" },
+    expect.objectContaining({
+      parentCallId: "parent",
+      name: "read_file",
+      args: { path: "owned.txt" },
+    }),
+  );
+  expect(reviewConsent).toHaveBeenCalledOnce();
+  expect(executeConsent).toHaveBeenCalledOnce();
+  expect(cancelConsent).not.toHaveBeenCalled();
+  await act(async () => {
+    resolveExecution({ id: "parent", receipt: {}, result: "done", files: {} });
+  });
+});
+// @lat: [[mithril-code#Mithril Code#Mounted native approval withdrawal]]
+it.each(["cancel", ...retirements])(
+  "withdraws pending native consent without effects after %s",
+  async (retirement) => {
+    const expiry = Date.now() + 40000;
+    createConsent.mockImplementation(async () => ({
+      ...consent("pending"),
+      expiresAt: expiry,
+    }));
+    pollConsent.mockImplementation(async () => ({
+      ...consent("pending"),
+      expiresAt: expiry,
+    }));
+    const view = render(
+      <MithrilChat profile="default" initialSessionId="s1" />,
+    );
+    await submit();
+    await act(async () => {
+      resolveAck(ack());
+    });
+    await waitFor(() => expect(host.call).toHaveBeenCalledOnce());
+    const child = broker("read_file", { path: "owned.txt" });
+    const rejected = expect(child).rejects.toThrow();
+    await screen.findByText("Waiting for approval of read_file.");
+    if (retirement === "cancel")
+      fireEvent.click(screen.getByRole("button", { name: "Cancel request" }));
+    else if (retirement === "unmount") view.unmount();
+    else if (retirement === "account") act(() => accountChanged());
+    else
+      view.rerender(
+        <MithrilChat
+          profile={retirement === "profile" ? "other" : "default"}
+          initialSessionId={retirement === "session" ? "s2" : "s1"}
+          visible={retirement !== "hidden"}
+        />,
+      );
+    await rejected;
+    await waitFor(() => expect(cancelConsent).toHaveBeenCalledOnce());
+    expect(executeConsent).not.toHaveBeenCalled();
+    await act(async () => {
+      resolveExecution({
+        id: "parent",
+        receipt: {},
+        result: "late",
+        files: {},
+      });
+    });
+  },
+);

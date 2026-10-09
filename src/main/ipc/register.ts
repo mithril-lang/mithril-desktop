@@ -1351,6 +1351,26 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudChat.reviewGateway(request);
   });
+  ipcMain.handle("cloud-chat-native-consent-create", (event, request, body) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.createNativeChildConsent(request, body);
+  });
+  ipcMain.handle("cloud-chat-native-consent-poll", (event, request) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.pollNativeChildConsent(request);
+  });
+  ipcMain.handle("cloud-chat-native-consent-review", (event, request) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.reviewNativeChildConsent(request);
+  });
+  ipcMain.handle("cloud-chat-native-consent-cancel", (event, request) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.cancelNativeChildConsent(request);
+  });
+  ipcMain.handle("cloud-chat-native-consent-execute", (event, request) => {
+    trustedWorkspaceSender(event);
+    return cloudChat.executeNativeChildConsent(request);
+  });
   ipcMain.handle("cloud-chat-browser-step", (event, id, body) => {
     trustedWorkspaceSender(event);
     return cloudChat.browserStep(id, body);

@@ -293,6 +293,7 @@ export class CloudWorkspace {
     profile: string,
     body?: unknown,
     timeoutMs = 15000,
+    method?: "DELETE",
   ): Promise<unknown> {
     const generation = this.generation;
     if (token !== this.deps.token() || profile !== this.deps.profile()) {
@@ -302,7 +303,7 @@ export class CloudWorkspace {
     let response: Response;
     try {
       response = await this.deps.fetch(`${this.deps.origin()}${path}`, {
-        method: body === undefined ? "GET" : "POST",
+        method: method ?? (body === undefined ? "GET" : "POST"),
         headers: {
           authorization: `Bearer ${token}`,
           accept: "application/json",
@@ -495,6 +496,7 @@ export class CloudWorkspace {
     body?: unknown,
     extraScope?: string | readonly string[],
     expectedContext?: Awaited<ReturnType<CloudWorkspace["nativeContext"]>>,
+    method?: "DELETE",
   ): Promise<{ value: unknown; userId: string }> {
     // Capture before authentication awaits; a fresh sign-in cannot inherit a call.
     const expected = expectedContext && { ...expectedContext };
@@ -512,7 +514,7 @@ export class CloudWorkspace {
         "Native request context changed; operation not dispatched",
       );
     if (
-      body !== undefined &&
+      (body !== undefined || method === "DELETE") &&
       !session.scopes.includes(this.deps.writeScope ?? "workspace:write")
     )
       throw new Error("Explicit write authorization required");
@@ -527,6 +529,8 @@ export class CloudWorkspace {
       session.token,
       session.profile,
       body,
+      undefined,
+      method,
     );
     this.checkOwner(
       value as { schemaVersion?: unknown; userId?: unknown },

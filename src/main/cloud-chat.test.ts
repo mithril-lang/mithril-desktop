@@ -1,3 +1,4 @@
+import { NativeChildApprovalQueue } from "../renderer/src/screens/CloudWorkspace/native-child-approvals";
 import { createClientToolTurnRunner } from "@mithril/workspace/client-tool-turn";
 import { describe, it, expect, vi } from "vitest";
 import { CloudWorkspace } from "./cloud-workspace";
@@ -21,7 +22,14 @@ function fixture(scopes = ["chat:read", "chat:write"]): {
 } {
   let token = `mf_${"a".repeat(43)}`;
   const response = (body: unknown, status = 200): Response =>
-    ({ ok: status === 200, status, json: async () => body }) as Response;
+    ({
+      ok: status === 200,
+      status,
+      json: async () =>
+        body && typeof body === "object" && "phase" in body
+          ? { sessionId: "s1", ...body }
+          : body,
+    }) as Response;
   const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/v1/me"))
       return response({
@@ -342,6 +350,9 @@ it.each(["js", "python"])(
     const f = fixture(["chat:read", "chat:write", "inference"]);
     await f.auth.enable();
     const commands: Record<string, unknown>[] = [];
+    const nativeRequests: Record<string, unknown>[] = [];
+    const expiresAt = Date.now() + 40000;
+    const approvals = new NativeChildApprovalQueue(f.client, () => {});
     f.fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url.endsWith("/v1/me"))
         return f.response({
@@ -349,6 +360,19 @@ it.each(["js", "python"])(
           user: { id: "a" },
           scopes: ["chat:read", "chat:write", "inference"],
         });
+      if (url.includes("/gateway/native-consent")) {
+        if (url.endsWith("/native-consent"))
+          nativeRequests.push(JSON.parse(String(init?.body)));
+        // Human-session grant fixture; real pending UI and HTTP human choice are qualified separately.
+        return f.response({
+          schemaVersion: 1,
+          userId: "a",
+          sessionId: "s1",
+          requestId: "b".repeat(64),
+          expiresAt,
+          state: "allowed",
+        });
+      }
       const body = JSON.parse(String(init?.body));
       commands.push(body);
       return f.response({
@@ -387,10 +411,17 @@ it.each(["js", "python"])(
       await expect(broker("unlisted", {})).rejects.toThrow();
       return { id: call.id, receipt: {}, result: 42, files: {} };
     });
-    const runner = createClientToolTurnRunner(
-      (sid, body) => f.client.browserStep(sid, body),
-      execute,
-    );
+    const runner = createClientToolTurnRunner((sid, body, signal) => {
+      if (body.action === "child") {
+        const { action: _action, ...intent } = body;
+        return approvals.call(
+          { userId: "a", profile: "default", sessionId: sid },
+          intent,
+          signal,
+        );
+      }
+      return f.client.browserStep(sid, body);
+    }, execute);
     const op = {
       type: "browser_turn",
       operationId: "turn",
@@ -409,6 +440,7 @@ it.each(["js", "python"])(
       toolProtocol: "mithril-browser-tools-v2",
     });
     expect(execute).toHaveBeenCalledOnce();
+    expect(nativeRequests).toHaveLength(1);
     await expect(retained("dynamic_write", {})).rejects.toThrow();
     runner.stop();
   },
@@ -470,7 +502,9 @@ it("binds a dynamic child inventory to owner, token, turn, round and parent and 
     await expect(
       f.client.browserStep("s1", { ...child, ...patch }),
     ).rejects.toThrow();
-  await f.client.browserStep("s1", child);
+  await expect(f.client.browserStep("s1", child)).rejects.toThrow(
+    "approval required",
+  );
   await f.client.browserStep("s1", { ...base, action: "result", results: [] });
   await expect(f.client.browserStep("s1", child)).rejects.toThrow("child");
   await f.client.browserStep("s1", { ...base, action: "next" });
@@ -693,4 +727,46 @@ describe("Owned conversation selection review", () => {
       ).toBe(true);
     }
   });
+});
+
+// @lat: [[mithril-code#Mithril Code#Browser checkpoint response identity]]
+it("refuses another Chat's Browser checkpoint before retaining its native child inventory", async () => {
+  const f = fixture(["chat:read", "chat:write", "inference"]);
+  await f.auth.enable();
+  const original = f.fetcher.getMockImplementation()! as (
+    url: string,
+    init?: RequestInit,
+  ) => Promise<Response>;
+  f.fetcher.mockImplementation(async (url: string, init?: RequestInit) =>
+    url.endsWith("/browser")
+      ? f.response({
+          schemaVersion: 1,
+          userId: "a",
+          sessionId: "foreign",
+          phase: "tools_wait",
+          round: 0,
+          calls: [{ id: "parent", function: { name: "js", arguments: "{}" } }],
+          childTools: ["read_file"],
+        })
+      : original(url, init),
+  );
+  const body = { turnId: "turn", executionToken: "a".repeat(64), round: 0 };
+  await expect(
+    f.client.browserStep("s1", { ...body, action: "next" }),
+  ).rejects.toThrow("Invalid tool response");
+  await expect(
+    f.client.createNativeChildConsent(
+      { userId: "a", profile: "default", sessionId: "s1" },
+      {
+        ...body,
+        parentCallId: "parent",
+        childId: "child",
+        name: "read_file",
+        args: {},
+      },
+    ),
+  ).rejects.toThrow("inventory retired");
+  expect(
+    f.fetcher.mock.calls.some(([url]) => url.endsWith("/native-consent")),
+  ).toBe(false);
 });

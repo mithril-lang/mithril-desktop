@@ -110,3 +110,49 @@ Changing the selected Chat retires the old control and discards late reads. Resp
 ## Native tool connection Chat mounting
 
 The actual MithrilChat consumer mounts selection review for its selected Chat and authenticated owner. Hiding the consumer unmounts the review control and retires pending metadata reads.
+
+## Native child exact request and release
+
+Main retains an exact intent under owner/profile/credential/epoch. Direct renderer dispatch cannot bypass approval. Release claims the held intent before dispatch; lost replies are never retried.
+
+[[src/main/native-child-consents.ts#NativeChildConsents]] stores bounded ephemeral intents. [[src/main/cloud-chat.ts#CloudChat#createNativeChildConsent]] requires the exact live parent inventory. The fixed native-consent API keeps human-session authority separate from the bearer requester. [[src/main/cloud-workspace.ts#CloudWorkspace#authorizedRequest]] retains the captured context for POST, GET and narrow DELETE. [[src/renderer/src/screens/CloudWorkspace/native-child-approvals.ts#NativeChildApprovalQueue]] polls metadata before release. Real Electron, public/installed releases, full operation manifests and native device attestation remain separate qualification gates.
+
+## Native child identity retirement
+
+Changing profile, credential or native identity epoch refuses pending request reads, review opening and child release. Requests never migrate to a new authenticated context.
+
+## Native child cancellation and unknown effect
+
+Cancellation narrows the captured pending request through DELETE and locally retires its release authority. A lost effect reply remains unknown and does not cause an automatic retry or a confirmed-stop claim.
+
+## Native child admission boundaries
+
+Undeclared child names, substituted scope, extra endpoint fields, nonfinite arguments and malformed response identity cannot register or release a native request.
+
+## Native child cancellation race
+
+A permission poll returning after local cancellation cannot release the effect. Main checks the claimed record again after the asynchronous poll.
+
+## Mounted native approval release
+
+The actual Chat and shared runner show a pending child, open the fixed Web review only on an explicit button action, and release the child once after allowed metadata is observed.
+
+## Mounted native approval withdrawal
+
+Cancel, hide, account, profile, conversation and unmount changes withdraw pending child authority before effects. Approval display does not grant execution by itself.
+
+## Native late creation withdrawal
+
+If request creation returns after the consumer was retired, the exact late locator is cancelled without presenting it or releasing a child effect.
+
+## Native pending deadline and refusal
+
+Expired, denied, changed-deadline and failed metadata reads stop the approval wait and withdraw the pending request without an effect attempt.
+
+## Native unknown release is not retried
+
+After release begins, a lost effect reply never restarts the child or treats best-effort cancellation as proof of a stopped effect.
+
+## Browser checkpoint response identity
+
+Every successful Browser HTTP response carries the authenticated owner and exact Chat ID. Main refuses foreign or missing identities before retaining inventory or accepting a child receipt; cached saved-result readback keeps the same envelope.

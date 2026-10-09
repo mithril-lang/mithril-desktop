@@ -1,3 +1,5 @@
+import { NativeChildApprovalQueue } from "./native-child-approvals";
+import { NativeChildApprovalNotice } from "./NativeChildApprovalNotice";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChatGatewayConnection } from "./ChatGatewayConnection";
 import { connectionNotice } from "./connection-notice";
@@ -122,12 +124,39 @@ export default function MithrilChat({
     }),
     [],
   );
+  const [, refreshNativeApprovals] = useState(0);
+  const nativeApprovals = useMemo(
+    () =>
+      new NativeChildApprovalQueue(
+        window.hermesAPI.cloudChat,
+        () => refreshNativeApprovals((value) => value + 1),
+        JSON.stringify([profile, accountId, epoch]),
+      ),
+    [profile, accountId, epoch],
+  );
   const toolRunner = useMemo(
     () =>
       createClientToolTurnRunner(
         async (id, body, signal) => {
           signal.throwIfAborted();
-          const result = await window.hermesAPI.cloudChat.browserStep(id, body);
+          let result;
+          if (
+            body.action === "child" &&
+            ![
+              "tool_catalog",
+              "mithril_tool",
+              "web_search",
+              "web_extract",
+            ].includes(String(body.name))
+          ) {
+            const { action: _action, ...intent } = body;
+            result = await nativeApprovals.call(
+              { userId: accountId ?? "", profile, sessionId: id },
+              intent,
+              signal,
+            );
+          } else
+            result = await window.hermesAPI.cloudChat.browserStep(id, body);
           signal.throwIfAborted();
           return result;
         },
@@ -178,7 +207,7 @@ export default function MithrilChat({
           }
         },
       ),
-    [profile],
+    [profile, accountId, nativeApprovals],
   );
   // Retire both active execution and acknowledged work still awaiting IPC.
   const toolAuthority = useMemo(
@@ -243,6 +272,22 @@ export default function MithrilChat({
           locale={locale}
         />
       )}
+      {visible &&
+        nativeApprovals
+          .snapshot()
+          .filter(
+            (item) =>
+              item.request.userId === accountId &&
+              item.request.profile === profile &&
+              item.request.sessionId === selectedSessionId,
+          )
+          .map((item) => (
+            <NativeChildApprovalNotice
+              key={item.request.requestId}
+              item={item}
+              locale={locale}
+            />
+          ))}
       <ChatSessions
         sidebarTarget={sidebarTarget}
         sidebarNavigation={sidebarNavigation}

@@ -427,6 +427,16 @@ const hermesAPI = {
       ipcRenderer.invoke("cloud-chat-native-import", id, choices),
   } satisfies NativeSessionImportAPI,
   cloudChat: {
+    createNativeChildConsent: (request, body) =>
+      ipcRenderer.invoke("cloud-chat-native-consent-create", request, body),
+    pollNativeChildConsent: (request) =>
+      ipcRenderer.invoke("cloud-chat-native-consent-poll", request),
+    reviewNativeChildConsent: (request) =>
+      ipcRenderer.invoke("cloud-chat-native-consent-review", request),
+    cancelNativeChildConsent: (request) =>
+      ipcRenderer.invoke("cloud-chat-native-consent-cancel", request),
+    executeNativeChildConsent: (request) =>
+      ipcRenderer.invoke("cloud-chat-native-consent-execute", request),
     gatewaySelection: (request) =>
       ipcRenderer.invoke("cloud-chat-gateway-selection", request),
     reviewGateway: (request) =>

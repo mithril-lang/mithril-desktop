@@ -1,0 +1,36 @@
+name: Self-hosted Mac readiness
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: trusted-mac-runner-readiness
+  cancel-in-progress: false
+jobs:
+  readiness:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, macOS, ARM64, mithril-desktop-trusted]
+    timeout-minutes: 5
+    steps:
+      - name: Verify native Mac runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = Darwin
+          test "$(uname -m)" = arm64
+          sw_vers
+          xcode-select -p
+          df -h .
+          echo "Native Mac runner accepted the GitHub Actions job."
+      - name: Check out reviewed source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          clean: true
+      - name: Verify exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
+          echo "Verified source: $GITHUB_SHA"

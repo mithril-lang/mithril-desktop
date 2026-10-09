@@ -132,6 +132,12 @@ The main-process service supervisor remains internal. Its three unused renderer 
 
 The preview gate verifies packaging, type safety, the DMG, the app bundle signature, and an Apple silicon launch. It publishes real Mithril bytes with checksums rather than renaming an old artifact. The download page and updater feed must point to those exact verified files.
 
+### Native self-hosted Mac admission
+
+GitHub Actions can coordinate Tailscale-connected native Mac workers without Kubernetes. A pre-job hook limits repository-scoped workers to designated manual main workflows. Readiness and publication remain separate gates.
+
+See `docs/self-hosted-mac-runner.md`. The readiness workflow checks native macOS and exact source without signing credentials. PR CI cannot use the trusted worker. Existing cross-platform installer gates remain in force until each native platform is migrated.
+
 ### Cross-platform preview
 
 The manual preview workflow builds Windows x64, Linux x64/ARM64, and both Mac architectures on native GitHub runners, then updates the existing prerelease only when every job succeeds.

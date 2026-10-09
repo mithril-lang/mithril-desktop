@@ -1623,6 +1623,6 @@ Shared tests and source packaging checks are distinct from signed release and au
 
 ## Shared Chat startup recovery
 
-Desktop pins immutable Workspace schedules.67 so transient inventory outages recover without replaying inference or tools.
+Desktop pins immutable Workspace schedules.68 so transient inventory outages recover without replaying inference or tools.
 
-The shared renderer retires delayed reads on account changes, stops automatic recovery on explicit disconnect, and follows verified inventory availability for the connected indicator. Authorization failures do not automatically retry. All 481 package files match the producer and installed dependency byte-for-byte (SHA256 `836a4c92d553847d27b1c26ab648cc275f3a4335b4db61ac4dc9e1f6171747d5`). Typechecks and lat checks pass. Source and package qualification do not prove installed-client updates or authenticated cross-device operation.
+The shared renderer retires delayed reads on account changes, stops automatic recovery on explicit disconnect, and follows verified inventory availability for the connected indicator. Authorization failures do not automatically retry. All 481 package files match the producer and installed dependency byte-for-byte (SHA256 `04fadf89b6e5fd3169037adab379765acf73d2a6b893ca970983e64fd3eb291f`). Typechecks and lat checks pass. Source and package qualification do not prove installed-client updates or authenticated cross-device operation.

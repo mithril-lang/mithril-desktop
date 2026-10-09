@@ -151,6 +151,9 @@ async function qualify(arch, state, identity, packageOnly = false) {
     console.log(`npm ${args.join(" ")}`);
     run("npm", args, { env });
   }
+  run(process.execPath, ["--test", "scripts/independent-macos/core.test.mjs"], {
+    env,
+  });
   const cli = join(checkout, "node_modules/electron-builder/out/cli/cli.js");
   run(process.execPath, [cli, "install-app-deps", `--arch=${arch}`], { env });
   run(
@@ -349,7 +352,11 @@ try {
   const [command, ...argv] = process.argv.slice(2);
   const options = {};
   for (let i = 0; i < argv.length; i += 2) {
-    if (!["--arch", "--state"].includes(argv[i]) || !argv[i + 1])
+    if (
+      !["--arch", "--state"].includes(argv[i]) ||
+      !argv[i + 1] ||
+      options[argv[i].slice(2)] !== undefined
+    )
       throw Error("Expected --arch or --state with a value");
     options[argv[i].slice(2)] = argv[i + 1];
   }

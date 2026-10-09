@@ -209,6 +209,55 @@ describe("useDashboardChatTransport recovery", () => {
     });
   });
 
+  // @lat: [[owned-tool-calls#Test specifications#Malformed declared effects]]
+  it("refuses malformed runtime declarations in the mounted consumer before tool dispatch", async () => {
+    const api: HarnessApi = {};
+    render(<Harness api={api} connectionId="a" connectionRevision={1} />);
+    dashboardMock.request.mockImplementation(async (method) =>
+      method === "session.create"
+        ? { session_id: "live", stored_session_id: "stored" }
+        : method === "model.options"
+          ? { model: "bad-model", provider: "bad-provider", providers: [] }
+          : {},
+    );
+    await act(async () => {
+      await api.send!("hello");
+    });
+    api.activeTurnRef!.current = null;
+    dashboardMock.request.mockClear();
+    dashboardMock.request.mockResolvedValue({
+      runtime_snapshot: {
+        protocol: "hermes-session-tool-snapshot-v1",
+        status: "built",
+        coverage: "model-visible-only",
+        context_id: "a".repeat(32),
+        revision: "b".repeat(64),
+        definitions: [
+          { function: { name: "write_file", parameters: { type: "object" } } },
+        ],
+        effect_manifests: [
+          {
+            name: "write_file",
+            coverage: "complete",
+            effects: ["file.write"],
+            targets: [],
+          },
+        ],
+      },
+    });
+    await expect(
+      api.callTool!({
+        requestId: "malformed",
+        name: "write_file",
+        arguments: { content: "must not write" },
+        timeoutMs: 1000,
+      }),
+    ).rejects.toMatchObject({ outcome: "not-dispatched" });
+    expect(dashboardMock.request.mock.calls.map((call) => call[0])).toEqual([
+      "tools.show",
+    ]);
+  });
+
   // @lat: [[owned-tool-calls#Test specifications#Mounted owned call lifecycle]]
   it.each([
     "return",

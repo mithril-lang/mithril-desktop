@@ -18,11 +18,17 @@ The dashboard client advertises server requests on gateway.ready and routes capt
 
 The latest successful session attachment response restores original approval frames from its bounded open_requests snapshot. Session IDs must match, metadata never creates authority, and answered/cancelled IDs cannot revive. Restoring a pending card still requires a new explicit human choice.
 
-Desktop now vendors agency.12. Its Cloud Browser runner and main adapter consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or replace server effect grants.
+Desktop now vendors agency.14 from Fund's qualified source. Its compiled snapshot parser validates partial/unknown effect declarations before dispatch; the archive, lock integrity and installed dependency are matched. Human native review displays declarations in Web's canonical card, not native status metadata.
+
+The Cloud Browser runner and main adapter still consume only server-returned checkpoint child names for the exact owner context and JS/Python parent. This does not connect the dashboard hook to Cloud Chat or resolve targets. Candidate preview.48 is not a new installer or live qualification.
 
 ## Test specifications
 
 Mounted consumer tests use the actual hook and compiled SDK with a synthetic gateway. They prove local admission and lifecycle behavior rather than hosted, installed or real provider execution.
+
+### Malformed declared effects
+
+The actual mounted dashboard hook and vendored compiled SDK reject a complete-coverage claim in discovery before tools.call. No effect or retry is issued; absent legacy metadata remains unknown in the existing lifecycle tests.
 
 ### Original peer restoration
 

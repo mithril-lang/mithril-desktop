@@ -1627,6 +1627,12 @@ Desktop pins immutable Workspace schedules.68 so transient inventory outages rec
 
 The shared renderer retires delayed reads on account changes, stops automatic recovery on explicit disconnect, and follows verified inventory availability for the connected indicator. Authorization failures do not automatically retry. All 481 package files match the producer and installed dependency byte-for-byte (SHA256 `04fadf89b6e5fd3169037adab379765acf73d2a6b893ca970983e64fd3eb291f`). Typechecks and lat checks pass. Source and package qualification do not prove installed-client updates or authenticated cross-device operation.
 
+## Shared Project file read recovery
+
+Desktop uses the same Workspace `0.6.31-sync.72` ProjectFiles component as Web. A successful current-owner refresh clears a stale connection notice without hiding a rejected save or removal.
+
+Fund PR #934 merged as `97361a26d0b5fe0a2e6799e961a59efad7bede27`. Its isolated Workspace qualification passed all 481 tests, including read recovery and retention of failed operations. The archive SHA256 is `244a5c363db09b3a2d25372cf8d9509b14338013a04bac14376d62f63bd8ff93`; all 481 packaged files match the Fund build and installed candidate dependency. Preview.76 adoption is source integration; signed native release and actual installed recovery remain separate gates.
+
 ## Owner-bound Project file upload candidate
 
 Desktop preview.71 adopts the shared files.69 package so uploaded immutable bytes are committed with the same owner boundary as Web. Source qualification and actual installed persistence remain separate gates.

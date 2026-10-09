@@ -44,6 +44,8 @@ Stable and beta release jobs import the Developer ID certificate into a workflow
 
 #### Identity output consumption
 
+Headless workers verify the pinned Apple Developer ID G2 intermediate against system roots and import it into the temporary signing keychain. System trust settings stay unchanged, and a failed staging operation deletes its owned temporary keychain.
+
 Signing verification consumes the complete identity list before deciding success, so early pipe closure cannot reject a valid Developer ID identity under `pipefail`.
 
 `scripts/import-macos-certificate.sh` retains failure propagation from the identity command and requires a matching identity. [[tests/macos-signing.test.ts]] exercises short output and a list exceeding pipe capacity, alongside password separation and credential cleanup.

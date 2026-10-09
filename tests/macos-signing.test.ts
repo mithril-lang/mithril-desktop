@@ -23,9 +23,14 @@ afterEach(() => {
 
 describe("macOS signing certificate import", () => {
   // @lat: [[desktop-updates#Stable and beta release channels#macOS signing keychain#Identity output consumption]]
-  it.each([false, true])(
-    "imports identities with long output: %s",
-    (longOutput) => {
+  it.each([
+    { longOutput: false, failure: "" },
+    { longOutput: true, failure: "" },
+    { longOutput: false, failure: "verify-cert" },
+    { longOutput: false, failure: "find-identity" },
+  ])(
+    "imports and cleans up signing custody: %o",
+    ({ longOutput, failure }) => {
       const workDir = mkdtempSync(join(tmpdir(), "hermes-macos-signing-"));
       workDirs.push(workDir);
 
@@ -41,6 +46,9 @@ describe("macOS signing certificate import", () => {
         fakeSecurity,
         `#!/bin/bash
 printf '%s\\n' "$*" >> "$SECURITY_LOG"
+if [ -n "$FAIL_STAGE" ] && [ "$1" = "$FAIL_STAGE" ]; then
+  exit 3
+fi
 if [ "$1" = "find-identity" ]; then
   echo '1) ABC123 "Developer ID Application: Hermes Test (ABCDE12345)"'
   if [ "$LONG_IDENTITY_OUTPUT" = "1" ]; then
@@ -64,6 +72,7 @@ fi
             GITHUB_ENV: githubEnv,
             SECURITY_LOG: securityLog,
             LONG_IDENTITY_OUTPUT: longOutput ? "1" : "0",
+            FAIL_STAGE: failure,
             CSC_LINK: Buffer.from("certificate-bytes").toString("base64"),
             CSC_KEY_PASSWORD: "certificate-password",
             MACOS_KEYCHAIN_PASSWORD: "test-keychain-password",
@@ -71,12 +80,29 @@ fi
         },
       );
 
-      expect(result.status, result.stderr).toBe(0);
       const log = readFileSync(securityLog, "utf-8");
       const keychain = join(
         runnerTemp,
         "hermes-macos-signing/hermes-signing.keychain",
       );
+
+      expect(
+        existsSync(join(runnerTemp, "hermes-macos-signing/developer-id.p12")),
+      ).toBe(false);
+      const intermediate = join(ROOT, "scripts/certificates/developer-id-g2.cer");
+      expect(log).toContain(`verify-cert -c ${intermediate} -p basic`);
+      if (failure) {
+        expect(result.status).not.toBe(0);
+        expect(log).toContain(`delete-keychain ${keychain}`);
+        expect(existsSync(githubEnv)).toBe(false);
+        if (failure === "verify-cert") {
+          expect(log).not.toContain(`import ${intermediate}`);
+        }
+        return;
+      }
+      expect(result.status, result.stderr).toBe(0);
+      expect(log).toContain(`import ${intermediate} -k ${keychain}`);
+      expect(log).not.toContain("add-trusted-cert");
 
       expect(log).toContain(
         `create-keychain -p test-keychain-password ${keychain}`,
@@ -92,9 +118,6 @@ fi
       expect(readFileSync(githubEnv, "utf-8")).toBe(
         `CSC_KEYCHAIN=${keychain}\n`,
       );
-      expect(
-        existsSync(join(runnerTemp, "hermes-macos-signing/developer-id.p12")),
-      ).toBe(false);
     },
   );
 });

@@ -11,6 +11,9 @@ signing_dir="$RUNNER_TEMP/hermes-macos-signing"
 certificate_path="$signing_dir/developer-id.p12"
 keychain_path="$signing_dir/hermes-signing.keychain"
 keychain_password="${MACOS_KEYCHAIN_PASSWORD:-$(openssl rand -hex 32)}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+intermediate_path="$script_dir/certificates/developer-id-g2.cer"
+keychain_created=false
 
 mkdir -p "$signing_dir"
 chmod 700 "$signing_dir"
@@ -18,6 +21,9 @@ chmod 700 "$signing_dir"
 cleanup_certificate() {
   local status=$?
   rm -f "$certificate_path"
+  if [ "$status" -ne 0 ] && [ "$keychain_created" = true ]; then
+    security delete-keychain "$keychain_path" >/dev/null 2>&1 || true
+  fi
   exit "$status"
 }
 trap cleanup_certificate EXIT
@@ -27,8 +33,17 @@ printf '%s' "$CSC_LINK" | base64 --decode > "$certificate_path"
 chmod 600 "$certificate_path"
 
 security create-keychain -p "$keychain_password" "$keychain_path"
+keychain_created=true
 security unlock-keychain -p "$keychain_password" "$keychain_path"
 security set-keychain-settings -lut 21600 "$keychain_path"
+
+# Headless workers may lack Xcode's automatically installed G2 intermediate.
+# Verify Apple's pinned public certificate without changing system trust.
+printf '%s  %s\n' \
+  f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a \
+  "$intermediate_path" | shasum -a 256 -c - >/dev/null
+security verify-cert -c "$intermediate_path" -p basic >/dev/null
+security import "$intermediate_path" -k "$keychain_path"
 
 # Keep the temporary keychain in the user search list. On macOS 26.6,
 # `security find-identity <keychain>` can see an imported identity while

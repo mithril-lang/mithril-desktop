@@ -10,6 +10,18 @@ Consent lasts in memory for one account and local profile. Replacing a token, di
 
 Workspace access requires explicit `workspace:read` and `workspace:write` scopes. Existing inference or billing tokens are never upgraded, and the renderer cannot issue tokens. The API retains its existing passkey confirmation before granting sensitive scopes.
 
+### Cloud Chat IPC registration
+
+[[src/main/cloud-chat-ipc.ts#registerCloudChatIPC]] registers the fixed Cloud Chat channels with the same trusted-main-frame guard used by the application entry point.
+
+Each handler checks the sender before accessing account authorization, file custody, sessions, Browser checkpoints or native child approval. Preload exposes bounded operations; credentials remain in main. This separation permits testing the production registration and preload inside Electron without starting unrelated services.
+
+### Isolated Electron Chat qualification
+
+`scripts/owned-chat-electron-main.mjs` boots an isolated test window with the actual preload, Cloud Chat registrar and trusted sender guard. It uses the real CloudChat and CloudWorkspace classes with explicit account/model/browser-open fixtures.
+
+`scripts/build-owned-chat-electron.mjs` compiles the test entry and production preload to a task directory. The cross-repository actual MithrilChat/WASM qualifier then checks JS/Python read/write/deny/alias through HTTP/D1 and Hermes, plus refusal of foreign windows and disallowed navigation and absence of IPC in Kuro frames. The entry is excluded from installer packaging. This qualifies neither whole application startup nor installed account/profile configuration, OS pairing/permissions or all operations.
+
 ## Shared screens
 
 The shared workspace package supplies Discover, Office, Kanban, Projects, Capabilities, Memory, Settings and Profile through one source; Discover, Office and Kanban navigation now mounts this renderer directly in both clients.

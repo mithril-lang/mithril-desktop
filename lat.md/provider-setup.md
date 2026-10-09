@@ -247,4 +247,6 @@ Routing updates and credential removal address direct task children only, preser
 
 ## Hermetic discovery key test
 
-The `.env` discovery regression keeps the canonical DeepSeek endpoint for key selection, then routes that one request to its real loopback HTTP fixture. It asserts the resolved Bearer header, parsed model and single request. Tests never call a live vendor or require external network access; unreachable-provider behavior has its own test.
+The `.env` discovery regression keeps the canonical DeepSeek endpoint for key selection and routes its request to a real loopback HTTP fixture.
+
+It asserts the resolved Bearer header, parsed model and single request. Tests never call a live vendor or require external network access; unreachable-provider behavior has its own test.

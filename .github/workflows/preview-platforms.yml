@@ -55,6 +55,13 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Restore complete checkout after readiness smoke
+        run: |
+          set -euo pipefail
+          git ls-files -z | git update-index --no-skip-worktree -z --stdin
+          git restore --source=HEAD --worktree -- .
+          test -f package.json
+          test -f package-lock.json
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -124,6 +131,13 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Restore complete checkout after readiness smoke
+        run: |
+          set -euo pipefail
+          git ls-files -z | git update-index --no-skip-worktree -z --stdin
+          git restore --source=HEAD --worktree -- .
+          test -f package.json
+          test -f package-lock.json
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

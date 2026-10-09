@@ -9,3 +9,9 @@ The manual `Self-hosted Mac readiness` workflow verifies native macOS, Command L
 The preview workflow routes both Mac package jobs to the trusted ARM64 worker and retains its full cross-platform publication gate. The worker serializes these jobs; the x64 package is cross-compiled and checked for its target architecture. Mac signing must use the existing temporary signing-keychain setup and cleanup. Linux and Windows workers require their own native runners; a Mac runner does not establish Windows or Linux installer readiness. Retain hosted jobs until those native workers are explicitly migrated.
 
 Register with a short-lived repository registration token delivered directly to the remote configuration process. Never commit runner credentials, copy the host Keychain, or store a personal GitHub token on the runner. Install as a service only after the hook's allowed and refused fixtures pass. Test real dispatch and report GitHub budget or access failures separately from runner connectivity.
+
+## Installed worker
+
+`mithril-benjamin-desktop` runs on the ARM64 Mac `benjamin` over Tailscale. Runner 2.337.0 was verified against GitHub's SHA-256 before extraction. The application lives at `/Users/benjamin/.local/share/mithril-actions/desktop-runner`; the admission hook lives in the sibling `hooks` directory.
+
+The root-owned `/Library/LaunchDaemons/fund.mithril.actions.desktop.plist` starts `bin/runsvc.sh` as user `benjamin`, with `RunAtLoad` and `KeepAlive`. This supports the headless host without a GUI login. The service is configured for boot startup; an actual host reboot is a separate check. Manage it with `sudo launchctl print system/fund.mithril.actions.desktop`. Do not delete registration files or change the hook during an active job.

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import http from "http";
+import https from "https";
 import type { AddressInfo } from "net";
 
 /**
@@ -360,13 +361,23 @@ describe("model-discovery", () => {
     writeFileSync(join(testHome, ".env"), "DEEPSEEK_API_KEY=sk-from-dotenv\n");
 
     // @lat: [[provider-setup#Hermetic discovery key test]]
-    const realFetch = globalThis.fetch;
-    const transport = vi
-      .spyOn(globalThis, "fetch")
-      .mockImplementation((input, init) => {
-        expect(String(input)).toBe("https://api.deepseek.com/v1/models");
-        return realFetch(baseUrl + "/models", init);
-      });
+    const transport = vi.spyOn(https, "request").mockImplementation(((
+      options: https.RequestOptions,
+      callback?: (response: http.IncomingMessage) => void,
+    ) => {
+      expect(options.hostname).toBe("api.deepseek.com");
+      expect(options.path).toBe("/v1/models");
+      const fixture = new URL(baseUrl);
+      return http.request(
+        {
+          ...options,
+          protocol: "http:",
+          hostname: fixture.hostname,
+          port: fixture.port,
+        },
+        callback,
+      );
+    }) as typeof https.request);
     try {
       const { discoverProviderModels } = await loadDiscovery();
       const result = await discoverProviderModels(

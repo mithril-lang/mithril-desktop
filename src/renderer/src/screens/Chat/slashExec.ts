@@ -75,12 +75,31 @@ export async function executeSlash(
     return { kind: "error", message: `/${name}: alias chain too deep` };
   }
 
-  // Primary dispatcher: the registry-backed slash worker.
+  // Only the RPC rejection can admit a second dispatcher. Output callbacks
+  // have no authority to declare that the backend refused execution.
+  let raw: unknown;
+  let refusedOwnership = false;
   try {
-    const raw = await request("slash.exec", {
+    raw = await request("slash.exec", {
       command: command.replace(/^\/+/, ""),
       session_id: sessionId,
     });
+  } catch (error) {
+    // Only a structured, pre-execution ownership refusal admits another route.
+    // A lost result may already have changed state; never redispatch it.
+    const code =
+      error instanceof Error && "code" in error ? error.code : undefined;
+    const message = error instanceof Error ? error.message : String(error);
+    const refused =
+      code === 4018 &&
+      (/^skill command: use command\.dispatch for \/[^\s/]+$/.test(message) ||
+        message ===
+          "snapshot restore mutates live config/state; use command.dispatch for /snapshot restore");
+    if (!refused) return { kind: "error", message };
+    refusedOwnership = true;
+  }
+
+  if (!refusedOwnership) {
     const dispatched = parseCommandDispatch(raw);
     if (dispatched) {
       return handleCommandDispatch(
@@ -95,18 +114,6 @@ export async function executeSlash(
     const body = r?.output || `/${name}: no output`;
     sys(r?.warning ? `warning: ${r.warning}\n${body}` : body);
     return { kind: "done" };
-  } catch (error) {
-    // Only a structured, pre-execution ownership refusal admits another route.
-    // A lost result may already have changed state; never redispatch it.
-    const code =
-      error instanceof Error && "code" in error ? error.code : undefined;
-    const message = error instanceof Error ? error.message : String(error);
-    const refused =
-      code === 4018 &&
-      (/^skill command: use command\.dispatch for \/[^\s/]+$/.test(message) ||
-        message ===
-          "snapshot restore mutates live config/state; use command.dispatch for /snapshot restore");
-    if (!refused) return { kind: "error", message };
   }
 
   // Fallback: resolve client-side directives (alias / plugin / skill / send).

@@ -23,6 +23,26 @@ describe("parseSlash", () => {
 });
 
 describe("executeSlash", () => {
+  // @lat: [[chat-commands#Slash command execution#Routing pipeline#Rendering failure has no execution authority]]
+  it("does not reroute a successful command when rendering throws refusal-shaped text", async () => {
+    const request = vi.fn().mockResolvedValue({ output: "effect committed" });
+    const failure = Object.assign(
+      new Error("skill command: use command.dispatch for /deploy"),
+      { code: 4018 },
+    );
+    await expect(
+      executeSlash({
+        command: "/deploy",
+        sessionId: "owned",
+        request,
+        sys: () => {
+          throw failure;
+        },
+      }),
+    ).rejects.toThrow(failure.message);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   // @lat: [[chat-commands#Slash command execution#Routing pipeline#Unknown outcome is never redispatched]]
   it.each([
     new Error("socket closed after execution"),

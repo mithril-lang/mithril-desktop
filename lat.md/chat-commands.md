@@ -26,6 +26,10 @@ The dashboard client preserves numeric server RPC error codes. It never extracts
 
 The actual dashboard client and slash router use controlled socket frames. A committed effect with a lost response remains single; a structured snapshot refusal dispatches once. This qualifies local code, not a live backend.
 
+### Rendering failure has no execution authority
+
+Only the slash RPC rejection admits fallback. Rendering or handling a successful response cannot authorize another dispatcher, even when its exception carries code 4018 and refusal-shaped text. The original caller surfaces that failure.
+
 ## Local vs gateway commands
 
 Every typed slash command is resolved through the merged catalog before execution. Ownership is explicit (`target: "desktop" | "agent" | "model"`); display categories such as `info` do not determine routing.

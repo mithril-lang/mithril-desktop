@@ -56,3 +56,5 @@ This directory defines the high-level concepts, business logic, and architecture
 
 - [[language-typography]] — government-adopted default fonts, language switching and offline script fallbacks.
 - [[endpoint-protection]] — local endpoint monitoring, bounded detection and signed definition delivery.
+
+- [[mithril-client-days-tests]] — Explicit consent, fixed endpoint and UTC-day reporting tests.

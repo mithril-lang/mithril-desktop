@@ -1,3 +1,4 @@
+import { recordMithrilClientDay } from "../mithril-client-day";
 import { NativeAccountArchive } from "../cloud-archive";
 import {
   synchronizeAllProfileHistories,
@@ -1187,6 +1188,11 @@ export function registerIpcHandlers(context: IpcContext): void {
   // approval page once the code is issued, and stores the encrypted session.
   // New Mithril account: an mf_ bearer verified against the Mithril API and
   // held in a separate encrypted profile store. The renderer never reads it.
+  ipcMain.handle("mithril-client-day", (_event, consented: unknown, profile?: string) => {
+    const active = getActiveProfileNameSync();
+    if (profile !== undefined && (typeof profile !== "string" || profile.trim() !== active)) return false;
+    return recordMithrilClientDay(consented, active);
+  });
   ipcMain.handle("mithril-account-get", (_event, profile?: string) =>
     mithrilAccount(profile?.trim() || getActiveProfileNameSync()),
   );

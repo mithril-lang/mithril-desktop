@@ -376,6 +376,8 @@ const hermesAPI = {
     return () => ipcRenderer.removeListener("oauth-login-progress", handler);
   },
 
+  recordMithrilClientDay: (consented: boolean, profile?: string): Promise<boolean> =>
+    ipcRenderer.invoke("mithril-client-day", consented, profile),
   getMithrilAccount: (profile?: string): Promise<MithrilAccount | null> =>
     ipcRenderer.invoke("mithril-account-get", profile),
   connectMithrilAccount: (

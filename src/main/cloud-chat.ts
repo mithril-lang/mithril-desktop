@@ -58,9 +58,8 @@ export class CloudChat implements SessionTransport {
     body: Record<string, unknown>,
   ): Promise<NativeChildConsent> {
     const context = await this.auth.nativeContext();
-    const inventory = this.browserInventories.get(
-      JSON.stringify([context, request?.sessionId]),
-    );
+    const inventoryKey = JSON.stringify([context, request?.sessionId]);
+    const inventory = this.browserInventories.get(inventoryKey);
     if (
       !inventory?.tools?.has(String(body?.name)) ||
       inventory.turnId !== body?.turnId ||
@@ -70,7 +69,23 @@ export class CloudChat implements SessionTransport {
       (inventory.expires ?? 0) <= Date.now()
     )
       throw Error("Native child inventory retired");
-    return this.nativeConsents.create(request, body, context);
+    const value = await this.nativeConsents.create(request, body, context);
+    if (
+      this.browserInventories.get(inventoryKey) !== inventory ||
+      (inventory.expires ?? 0) <= Date.now()
+    ) {
+      // Locally retire the exact locator even if its narrow network withdrawal
+      // fails. A late registration cannot restore a retired parent inventory.
+      await this.nativeConsents
+        .cancel({ ...request, requestId: value.requestId })
+        .catch(() => {});
+      throw Error("Native child inventory retired");
+    }
+    // This validated server deadline is bounded to 60 seconds and the exact
+    // native request. Retain discovery metadata while that request is pending;
+    // every dynamic effect still requires the held human grant at release.
+    inventory.expires = Math.max(inventory.expires ?? 0, value.expiresAt);
+    return value;
   }
   pollNativeChildConsent(
     request: NativeChildConsentRequest,

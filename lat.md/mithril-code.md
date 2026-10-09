@@ -156,3 +156,11 @@ After release begins, a lost effect reply never restarts the child or treats bes
 ## Browser checkpoint response identity
 
 Every successful Browser HTTP response carries the authenticated owner and exact Chat ID. Main refuses foreign or missing identities before retaining inventory or accepting a child receipt; cached saved-result readback keeps the same envelope.
+
+## Native consent window matches release
+
+An exact approved child remains releasable throughout its declared consent window, including after the ordinary 45-second inventory cache window. Expiry, direct renderer dispatch and consumed requests never grant another effect.
+
+## Native late registration cannot revive inventory
+
+A delayed native registration cannot extend an expired or replaced parent inventory. Main retires the exact locator and attempts scoped withdrawal before refusing its release; network withdrawal is not proof of a stopped effect.

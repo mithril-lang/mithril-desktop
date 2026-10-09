@@ -13,7 +13,7 @@ const intent = {
 };
 const rid = "b".repeat(64),
   handle = { ...scope, requestId: rid };
-async function fixture(): Promise<{
+async function fixture(windowMs = 40000): Promise<{
   client: CloudChat;
   auth: CloudWorkspace;
   calls: { url: string; init?: RequestInit }[];
@@ -22,6 +22,7 @@ async function fixture(): Promise<{
   fetcher: ReturnType<typeof vi.fn>;
   allow: () => void;
   setPoll: (fn: () => Promise<Response>) => void;
+  setCreate: (fn: () => Promise<Response>) => void;
   failChild: () => void;
   contextChange: (kind: string) => void;
   expiresAt: number;
@@ -29,7 +30,7 @@ async function fixture(): Promise<{
   let token = `mf_${"c".repeat(43)}`,
     profile = "default",
     state = "pending";
-  const expiresAt = Date.now() + 40000;
+  const expiresAt = Date.now() + windowMs;
   const calls: { url: string; init?: RequestInit }[] = [];
   let childReply: () => Promise<Response> = async () =>
     response({
@@ -42,6 +43,7 @@ async function fixture(): Promise<{
       childResult: { id: "child", receipt: {}, result: "written", files: {} },
     });
   let pollReply: (() => Promise<Response>) | undefined;
+  let createReply: (() => Promise<Response>) | undefined;
   const response = (body: unknown, status = 200): Response =>
     new Response(JSON.stringify(body), { status });
   const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
@@ -60,7 +62,8 @@ async function fixture(): Promise<{
       state,
       expiresAt,
     };
-    if (url.endsWith("/native-consent")) return response(envelope);
+    if (url.endsWith("/native-consent"))
+      return createReply ? createReply() : response(envelope);
     if (url.endsWith(`/native-consent/${rid}`)) {
       if (init?.method === "DELETE") {
         state = "cancelled";
@@ -113,6 +116,9 @@ async function fixture(): Promise<{
     },
     setPoll: (fn: () => Promise<Response>) => {
       pollReply = fn;
+    },
+    setCreate: (fn: () => Promise<Response>) => {
+      createReply = fn;
     },
     failChild: () => {
       childReply = async () => {
@@ -276,3 +282,92 @@ it("rejects a release whose permission poll returns after local cancellation", a
   await expect(executing).rejects.toThrow("not allowed");
   expect(effects(f)).toHaveLength(0);
 });
+
+// @lat: [[mithril-code#Mithril Code#Native consent window matches release]]
+it.each([45001, 59999, 60000])(
+  "honors the exact native consent window at %s ms without replay authority",
+  async (elapsed) => {
+    let now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      const f = await fixture(60000);
+      await f.client.createNativeChildConsent(scope, intent);
+      now += elapsed;
+      f.allow();
+      if (elapsed < 60000) {
+        await expect(
+          f.client.executeNativeChildConsent(handle),
+        ).resolves.toMatchObject({ childResult: { result: "written" } });
+        expect(effects(f)).toHaveLength(1);
+        await expect(
+          f.client.executeNativeChildConsent(handle),
+        ).rejects.toThrow("retired");
+      } else {
+        await expect(
+          f.client.executeNativeChildConsent(handle),
+        ).rejects.toThrow("retired");
+        expect(effects(f)).toHaveLength(0);
+      }
+      await expect(
+        f.client.browserStep("s1", { ...intent, action: "child" }),
+      ).rejects.toThrow();
+      expect(effects(f)).toHaveLength(elapsed < 60000 ? 1 : 0);
+    } finally {
+      clock.mockRestore();
+    }
+  },
+);
+
+// @lat: [[mithril-code#Mithril Code#Native late registration cannot revive inventory]]
+it.each(["expired", "new-parent"])(
+  "withdraws native creation after the original inventory is %s",
+  async (mode) => {
+    let now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      const f = await fixture(60000);
+      let reply!: (response: Response) => void;
+      f.setCreate(
+        () =>
+          new Promise((resolve) => {
+            reply = resolve;
+          }),
+      );
+      const created = f.client.createNativeChildConsent(scope, intent).then(
+        (value) => value,
+        (error) => error,
+      );
+      await vi.waitFor(() => expect(reply).toBeTypeOf("function"));
+      if (mode === "expired") now += 45001;
+      else
+        await f.client.browserStep("s1", {
+          action: "next",
+          turnId: "new-turn",
+          executionToken: "d".repeat(64),
+          round: 0,
+        });
+      reply(
+        f.response({
+          schemaVersion: 1,
+          userId: "owner",
+          sessionId: "s1",
+          requestId: rid,
+          state: "pending",
+          expiresAt: f.expiresAt,
+        }),
+      );
+      expect(await created).toBeInstanceOf(Error);
+      expect(f.calls.filter((c) => c.init?.method === "DELETE")).toHaveLength(
+        1,
+      );
+      f.allow();
+      await expect(
+        f.client.executeNativeChildConsent(handle),
+      ).rejects.toThrow();
+      expect(effects(f)).toHaveLength(0);
+      expect(f.open).not.toHaveBeenCalled();
+    } finally {
+      clock.mockRestore();
+    }
+  },
+);

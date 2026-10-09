@@ -104,3 +104,9 @@ The actual hook and compiled shared panel render complete memory review before o
 ### Retired review has no authority
 
 A delayed full review cannot restore decision controls after model, provider, connection, session, cancellation, disconnect or unmount. Even a retained adapter cannot send a stale decision.
+
+### Real Electron review and result loss
+
+A sandboxed Electron window uses production preload, dashboard client, Chat hook and shared panel. Real ticket WS and persistent workers qualify human review, A/B/A custody, retired review and committed reply loss.
+
+Launch/profile URL issuance and the surrounding screen are fixtures; no real account, installed app or whole boot is claimed. The renderer must apply the packaged review stylesheet. The backend independently checks disk, queues, frozen prompts and history.

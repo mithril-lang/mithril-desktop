@@ -1620,3 +1620,9 @@ The preview Windows packaging job runs the actual destination replacement test b
 Desktop pins immutable Workspace `.66` with the current Fund Code UI and styles. Every packed file matches the producer and installed consumer.
 
 Shared tests and source packaging checks are distinct from signed release and authenticated installed cross-device QA.
+
+## Shared Chat startup recovery
+
+Desktop pins immutable Workspace schedules.67 so transient inventory outages recover without replaying inference or tools.
+
+The shared renderer retires delayed reads on account changes, stops automatic recovery on explicit disconnect, and follows verified inventory availability for the connected indicator. Authorization failures do not automatically retry. All 481 package files match the producer and installed dependency byte-for-byte (SHA256 `836a4c92d553847d27b1c26ab648cc275f3a4335b4db61ac4dc9e1f6171747d5`). Typechecks and lat checks pass. Source and package qualification do not prove installed-client updates or authenticated cross-device operation.

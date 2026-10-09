@@ -1605,7 +1605,7 @@ Selected folders retain file-set tombstones and revisions. Unchanged bytes move 
 
 Archive intents use the Electron runtime's built-in SQLite with FULL-synchronous transactions. Private legacy JSON entries remain readable until replaced, and durable empty rows suppress old acknowledged intents without deleting recovery files.
 
-Electron 44.1.1's actual Node 24.19 runtime was checked for node:sqlite availability. The journal contains only owner-bound operation metadata, not account source data or credentials; api.mithril.fund remains the canonical backend. Installed and Windows destination-save qualification remain pending.
+Electron 44.1.1's actual Node 24.19 runtime was checked for node:sqlite availability. CI and installer builds use Node 24, and native archive tests run in the Node environment so Vite never attempts to bundle the built-in SQLite module for a browser. The journal contains only owner-bound operation metadata, not account source data or credentials; api.mithril.fund remains the canonical backend. Installed and Windows destination-save qualification remain pending.
 
 ## Archive destination replacement
 

@@ -10,6 +10,8 @@ Desktop forwards bounded JS/Python child calls to the canonical authenticated AP
 
 [[src/renderer/src/screens/CloudWorkspace/MithrilChat.tsx#MithrilChat]] passes the initiating runner's broker into the isolated Kuro host. Renderer regression coverage checks the broker remains attached until the parent execution finishes and the host is disposed.
 
+Checkpoint transport deadlines follow the API operation limits: model completion has a 65-second connection budget for its 60-second server deadline, and child execution has 25 seconds for its 20-second server deadline. Ordinary requests retain 15 seconds. Delayed checkpoint coverage verifies a single response without an automatic retry or identity reset.
+
 ## Main process boundary
 
 [[src/main/cloud-workspace.ts#CloudWorkspace]] verifies the active secure-store bearer and owner before each fixed Mithril API request; renderer IPC never receives the credential.

@@ -189,6 +189,9 @@ export class CloudChat implements SessionTransport {
       `/v1/chat/sessions/${encodeURIComponent(id)}/browser`,
       { ...body, toolProtocol: "mithril-language-v1" },
       "inference",
+      // The API bounds model completion to 60 seconds and child calls to 20.
+      // Keep transport alive through that operation, without replaying it.
+      body.action === "next" ? 65000 : body.action === "child" ? 25000 : 15000,
     );
     const result = value as {
       phase: string;

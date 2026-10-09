@@ -396,6 +396,67 @@ describe("Canonical Desktop chat transport", () => {
     });
     runner.stop();
   });
+  it("receives a slow model checkpoint once without the ordinary read timeout aborting it", async () => {
+    const f = fixture(["chat:read", "chat:write", "inference"]);
+    await f.auth.enable();
+    vi.useFakeTimers();
+    const timeout = vi
+      .spyOn(AbortSignal, "timeout")
+      .mockImplementation((ms) => {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), ms);
+        return controller.signal;
+      });
+    f.fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/v1/me"))
+        return f.response({
+          via: "api_token",
+          user: { id: "a" },
+          scopes: ["chat:read", "chat:write", "inference"],
+        });
+      return new Promise<Response>((resolve, reject) => {
+        init?.signal?.addEventListener(
+          "abort",
+          () => reject(Error("aborted")),
+          { once: true },
+        );
+        setTimeout(
+          () =>
+            resolve(
+              f.response({
+                schemaVersion: 1,
+                userId: "a",
+                phase: "completed",
+                round: 0,
+                calls: [],
+              }),
+            ),
+          20000,
+        );
+      });
+    });
+    try {
+      const pending = f.client.browserStep("s1", {
+        action: "next",
+        turnId: "slow-turn",
+        executionToken: "a".repeat(64),
+        round: 0,
+      });
+      const settled = expect(pending).resolves.toMatchObject({
+        phase: "completed",
+      });
+      await vi.advanceTimersByTimeAsync(20000);
+      await settled;
+      expect(
+        f.fetcher.mock.calls.filter((call) => call[0].endsWith("/browser")),
+      ).toHaveLength(1);
+      expect(f.changed).not.toHaveBeenCalled();
+    } finally {
+      timeout.mockRestore();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
   it("discards late prior-account data without disabling a newly enabled account", async () => {
     const f = fixture();
     await f.auth.enable();

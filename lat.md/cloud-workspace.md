@@ -2,6 +2,12 @@
 
 Desktop and Web should preserve the original Desktop UI through one account-scoped cloud data repository; the current shared cloud screens and native dialogs are transitional.
 
+## Interpreter child tool checkpoints
+
+Desktop forwards bounded JS/Python child calls to the canonical authenticated API and binds returned receipts to the initiating child ID and round.
+
+[[src/main/cloud-chat.ts#CloudChat#browserStep]] accepts only catalog, account tool, search and extraction child requests. It retains scoped credentials in the main process and rejects mixed checkpoint fields, oversized arguments and unrelated child receipts. The API remains responsible for owner, parent lease, argument and dataset-generation validation. This makes the Desktop adapter support the shared client runner's existing child protocol without adding a native execution escape.
+
 ## Main process boundary
 
 [[src/main/cloud-workspace.ts#CloudWorkspace]] verifies the active secure-store bearer and owner before each fixed Mithril API request; renderer IPC never receives the credential.

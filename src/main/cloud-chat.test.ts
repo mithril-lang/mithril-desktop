@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { CloudWorkspace } from "./cloud-workspace";
 import { CloudChat } from "./cloud-chat";
+import { createClientToolTurnRunner } from "@mithril/workspace/client-tool-turn";
+import type { ChatOperation } from "@mithril/workspace/sessions";
 const session = {
   id: "s1",
   title: "Demo",
@@ -238,6 +240,159 @@ describe("Canonical Desktop chat transport", () => {
       ...body,
       toolProtocol: "mithril-language-v1",
     });
+  });
+  // @lat: [[lat.md/cloud-workspace#Cloud workspace#Interpreter child tool checkpoints]]
+  it("transports bounded interpreter child calls and binds their receipts", async () => {
+    const f = fixture(["chat:read", "chat:write", "inference"]);
+    await f.auth.enable();
+    const body = {
+      action: "child",
+      turnId: "tool-turn",
+      executionToken: "a".repeat(64),
+      round: 1,
+      parentCallId: "js-parent",
+      childId: "child-1",
+      name: "tool_catalog",
+      args: {},
+    };
+    f.fetcher.mockImplementation(async (url: string) =>
+      url.endsWith("/v1/me")
+        ? f.response({
+            via: "api_token",
+            user: { id: "a" },
+            scopes: ["chat:read", "chat:write", "inference"],
+          })
+        : f.response({
+            schemaVersion: 1,
+            userId: "a",
+            phase: "child_result",
+            round: 1,
+            calls: [],
+            childResult: { id: "child-1", receipt: {}, result: [], files: {} },
+          }),
+    );
+    const result = await f.client.browserStep("s1", body);
+    expect(result.childResult?.id).toBe("child-1");
+    expect(
+      JSON.parse(
+        String(
+          f.fetcher.mock.calls.find((call) => call[0].endsWith("/browser"))?.[1]
+            ?.body,
+        ),
+      ),
+    ).toEqual({ ...body, toolProtocol: "mithril-language-v1" });
+    for (const invalid of [
+      { ...body, name: "execute_shell" },
+      { ...body, parentCallId: "../escape" },
+      { ...body, results: [] },
+      { ...body, args: { text: "x".repeat(16001) } },
+      { ...body, action: "next" },
+    ]) {
+      await expect(f.client.browserStep("s1", invalid)).rejects.toThrow(
+        "Invalid tool checkpoint",
+      );
+    }
+    expect(
+      f.fetcher.mock.calls.filter((call) => call[0].endsWith("/browser")),
+    ).toHaveLength(1);
+    f.fetcher.mockImplementation(async (url: string) =>
+      url.endsWith("/v1/me")
+        ? f.response({
+            via: "api_token",
+            user: { id: "a" },
+            scopes: ["chat:read", "chat:write", "inference"],
+          })
+        : f.response({
+            phase: "child_result",
+            round: 1,
+            calls: [],
+            schemaVersion: 1,
+            userId: "a",
+            childResult: { id: "other-child" },
+          }),
+    );
+    await expect(f.client.browserStep("s1", body)).rejects.toThrow(
+      "Invalid tool response",
+    );
+  });
+  it("completes the shared JS runner through the Desktop child checkpoint adapter", async () => {
+    const f = fixture(["chat:read", "chat:write", "inference"]);
+    await f.auth.enable();
+    const checkpoints: Record<string, unknown>[] = [];
+    f.fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/v1/me"))
+        return f.response({
+          via: "api_token",
+          user: { id: "a" },
+          scopes: ["chat:read", "chat:write", "inference"],
+        });
+      const body = JSON.parse(String(init?.body));
+      checkpoints.push(body);
+      return f.response({
+        schemaVersion: 1,
+        userId: "a",
+        round: body.round,
+        ...(body.action === "child"
+          ? {
+              phase: "child_result",
+              calls: [],
+              childResult: {
+                id: body.childId,
+                receipt: {},
+                files: {},
+                result: { count: 20 },
+              },
+            }
+          : body.action === "next" && body.round === 0
+            ? {
+                phase: "tools_wait",
+                calls: [
+                  { id: "parent", function: { name: "js", arguments: "{}" } },
+                ],
+              }
+            : { phase: "completed", calls: [] }),
+      });
+    });
+    const runner = createClientToolTurnRunner(
+      (id, body) => f.client.browserStep(id, body),
+      async (call, _signal, broker) => {
+        const child = await broker!("tool_catalog", {});
+        expect(child.result).toEqual({ count: 20 });
+        return { id: call.id, receipt: {}, result: child.result, files: {} };
+      },
+    );
+    const operation = {
+      type: "browser_turn",
+      operationId: "parent-turn",
+      data: { executionToken: "a".repeat(64) },
+    } as ChatOperation;
+    runner.start("s1", operation, {
+      operationId: operation.operationId,
+      status: "accepted",
+      session: {
+        ...session,
+        activeTurn: {
+          id: operation.operationId,
+          status: "running",
+          leaseExpiresAt: Date.now() + 60000,
+        },
+      },
+    });
+    await vi.waitFor(() =>
+      expect(checkpoints.map((body) => body.action)).toEqual([
+        "next",
+        "child",
+        "result",
+        "next",
+      ]),
+    );
+    expect(checkpoints[1]).toMatchObject({
+      parentCallId: "parent",
+      name: "tool_catalog",
+      turnId: "parent-turn",
+      toolProtocol: "mithril-language-v1",
+    });
+    runner.stop();
   });
   it("discards late prior-account data without disabling a newly enabled account", async () => {
     const f = fixture();

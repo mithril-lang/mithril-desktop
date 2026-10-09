@@ -22,6 +22,7 @@ import {
   TEAM,
   sha256,
   assertSource,
+  buildEnvironment,
   notarizationArgs,
   verifySignatureMetadata,
   artifactRecord,
@@ -130,21 +131,15 @@ async function qualify(arch, state, identity, packageOnly = false) {
   const auth = preflight(arch, !packageOnly);
   if (existsSync(join(checkout, "dist")))
     throw Error("Use a fresh checkout without prior dist artifacts");
-  const env = {
-    ...process.env,
-    PATH: `${dirname(process.execPath)}:${process.env.PATH}`,
-    CSC_NAME: IDENTITY,
-    CSC_IDENTITY_AUTO_DISCOVERY: "true",
-  };
-  // Automatic notarization is disabled only here; manual accepted submission and
-  // staple verification below are required before any qualified receipt exists.
-  delete env.CSC_LINK;
+  // Source tests never inherit configured provider tokens or notarization keys.
+  const env = buildEnvironment(process.env, process.execPath);
+  // Manual accepted notarization and staple verification below remain required.
   for (const args of [
     ["ci"],
     ["run", "audit:prod"],
     ["run", "lint"],
     ["run", "build"],
-    ["test"],
+    ["test", "--", "--maxWorkers=2"],
     ["run", "check:packaging"],
     ["run", "lat:check"],
   ]) {

@@ -10,6 +10,7 @@ import {
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import type { ChatSession } from "@mithril/workspace/sessions";
 import MithrilChat from "./MithrilChat";
+import * as clientTools from "@mithril/workspace/client-tool-turn";
 const enable = vi.fn(async () => ({ userId: "owner", enabled: true }));
 const list = vi.fn(async () => ({
   schemaVersion: 1,
@@ -19,6 +20,48 @@ const list = vi.fn(async () => ({
 const models = vi.fn(async () => [{ id: "mithril-model", available: true }]);
 const apply = vi.fn();
 const preview = vi.fn();
+it("keeps the initiating runner broker attached to the isolated JS host", async () => {
+  let execute!: Parameters<typeof clientTools.createClientToolTurnRunner>[1];
+  const runner = vi
+    .spyOn(clientTools, "createClientToolTurnRunner")
+    .mockImplementation((_step, run) => {
+      execute = run;
+      return { start: vi.fn(), stop: vi.fn() };
+    });
+  const hostCall = vi.fn(async (call, _signal, broker) => {
+    const child = await broker("tool_catalog", {});
+    return { ...child, id: call.id };
+  });
+  const dispose = vi.fn();
+  const host = vi
+    .spyOn(clientTools, "createKuroToolHost")
+    .mockReturnValue({ call: hostCall, dispose });
+  try {
+    render(<MithrilChat profile="default" />);
+    await screen.findByRole("combobox", { name: /Mithril model/ });
+    const broker = vi.fn(async () => ({
+      id: "child",
+      receipt: {},
+      result: 20,
+      files: {},
+    }));
+    const signal = new AbortController().signal;
+    const call = {
+      id: "parent",
+      function: { name: "js" as const, arguments: "{}" },
+    };
+    await expect(execute(call, signal, broker)).resolves.toMatchObject({
+      id: "parent",
+      result: 20,
+    });
+    expect(broker).toHaveBeenCalledWith("tool_catalog", {});
+    expect(hostCall).toHaveBeenCalledWith(call, signal, broker);
+    expect(dispose).toHaveBeenCalledOnce();
+  } finally {
+    runner.mockRestore();
+    host.mockRestore();
+  }
+});
 let changed: () => void;
 beforeEach(() => {
   vi.clearAllMocks();

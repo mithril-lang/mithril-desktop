@@ -139,7 +139,7 @@ export default function MithrilChat({
           signal.throwIfAborted();
           return result;
         },
-        async (call, signal) => {
+        async (call, signal, broker) => {
           if (call.function.name === "mithril_code") {
             const args = JSON.parse(call.function.arguments);
             if (
@@ -180,7 +180,7 @@ export default function MithrilChat({
           }
           const host = createKuroToolHost();
           try {
-            return await host.call(call, signal);
+            return await host.call(call, signal, broker);
           } finally {
             host.dispose();
           }

@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -90,6 +91,156 @@ beforeEach(() => {
   });
 });
 afterEach(cleanup);
+
+// @lat: [[cloud-workspace-tests#Selected conversation reconnect]]
+it("restores the selected conversation after the same checked account reconnects without replay", async () => {
+  const session: ChatSession = {
+    id: "selection-qa",
+    title: "Reconnect selection QA",
+    model: "mithril-model",
+    revision: 1,
+    eventSeq: 0,
+    deleted: false,
+    activeTurn: null,
+  };
+  list.mockResolvedValue({
+    schemaVersion: 1,
+    userId: "owner",
+    sessions: [session],
+  });
+  vi.mocked(window.hermesAPI.cloudChat.events).mockResolvedValue({
+    schemaVersion: 1,
+    userId: "owner",
+    session,
+    events: [],
+    hasMore: false,
+    nextAfter: null,
+  });
+  try {
+    render(<MithrilChat profile="default" />);
+    fireEvent.click(
+      await screen.findByRole("tab", { name: "Reconnect selection QA" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("tab", { name: "Reconnect selection QA" }),
+      ).toHaveAttribute("aria-selected", "true"),
+    );
+    act(() => changed());
+    await waitFor(() => expect(enable).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("tab", { name: "Reconnect selection QA" }),
+      ).toHaveAttribute("aria-selected", "true"),
+    );
+    expect(apply).not.toHaveBeenCalled();
+  } finally {
+    list.mockResolvedValue({ schemaVersion: 1, userId: "owner", sessions: [] });
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Selected conversation reconnect#New Chat clears remembered selection]]
+it("keeps New Chat empty across a same-account reconnect", async () => {
+  const session: ChatSession = {
+    id: "selection-qa",
+    title: "Reconnect selection QA",
+    model: "mithril-model",
+    revision: 1,
+    eventSeq: 0,
+    deleted: false,
+    activeTurn: null,
+  };
+  list.mockResolvedValue({
+    schemaVersion: 1,
+    userId: "owner",
+    sessions: [session],
+  });
+  vi.mocked(window.hermesAPI.cloudChat.events).mockResolvedValue({
+    schemaVersion: 1,
+    userId: "owner",
+    session,
+    events: [],
+    hasMore: false,
+    nextAfter: null,
+  });
+  try {
+    render(<MithrilChat profile="default" initialSessionId="selection-qa" />);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("tab", { name: "Reconnect selection QA" }),
+      ).toHaveAttribute("aria-selected", "true"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "New synced chat" }));
+    act(() => changed());
+    await waitFor(() => expect(enable).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("tab", { name: "Reconnect selection QA" }),
+      ).toHaveAttribute("aria-selected", "false"),
+    );
+    expect(apply).not.toHaveBeenCalled();
+  } finally {
+    list.mockResolvedValue({ schemaVersion: 1, userId: "owner", sessions: [] });
+  }
+});
+
+// @lat: [[cloud-workspace-tests#Selected conversation reconnect#Different owners do not inherit selection]]
+it("does not select the previous owner's session even when another owner has the same ID", async () => {
+  const session: ChatSession = {
+    id: "selection-qa",
+    title: "Reconnect selection QA",
+    model: "mithril-model",
+    revision: 1,
+    eventSeq: 0,
+    deleted: false,
+    activeTurn: null,
+  };
+  list.mockResolvedValue({
+    schemaVersion: 1,
+    userId: "owner",
+    sessions: [session],
+  });
+  vi.mocked(window.hermesAPI.cloudChat.events).mockResolvedValue({
+    schemaVersion: 1,
+    userId: "owner",
+    session,
+    events: [],
+    hasMore: false,
+    nextAfter: null,
+  });
+  try {
+    render(<MithrilChat profile="default" />);
+    fireEvent.click(
+      await screen.findByRole("tab", { name: "Reconnect selection QA" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("tab", { name: "Reconnect selection QA" }),
+      ).toHaveAttribute("aria-selected", "true"),
+    );
+    vi.mocked(window.hermesAPI.cloudChat.status).mockResolvedValue({
+      userId: "other",
+      enabled: false,
+    });
+    list.mockResolvedValue({
+      schemaVersion: 1,
+      userId: "other",
+      sessions: [session],
+    });
+    vi.mocked(window.hermesAPI.cloudChat.events).mockClear();
+    act(() => changed());
+    await waitFor(() => expect(enable).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("tab", { name: "Reconnect selection QA" }),
+      ).toHaveAttribute("aria-selected", "false"),
+    );
+    expect(window.hermesAPI.cloudChat.events).not.toHaveBeenCalled();
+    expect(apply).not.toHaveBeenCalled();
+  } finally {
+    list.mockResolvedValue({ schemaVersion: 1, userId: "owner", sessions: [] });
+  }
+});
 describe("Default shared Mithril Chat", () => {
   // @lat: [[cloud-workspace#Cloud workspace#Shared sidebar history#Read-only cloud sidebar]]
   it("renders shared API sidebar projects without importing local history or issuing chat operations", async () => {

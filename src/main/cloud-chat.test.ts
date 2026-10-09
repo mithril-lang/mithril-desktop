@@ -367,6 +367,8 @@ describe("Canonical Desktop chat transport", () => {
       data: { executionToken: "a".repeat(64) },
     } as ChatOperation;
     runner.start("s1", operation, {
+      schemaVersion: 1,
+      userId: "a",
       operationId: operation.operationId,
       status: "accepted",
       session: {

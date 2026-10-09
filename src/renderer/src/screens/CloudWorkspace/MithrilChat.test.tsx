@@ -90,6 +90,47 @@ beforeEach(() => {
     },
   });
 });
+
+// @lat: [[cloud-workspace-tests#Chat identity checking]]
+it("shows an account check instead of sign-in while identity is unresolved", async () => {
+  let complete!: (value: { userId: string; enabled: boolean }) => void;
+  vi.mocked(window.hermesAPI.cloudChat.status).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+  );
+  render(<MithrilChat profile="default" onConnectAccount={vi.fn()} />);
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Checking Mithril account…",
+  );
+  expect(
+    screen.queryByRole("button", { name: "Sign in to Mithril" }),
+  ).toBeNull();
+  expect(list).not.toHaveBeenCalled();
+  expect(apply).not.toHaveBeenCalled();
+  await act(async () => complete({ userId: "owner", enabled: false }));
+  await screen.findByRole("combobox", { name: /Mithril model/ });
+  expect(screen.queryByText("Checking Mithril account…")).toBeNull();
+  expect(apply).not.toHaveBeenCalled();
+  vi.mocked(window.hermesAPI.cloudChat.status).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+  );
+  act(() => changed());
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Checking Mithril account…",
+  );
+  expect(
+    screen.queryByRole("button", { name: "Sign in to Mithril" }),
+  ).toBeNull();
+  expect(screen.queryByRole("combobox", { name: /Mithril model/ })).toBeNull();
+  await act(async () => complete({ userId: "owner", enabled: false }));
+  await screen.findByRole("combobox", { name: /Mithril model/ });
+  expect(apply).not.toHaveBeenCalled();
+});
 afterEach(cleanup);
 
 // @lat: [[cloud-workspace-tests#Selected conversation reconnect]]

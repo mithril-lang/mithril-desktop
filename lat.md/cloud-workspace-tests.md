@@ -547,6 +547,10 @@ Verify jobs resolving to one native directory cannot request different cloud sna
 
 Failed identity checks display readable sign-in guidance and no chat operation is sent. Shared tests cover opening without identity/models and retaining the new screen after an initial session link.
 
+## Chat identity checking
+
+Unresolved startup and reconnect checks show account verification rather than sign-in. No prior-owner content or interactive Chat is rendered until identity resolves; successful checks resume without starting a turn.
+
 ## Signed-in scoped authorization recovery
 
 Chat distinguishes missing scoped permission from account expiry and transport errors. Its original shared welcome action offers permission approval or network retry; retries never start device sign-in or change stored credentials.

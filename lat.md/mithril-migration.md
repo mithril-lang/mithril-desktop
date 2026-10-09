@@ -194,4 +194,6 @@ Settings replaces legacy provider/key/OAuth/credential-pool controls with the Mi
 
 A valid account is labeled Signed in independently of Chat and Workspace access. Missing explicit scopes open the existing account approval flow; generic transport failure offers retry rather than another sign-in.
 
+Chat shows account verification while its main-process identity read is pending, including a reconnect after invalidation. Until the check resolves, no old-owner Chat is rendered and no sign-in action is offered. Existing refusal, scope approval and network retry behavior remains authoritative.
+
 Shared Chat dependency for this repair is workspace 0.6.24-auth.1, SHA256 `808053fad14f293ef5c5cc325705fee6032993dead6db1a5994e313f51dcf753`. It adds a consumer authorization action label to the original welcome. Native keeps its explicit passkey device flow and distinguishes scoped approval from network retry.

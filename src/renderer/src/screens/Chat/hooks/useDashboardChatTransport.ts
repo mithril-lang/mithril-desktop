@@ -1,9 +1,9 @@
 import {
-  callOwnedTool,
   OwnedToolCallError,
   type OwnedToolCall,
   type OwnedToolResult,
 } from "@mithril/workspace/owned-gateway-tools";
+import { callDashboardOwnedTool } from "../dashboardOwnedTools";
 import { ToolAttemptReader } from "../toolAttemptReader";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LOCAL_PRESETS } from "../../../constants";
@@ -2263,7 +2263,7 @@ export function useDashboardChatTransport({
           "not-dispatched",
           `rpc:${request.requestId}`,
         );
-      return callOwnedTool(client, {
+      return callDashboardOwnedTool(client, {
         ...request,
         sessionId,
         current: () =>

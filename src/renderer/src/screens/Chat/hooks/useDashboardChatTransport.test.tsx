@@ -188,6 +188,65 @@ function Harness({
   return <ToolAttemptsPanel reader={transport.toolAttempts} />;
 }
 
+const targetPreviewSnapshot = (): {
+  runtime_snapshot: {
+    protocol: string;
+    status: string;
+    coverage: string;
+    context_id: string;
+    revision: string;
+    definitions: Array<{
+      function: { name: string; parameters: { type: string } };
+    }>;
+  };
+} => ({
+  runtime_snapshot: {
+    protocol: "hermes-session-tool-snapshot-v1",
+    status: "built",
+    coverage: "model-visible-only",
+    context_id: "a".repeat(32),
+    revision: "b".repeat(64),
+    definitions: [
+      { function: { name: "write_file", parameters: { type: "object" } } },
+    ],
+  },
+});
+const resolvedTargetPreview = (): {
+  protocol: string;
+  target_binding: {
+    coverage: string;
+    digest: string;
+    target: { namespace: string; path: string };
+  };
+} => ({
+  protocol: "hermes-owned-target-preview-v1",
+  target_binding: {
+    coverage: "partial",
+    digest: "c".repeat(64),
+    target: { namespace: "selected-local-terminal", path: "/owned/once.txt" },
+  },
+});
+async function attachOwnedHarness(
+  api: HarnessApi,
+): Promise<ReturnType<typeof render>> {
+  const view = render(
+    <Harness api={api} connectionId="a" connectionRevision={1} />,
+  );
+  dashboardMock.request.mockImplementation(async (method) =>
+    method === "session.create"
+      ? { session_id: "live", stored_session_id: "stored" }
+      : method === "model.options"
+        ? { model: "bad-model", provider: "bad-provider", providers: [] }
+        : {},
+  );
+  await act(async () => {
+    await api.send!("hello");
+  });
+  api.activeTurnRef!.current = null;
+  dashboardMock.request.mockClear();
+  return view;
+}
+
 describe("useDashboardChatTransport recovery", () => {
   beforeEach(() => {
     dashboardMock.close.mockClear();
@@ -326,6 +385,18 @@ describe("useDashboardChatTransport recovery", () => {
             ],
           },
         };
+      if (method === "tools.target_preview")
+        return {
+          protocol: "hermes-owned-target-preview-v1",
+          target_binding: {
+            coverage: "partial",
+            digest: "c".repeat(64),
+            target: {
+              namespace: "selected-local-terminal",
+              path: "/owned/once.txt",
+            },
+          },
+        };
       if (method === "tools.call")
         return new Promise((resolve) => {
           finish = resolve;
@@ -342,6 +413,18 @@ describe("useDashboardChatTransport recovery", () => {
     request.targetBinding.target.path = "/foreign/changed.txt";
     await waitFor(() => expect(finish).toBeTypeOf("function"));
     expect(dashboardMock.request.mock.calls).toEqual([
+      ["tools.show", { session_id: "live" }, 30000],
+      [
+        "tools.target_preview",
+        {
+          session_id: "live",
+          name: "write_file",
+          arguments: { content: "once" },
+          context_id: "a".repeat(32),
+          revision: "b".repeat(64),
+        },
+        30000,
+      ],
       ["tools.show", { session_id: "live" }],
       [
         "tools.call",
@@ -402,6 +485,189 @@ describe("useDashboardChatTransport recovery", () => {
       ),
     ).toBe(false);
   });
+
+  // @lat: [[owned-tool-calls#Test specifications#Host target preview admission]]
+  it.each([
+    "resolved",
+    "unknown",
+    "mismatched",
+    "malformed",
+    "missing",
+    "context",
+    "revision",
+  ])("requires the host target preview before dispatch: %s", async (mode) => {
+    const api: HarnessApi = {};
+    await attachOwnedHarness(api);
+    let shows = 0;
+    dashboardMock.request.mockImplementation(async (method) => {
+      if (method === "tools.show") {
+        const snapshot = targetPreviewSnapshot();
+        if (++shows === 2) {
+          if (mode === "context")
+            snapshot.runtime_snapshot.context_id = "e".repeat(32);
+          if (mode === "revision")
+            snapshot.runtime_snapshot.revision = "f".repeat(64);
+        }
+        return snapshot;
+      }
+      if (method === "tools.target_preview") {
+        if (mode === "missing") throw new Error("Method not found");
+        if (mode === "unknown")
+          return {
+            protocol: "hermes-owned-target-preview-v1",
+            target_binding: null,
+          };
+        if (mode === "malformed")
+          return { ...resolvedTargetPreview(), protocol: "untrusted" };
+        return resolvedTargetPreview();
+      }
+      if (method === "tools.call")
+        return {
+          protocol: "hermes-owned-tool-call-v1",
+          attempt_id: "rpc:preview",
+          state: "returned",
+          terminal: true,
+          duplicate: false,
+          observation: "handler-return",
+          output: { written: true },
+        };
+      return {};
+    });
+    const input = {
+      requestId: "preview",
+      name: "write_file",
+      arguments: { content: "once" },
+      timeoutMs: 1000,
+      // Object key order is presentation, not target identity.
+      ...(mode === "resolved" || mode === "mismatched"
+        ? {
+            targetBinding: {
+              target: {
+                path: "/owned/once.txt",
+                namespace: "selected-local-terminal" as const,
+              },
+              digest: (mode === "mismatched" ? "e" : "c").repeat(64),
+              coverage: "partial" as const,
+            },
+          }
+        : {}),
+    };
+    const outcome = api.callTool!(input);
+    if (mode === "resolved" || mode === "unknown") {
+      await expect(outcome).resolves.toMatchObject({
+        attemptId: "rpc:preview",
+        output: { written: true },
+      });
+      const calls = dashboardMock.request.mock.calls.filter(
+        ([method]) => method === "tools.call",
+      );
+      expect(calls).toHaveLength(1);
+      expect(calls[0][1]).toMatchObject({
+        session_id: "live",
+        arguments: { content: "once" },
+      });
+      if (mode === "resolved")
+        expect(calls[0][1]).toHaveProperty("target_digest", "c".repeat(64));
+      else expect(calls[0][1]).not.toHaveProperty("target_digest");
+    } else {
+      await expect(outcome).rejects.toMatchObject({
+        outcome: "not-dispatched",
+        attemptId: "rpc:preview",
+      });
+      expect(
+        dashboardMock.request.mock.calls.some(
+          ([method]) => method === "tools.call",
+        ),
+      ).toBe(false);
+    }
+    expect(
+      dashboardMock.request.mock.calls.find(
+        ([method]) => method === "tools.target_preview",
+      )?.[1],
+    ).toEqual({
+      session_id: "live",
+      name: "write_file",
+      arguments: { content: "once" },
+      context_id: "a".repeat(32),
+      revision: "b".repeat(64),
+    });
+    expect(
+      dashboardMock.request.mock.calls.some(([method]) =>
+        ["session.create", "session.resume", "prompt.submit"].includes(method),
+      ),
+    ).toBe(false);
+  });
+
+  // @lat: [[owned-tool-calls#Test specifications#Retired preview cannot dispatch]]
+  it.each([
+    "model",
+    "provider",
+    "connection-roundtrip",
+    "session",
+    "abort",
+    "disconnect",
+    "unmount",
+  ])(
+    "refuses a delayed target preview after %s without dispatch",
+    async (mode) => {
+      const api: HarnessApi = {};
+      const view = await attachOwnedHarness(api);
+      let finish!: (value: unknown) => void;
+      dashboardMock.request.mockImplementation(async (method) => {
+        if (method === "tools.show") return targetPreviewSnapshot();
+        if (method === "tools.target_preview")
+          return new Promise((resolve) => {
+            finish = resolve;
+          });
+        return {};
+      });
+      const result = api.callTool!({
+        requestId: "retired-preview",
+        name: "write_file",
+        arguments: { content: "once" },
+        timeoutMs: 1000,
+      }).catch((error) => error);
+      await waitFor(() => expect(finish).toBeTypeOf("function"));
+      await act(async () => {
+        if (mode === "model") api.setModel!("changed");
+        if (mode === "provider") api.setProvider!("changed");
+        if (mode === "connection-roundtrip")
+          view.rerender(
+            <Harness api={api} connectionId="b" connectionRevision={2} />,
+          );
+        if (mode === "session")
+          dashboardMock.onEvent?.({
+            type: "session.info",
+            session_id: "live",
+            payload: {},
+          });
+        if (mode === "abort") api.abort!();
+        if (mode === "disconnect") dashboardMock.onClose?.();
+        if (mode === "unmount") view.unmount();
+      });
+      if (mode === "connection-roundtrip")
+        await act(async () => {
+          view.rerender(
+            <Harness api={api} connectionId="a" connectionRevision={3} />,
+          );
+        });
+      finish(resolvedTargetPreview());
+      expect(await result).toMatchObject({
+        outcome: "not-dispatched",
+        attemptId: "rpc:retired-preview",
+      });
+      expect(
+        dashboardMock.request.mock.calls.some(
+          ([method]) => method === "tools.call",
+        ),
+      ).toBe(false);
+      expect(
+        dashboardMock.request.mock.calls.filter(
+          ([method]) => method === "tools.target_preview",
+        ),
+      ).toHaveLength(1);
+    },
+  );
 
   // @lat: [[tool-attempts#Test specifications#Mounted transport consumer]]
   it("reads metadata from the mounted existing transport without read-triggered connect or prompts", async () => {

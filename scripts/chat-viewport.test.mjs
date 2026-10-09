@@ -41,7 +41,7 @@ test("production Chat keeps its composer visible with empty and long transcripts
       } else {
         response.setHeader("Content-Type", "text/html");
         response.end(
-          `<html><head><style>${nativeCss}html,body,#root{height:100%;margin:0}#root{display:flex;flex-direction:column}</style><link rel="stylesheet" href="/chat-viewport.css"></head><body><div id="root"></div><script type="module" src="/chat-viewport.js"></script></body></html>`,
+          `<html data-theme="dark"><head><style>${nativeCss}html,body,#root{height:100%;margin:0}#root{display:flex;flex-direction:column}</style><link rel="stylesheet" href="/chat-viewport.css"></head><body><div id="root"></div><script type="module" src="/chat-viewport.js"></script></body></html>`,
         );
       }
     });

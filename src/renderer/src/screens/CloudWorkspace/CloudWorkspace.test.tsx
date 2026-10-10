@@ -145,8 +145,11 @@ describe("Desktop shared workspace", () => {
     expect(
       window.hermesAPI.cloudWorkspace.applyOperations,
     ).not.toHaveBeenCalled();
+    const readsBeforeRefresh = snapshot.mock.calls.length;
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await waitFor(() => expect(snapshot.mock.calls.length).toBeGreaterThan(2));
+    await waitFor(() =>
+      expect(snapshot).toHaveBeenCalledTimes(readsBeforeRefresh + 1),
+    );
     expect(disable).not.toHaveBeenCalled();
   });
 

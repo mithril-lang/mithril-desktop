@@ -33,6 +33,8 @@ export default function MithrilChat({
   visible?: boolean;
   locale?: string;
 }): React.JSX.Element {
+  const [codeError, setCodeError] = useState<string | null>(null);
+  useEffect(() => setCodeError(null), [profile]);
   const [sidebarTarget, setSidebarTarget] = useState<HTMLElement | null>(null);
   useEffect(() => {
     setSidebarTarget(document.getElementById("cloud-session-sidebar"));
@@ -151,16 +153,23 @@ export default function MithrilChat({
             )
               throw Error("Invalid Mithril request");
             signal.throwIfAborted();
+            setCodeError(null);
             const response = await window.hermesAPI.codeHarness(
               "run",
               args.goal,
               profile,
             );
             signal.throwIfAborted();
-            if (!response.ok || !("result" in response))
+            if (!response.ok || !("result" in response)) {
+              setCodeError(
+                !response.ok && response.error === "mithril_connection_required"
+                  ? "Connect Mithril API for this profile in Providers, or unlock its configured 1Password vault."
+                  : "Mithril generation could not be confirmed. Review the original checkpoint before starting another request.",
+              );
               throw Error(
                 response.ok ? "Missing Mithril result" : response.error,
               );
+            }
             const value = response.result;
             if (value.format !== "mithril.language-project/v1")
               throw Error(
@@ -230,6 +239,11 @@ export default function MithrilChat({
       {connectionError && (
         <div className="session-notice" role="alert">
           <p>{connectionError.message}</p>
+        </div>
+      )}
+      {codeError && (
+        <div className="session-notice" role="alert">
+          {codeError}
         </div>
       )}
       <ChatSessions

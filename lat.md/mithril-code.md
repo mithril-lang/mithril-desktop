@@ -4,9 +4,9 @@ Desktop uses its ordinary Chat harness and profile-scoped Hermes plugin to gener
 
 ## Native execution
 
-[[src/main/code-harness.ts#codeHarness]] invokes the profile-scoped `hermes mithril-code` CLI through fixed subprocess arguments. The brief travels over stdin; only the selected profile supplies its encrypted Mithril API credential. No automatic execution, retries or publication occurs.
+[[src/main/code-harness.ts#codeHarness]] sends an explicit generation request to the owned Code verification service using only the initiating profile’s stored Mithril API credential. No Hermes CLI installation is required, and unknown outcomes never retry.
 
-The Agent plugin requires explicit enablement and the selected profile's MITHRIL_API_KEY. It calls the owned Code verification service, whose only inference route is api.mithril.fund/v1/chat/completions (qwen/qwen3.8-27b). Legacy runner settings are retained but never used as fallback. Unknown POST outcomes remain uncertain. The shared registered Code quota and API inference allowance apply.
+The native bridge resolves only the selected profile's MITHRIL_API_KEY, including its explicitly configured 1Password reference. Vault failure never borrows a launch-profile or other profile key. It calls the owned Code verification service, whose only inference route is api.mithril.fund/v1/chat/completions (qwen/qwen3.8-27b). Legacy runner settings are retained but never used as fallback. Unknown POST outcomes remain uncertain. The shared registered Code quota and API inference allowance apply.
 
 ## Review and measurements
 
@@ -24,7 +24,9 @@ Desktop, App `/code` and Code use the compiled workspace `CodeWorkspace`, includ
 
 ## Execution destination
 
-Desktop explicitly offers a configured Hermes profile runner or the fixed Code service. Selecting a destination never starts execution or silently falls back after a failure.
+Desktop uses the selected profile’s stored Mithril credential for normal-chat generation. Destination selection never starts execution or falls back after failure.
+
+The standalone editor also offers the fixed Code service with an explicitly supplied transient credential.
 
 [[src/main/code-api.ts#codeServiceRun]] validates a bounded brief and sends the bounded Mithril application task to Code with a transient Mithril API token and fresh request ID; GitHub credentials are excluded. The service emits Mithril Form source and requires the existing App compiler to admit its ontology application and semantic stages. Receipts state actual model and usage, not Jev identity or fabricated API cost. This choice needs no local device runtime and does not borrow the browser's session-only free allowance. [[src/main/code-api.ts#codeServiceStatus]] reads readiness without credentials or inference.
 
@@ -48,7 +50,7 @@ Code preserves consumed attempts and receipt IDs while moving its external-runne
 
 The canonical Chat starts the same client-bound tool turn as App and Code after an explicit acknowledged send.
 
-Mithril generation uses the owning profile's existing `mithril_code` Hermes plugin. The plugin returns `application.mith`, the admitted App IR, compiler/semantic receipts and static HTML. Supported output is a bounded static ontology application; arbitrary runtime logic remains outside this contract. Existing imported history never starts tools, and duplicate acknowledgements cannot replay generation after an uncertain result.
+Mithril generation uses the owning profile's `mithril_code` native API bridge. The verifier returns `application.mith`, the admitted App IR, compiler/semantic receipts and static HTML. Supported output is a bounded static ontology application; arbitrary runtime logic remains outside this contract. Existing imported history never starts tools, and duplicate acknowledgements cannot replay generation after an uncertain result.
 
 The tool checkpoint opens the existing shared Code source/GitHub editor. The Code navigation entry returns to Chat. Editing `.mith` requires an explicit recompilation before saving, and GitHub creation/commit/Pages retain the existing reviewed, non-force operations. Compiler calls carry source only. Native chat uses narrow owner-scoped IPC for canonical tool checkpoints; no bearer credential reaches the renderer or sandbox frame.
 
@@ -59,3 +61,17 @@ The main process advertises `mithril-browser-tools-v2` on validated Chat checkpo
 Preview.32 pins the exact workspace 0.6.20 archive after merging the concurrent main changes. Web and native coding consumers share the accepted tool runner and source/GitHub editor; consumer transport and authority stay separate. Preview.30 and preview.31 remain unpublished drafts.
 
 Preview.33 pins workspace0.6.23: the shared Mithril compile control uses the existing action styling and retains the concurrent repository-refactor improvements. Code Web confines collapsed navigation CSS to its sidebar so editor filenames stay visible. The public Chat report confirms Web generation/edited compilation; native activation and live generation remain separate checks.
+
+## Profile vault and API completion
+
+[[src/main/code-credential.ts#codeCredential]] resolves only the initiating profile’s explicitly configured Mithril secret. Missing credentials are explained in Chat rather than requiring an unavailable Hermes CLI.
+
+The configured 1Password reference is read through the existing local op installation with fixed arguments and no ambient API or vault tokens. Its value remains in main-process memory. A vault failure does not fall back to a stored or another profile’s credential.
+
+The fixed Fund SDK archive `eedc3842` removes complete inventory reads from explicit send preflight while retaining owner, generation and operation receipt checks. Initial full inventory loading remains a separate latency limit.
+
+## Native QA on 2026-10-10
+
+The Developer ID signed ARM64 QA bundle completed normal-chat Mithril generation through the selected profile and opened the shared Code editor with source, inference metrics and compiler receipts.
+
+The owned service reported 6.863 seconds for proposal, Mithril emission, App compilation and bounded semantic execution, excluding Chat orchestration and publication. Inference used api.mithril.fund, qwen/qwen3.8-27b, 173 input and 129 output tokens; API cost was unreported. Explicit UI recompilation was admitted, executed OWL/SPARQL/SHACL stages with zero violations, and passed two artifact checks. This qualifies a static ontology application, not dynamic CodeGraph refactoring or a published installer. The independent native platform/signing/notarization matrix remains release-held.

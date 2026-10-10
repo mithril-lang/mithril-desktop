@@ -69,3 +69,9 @@ Preview.33 pins workspace0.6.23: the shared Mithril compile control uses the exi
 The configured 1Password reference is read through the existing local op installation with fixed arguments and no ambient API or vault tokens. Its value remains in main-process memory. A vault failure does not fall back to a stored or another profile’s credential.
 
 The fixed Fund SDK archive `eedc3842` removes complete inventory reads from explicit send preflight while retaining owner, generation and operation receipt checks. Initial full inventory loading remains a separate latency limit.
+
+## Native QA on 2026-10-10
+
+The Developer ID signed ARM64 QA bundle completed normal-chat Mithril generation through the selected profile and opened the shared Code editor with source, inference metrics and compiler receipts.
+
+The owned service reported 6.863 seconds for proposal, Mithril emission, App compilation and bounded semantic execution, excluding Chat orchestration and publication. Inference used api.mithril.fund, qwen/qwen3.8-27b, 173 input and 129 output tokens; API cost was unreported. Explicit UI recompilation was admitted, executed OWL/SPARQL/SHACL stages with zero violations, and passed two artifact checks. This qualifies a static ontology application, not dynamic CodeGraph refactoring or a published installer. The independent native platform/signing/notarization matrix remains release-held.

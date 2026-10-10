@@ -75,3 +75,9 @@ The fixed Fund SDK archive `eedc3842` removes complete inventory reads from expl
 The Developer ID signed ARM64 QA bundle completed normal-chat Mithril generation through the selected profile and opened the shared Code editor with source, inference metrics and compiler receipts.
 
 The owned service reported 6.863 seconds for proposal, Mithril emission, App compilation and bounded semantic execution, excluding Chat orchestration and publication. Inference used api.mithril.fund, qwen/qwen3.8-27b, 173 input and 129 output tokens; API cost was unreported. Explicit UI recompilation was admitted, executed OWL/SPARQL/SHACL stages with zero violations, and passed two artifact checks. This qualifies a static ontology application, not dynamic CodeGraph refactoring or a published installer. The independent native platform/signing/notarization matrix remains release-held.
+
+## Product and loop names
+
+The shared Code editor displays System One Coding as the method and Mithril Semantic Loop as the agent loop, with ontology-driven generation and verification as its technical description.
+
+The project title, normal Chat harness and explicit compile/save/publish controls remain separate. Desktop uses the same compiled Workspace UI as App and Code. Names do not qualify dynamic task coverage or unmeasured speed/cost claims. Native publication still requires the approved independent platform and installer gates.

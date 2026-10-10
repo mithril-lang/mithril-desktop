@@ -1,9 +1,9 @@
 # Shared Mithril workspace
 
-The active dependency is mithril-workspace-0.6.16.tgz, built and packed from the canonical Fund workspace package. Desktop and Web import the same renderer bodies behind consumer-specific ports.
+Desktop imports the canonical Fund workspace behind native transport adapters. The active dependency is `mithril-workspace-0.6.31-sync.73-eedc3842.tgz`, built from fixed Fund main `eedc3842` in an isolated source archive.
 
-This package includes the original Desktop views, per-key locale fallback and an explicit reconnect hook. Automatic connection never invokes the explicit hook. Desktop retains its original account card and secure main-process credential handling; Web retains its existing browser retry behavior.
+This archive includes the receipt-based explicit-send preflight, canonical browser-tools-v2 bridge, and shared Code artifact editor. Receipt, owner and generation validation remain authoritative; uncertain turns are never replayed.
 
-SHA-256: 742832237c9874020749c6b9d8cffe82af75dccdad9cd310382c023353c290fd.
+SHA-256: `aa258f4a8fbb67fc97648127d6529dfd2de7d7b536cb73855008c241161f1c6b`.
 
-Update by building and packing the canonical package, selecting a fresh version, replacing the file dependency and regenerating the exact lock entry. Run renderer/protocol tests, types, lint, production build and lat check. Preview.29 is pending qualification and publication; this file does not certify an installed app or full synchronization.
+Qualification covers shared renderer/protocol tests, types, production compilation and lat check. Installed-client generation and native installer publication require separate evidence.

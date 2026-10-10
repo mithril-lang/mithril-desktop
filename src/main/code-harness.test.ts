@@ -1,83 +1,105 @@
-import { afterAll, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
-
-const fixture = vi.hoisted(() => ({ script: "", root: "" }));
-vi.mock("./installer", () => ({
-  HERMES_PYTHON: process.execPath,
-  HERMES_REPO: fixture.root,
-  hermesCliArgs: (args: string[]) => [fixture.script, ...args],
-  getEnhancedPath: () => process.env.PATH,
+import { afterEach, expect, it, vi } from "vitest";
+const service = vi.hoisted(() => ({ run: vi.fn(), status: vi.fn() }));
+vi.mock("./code-api", () => ({
+  codeServiceRun: service.run,
+  codeServiceStatus: service.status,
 }));
 vi.mock("./utils", () => ({
   profileHome: (profile: string) => {
-    if (!["a", "b"].includes(profile)) throw Error("bad profile");
-    return join(fixture.root, profile);
+    if (!["a", "b", "missing"].includes(profile)) throw Error("bad profile");
+    return profile;
   },
 }));
-vi.mock("./config", () => ({
-  readEnv: (profile: string) => ({ MITHRIL_API_KEY: profile.repeat(32) }),
+vi.mock("./code-credential", () => ({
+  codeCredential: async (profile: string) =>
+    profile === "missing" ? null : "mf_" + profile.repeat(43),
 }));
-vi.mock("./process-options", () => ({ HIDDEN_SUBPROCESS_OPTIONS: {} }));
 import { codeHarness } from "./code-harness";
 import { parseCodeHarnessResponse } from "../shared/code-harness";
+afterEach(() => vi.resetAllMocks());
 
-fixture.root = mkdtempSync(join(tmpdir(), "code-harness-native-"));
-fixture.script = join(fixture.root, "fixture.cjs");
-writeFileSync(
-  fixture.script,
-  `const assert=require('node:assert/strict'); const path=require('node:path');
-const profile=path.basename(process.env.HERMES_HOME);assert.equal(process.env.MITHRIL_API_KEY,profile.repeat(32));
-assert.equal(process.env.OPENROUTER_API_KEY,undefined);assert.equal(process.argv[2],'mithril-code');
-let input='';process.stdin.on('data',chunk=>input+=chunk);process.stdin.on('end',()=>{
-assert.equal(JSON.parse(input).goal,process.argv[3]==='run'?'todo':'');
-console.log(JSON.stringify({ok:true,ready:true,busy:false,template:'todo'}));});`,
-);
-afterAll(() => rmSync(fixture.root, { recursive: true, force: true }));
-
-it("runs the fixed CLI with stdin and the selected profile's secrets across A B A", async () => {
-  // @lat: [[mithril-code#Mithril Code#Native execution]]
-  const old = process.env.OPENROUTER_API_KEY;
-  process.env.OPENROUTER_API_KEY = "unrelated-launch-profile-key";
-  try {
-    for (const profile of ["a", "b", "a"])
-      expect(await codeHarness("status", "", profile)).toEqual({
-        ok: true,
-        ready: true,
-        busy: false,
-        template: "todo",
-      });
-    expect(await codeHarness("run", "", "a")).toEqual({
-      ok: false,
-      error: "invalid_goal",
+// @lat: [[mithril-code#Mithril Code#Native execution]]
+it("authorizes the fixed verifier using only the selected profile without a local CLI", async () => {
+  service.status.mockResolvedValue({ ok: true, value: { ready: true } });
+  service.run.mockResolvedValue({ ok: false, error: "outcome_unknown" });
+  for (const profile of ["a", "b", "a"]) {
+    expect(await codeHarness("status", "", profile)).toMatchObject({
+      ok: true,
+      template: "mithril-app",
     });
-    expect(await codeHarness("status", "", "../foreign")).toEqual({
+    expect(await codeHarness("run", "report", profile)).toEqual({
       ok: false,
-      error: "invalid_profile",
+      error: "outcome_unknown",
     });
-  } finally {
-    if (old === undefined) delete process.env.OPENROUTER_API_KEY;
-    else process.env.OPENROUTER_API_KEY = old;
   }
+  expect(service.run.mock.calls.map((call) => call[1])).toEqual([
+    { provider: "mf_" + "a".repeat(43) },
+    { provider: "mf_" + "b".repeat(43) },
+    { provider: "mf_" + "a".repeat(43) },
+  ]);
+  expect(service.run).toHaveBeenCalledTimes(3);
+  expect(await codeHarness("run", "", "a")).toEqual({
+    ok: false,
+    error: "invalid_goal",
+  });
+  expect(await codeHarness("run", "report", "../foreign")).toEqual({
+    ok: false,
+    error: "invalid_profile",
+  });
+  expect(await codeHarness("run", "report", "missing")).toEqual({
+    ok: false,
+    error: "mithril_connection_required",
+  });
+  expect(service.run).toHaveBeenCalledTimes(3);
 });
-
-it("does not admit unverified source or raw upstream errors", () => {
-  expect(
-    parseCodeHarnessResponse(
-      JSON.stringify({
-        ok: true,
-        result: {
-          format: "mithril.code-project/v1",
-          verified: false,
-          files: {},
-        },
-      }),
-    ).ok,
-  ).toBe(false);
+it("admits verified language artifacts and rejects unverified output", async () => {
+  const source = "(mithril/app-agent)";
+  const result = {
+    format: "mithril.language-project/v1",
+    verified: true,
+    files: {
+      ".nojekyll": "",
+      "README.md": "QA",
+      "application.mith": source,
+      "artifact.json": "{}",
+      "index.html": "<h1>QA</h1>",
+    },
+    logic: { format: "https://mithril.fund/artifact/app-agent-v1" },
+    metrics: { "verification-passed": true },
+    receipt: {
+      format: "mithril.language-inference-receipt/v1",
+      status: "admitted",
+      compiler: "https://app.mithril.fund/api/compile",
+      source,
+    },
+  };
+  service.run.mockResolvedValue({ ok: true, value: result });
+  expect(await codeHarness("run", "report", "a")).toEqual({ ok: true, result });
+  service.run.mockResolvedValue({
+    ok: true,
+    value: { ...result, verified: false },
+  });
+  expect((await codeHarness("run", "report", "a")).ok).toBe(false);
   expect(
     parseCodeHarnessResponse(
       JSON.stringify({ ok: false, error: "Bearer sensitive-key" }),
     ),
   ).toEqual({ ok: false, error: "invalid_runner_response" });
+});
+it("keeps overlapping attempts in the same profile from making a second POST", async () => {
+  let finish!: (value: unknown) => void;
+  service.run.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const first = codeHarness("run", "report", "a");
+  expect(await codeHarness("run", "report", "a")).toEqual({
+    ok: false,
+    error: "runner_busy",
+  });
+  finish({ ok: false, error: "outcome_unknown" });
+  await first;
+  expect(service.run).toHaveBeenCalledOnce();
 });

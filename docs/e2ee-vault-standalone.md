@@ -46,3 +46,11 @@ is not applied by these source checks. General availability requires the externa
 review and recovery drill in kagi SECURITY.md, native installed-client evidence,
 reviewed schema deployment and live sync read-back. Device revocation, automatic
 item discovery and authenticated deletion remain outside this preview.
+
+## Training account connection
+
+Set `MITHRIL_VAULT_TRAINING_SESSION_FILE` explicitly to a private external mode-0600 file containing `realm`, the fixed training `origin`, `ownerId`, `token` and epoch-second `expiresAt`. Main rejects symlinks, another OS owner, unsafe permissions, expiry, production credentials and an identity/scope mismatch. The file is not an inference provider credential and never enters renderer settings, logs or source.
+
+Only the Vault transport uses `https://mithril-vault-training-20261011.cloud-kotoba.workers.dev`. Privacy labels the realm as training with disposable secrets and expiry. General account, billing and inference origins are unchanged. Training account IDs have a separate namespace used in encryption AAD and local custody filenames. The shared encrypted transport checks the account namespace, dedicated bearer marker and explicit realm before sending any request. No arbitrary API-origin override is added.
+
+The API owner must publish and verify the isolated realm before the installed drill. A private credential file, component tests and cloud account rows alone are not installed-device recovery evidence.

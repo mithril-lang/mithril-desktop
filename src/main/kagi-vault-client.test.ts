@@ -175,3 +175,35 @@ describe("kagi + kagitaba Desktop transport", () => {
     expect(f.durable().pending).toBeUndefined();
   });
 });
+
+it("training credentials and account namespace cannot cross the production transport", async () => {
+  const f = fixture();
+  f.setSession({
+    ownerId: f.state.ownerId,
+    token: "mf_training" + "a".repeat(35),
+    realm: "vault-training-v1",
+  });
+  await expect(f.client().save(input)).rejects.toMatchObject({
+    code: "vault_realm_mismatch",
+  });
+  expect(f.calls).toHaveLength(0);
+  const g = fixture();
+  g.state.ownerId = "training-" + "a".repeat(32);
+  g.setSession({
+    ownerId: g.state.ownerId,
+    token: "mf_training" + "b".repeat(35),
+    realm: "vault-training-v1",
+  });
+  await g.client().save(input);
+  expect(g.calls[0].url).toBe(
+    "https://mithril-vault-training-20261011.cloud-kotoba.workers.dev/v1/vault/" +
+      g.state.vaultId +
+      "/items/" +
+      itemId,
+  );
+  g.setSession({ ownerId: g.state.ownerId, token: "mf_synthetic" });
+  await expect(g.client().pull(itemId)).rejects.toMatchObject({
+    code: "vault_realm_mismatch",
+  });
+  expect(g.calls).toHaveLength(1);
+});

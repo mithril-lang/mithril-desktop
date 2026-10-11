@@ -1,3 +1,4 @@
+import { trainingVaultSession } from "./kagi-vault-training";
 import { getConnectionConfig } from "./config";
 // @lat: [[e2ee-vault#Native Vault UI]]
 import {
@@ -55,6 +56,8 @@ export function registerKagiVaultIpc(
     session: async (profile) => {
       if (profile !== (normalizeProfileName(getActiveProfileNameSync()) || ""))
         return null;
+      if (process.env.MITHRIL_VAULT_TRAINING_SESSION_FILE)
+        return trainingVaultSession();
       const token = readCloudAccountToken(profile);
       if (!token) return null;
       const account = await inspectMithrilToken(token);

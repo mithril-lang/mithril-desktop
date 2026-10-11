@@ -100,11 +100,13 @@ export class KagiVaultController {
     const session = await this.account(profile);
     if (!this.state)
       return {
+        realm: session.realm,
         status: this.deps.exists(session.ownerId) ? "locked" : "absent",
         pendingWrites: 0,
         items: [],
       };
     return {
+      realm: session.realm,
       status: "unlocked",
       vaultId: this.state.vaultId,
       pendingWrites: Object.keys(this.state.pending ?? {}).length,

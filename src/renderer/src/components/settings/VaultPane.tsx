@@ -84,6 +84,11 @@ export default function VaultPane(): React.JSX.Element {
         {view?.status === "unlocked" &&
           button("Lock and revoke grants", "lock")}
       </div>
+      {view?.realm === "vault-training-v1" && (
+        <p role="status">
+          Training Vault — disposable test secrets only. This account expires.
+        </p>
+      )}
       {view?.status === "unlocked" && (
         <>
           <label className="block text-sm">

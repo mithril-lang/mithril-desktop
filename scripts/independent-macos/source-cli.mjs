@@ -231,6 +231,7 @@ try {
   const identity = {
     repository: repo,
     sha,
+    mode,
     recipe: sourceRecipe(repo),
     nodeSha256: sha256(readFileSync(process.execPath)),
     owner: `${hostname()}\n${ownerCertificate()}`,

@@ -37,6 +37,7 @@ test("receipts bind exact source recipe runtime owner freshness and release excl
       recipe: sourceRecipe(repository),
       nodeSha256: "node",
       owner: "owner",
+      mode: "candidate",
       now,
     };
   const payload = {
@@ -54,6 +55,7 @@ test("receipts bind exact source recipe runtime owner freshness and release excl
   for (const change of [
     { sha: "b".repeat(40) },
     { recipe: "other" },
+    { mode: "current-main" },
     { owner: "other" },
     { nodeSha256: "other" },
     { releaseEligible: true },

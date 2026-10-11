@@ -102,7 +102,7 @@ export function sourceInventory(directory) {
 }
 export function verifySourcePayload(
   payload,
-  { repository, sha, recipe, nodeSha256, owner, now = Date.now() },
+  { repository, sha, recipe, nodeSha256, owner, mode, now = Date.now() },
 ) {
   const age = now - Date.parse(payload?.finishedAt);
   if (
@@ -110,6 +110,8 @@ export function verifySourcePayload(
     payload.repository !== repository ||
     payload.image !== SOURCE_IMAGE ||
     payload.sha !== sha ||
+    payload.mode !== mode ||
+    !["candidate", "current-main"].includes(payload.mode) ||
     payload.recipe !== recipe ||
     payload.nodeSha256 !== nodeSha256 ||
     payload.owner !== owner ||

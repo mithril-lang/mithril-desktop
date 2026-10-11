@@ -152,7 +152,7 @@ export function registerKagiVaultIpc(
             break;
           case "save": {
             const value = await secret(
-              "Enter the secret value. It stays outside the chat and settings renderer.",
+              `Enter the value for ${input.title ?? ""} (${input.key ?? ""}). It stays outside the chat and settings renderer.`,
             );
             if (value)
               await controller.save(

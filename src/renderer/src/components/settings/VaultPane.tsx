@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type {
   VaultAction,
   VaultInput,
@@ -6,16 +6,19 @@ import type {
 } from "../../../../shared/kagi-vault";
 
 export default function VaultPane(): React.JSX.Element {
+  const identityEpoch = useRef(0);
   const [view, setView] = useState<VaultView | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState("");
   const [key, setKey] = useState("");
   async function run(action: VaultAction, input?: VaultInput): Promise<void> {
+    const epoch = identityEpoch.current;
     setBusy(true);
     setError("");
     try {
       const result = await window.hermesAPI.vault(action, input);
+      if (epoch !== identityEpoch.current) return;
       if (result.ok) setView(result.view);
       else setError(result.error);
     } catch {
@@ -26,6 +29,17 @@ export default function VaultPane(): React.JSX.Element {
   }
   useEffect(() => {
     void run("status");
+    const unsubscribe = window.hermesAPI.onCloudWorkspaceAccountChanged?.(
+      () => {
+        ++identityEpoch.current;
+        setView(null);
+        void run("status");
+      },
+    );
+    return () => {
+      ++identityEpoch.current;
+      unsubscribe?.();
+    };
   }, []);
   const button = (
     label: string,

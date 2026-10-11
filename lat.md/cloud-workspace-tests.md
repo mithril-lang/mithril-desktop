@@ -1377,3 +1377,7 @@ Cached metadata authorization never grants schedule editing or execution; both s
 ## Bounded inventory request
 
 Desktop requests 50 inventory documents through its fixed authenticated route, preserving the exclusive cursor and rejecting a foreign owner.
+
+## Local shared schedule list
+
+[[local-workspace#Cached shared Schedules inventory]] tests prove durable offline restart reads, no network read, account retirement, and rejection of foreign, invalid or generation-mismatched snapshots. Schedule edits and execution retain online authorization.

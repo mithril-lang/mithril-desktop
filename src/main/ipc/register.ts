@@ -1654,7 +1654,7 @@ export function registerIpcHandlers(context: IpcContext): void {
   });
   ipcMain.handle("cloud-workspace-schedules", (event) => {
     trustedWorkspaceSender(event);
-    return cloudWorkspace.getSchedules();
+    return localWorkspace().getSchedules();
   });
   ipcMain.handle("cloud-workspace-schedule-edit", (event, operation) => {
     trustedWorkspaceSender(event);

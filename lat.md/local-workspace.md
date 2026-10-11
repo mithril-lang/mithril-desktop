@@ -77,3 +77,7 @@ A previously checked, ready main-process cache lets Desktop reopen its workspace
 The original Schedules inventory reads its existing local source after the credential-bound cache and both saved account/profile ownership bindings pass. Reads recheck identity after completion; editing and execution retain live authentication.
 
 [[src/main/original-schedule-replication-runtime.ts#runOriginalScheduleScreen]] keeps this readonly path outside the lifecycle synchronization lane. Missing bindings, blocked/revoked caches, another requested profile and symlinked native homes fail closed. It does not adopt a source, upload original files or grant schedule execution.
+
+### Cached shared Schedules inventory
+
+The shared Schedules list uses a validated owner and generation scoped SQLite snapshot, fetched during background synchronization. Original source reads keep their existing ownership checks. Schedule edits and execution still use authenticated online transactions; cached lists grant no write authority. A missing initial schedule inventory fails explicitly instead of inventing an empty cloud list.

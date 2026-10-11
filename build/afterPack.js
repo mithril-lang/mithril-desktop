@@ -1,5 +1,6 @@
 const { execSync } = require("child_process");
 const path = require("path");
+const { checkAsarStorage } = require("./check-asar-storage.js");
 
 // Sign a single path, ignoring "not an Mach-O" errors for non-binary files.
 function sign(target) {
@@ -18,6 +19,15 @@ function sign(target) {
 }
 
 exports.default = async function afterPack(context) {
+  const resources =
+    context.electronPlatformName === "darwin"
+      ? path.join(
+          context.appOutDir,
+          `${context.packager.appInfo.productFilename}.app`,
+          "Contents/Resources",
+        )
+      : path.join(context.appOutDir, "resources");
+  checkAsarStorage(path.join(resources, "app.asar"));
   if (context.electronPlatformName !== "darwin") return;
 
   const appPath = path.join(

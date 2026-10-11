@@ -13,6 +13,11 @@ directories:
 # ad-hoc inside-out (measured 2026-09-22 on the first Kotoba build).
 afterPack: build/afterPack.js
 files:
+  # Output overrides must not cause earlier installers/app bundles to be
+  # embedded in app.asar. Keep compiled out/** and runtime resources.
+  - "!dist/**"
+  - "!release/**"
+  - "!artifacts/**"
   # Immutable npm source archives are build inputs; the installed Workspace
   # dependency and compiled renderer provide the runtime implementation.
   - "!vendor/mithril-workspace-*.tgz"

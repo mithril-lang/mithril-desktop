@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { readFileSync } from "fs";
+import { spawnSync } from "node:child_process";
 import { join } from "path";
 import { load } from "js-yaml";
 import { DebugLogger } from "builder-util";
@@ -19,6 +20,15 @@ const metadata = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const packager = { config, metadata } as Packager;
 
 describe("platform packaging identity", () => {
+  it("rejects recursive build output in the afterPack ASAR gate", () => {
+    const result = spawnSync(
+      process.execPath,
+      ["--test", "scripts/asar-storage.test.mjs"],
+      { cwd: root, encoding: "utf8" },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+  });
   it("blocks every packaging script until legacy runtime protocols are removed", () => {
     expect(metadata.scripts["check:packaging"]).toBe(
       "node scripts/check-mithril-packaging.mjs",

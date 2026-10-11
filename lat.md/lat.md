@@ -3,6 +3,7 @@ This directory defines the high-level concepts, business logic, and architecture
 > **Hermes One** is a community-maintained project. This desktop app is a wrapper around **Hermes Agent** — it is **not affiliated with, endorsed by, or supported by Nous Research**. "Hermes One" is the name of this community project; "Hermes"/"Hermes Agent" refer to the upstream agent it builds on.
 
 - [[chat-commands]] — how typed slash commands are routed through the gateway's `slash.exec`/`command.dispatch` pipeline instead of being sent as prompt text.
+- [[build-storage]] — build output exclusions and ASAR checks that prevent recursive application packaging.
 - [[shared-chat-components]] — React chat components shared with Web App through a separate repo and platform adapters.
 - [[discover]] — the original marketplace screen and styles shared by Desktop and Web through platform adapters.
 - [[international-investigation]] — planned Registry contract for local evidence work, selective agency exchange and independent authority/receipt boundaries.

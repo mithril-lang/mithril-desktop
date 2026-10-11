@@ -39,3 +39,15 @@ Authenticated client usage days require a separate explicit opt-in, disabled by 
 [[src/main/mithril-client-day.ts#recordMithrilClientDay]] sends only client type and consent to the fixed Mithril endpoint, using the encrypted active-profile token solely in main. [[src/renderer/src/utils/mithril-client-days.ts#startMithrilClientDays]] reports foreground use once per successful UTC day; failures remain nonblocking. Privacy Settings allows revocation. No chat content, device identifier, credential, file path or installation proof is submitted.
 
 The boundary is covered by [[mithril-client-days-tests#Mithril usage day tests]].
+
+## Native measurement installer candidate
+
+The client-day reporter is merged into main. Preview.70 was used for isolated Mac qualification without replacing preview.69. The packaging fix preserves the newer main version and dependencies.
+
+Source tests and signed local Mac candidates do not prove notarization, cross-platform release or installed retention.
+
+## Packaged measurement candidate inputs
+
+Source vendor archives remain compiler/install inputs and are excluded from native installers. Installed Workspace dependencies and compiled main/preload/renderer files remain packaged.
+
+The first candidate contained 101 source tarballs totaling 659 MiB despite no runtime references to that source directory. The repackaged preview.70 ASAR contains no source vendor tarballs, retains 279 Workspace files and 872 compiled runtime entries, and contains the client-day endpoint in its main bundle. The DMG is 255,213,322 bytes and the ZIP is 254,754,911 bytes. Deep strict Developer ID verification and the actual bundle version pass. The ZIP and initial DMG were accepted by Apple notarization after the existing team key was paired with its browser-confirmed Issuer ID. The app passes ticket validation and Gatekeeper and launches from an isolated QA installation. The initial unsigned DMG failed container assessment despite notarization; DMG signing is now required. The signed preview.70 container was separately accepted by Apple, stapled and passed signature and Gatekeeper assessment. Public release, authenticated use, cross-platform and update replacement checks remain pending.

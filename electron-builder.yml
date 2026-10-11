@@ -27,6 +27,7 @@ files:
   - "!verification/**"
   - "!vitest.local-d1.config.ts"
   - "!lat.md/**"
+  - "!vendor/**"
   - "!scripts/**"
   - "!.github/**"
   - "!AGENTS.md"

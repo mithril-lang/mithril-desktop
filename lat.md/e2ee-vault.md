@@ -51,3 +51,5 @@ Receipts bind repository, source archive, SHA, recipe, runtime, owner certificat
 An explicit private main-process credential file connects only Vault to the fixed expiring training API. [[src/main/kagi-vault-training.ts#trainingVaultSession]] rejects production tokens, wrong owners/origins and insecure files before any network request.
 
 The renderer labels this realm as training. General account, inference and billing routing retain their own account credentials. The same encrypted client, controller, native key custody, device transfer and recovery paths serve the dedicated disposable account. Creation of a cloud database or local session file does not prove publication or an installed-client drill.
+
+The public Desktop source controller uses [[scripts/independent-macos/source-core.mjs#publicDesktopArchiveSetup]] to require the exact local archive digest before extraction. This avoids large SSH uploads while keeping credential-free isolation and offline test stages. Private Fund source transport remains independently qualified.

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  publicDesktopArchiveSetup,
   SOURCE_IMAGE,
   assertCandidate,
   sourceRecipe,
@@ -110,4 +111,21 @@ test("compiled artifact admission rejects traversal, duplicate paths and changed
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("public Desktop fetch pins both commit and exact archive before extraction", () => {
+  const hash = "b".repeat(64);
+  const script = publicDesktopArchiveSetup(repository, sha, hash);
+  assert.ok(
+    script.indexOf("sha256sum") < script.indexOf("tar --no-same-owner"),
+  );
+  assert.ok(script.includes(`= '${hash}'`));
+  assert.ok(script.includes("credential.helper="));
+  for (const invalid of [
+    ["mithril-lang/mithril-fund", sha, hash],
+    [repository, "main", hash],
+    [repository, sha, "b;env"],
+    [repository, sha + ";env", hash],
+  ])
+    assert.throws(() => publicDesktopArchiveSetup(...invalid));
 });

@@ -21,6 +21,7 @@ import { hostname } from "node:os";
 import { fileURLToPath } from "node:url";
 import { sha256, IDENTITY, verifySignatureMetadata } from "./core.mjs";
 import {
+  publicDesktopArchiveSetup,
   SOURCE_PROFILES,
   SOURCE_IMAGE,
   importSourceArtifacts,
@@ -285,8 +286,13 @@ try {
         "--env",
         "CI=true",
       ];
+      const publicDesktop = repo === "mithril-lang/mithril-desktop";
+      const sourceSetup = publicDesktop
+        ? publicDesktopArchiveSetup(repo, sha, sourceArchiveSha256)
+        : "tar --no-same-owner --no-same-permissions -xf - -C /work";
       const setup =
-        "tar --no-same-owner --no-same-permissions -xf - -C /work && git config --global url.https://github.com/.insteadOf ssh://git@github.com/ && " +
+        sourceSetup +
+        " && git config --global url.https://github.com/.insteadOf ssh://git@github.com/ && " +
         (SOURCE_PROFILES[repo].setup ?? [])
           .map(([bin, argv]) => [bin, ...argv].map(quote).join(" "))
           .join(" && ");
@@ -306,7 +312,7 @@ try {
           setupScript,
         ],
         fd,
-        archive,
+        publicDesktop ? null : archive,
       );
       for (const [binary, argv] of SOURCE_PROFILES[repo].commands) {
         console.log(`${repo}: offline ${binary} ${argv.join(" ")}`);

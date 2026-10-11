@@ -1674,3 +1674,7 @@ The Desktop adapter remembers selected Chat navigation within the checked accoun
 The wrapper's account recheck previously cleared the shared Chat selection and left its welcome screen after a background reconnect. A regression against the real shared component reproduced the lost selection before this change. Navigation now retains the checked owner, profile and initial navigation request. A different owner/profile cannot inherit it; New Chat explicitly clears it even after an initial session link. Each account epoch mounts a fresh shared client, so stale transport custody is still revoked. Read-only restoration remains behind a fresh owner check and complete session inventory.
 
 Preview.74 is a source candidate. Installed preview.73 verified normal tab clicks and DESKTOP_73_OK but also exposed selection loss during background refresh. Current-main Web/native qualification and installed preview.74 verification remain separate gates. See [[cloud-workspace-tests#Selected conversation reconnect]].
+
+## Local SQLite metadata service
+
+Desktop portable metadata now uses [[local-workspace#Local SQLite workspace]] for local reads, durable offline writes and shared main-process reconciliation with the existing D1 API. Native execution and file-byte transports retain their separate authority.

@@ -8,6 +8,14 @@ export interface CloudWorkspaceStatus {
 }
 
 export interface CloudWorkspaceAPI extends WorkspaceTransport {
+  localSync: {
+    status(): Promise<import("./local-workspace").LocalWorkspaceSyncStatus>;
+    synchronize(): Promise<
+      import("./local-workspace").LocalWorkspaceSyncStatus
+    >;
+    resolve(operationId: string, choice: "local" | "cloud"): Promise<void>;
+    onChanged(callback: () => void): () => void;
+  };
   archive: {
     pending(
       owner: string,

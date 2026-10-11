@@ -1,3 +1,4 @@
+import LocalSyncStatus from "./LocalSyncStatus";
 import { useWorkspacePreferences } from "./useWorkspacePreferences";
 import CloudConnectionPane from "./CloudConnectionPane";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -48,6 +49,9 @@ export default function CloudWorkspace({
   const preferences = useWorkspacePreferences();
   const chat = useChatPreferences();
   const [identityEpoch, setIdentityEpoch] = useState(0);
+  const [localReady, setLocalReady] = useState(
+    !window.hermesAPI.cloudWorkspace.localSync,
+  );
   const [signInOpen, setSignInOpen] = useState(false);
   useEffect(() => setSignInOpen(false), [profile]);
   useEffect(
@@ -84,60 +88,74 @@ export default function CloudWorkspace({
     }
   }, []);
   return (
-    <>
-      <WorkspaceApp
-        key={profile}
-        initialView={initialView}
-        settingsInitialSection={settingsInitialSection}
-        embedded={embedded}
-        discoverFocus={discoverFocus}
-        autoConnect
-        repositoryTransport={window.hermesAPI.cloudWorkspace.repository}
-        repositorySeed={repositorySeed}
-        capabilitySeed={window.hermesAPI.cloudWorkspace.capabilitySnapshot}
-        capabilityRuntime={window.hermesAPI}
-        capabilityResources={
-          window.hermesAPI.cloudWorkspace.capabilityResources
-        }
-        memoryProfile={profile}
-        memorySeed={window.hermesAPI.cloudWorkspace.memorySnapshot}
-        memoryRuntime={window.hermesAPI}
-        transport={window.hermesAPI.cloudWorkspace}
-        fileTransport={window.hermesAPI.cloudWorkspace.files}
-        taskAttachmentDownloads={taskAttachmentDownloads}
-        folderAdapter={window.hermesAPI.projectFolderSync}
-        runtimeAdapter={window.hermesAPI.nativeWorkspace}
-        settingsRuntime={{
-          gpu: window.hermesAPI,
-          spellcheck: chat,
-          wrapSettings: (children) => (
-            <NativeSettingsProvider key={profile} profile={profile}>
-              {children}
-            </NativeSettingsProvider>
-          ),
-          renderPane: (section) =>
-            section === "connection" ? (
-              <CloudConnectionPane
-                scope={`${profile}:${identityEpoch}`}
-                locale={locale}
-                onManageAccount={() => setSignInOpen(true)}
-              />
-            ) : (
-              <NativeSettingsPane section={section} />
-            ),
-        }}
-        onOpenNativeSection={onOpenNativeSection}
-        onOpenChat={onOpenChat}
-        beforeConnect={beforeConnect}
-        beforeReconnect={beforeReconnect}
-        afterDisconnect={() => window.hermesAPI.cloudWorkspace.disable()}
-        identityEpoch={`${profile}:${identityEpoch}`}
-        discoverDocuments={window.hermesAPI.cloudWorkspace.discoverDocuments}
-        loadRegistrySkill={window.hermesAPI.cloudWorkspace.registrySkill}
-        onPreferences={preferences}
+    <div
+      className={
+        window.hermesAPI.cloudWorkspace.localSync
+          ? "desktop-local-workspace"
+          : undefined
+      }
+    >
+      <LocalSyncStatus
+        profile={`${profile}:${identityEpoch}`}
         locale={locale}
-        active={active}
+        onReady={setLocalReady}
+        onReconnect={beforeReconnect}
       />
+      {localReady && (
+        <WorkspaceApp
+          key={profile}
+          initialView={initialView}
+          settingsInitialSection={settingsInitialSection}
+          embedded={embedded}
+          discoverFocus={discoverFocus}
+          autoConnect
+          repositoryTransport={window.hermesAPI.cloudWorkspace.repository}
+          repositorySeed={repositorySeed}
+          capabilitySeed={window.hermesAPI.cloudWorkspace.capabilitySnapshot}
+          capabilityRuntime={window.hermesAPI}
+          capabilityResources={
+            window.hermesAPI.cloudWorkspace.capabilityResources
+          }
+          memoryProfile={profile}
+          memorySeed={window.hermesAPI.cloudWorkspace.memorySnapshot}
+          memoryRuntime={window.hermesAPI}
+          transport={window.hermesAPI.cloudWorkspace}
+          fileTransport={window.hermesAPI.cloudWorkspace.files}
+          taskAttachmentDownloads={taskAttachmentDownloads}
+          folderAdapter={window.hermesAPI.projectFolderSync}
+          runtimeAdapter={window.hermesAPI.nativeWorkspace}
+          settingsRuntime={{
+            gpu: window.hermesAPI,
+            spellcheck: chat,
+            wrapSettings: (children) => (
+              <NativeSettingsProvider key={profile} profile={profile}>
+                {children}
+              </NativeSettingsProvider>
+            ),
+            renderPane: (section) =>
+              section === "connection" ? (
+                <CloudConnectionPane
+                  scope={`${profile}:${identityEpoch}`}
+                  locale={locale}
+                  onManageAccount={() => setSignInOpen(true)}
+                />
+              ) : (
+                <NativeSettingsPane section={section} />
+              ),
+          }}
+          onOpenNativeSection={onOpenNativeSection}
+          onOpenChat={onOpenChat}
+          beforeConnect={beforeConnect}
+          beforeReconnect={beforeReconnect}
+          afterDisconnect={() => window.hermesAPI.cloudWorkspace.disable()}
+          identityEpoch={`${profile}:${identityEpoch}`}
+          discoverDocuments={window.hermesAPI.cloudWorkspace.discoverDocuments}
+          loadRegistrySkill={window.hermesAPI.cloudWorkspace.registrySkill}
+          onPreferences={preferences}
+          locale={locale}
+          active={active}
+        />
+      )}
       <Dialog.Root open={signInOpen} onOpenChange={setSignInOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="device-history-backdrop" />
@@ -159,6 +177,6 @@ export default function CloudWorkspace({
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </>
+    </div>
   );
 }

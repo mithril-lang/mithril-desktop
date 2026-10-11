@@ -1,3 +1,4 @@
+import { localWorkspace } from "../local-workspace-runtime";
 import { recordMithrilClientDay } from "../mithril-client-day";
 import { NativeAccountArchive } from "../cloud-archive";
 import {
@@ -1486,7 +1487,9 @@ export function registerIpcHandlers(context: IpcContext): void {
     "cloud-workspace-repository-page",
     (event, collection, after) => {
       trustedWorkspaceSender(event);
-      return cloudWorkspace.repositoryPage(collection, after);
+      return collection === "chat"
+        ? cloudWorkspace.repositoryPage(collection, after)
+        : localWorkspace().repositoryPage(collection, after);
     },
   );
   ipcMain.handle(
@@ -1498,7 +1501,9 @@ export function registerIpcHandlers(context: IpcContext): void {
   );
   ipcMain.handle("cloud-workspace-repository-apply", (event, edit) => {
     trustedWorkspaceSender(event);
-    return cloudWorkspace.repositoryApply(edit);
+    return edit?.capabilityMigration || edit?.collection === "chat"
+      ? cloudWorkspace.repositoryApply(edit)
+      : localWorkspace().repositoryApply(edit);
   });
   ipcMain.handle("cloud-workspace-catalog", (event) => {
     trustedWorkspaceSender(event);
@@ -1569,14 +1574,15 @@ export function registerIpcHandlers(context: IpcContext): void {
   });
   ipcMain.handle("cloud-workspace-status", (event) => {
     trustedWorkspaceSender(event);
-    return cloudWorkspace.status();
+    return localWorkspace().connectionStatus();
   });
   ipcMain.handle("cloud-workspace-enable", (event) => {
     trustedWorkspaceSender(event);
-    return cloudWorkspace.enable();
+    return localWorkspace().enable();
   });
   ipcMain.handle("cloud-workspace-disable", (event) => {
     trustedWorkspaceSender(event);
+    localWorkspace().reset();
     cloudWorkspace.reset();
   });
   ipcMain.handle("cloud-workspace-local-schedules", async (event) => {
@@ -1658,15 +1664,28 @@ export function registerIpcHandlers(context: IpcContext): void {
     trustedWorkspaceSender(event);
     return cloudWorkspace.applySidebar(operation);
   });
+  ipcMain.handle("local-workspace-sync-status", (event) => {
+    trustedWorkspaceSender(event);
+    return localWorkspace().syncStatus();
+  });
+  ipcMain.handle("local-workspace-sync-now", async (event) => {
+    trustedWorkspaceSender(event);
+    await localWorkspace().reconnect();
+    return localWorkspace().syncStatus();
+  });
+  ipcMain.handle("local-workspace-resolve", (event, operationId, choice) => {
+    trustedWorkspaceSender(event);
+    localWorkspace().resolve(operationId, choice);
+  });
   ipcMain.handle("cloud-workspace-snapshot", (event) => {
     trustedWorkspaceSender(event);
-    return cloudWorkspace.getSnapshot();
+    return localWorkspace().getSnapshot();
   });
   ipcMain.handle(
     "cloud-workspace-operations",
     (event, operations, expectedOwner) => {
       trustedWorkspaceSender(event);
-      return cloudWorkspace.applyOperations(operations, expectedOwner);
+      return localWorkspace().applyOperations(operations, expectedOwner);
     },
   );
   ipcMain.handle("cloud-workspace-history", (event, id, offset) => {

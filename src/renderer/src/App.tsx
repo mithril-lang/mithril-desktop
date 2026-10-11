@@ -1,3 +1,4 @@
+import { workspaceEntry } from "./workspace-entry";
 import { startMithrilClientDays } from "./utils/mithril-client-days";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Toaster } from "react-hot-toast";
@@ -80,14 +81,13 @@ function App(): React.JSX.Element {
       nextSetupProfile = status?.activeProfile || "default";
       const first =
         await window.hermesAPI.getMithrilFirstRunState(nextSetupProfile);
-      const account = first.connected
-        ? await window.hermesAPI.getMithrilAccount(nextSetupProfile)
-        : null;
+      const entry = first.connected
+        ? await workspaceEntry(window.hermesAPI, nextSetupProfile)
+        : { allowed: false, live: false };
       if (myRun !== runIdRef.current) return;
-      const verified = !!account?.live && !!account.userId;
-      setAuthenticated(verified);
-      setMithrilConnected(verified);
-      next = verified ? "main" : "mithril";
+      setAuthenticated(entry.allowed);
+      setMithrilConnected(entry.live);
+      next = entry.allowed ? "main" : "mithril";
     } catch {
       next = "mithril";
     }
@@ -138,14 +138,14 @@ function App(): React.JSX.Element {
 
   const openWorkspace = useCallback(async (): Promise<void> => {
     const attempt = ++accountCheck.current;
-    const account = await window.hermesAPI
-      .getMithrilAccount(setupProfile)
-      .catch(() => null);
+    const entry = await workspaceEntry(
+      window.hermesAPI,
+      setupProfile || "default",
+    );
     if (attempt !== accountCheck.current) return;
-    const verified = !!account?.live && !!account.userId;
-    setAuthenticated(verified);
-    setMithrilConnected(verified);
-    setScreen(verified ? "main" : "mithril");
+    setAuthenticated(entry.allowed);
+    setMithrilConnected(entry.live);
+    setScreen(entry.allowed ? "main" : "mithril");
   }, [setupProfile]);
 
   useEffect(() => {

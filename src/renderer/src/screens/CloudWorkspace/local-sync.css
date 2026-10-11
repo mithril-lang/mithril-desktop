@@ -1,0 +1,25 @@
+.desktop-local-workspace .workspace-sync-automatic {
+  display: none;
+}
+.desktop-local-sync {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-secondary, #aaa);
+}
+.desktop-local-sync p,
+.desktop-local-sync details {
+  flex-basis: 100%;
+}
+.desktop-local-sync pre {
+  overflow: auto;
+  max-height: 240px;
+}
+.desktop-local-sync button {
+  padding: 4px 8px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+}

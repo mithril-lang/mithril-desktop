@@ -621,7 +621,7 @@ export class CloudWorkspace {
     )
       throw Error("Invalid repository page");
     const { value } = await this.authorizedRequest(
-      `/v1/workspace/repository/${collection}${after ? `?after=${encodeURIComponent(after)}` : ""}`,
+      `/v1/workspace/repository/${collection}?limit=50${after ? `&after=${encodeURIComponent(after)}` : ""}`,
       undefined,
       collection === "chat" ? "chat:read" : undefined,
     );

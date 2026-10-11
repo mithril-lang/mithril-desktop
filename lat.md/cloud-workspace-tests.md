@@ -1355,3 +1355,23 @@ Opening New Chat clears remembered selection, including a conversation opened th
 ### Different owners do not inherit selection
 
 An account change never selects the prior owner's remembered conversation, even if the new owner's inventory has the same session ID.
+
+## Original Schedules cached source read
+
+A warm credential-bound SQLite cache and both retained native source-owner bindings allow original schedule reads without live authentication or the background sync lane.
+
+## Original Schedules cached source isolation
+
+Unbound profiles, other profiles, symlinked native homes and revoked cached accounts cannot expose an original schedule inventory.
+
+## Original Schedules cached read result fencing
+
+Changing the credential while a readonly source operation runs discards its old-owner result.
+
+## Original Schedules cached read has no write authority
+
+Cached metadata authorization never grants schedule editing or execution; both still require the original live mirror and custody checks.
+
+## Bounded inventory request
+
+Desktop requests 50 inventory documents through its fixed authenticated route, preserving the exclusive cursor and rejecting a foreign owner.

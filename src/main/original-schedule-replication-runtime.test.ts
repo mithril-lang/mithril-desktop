@@ -3,7 +3,13 @@ vi.mock("./mithril-token-store", () => ({
   readCloudAccountToken: () => f.token,
 }));
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { mkdtempSync, mkdirSync, realpathSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 const f = vi.hoisted(() => ({
@@ -31,11 +37,17 @@ const f = vi.hoisted(() => ({
   manualCommand: vi.fn(),
   sourceRun: vi.fn(),
   sourceInspect: vi.fn(),
+  cached: vi.fn(),
+  owned: vi.fn(),
+  status: vi.fn(),
+}));
+vi.mock("./local-workspace-runtime", () => ({
+  localWorkspace: () => ({ syncStatus: f.cached }),
 }));
 vi.mock("electron", () => ({ app: { getPath: () => "/test/user-data" } }));
 vi.mock("./cloud-workspace-runtime", () => ({
   cloudWorkspace: {
-    status: async () => ({ userId: "alice" }),
+    status: f.status,
     enable: async () => {},
     nativeContext: async () => ({
       userId: "alice",
@@ -59,7 +71,7 @@ vi.mock("./config", () => ({
 }));
 vi.mock("./utils", () => ({
   getActiveProfileNameSync: () => "default",
-  profileHome: () => "/test/home",
+  profileHome: () => f.root,
 }));
 vi.mock("./installer", () => ({
   HERMES_PYTHON: "/test/python",
@@ -70,7 +82,7 @@ vi.mock("./profile-metadata-inventory", () => ({
 }));
 vi.mock("./repository-kanban-runtime", () => ({
   bindRepositorySource: f.bind,
-  repositorySourceOwned: () => true,
+  repositorySourceOwned: f.owned,
 }));
 vi.mock("./cronjobs", () => ({
   readOriginalCronSource: vi.fn(),
@@ -122,6 +134,9 @@ beforeEach(() => {
   f.sync.mockResolvedValue({ status: "synced" });
   f.check.mockResolvedValue(undefined);
   f.selected.mockResolvedValue(undefined);
+  f.cached.mockReturnValue({ ready: false, userId: null, phase: "starting" });
+  f.owned.mockReturnValue(true);
+  f.status.mockResolvedValue({ userId: "alice" });
 });
 afterEach(() => rmSync(f.root, { recursive: true, force: true }));
 const flush = async (): Promise<void> => {
@@ -442,4 +457,79 @@ it("keeps polling another owned profile while one manual run remains busy", asyn
     stop();
     vi.useRealTimers();
   }
+});
+
+// @lat: [[cloud-workspace-tests#Original Schedules cached source read]]
+it("reads an owned original source without remote authentication or the sync lane after a cached offline restart", async () => {
+  f.cached.mockReturnValue({ ready: true, userId: "alice", phase: "offline" });
+  f.status.mockRejectedValue(Error("Workspace network unavailable"));
+  const action = vi.fn(async () => ["original"]);
+  await expect(
+    runOriginalScheduleScreen("default", action, "read"),
+  ).resolves.toEqual(["original"]);
+  expect(f.status).not.toHaveBeenCalled();
+  expect(f.sync).not.toHaveBeenCalled();
+  expect(f.bind).not.toHaveBeenCalled();
+  expect(f.owned).toHaveBeenCalledWith(
+    "/test/user-data/mithril-original-schedules/source-owners",
+    "default",
+    "alice",
+  );
+});
+// @lat: [[cloud-workspace-tests#Original Schedules cached source isolation]]
+it("refuses unbound, foreign-profile, symlinked and retired cached reads", async () => {
+  const action = vi.fn(async () => []);
+  f.cached.mockReturnValue({ ready: true, userId: "alice", phase: "offline" });
+  f.owned.mockReturnValue(false);
+  await expect(
+    runOriginalScheduleScreen("default", action, "read"),
+  ).rejects.toThrow("ownership unavailable");
+  f.owned.mockReturnValue(true);
+  await expect(
+    runOriginalScheduleScreen("other", action, "read"),
+  ).rejects.toThrow("ownership unavailable");
+  const home = f.root;
+  const link = join(home, "linked");
+  symlinkSync(home, link);
+  f.root = link;
+  try {
+    await expect(
+      runOriginalScheduleScreen("default", action, "read"),
+    ).rejects.toThrow("Schedule profile unavailable");
+  } finally {
+    f.root = home;
+  }
+  f.cached.mockReturnValue({ ready: true, userId: null, phase: "blocked" });
+  f.status.mockRejectedValue(
+    Error("Workspace sign-in expired or access refused"),
+  );
+  await expect(
+    runOriginalScheduleScreen("default", action, "read"),
+  ).rejects.toThrow("access refused");
+  expect(action).not.toHaveBeenCalled();
+});
+// @lat: [[cloud-workspace-tests#Original Schedules cached read result fencing]]
+it("discards a cached source response if its credential changes during the read", async () => {
+  f.cached.mockReturnValue({ ready: true, userId: "alice", phase: "offline" });
+  await expect(
+    runOriginalScheduleScreen(
+      "default",
+      async () => {
+        f.token = "synthetic-account-b";
+        return ["old-owner"];
+      },
+      "read",
+    ),
+  ).rejects.toThrow("account changed");
+});
+// @lat: [[cloud-workspace-tests#Original Schedules cached read has no write authority]]
+it("never uses cached metadata authorization to admit edits or execution", async () => {
+  f.cached.mockReturnValue({ ready: true, userId: "alice", phase: "offline" });
+  f.status.mockRejectedValue(Error("Workspace network unavailable"));
+  const action = vi.fn(async () => true);
+  for (const kind of ["edit", "execute"] as const)
+    await expect(
+      runOriginalScheduleScreen("default", action, kind),
+    ).rejects.toThrow("network unavailable");
+  expect(action).not.toHaveBeenCalled();
 });

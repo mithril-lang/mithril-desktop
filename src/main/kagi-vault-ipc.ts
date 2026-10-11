@@ -1,3 +1,4 @@
+import { getConnectionConfig } from "./config";
 // @lat: [[e2ee-vault#Native Vault UI]]
 import {
   app,
@@ -23,7 +24,7 @@ import { readKagiVaultState, writeKagiVaultState } from "./kagi-vault-store";
 import { setKagiVaultController } from "./kagi-vault-runtime";
 import { readCloudAccountToken } from "./mithril-token-store";
 import { inspectMithrilToken } from "./mithril-token";
-import { getActiveProfileNameSync } from "./utils";
+import { getActiveProfileNameSync, normalizeProfileName } from "./utils";
 import { showPasswordDialog } from "./askpass";
 import type {
   VaultAction,
@@ -52,7 +53,8 @@ export function registerKagiVaultIpc(
   };
   const controller = new KagiVaultController({
     session: async (profile) => {
-      if (profile !== (getActiveProfileNameSync() || "")) return null;
+      if (profile !== (normalizeProfileName(getActiveProfileNameSync()) || ""))
+        return null;
       const token = readCloudAccountToken(profile);
       if (!token) return null;
       const account = await inspectMithrilToken(token);
@@ -72,6 +74,7 @@ export function registerKagiVaultIpc(
       writeKagiVaultState(path(state.ownerId), state);
     },
     consent,
+    canExecute: () => getConnectionConfig().mode === "local",
   });
   setKagiVaultController(controller);
   app.once("before-quit", () => controller.lock());
@@ -133,7 +136,7 @@ export function registerKagiVaultIpc(
       )
         return { ok: false, error: "Invalid Vault request." };
       busy = true;
-      const profile = getActiveProfileNameSync() || "";
+      const profile = normalizeProfileName(getActiveProfileNameSync()) || "";
       try {
         switch (action) {
           case "status":

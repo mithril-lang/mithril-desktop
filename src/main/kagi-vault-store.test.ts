@@ -1,3 +1,4 @@
+import { sealSecret } from "@kotoba-lang/kagi/mithril-vault";
 // @vitest-environment node
 import { afterEach, expect, it, vi } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -69,4 +70,42 @@ it("restores key and pending state only for the same owner and preserves corrupt
   writeFileSync(file, "corrupt");
   expect(() => readKagiVaultState(file, "owner-a")).toThrow();
   expect(readFileSync(file, "utf8")).toBe("corrupt");
+});
+
+it("preserves working state when an otherwise valid encrypted index exceeds the readable file limit", () => {
+  const file = path(),
+    large = state();
+  writeFileSync(file, "working-state");
+  const records: import("./kagi-vault-client").VaultState["records"] = {};
+  for (let i = 1; i <= 700; i++) {
+    const id = i.toString(16).padStart(32, "0");
+    records[id] = {
+      vaultId: large.vaultId,
+      itemId: id,
+      revision: 1,
+      operationId: id,
+      deleted: false,
+      createdAt: 10,
+      envelope: sealSecret(
+        large.key,
+        {
+          ownerId: large.ownerId,
+          vaultId: large.vaultId,
+          itemId: id,
+          generation: 1,
+        },
+        {
+          format: "kagitaba-secret-v1",
+          id,
+          title: "Synthetic",
+          key: "SYNTHETIC_KEY",
+          value: "x".repeat(16384),
+        },
+      ),
+    };
+  }
+  expect(() => writeKagiVaultState(file, { ...large, records })).toThrow(
+    "Vault state exceeds the local storage limit.",
+  );
+  expect(readFileSync(file, "utf8")).toBe("working-state");
 });

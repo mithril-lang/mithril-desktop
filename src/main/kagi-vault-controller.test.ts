@@ -17,11 +17,13 @@ interface Fixture {
   stored(): VaultState;
   owner(value: string): void;
   time(value: number): void;
+  local(value: boolean): void;
 }
 function fixture(): Fixture {
   let stored: VaultState | null = null;
   let owner = "owner";
   let now = 1000;
+  let local = true;
   const consent = vi.fn(async () => true);
   const session = vi.fn(async (_profile: string) => ({
     ownerId: owner,
@@ -35,6 +37,7 @@ function fixture(): Fixture {
       stored = structuredClone(state);
     },
     consent,
+    canExecute: () => local,
     now: () => now,
   });
   return {
@@ -44,6 +47,9 @@ function fixture(): Fixture {
     stored: () => stored!,
     owner: (value: string) => {
       owner = value;
+    },
+    local: (value: boolean) => {
+      local = value;
     },
     time: (value: number) => {
       now = value;
@@ -158,6 +164,24 @@ describe("Vault enrollment, recovery and execution boundaries", () => {
       a.controller.resolve("other-profile", "SYNTHETIC_KEY", "session"),
     ).rejects.toThrow();
     expect((await a.controller.view("profile")).status).toBe("locked");
+  });
+  it("refuses remote connections, including a switch during native disclosure consent", async () => {
+    const a = fixture(),
+      id = await withSecret(a);
+    a.local(false);
+    await expect(a.controller.grant("profile", id)).rejects.toThrow();
+    expect(
+      await a.controller.resolve("profile", "SYNTHETIC_KEY", "session"),
+    ).toBeNull();
+    a.local(true);
+    await a.controller.grant("profile", id);
+    a.consent.mockImplementationOnce(async () => {
+      a.local(false);
+      return true;
+    });
+    expect(
+      await a.controller.resolve("profile", "SYNTHETIC_KEY", "session"),
+    ).toBeNull();
   });
   it("denies cancellation and account switching while release consent is open", async () => {
     const a = fixture(),

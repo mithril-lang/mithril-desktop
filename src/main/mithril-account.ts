@@ -1,3 +1,4 @@
+import { lockKagiVault } from "./kagi-vault-runtime";
 // @lat: [[mithril-migration#Mithril desktop migration#Native Mithril account]]
 import { MITHRIL_ACCOUNT_URL, inspectMithrilToken } from "./mithril-token";
 import {
@@ -20,6 +21,7 @@ export async function connectMithrilAccount(
 ): Promise<MithrilAccountConnectResult> {
   const inspection = await inspectMithrilToken(rawToken, fetchImpl);
   if (!inspection.ok) return { status: "refused", error: inspection.error };
+  lockKagiVault();
   try {
     writeMithrilAccountCredentials(profile, rawToken.trim());
   } catch {
@@ -74,6 +76,7 @@ export async function mithrilAccount(
 export function disconnectMithrilAccount(profile?: string): {
   success: boolean;
 } {
+  lockKagiVault();
   clearCloudAccountToken();
   clearMithrilToken(profile);
   try {

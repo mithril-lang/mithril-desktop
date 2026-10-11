@@ -2507,7 +2507,7 @@ async function sendMessageViaTuiGateway(
           : isSudo
             ? promptSudoPassword()
             : resolveGrantedVaultSecret(
-                profile || "",
+                resolveProfile(profile) || "",
                 envVar,
                 activeSessionId,
               ).then(

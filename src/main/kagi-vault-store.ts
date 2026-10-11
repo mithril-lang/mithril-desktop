@@ -18,10 +18,13 @@ export function writeKagiVaultState(path: string, state: VaultState): void {
   // Verify keychain read-back before replacing the last working state.
   if (safeStorage.decryptString(ciphertext) !== plaintext)
     throw new Error("Vault keychain verification failed.");
-  safeWriteFile(
-    path,
-    JSON.stringify({ version: 1, ciphertext: ciphertext.toString("base64") }),
-  );
+  const stored = JSON.stringify({
+    version: 1,
+    ciphertext: ciphertext.toString("base64"),
+  });
+  if (Buffer.byteLength(stored, "utf8") > 16777216)
+    throw Error("Vault state exceeds the local storage limit.");
+  safeWriteFile(path, stored);
 }
 export function readKagiVaultState(
   path: string,

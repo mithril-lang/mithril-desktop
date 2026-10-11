@@ -35,6 +35,7 @@ export interface VaultDependencies {
   write(state: VaultState): void;
   consent(detail: string): Promise<boolean>;
   now?: () => number;
+  canExecute?: (profile: string) => boolean;
   fetch?: typeof fetch;
 }
 /** Renderer never receives root keys, recovery codes, snapshots or secret values. */
@@ -333,6 +334,10 @@ export class KagiVaultController {
   }
   // @lat: [[e2ee-vault#Execution consent]]
   async grant(profile: string, itemId: string): Promise<void> {
+    if (!this.deps.canExecute?.(profile))
+      throw Error(
+        "Choose a local connection before granting a credential disclosure.",
+      );
     const view = await this.view(profile),
       item = view.items.find((row) => row.id === itemId);
     if (!item || !/^[A-Z][A-Z0-9_]{0,127}$/.test(item.key))
@@ -345,7 +350,8 @@ export class KagiVaultController {
     )
       return;
     await this.unlocked(profile);
-    if (epoch !== this.epoch) throw Error("Vault changed.");
+    if (epoch !== this.epoch || !this.deps.canExecute?.(profile))
+      throw Error("Vault or connection changed.");
     if (
       [...this.grants.values()].some(
         (g) =>
@@ -370,6 +376,7 @@ export class KagiVaultController {
     key: string,
     sessionId: string,
   ): Promise<string | null> {
+    if (!this.deps.canExecute?.(profile)) return null;
     const client = await this.unlocked(profile);
     const grant = [...this.grants.values()].find(
       (g) => g.profile === profile && g.key === key && g.expiresAt > this.now(),
@@ -386,13 +393,15 @@ export class KagiVaultController {
       return null;
     await this.unlocked(profile);
     if (
+      !this.deps.canExecute?.(profile) ||
       epoch !== this.epoch ||
       grantEpoch !== this.grantEpoch ||
       grant.expiresAt <= this.now()
     )
       return null;
     const value = await client.resolve(grant.itemId, key);
-    return epoch === this.epoch &&
+    return this.deps.canExecute?.(profile) &&
+      epoch === this.epoch &&
       grantEpoch === this.grantEpoch &&
       grant.expiresAt > this.now()
       ? value

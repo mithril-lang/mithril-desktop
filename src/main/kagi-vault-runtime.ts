@@ -3,6 +3,9 @@ let controller: KagiVaultController | null = null;
 export function setKagiVaultController(value: KagiVaultController): void {
   controller = value;
 }
+export function lockKagiVault(): void {
+  controller?.lock();
+}
 /** Only the local gateway's targeted secret.request path can consume grants. */
 export async function resolveGrantedVaultSecret(
   profile: string,

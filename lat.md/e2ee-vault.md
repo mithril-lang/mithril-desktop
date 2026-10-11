@@ -12,7 +12,7 @@ Only ciphertext leaves Desktop. A response after account switching is refused. W
 
 [[src/main/kagi-vault-store.ts#writeKagiVaultState]] protects the Vault key and local record index with a real OS keyring. The weaker token-file fallback is not used for Vault keys.
 
-State read-back precedes replacement. Unreadable or account-mismatched state is preserved and refused. The existing SecretsProvider remains synchronous; this client has an async boundary and is not silently inserted into that path.
+State read-back precedes replacement. Unreadable, oversized or account-mismatched state is preserved and refused. Writes are bounded by the reader limit before replacement. The existing SecretsProvider remains synchronous; this client has an async boundary and is not silently inserted into that path.
 
 ## Release gates
 
@@ -38,7 +38,7 @@ X25519 transfers are classical, not kagi's existing PQC actor. Recovery files us
 
 A one-use, ten-minute grant binds an item, exact variable and active local Hermes profile. [[src/main/kagi-vault-runtime.ts#resolveGrantedVaultSecret]] only serves the local gateway's targeted secret.request path.
 
-A second native confirmation identifies the requesting session. Account switching, locking, expiry, cancellation and revocation refuse release. Desktop does not enumerate Vault secrets or inject them into a subprocess environment. The existing Hermes credential-capture handler persists an approved disclosure into profile .env/auth data and may expose it to subprocesses. Native consent explicitly discloses this; grant revocation cannot erase released copies. Rotate issuer credentials when needed.
+A second native confirmation identifies the requesting session. Account switching, locking, expiry, cancellation and revocation refuse release. Sign-out, credential replacement and active-profile changes immediately lock the controller. Remote and SSH connections cannot grant or consume Vault disclosures. Desktop does not enumerate Vault secrets or inject them into a subprocess environment. The existing Hermes credential-capture handler persists an approved disclosure into profile .env/auth data and may expose it to subprocesses. Native consent explicitly discloses this; grant revocation cannot erase released copies. Rotate issuer credentials when needed.
 
 ## Candidate standalone qualification
 

@@ -15,6 +15,7 @@ export const SOURCE_PROFILES = Object.freeze({
     name: "desktop-source-v1",
     setup: [
       ["npm", ["ci", "--ignore-scripts"]],
+      ["node", ["node_modules/electron/install.js"]],
       ["npm", ["run", "audit:prod"]],
     ],
     commands: [

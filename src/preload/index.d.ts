@@ -1,3 +1,8 @@
+import type {
+  VaultAction,
+  VaultInput,
+  VaultResult,
+} from "../shared/kagi-vault";
 import type { AppLocale } from "../shared/i18n/types";
 import type { DeviceCareAPI } from "../shared/device-care";
 import type { Attachment } from "../shared/attachments";
@@ -272,6 +277,7 @@ interface KanbanCreateTaskInput {
 }
 
 interface HermesAPI {
+  vault(action: VaultAction, input?: VaultInput): Promise<VaultResult>;
   deviceCare: DeviceCareAPI;
   endpoint: import("../shared/endpoint-protection").EndpointAPI;
   // Installation

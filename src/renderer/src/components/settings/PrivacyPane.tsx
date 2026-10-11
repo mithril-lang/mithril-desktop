@@ -1,3 +1,4 @@
+import VaultPane from "./VaultPane";
 import { useState } from "react";
 import {
   getMithrilMeasurementConsent,
@@ -34,6 +35,7 @@ export default function PrivacyPane(): React.JSX.Element {
           ? "利用統計のため、端末種別とUTCの利用日をMithrilへ送信します。会話本文や端末識別子は送信しません。いつでも停止できます。"
           : "Share client type and UTC usage day with Mithril for usage statistics. No chat content or device identifier is sent. You can stop this at any time."}
       </label>
+      <VaultPane />
     </>
   );
 }

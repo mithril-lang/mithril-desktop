@@ -1,4 +1,5 @@
 import { localWorkspace } from "../local-workspace-runtime";
+import { registerKagiVaultIpc } from "../kagi-vault-ipc";
 import { recordMithrilClientDay } from "../mithril-client-day";
 import { NativeAccountArchive } from "../cloud-archive";
 import {
@@ -1278,6 +1279,7 @@ export function registerIpcHandlers(context: IpcContext): void {
       app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL,
     );
   };
+  registerKagiVaultIpc(trustedWorkspaceSender, getMainWindow);
   onCloudWorkspaceAccountChanged(() => {
     const win = getMainWindow();
     if (win && !win.webContents.isDestroyed())

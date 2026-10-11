@@ -30,7 +30,9 @@ Concurrent edits keep both values and preserve later local intent. Dependent ope
 
 ## Repository metadata synchronization
 
-Rich Kanban task metadata persists offline and appears in a second device after reconciliation. Local pages preserve the existing two-document, inventory-bound pagination contract.
+Rich Kanban task metadata persists offline and appears in a second device after reconciliation.
+
+Remote inventory reads request at most 50 documents, with a server byte budget and the existing owner/generation/count boundary. Older servers retain their default two-document pages. Local pages retain their existing pagination contract.
 
 ## Account and generation fencing
 
@@ -69,3 +71,9 @@ Set RUN_GAD_SQLITE_QA=1 for the bounded test. A Mac edit reaches the remote SQLi
 ## Offline application entry
 
 A previously checked, ready main-process cache lets Desktop reopen its workspace without a live account request. Cached access never sets the live account flag or grants execution authority; signed-out, revoked and new caches require normal sign-in.
+
+## Original schedule cached reads
+
+The original Schedules inventory reads its existing local source after the credential-bound cache and both saved account/profile ownership bindings pass. Reads recheck identity after completion; editing and execution retain live authentication.
+
+[[src/main/original-schedule-replication-runtime.ts#runOriginalScheduleScreen]] keeps this readonly path outside the lifecycle synchronization lane. Missing bindings, blocked/revoked caches, another requested profile and symlinked native homes fail closed. It does not adopt a source, upload original files or grant schedule execution.

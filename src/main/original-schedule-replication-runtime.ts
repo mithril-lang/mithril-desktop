@@ -1,4 +1,5 @@
 import { readCloudAccountToken } from "./mithril-token-store";
+import { localWorkspace } from "./local-workspace-runtime";
 import { app } from "electron";
 import { dirname, join } from "node:path";
 import { lstatSync } from "node:fs";
@@ -193,6 +194,52 @@ export function runOriginalScheduleScreen<T>(
         "Workspace account changed; queued schedule action discarded",
       );
   };
+  // A read of the already bound original source needs no remote transaction or
+  // execution lease. Keep it independent of the potentially long sync lane.
+  const cached = kind === "read" ? localWorkspace().syncStatus() : null;
+  if (cached?.ready && cached.userId && cached.phase !== "blocked") {
+    const owner = cached.userId;
+    const checkRead = (): void => {
+      checkRequest();
+      const current = localWorkspace().syncStatus();
+      if (
+        getConnectionConfig().mode !== "local" ||
+        (profile !== undefined && profile !== requestedProfile) ||
+        !current.ready ||
+        current.userId !== owner ||
+        current.phase === "blocked" ||
+        !repositorySourceOwned(
+          join(app.getPath("userData"), "repository-source-owners"),
+          requestedProfile,
+          owner,
+        ) ||
+        !repositorySourceOwned(
+          join(
+            app.getPath("userData"),
+            "mithril-original-schedules",
+            "source-owners",
+          ),
+          requestedProfile,
+          owner,
+        )
+      )
+        throw Error("Cached schedule source ownership unavailable");
+      const home = profileHome(requestedProfile);
+      if (!lstatSync(home).isDirectory())
+        throw Error("Schedule profile unavailable");
+      for (let path = home; ; path = dirname(path)) {
+        if (lstatSync(path).isSymbolicLink())
+          throw Error("Unsafe schedule profile directory");
+        if (dirname(path) === path) break;
+      }
+    };
+    return (async () => {
+      checkRead();
+      const result = await action();
+      checkRead();
+      return result;
+    })();
+  }
   return serial(async () => {
     checkRequest();
     const engine = await createEngine();

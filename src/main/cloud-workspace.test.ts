@@ -1339,3 +1339,37 @@ it("archive requests use fixed main-only credentials and require separate chat s
     }),
   ).rejects.toThrow("Unsupported");
 });
+
+// @lat: [[cloud-workspace-tests#Bounded inventory request]]
+it("requests bounded inventory pages and rejects foreign-owner responses", async () => {
+  const original = fetcher.getMockImplementation()! as (
+    url: string,
+  ) => Promise<Response>;
+  let owner = "a";
+  fetcher.mockImplementation(async (url: string) => {
+    if (url.includes("/repository/task?"))
+      return reply({
+        schemaVersion: 1,
+        userId: owner,
+        collection: "task",
+        datasetGeneration: 0,
+        inventory: { cursor: 0, anchor: 0, total: 0 },
+        documents: [],
+        nextAfter: null,
+      });
+    return original(url);
+  });
+  await client.enable();
+  expect((await client.repositoryPage("task", "last_id")).documents).toEqual(
+    [],
+  );
+  expect(
+    fetcher.mock.calls.some(
+      (call) =>
+        call[0] ===
+        "https://api.mithril.fund/v1/workspace/repository/task?limit=50&after=last_id",
+    ),
+  ).toBe(true);
+  owner = "other";
+  await expect(client.repositoryPage("task")).rejects.toThrow();
+});

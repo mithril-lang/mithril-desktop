@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import startVid from "../../assets/startvid.mp4";
 import mithrilMark from "@mithril/design-system/mithril-mark.svg";
+import mithrilWordmark from "../../assets/mithril-wordmark.svg";
 
 interface SplashScreenProps {
   onFinished: () => void;
@@ -61,7 +62,7 @@ function SplashScreen({
       />
       <div className="splash-logo" aria-label="Mithril">
         <img src={mithrilMark} alt="" />
-        <span>Mithril</span>
+        <img src={mithrilWordmark} alt="" style={{ width: "4.4em", height: "1em" }} />
       </div>
       {onSwitchToLocal && showEscape && (
         <div className="splash-escape">

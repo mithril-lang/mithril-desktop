@@ -215,3 +215,9 @@ All 481 archive files match the producer and installed candidate dependency. Bot
 Desktop pins Workspace `0.6.31-sync.73`, preserving newly acknowledged chats when a delayed inventory from before their creation arrives.
 
 The archive SHA256 is `b95eb6b617366f7c835f01024a417ab6d78b538134dd092d8a1e4b106902a124`; all 481 files match the installed dependency. A newer acknowledged session invalidates older inventory readers. A future complete inventory can still remove deleted records or apply restored-generation changes. Desktop's authenticated tool adapter also offers browser-tools-v2 from the first checkpoint, enabling the API's existing bounded child bridge. Existing uncertain turns are not replayed. These are candidate source changes; previous native receipts, installer feeds and installed preview.77 do not qualify preview.78.
+
+## Cinematic wordmark
+
+Mithril logos use the same commercially licensed Cinzel Decorative Bold outlines as the shared design system and promotional titles. Body and control text keep their existing fonts.
+
+[[src/renderer/src/screens/SplashScreen/SplashScreen.tsx]] uses the white outlined wordmark beside the existing shared crystal. The source asset is `src/renderer/src/assets/mithril-wordmark.svg`; its SIL Open Font License is preserved in `src/renderer/src/assets/mithril-wordmark-OFL.txt`. This source branding update does not qualify a new installer. Keep the current independent native packaging, signing, notarization, launch and updater read-back gates.

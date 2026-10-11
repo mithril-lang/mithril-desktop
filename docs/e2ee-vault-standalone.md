@@ -13,7 +13,7 @@ Run the controller with the existing owner's qualified Node 24 runtime:
 
 ```
 node scripts/independent-macos/source-cli.mjs qualify --checkout /absolute/source --state /external/owner-only/state --mode candidate
-node scripts/independent-macos/source-cli.mjs verify --checkout /absolute/source --state /external/owner-only/state --receipt /external/owner-only/state/receipt.cms --mode candidate
+node scripts/independent-macos/source-cli.mjs verify --checkout /absolute/source --state /external/owner-only/state --receipt /external/owner-only/state/receipt.receipt.bundle --mode candidate
 ```
 
 The controller itself must be committed and clean. Only the fixed Desktop,
@@ -25,9 +25,8 @@ public package sources; subsequent tests/builds have no network. Containers drop
 capabilities and enforce CPU, memory and PID limits. Only the newly created
 source volume is removed after a run.
 
-The existing Mac Developer ID signs the receipt with SHA256 CMS. Verification
-checks the cryptographic signature and exact owner certificate rather than
-CMS's generic email policy, then repository, SHA, recipe/controller/runtime
+The existing Mac Developer ID signs the receipt with the native codesign resource seal. Verification
+checks the strict code signature, hardened-runtime/timestamp metadata and exact owner certificate, then repository, SHA, recipe/controller/runtime
 hashes, 24-hour freshness, logs and compiled artifact inventory. A candidate
 receipt is not an installer, external security review, production migration or
 publication authority. The library profiles qualify the new SDK adapters;
@@ -42,7 +41,7 @@ api` and its own signing authority; these receipts cannot substitute for it.
 
 The native installer qualifier retains its clean-current-main, Developer ID,
 notarization, Gatekeeper, launch and architecture guards. Windows/Linux native
-owners remain separate. The API feature flag defaults off and migration 0058
+owners remain separate. The API feature flag defaults off and migration 0059
 is not applied by these source checks. General availability requires the external
 review and recovery drill in kagi SECURITY.md, native installed-client evidence,
 reviewed schema deployment and live sync read-back. Device revocation, automatic

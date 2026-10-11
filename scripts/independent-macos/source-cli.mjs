@@ -13,11 +13,13 @@ import {
   openSync,
   closeSync,
   createReadStream,
+  copyFileSync,
+  chmodSync,
 } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { hostname } from "node:os";
 import { fileURLToPath } from "node:url";
-import { sha256, IDENTITY } from "./core.mjs";
+import { sha256, IDENTITY, verifySignatureMetadata } from "./core.mjs";
 import {
   SOURCE_PROFILES,
   SOURCE_IMAGE,
@@ -133,49 +135,52 @@ function ownerCertificate() {
 function verify(receiptPath, identity, state) {
   const temp = mkdtempSync(join(state, "verify-"));
   try {
-    const decoded = join(temp, "payload.json"),
-      signer = join(temp, "signer.pem");
-    run(
-      "/usr/bin/openssl",
-      [
-        "cms",
-        "-verify",
-        "-inform",
-        "DER",
-        "-in",
-        receiptPath,
-        "-noverify",
-        "-out",
-        decoded,
-        "-signer",
-        signer,
-      ],
-      runner,
-      undefined,
-    );
-    // -noverify skips generic email-chain policy, not the CMS cryptographic signature.
-    // The signer MUST match this owner's existing pinned Developer ID certificate.
     if (
-      new X509Certificate(readFileSync(signer)).fingerprint256 !==
+      !receiptPath.endsWith(".receipt.bundle") ||
+      !receiptPath.startsWith(state + "/") ||
+      !lstatSync(receiptPath).isDirectory() ||
+      realpathSync(receiptPath) !== receiptPath
+    )
+      throw Error("Receipt must be an owner-state signed bundle");
+    run(
+      "/usr/bin/codesign",
+      ["--verify", "--deep", "--strict", receiptPath],
+      runner,
+    );
+    const metadata = spawnSync(
+      "/usr/bin/codesign",
+      ["--display", "--verbose=4", receiptPath],
+      { encoding: "utf8" },
+    );
+    if (metadata.status !== 0)
+      throw Error("Receipt signing metadata unavailable");
+    verifySignatureMetadata(metadata.stderr);
+    const prefix = join(temp, "signer-");
+    run(
+      "/usr/bin/codesign",
+      ["--display", "--extract-certificates", prefix, receiptPath],
+      runner,
+    );
+    if (
+      new X509Certificate(readFileSync(prefix + "0")).fingerprint256 !==
       ownerCertificate()
     )
-      throw Error("Receipt signer differs from the configured local owner");
+      throw Error("Receipt signer differs from configured owner");
+    const decoded = join(receiptPath, "Contents/Resources/receipt.json");
     const payload = verifySourcePayload(
       JSON.parse(readFileSync(decoded)),
       identity,
     );
     if (
-      !receiptPath.endsWith(".cms") ||
-      !receiptPath.startsWith(state + "/") ||
-      lstatSync(receiptPath).isSymbolicLink()
-    )
-      throw Error("Receipt must be a regular CMS file in owner state");
-    if (
-      sha256(readFileSync(receiptPath.replace(/\.cms$/, ".log"))) !==
-      payload.logSha256
+      sha256(
+        readFileSync(receiptPath.replace(/\.receipt\.bundle$/, ".log")),
+      ) !== payload.logSha256
     )
       throw Error("Qualification log changed");
-    const artifactPath = receiptPath.replace(/\.cms$/, ".artifacts");
+    const artifactPath = receiptPath.replace(
+      /\.receipt\.bundle$/,
+      ".artifacts",
+    );
     if (
       JSON.stringify(sourceInventory(artifactPath)) !==
       JSON.stringify(payload.artifacts)
@@ -244,7 +249,7 @@ try {
   } else if (command === "qualify") {
     const temp = mkdtempSync(join(state, "source-")),
       id = `${repo.split("/")[1]}-${sha.slice(0, 12)}-${Date.now()}`;
-    const receipt = join(state, id + ".cms"),
+    const receipt = join(state, id + ".receipt.bundle"),
       log = join(state, id + ".log"),
       artifactPath = join(state, id + ".artifacts");
     const archive = join(temp, "source.tar");
@@ -347,20 +352,32 @@ try {
         logSha256: sha256(readFileSync(log)),
         finishedAt: new Date().toISOString(),
       };
-      const plaintext = join(temp, "receipt.json");
-      writeFileSync(plaintext, JSON.stringify(payload), { mode: 0o600 });
+      // A code-signed resource bundle seals the JSON using the already approved
+      // native codesign owner; no new private key or keychain ACL is introduced.
+      const contents = join(receipt, "Contents");
+      mkdirSync(join(contents, "MacOS"), { recursive: true, mode: 0o700 });
+      mkdirSync(join(contents, "Resources"), { mode: 0o700 });
+      copyFileSync("/usr/bin/true", join(contents, "MacOS/attestation"));
+      chmodSync(join(contents, "MacOS/attestation"), 0o700);
+      writeFileSync(
+        join(contents, "Info.plist"),
+        `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>fund.mithril.source-receipt</string><key>CFBundleExecutable</key><string>attestation</string><key>CFBundlePackageType</key><string>BNDL</string><key>CFBundleVersion</key><string>1</string></dict></plist>`,
+        { mode: 0o600 },
+      );
+      writeFileSync(
+        join(contents, "Resources/receipt.json"),
+        JSON.stringify(payload),
+        { mode: 0o600 },
+      );
       run(
-        "/usr/bin/security",
+        "/usr/bin/codesign",
         [
-          "cms",
-          "-S",
-          "-N",
+          "--force",
+          "--sign",
           IDENTITY,
-          "-H",
-          "SHA256",
-          "-i",
-          plaintext,
-          "-o",
+          "--options",
+          "runtime",
+          "--timestamp",
           receipt,
         ],
         runner,

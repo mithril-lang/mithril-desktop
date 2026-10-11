@@ -42,6 +42,6 @@ A second native confirmation identifies the requesting session. Account switchin
 
 ## Candidate standalone qualification
 
-`scripts/independent-macos/source-cli.mjs` archives exact clean candidates into gad containers under a fixed Node image, then runs offline source recipes without provider/deployment credentials. Existing Developer ID signs CMS receipts.
+`scripts/independent-macos/source-cli.mjs` archives exact clean candidates into gad containers under a fixed Node image, then runs offline source recipes without provider/deployment credentials. Existing Developer ID signs resource-bundle receipts.
 
-Receipts bind repository, source archive, SHA, recipe, runtime, owner certificate, logs and compiled artifact hashes. Verification checks the CMS signature against the local owner's certificate and a 24-hour lifetime. Candidate and integrated current-main source checks are separate from native installer/notarization/publication qualification; neither source profile creates publication authority or changes the native current-main guard.
+Receipts bind repository, source archive, SHA, recipe, runtime, owner certificate, logs and compiled artifact hashes. Verification checks the strict resource-bundle signature against the local owner's certificate and a 24-hour lifetime. Candidate and integrated current-main source checks are separate from native installer/notarization/publication qualification; neither source profile creates publication authority or changes the native current-main guard.

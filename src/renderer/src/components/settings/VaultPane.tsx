@@ -37,7 +37,6 @@ export default function VaultPane(): React.JSX.Element {
       },
     );
     return () => {
-      ++identityEpoch.current;
       unsubscribe?.();
     };
   }, []);

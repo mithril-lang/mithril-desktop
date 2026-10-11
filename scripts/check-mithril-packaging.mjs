@@ -45,6 +45,10 @@ for (const path of files) {
 
 const metadata = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const builder = readFileSync(join(root, "electron-builder.yml"), "utf8");
+for (const output of ["dist", "release", "artifacts"]) {
+  if (!builder.includes(`"!${output}/**"`))
+    failures.push(`missing build output exclusion: ${output}`);
+}
 const devFeed = readFileSync(join(root, "dev-app-update.yml"), "utf8");
 if (
   metadata.name !== "mithril-desktop" ||

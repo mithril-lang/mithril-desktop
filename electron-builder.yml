@@ -19,6 +19,8 @@ files:
   - "!**/.vscode/*"
   - "!src/**"
   - "!tests/**"
+  - "!verification/**"
+  - "!vitest.local-d1.config.ts"
   - "!lat.md/**"
   - "!scripts/**"
   - "!.github/**"

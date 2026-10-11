@@ -60,3 +60,5 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[mithril-client-days-tests]] — Explicit consent, fixed endpoint and UTC-day reporting tests.
 
 - [[independent-macos]] — independent Apple package signing, notarization, native launch qualification and release-held receipts.
+
+- [[local-workspace]] — local SQLite metadata, durable offline edits and shared main-process D1 reconciliation.

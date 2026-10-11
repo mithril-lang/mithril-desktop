@@ -479,6 +479,18 @@ const hermesAPI = {
       ipcRenderer.invoke("project-folder-disconnect", projectId),
   },
   cloudWorkspace: {
+    localSync: {
+      status: () => ipcRenderer.invoke("local-workspace-sync-status"),
+      synchronize: () => ipcRenderer.invoke("local-workspace-sync-now"),
+      resolve: (operationId, choice) =>
+        ipcRenderer.invoke("local-workspace-resolve", operationId, choice),
+      onChanged: (callback) => {
+        const listener = (): void => callback();
+        ipcRenderer.on("local-workspace-changed", listener);
+        return () =>
+          ipcRenderer.removeListener("local-workspace-changed", listener);
+      },
+    },
     replica: {
       snapshot: () => ipcRenderer.invoke("cloud-workspace-replica-snapshot"),
       apply: (write) =>

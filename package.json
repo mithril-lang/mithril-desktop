@@ -32,7 +32,8 @@
     "build:mac": "npm run check:packaging && electron-vite build && electron-builder --mac",
     "build:linux": "npm run check:packaging && electron-vite build && electron-builder --linux",
     "build:rpm": "npm run check:packaging && npm run build && electron-builder --linux rpm",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:local-d1": "vitest run --config vitest.local-d1.config.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

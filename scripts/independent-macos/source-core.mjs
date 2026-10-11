@@ -164,3 +164,22 @@ export function importSourceArtifacts(files, directory) {
   }
   return sourceInventory(directory);
 }
+
+/** Public Desktop only: verify exact archive bytes before executing source. */
+export function publicDesktopArchiveSetup(repository, sha, archiveSha256) {
+  if (
+    repository !== "mithril-lang/mithril-desktop" ||
+    !/^[a-f0-9]{40}$/.test(sha) ||
+    !/^[a-f0-9]{64}$/.test(archiveSha256)
+  )
+    throw Error("Fixed public Desktop archive identity required");
+  const temp = "/tmp/mithril-public-source";
+  return [
+    `git -c credential.helper= -c core.hooksPath=/dev/null init ${temp}`,
+    `git -C ${temp} -c credential.helper= -c core.hooksPath=/dev/null -c protocol.file.allow=never -c protocol.ext.allow=never fetch --depth=1 --no-tags https://github.com/mithril-lang/mithril-desktop.git ${sha}`,
+    `test "$(git -C ${temp} rev-parse FETCH_HEAD)" = '${sha}'`,
+    `test "$(git -C ${temp} archive --format=tar ${sha} | sha256sum | cut -d ' ' -f 1)" = '${archiveSha256}'`,
+    `git -C ${temp} archive --format=tar ${sha} | tar --no-same-owner --no-same-permissions -xf - -C /work`,
+    `rm -rf -- ${temp}`,
+  ].join(" && ");
+}

@@ -10,6 +10,8 @@ import {
 import { secretItem, type SecretItem } from "@kotoba-lang/kagitaba/secret-item";
 
 const API = "https://api.mithril.fund";
+export const VAULT_TRAINING_ORIGIN =
+  "https://mithril-vault-training-20261011.cloud-kotoba.workers.dev";
 export interface EncryptedVaultRecord {
   vaultId: string;
   itemId: string;
@@ -20,6 +22,7 @@ export interface EncryptedVaultRecord {
   createdAt: number;
 }
 export interface VaultSession {
+  realm?: "vault-training-v1";
   ownerId: string;
   token: string;
 }
@@ -66,6 +69,12 @@ export class KagiVaultClient {
       !session.token.startsWith("mf_")
     )
       throw new VaultClientError("vault_account_mismatch");
+    const training = session.realm === "vault-training-v1";
+    if (
+      training !== /^training-[a-f0-9]{32}$/.test(session.ownerId) ||
+      training !== /^mf_training[A-Za-z0-9_-]{35}$/.test(session.token)
+    )
+      throw new VaultClientError("vault_realm_mismatch");
     return session;
   }
   private context(itemId: string, revision: number): VaultContext {
@@ -89,7 +98,7 @@ export class KagiVaultClient {
     let response: Response;
     try {
       response = await this.fetchImpl(
-        `${API}/v1/vault/${this.state.vaultId}/items/${itemId}`,
+        `${session.realm === "vault-training-v1" ? VAULT_TRAINING_ORIGIN : API}/v1/vault/${this.state.vaultId}/items/${itemId}`,
         {
           method: mutation ? "PUT" : "GET",
           redirect: "error",

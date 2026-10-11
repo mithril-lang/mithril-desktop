@@ -19,6 +19,7 @@ export interface VaultInput {
   key?: string;
 }
 export interface VaultView {
+  realm?: "vault-training-v1";
   status: "locked" | "unlocked" | "absent";
   vaultId?: string;
   pendingWrites: number;

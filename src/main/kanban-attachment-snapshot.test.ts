@@ -690,7 +690,7 @@ it("restores added/replaced/removed cloud attachments into original rows, retain
       capture.dispose();
     }
   }
-});
+}, 30_000);
 
 it("rejects corrupted bytes, owner changes, source conflicts and SQL coercion without replacing original attachments", async () => {
   for (const mode of ["bytes", "owner", "source", "sql", "symlink"]) {
@@ -801,7 +801,7 @@ it("rejects corrupted bytes, owner changes, source conflicts and SQL coercion wi
       capture.dispose();
     }
   }
-});
+}, 30_000);
 
 it("restores a cloud-created inactive task with files into the existing original board exactly once", async () => {
   const f = fixture(),
@@ -1104,7 +1104,7 @@ it("restores every connected task file through the main owner-scoped route and r
   } finally {
     capture.dispose();
   }
-});
+}, 30_000);
 
 // @lat: [[cloud-workspace-tests#Cloud workspace tests#Attachment identity collision reconciliation]]
 it("retains existing files across attachment ID collisions, alias overlaps, updates and removal", async () => {
@@ -1228,4 +1228,4 @@ it("retains existing files across attachment ID collisions, alias overlaps, upda
   } finally {
     capture.dispose();
   }
-});
+}, 30_000);

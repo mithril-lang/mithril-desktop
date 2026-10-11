@@ -8,6 +8,8 @@ The entrypoint is `scripts/independent-macos/cli.mjs`. Its preflight requires a 
 
 Build/test children receive only the necessary host environment and no inherited provider or notarization credentials; Vitest runs directly with two workers so npm's four-worker default cannot add a conflicting flag.
 
+Native qualification uses an owner-only temporary directory on the internal Mac filesystem. External-volume custom file flags must still be refused by credential replacement tests; protection is not disabled for release checks.
+
 Qualification builds and tests locked source, packages each Mac architecture, verifies the SQLite native module and executable architecture, and checks the Developer ID chain, hardened runtime and secure timestamp.
 
 The `package` command can prepare signed-only artifacts when notarization credentials are unavailable. Its pending receipt cannot pass qualification or release verification.

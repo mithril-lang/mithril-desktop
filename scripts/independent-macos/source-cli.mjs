@@ -158,7 +158,7 @@ function verify(receiptPath, identity, state) {
     const prefix = join(temp, "signer-");
     run(
       "/usr/bin/codesign",
-      ["--display", "--extract-certificates", prefix, receiptPath],
+      ["--display", `--extract-certificates=${prefix}`, receiptPath],
       runner,
     );
     if (

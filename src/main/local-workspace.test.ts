@@ -383,7 +383,7 @@ it("keeps newer cached data when a stale cloud generation is returned", async ()
   c.restore();
   await warm(a);
   vi.mocked(c.remote.getSnapshot).mockResolvedValueOnce({
-    schemaVersion: 1,
+    schemaVersion: 1 as const,
     userId: "alice",
     cursor: 0,
     datasetGeneration: 0,
@@ -439,4 +439,54 @@ it("fences late responses after sign-out without committing or replaying edits",
   await pass;
   expect(d.service.status().userId).toBeNull();
   expect(c.sent).toEqual([]);
+});
+
+// @lat: [[cloud-workspace-tests#Local shared schedule list]]
+it("persists validated cloud schedule lists for offline restarts without network reads", async () => {
+  const fixture = cloud();
+  fixture.remote.getSchedules = vi.fn(async () => ({
+    schemaVersion: 1 as const,
+    userId: "alice",
+    datasetGeneration: 0,
+    schedules: [],
+  }));
+  const first = device(fixture.remote);
+  await first.service.enable();
+  await first.service.sync();
+  expect(first.service.getSchedules().schedules).toEqual([]);
+  first.service.close();
+  fixture.offline();
+  const restarted = device(fixture.remote, () => {}, first.file);
+  await restarted.service.enable();
+  fixture.remote.getSchedules = vi.fn(async () => {
+    throw Error("Workspace network unavailable");
+  });
+  expect(restarted.service.getSchedules().userId).toBe("alice");
+  expect(fixture.remote.getSchedules).not.toHaveBeenCalled();
+  restarted.account("scope-bob");
+  expect(() => restarted.service.getSchedules()).toThrow();
+});
+it("refuses foreign, stale-generation, and invalid cloud schedule inventories", async () => {
+  for (const change of [
+    { userId: "bob" },
+    { datasetGeneration: 1 },
+    { schedules: [{ id: "bad" }] },
+  ]) {
+    const fixture = cloud();
+    fixture.remote.getSchedules = vi.fn(
+      async () =>
+        ({
+          schemaVersion: 1,
+          userId: "alice",
+          datasetGeneration: 0,
+          schedules: [],
+          ...change,
+        }) as never,
+    );
+    const d = device(fixture.remote);
+    await d.service.enable();
+    await d.service.sync();
+    expect(d.service.syncStatus().phase).toBe("blocked");
+    expect(() => d.service.getSchedules()).toThrow();
+  }
 });

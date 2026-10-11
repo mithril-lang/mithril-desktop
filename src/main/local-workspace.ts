@@ -1,3 +1,7 @@
+import {
+  validCloudSchedule,
+  type ScheduleSnapshot,
+} from "@mithril/workspace/schedules";
 import Database from "better-sqlite3";
 import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -45,6 +49,7 @@ interface Pending {
 }
 interface State {
   owner: string;
+  schedules?: ScheduleSnapshot;
   authorized: boolean;
   ready: boolean;
   generation?: number;
@@ -60,6 +65,7 @@ interface State {
 export interface LocalWorkspaceRemote {
   enable(): Promise<{ userId: string | null; enabled: boolean }>;
   getSnapshot(): Promise<WorkspaceSnapshot>;
+  getSchedules?(): Promise<ScheduleSnapshot>;
   applyOperations(
     ops: WorkspaceOperation[],
     owner?: string,
@@ -269,6 +275,13 @@ export class LocalWorkspace {
       cursor: state.cursor,
       records: state.records,
     };
+  }
+  /** Cached list grants no schedule edit or execution authority. */
+  getSchedules(): ScheduleSnapshot {
+    const { state } = this.context();
+    if (!state.schedules)
+      throw Error("Schedule inventory not synchronized yet");
+    return structuredClone(state.schedules);
   }
   repositoryPage(
     collection: RepositoryCollection,
@@ -489,6 +502,20 @@ export class LocalWorkspace {
         throw Error(
           "Workspace dataset generation changed; pending edits retained for review",
         );
+      const schedules = await this.remote.getSchedules?.();
+      this.current(scope, epoch);
+      if (
+        schedules &&
+        (schedules.schemaVersion !== 1 ||
+          schedules.userId !== initial.owner ||
+          (schedules.datasetGeneration ?? 0) !== generation ||
+          !Array.isArray(schedules.schedules) ||
+          schedules.schedules.length > 100 ||
+          !schedules.schedules.every(validCloudSchedule) ||
+          new Set(schedules.schedules.map((row) => row.id)).size !==
+            schedules.schedules.length)
+      )
+        throw Error("Invalid schedule owner/schema/generation");
       const documents: RepositoryDocument[] = [];
       for (const collection of repositoryCollections.filter(
         (value) => value !== "chat",
@@ -530,6 +557,7 @@ export class LocalWorkspace {
             keys.has(`repository:${d.collection}:${d.id}`),
           ),
         ];
+        state.schedules = schedules ? structuredClone(schedules) : undefined;
         state.cursor = snapshot.cursor;
         state.generation = generation;
         state.ready = true;

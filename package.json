@@ -1,7 +1,7 @@
 {
   "name": "mithril-desktop",
   "version": "0.8.0-preview.78",
-  "description": "Mithril desktop app \u2014 Mithril Agent client for Mithril Fund (fork of fathah/hermes-desktop)",
+  "description": "Mithril desktop app — Mithril Agent client for Mithril Fund (fork of fathah/hermes-desktop)",
   "main": "./out/main/index.js",
   "author": "Mithril",
   "homepage": "https://app.mithril.fund/",
@@ -38,6 +38,8 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@kotoba-lang/kagi": "git+https://github.com/kotoba-lang/kagi.git#d45f279d8c6fdd21744eff4c654d0e8e684f51db",
+    "@kotoba-lang/kagitaba": "git+https://github.com/kotoba-lang/kagitaba.git#713c6976258f7a4863232922a701a8177f250d26",
     "@mithril/design-system": "git+https://github.com/mithril-lang/design-system.git#28a5e601bc5d8189c7c4362e2f65997767114fcc",
     "@mithril/workspace": "file:vendor/mithril-workspace-0.6.31-sync.73-eedc3842.tgz",
     "@radix-ui/react-dialog": "^1.1.17",

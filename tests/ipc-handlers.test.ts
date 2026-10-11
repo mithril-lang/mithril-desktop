@@ -11,6 +11,7 @@ const indexSrc = [
   "src/main/capability-resource-ipc.ts",
   "src/main/task-attachment-ipc.ts",
   "src/main/device-care/ipc.ts",
+  "src/main/kagi-vault-ipc.ts",
 ]
   .map((p) => readFileSync(join(ROOT, p), "utf-8"))
   .join("\n");

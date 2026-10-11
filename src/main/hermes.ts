@@ -1,3 +1,4 @@
+import { resolveGrantedVaultSecret } from "./kagi-vault-runtime";
 import {
   mithrilModelConfig,
   requireMithrilProvider,
@@ -2505,7 +2506,15 @@ async function sendMessageViaTuiGateway(
           ? Promise.resolve(vaultValue)
           : isSudo
             ? promptSudoPassword()
-            : promptSecretValue(envVar, String(payload?.prompt ?? ""));
+            : resolveGrantedVaultSecret(
+                resolveProfile(profile) || "",
+                envVar,
+                activeSessionId,
+              ).then(
+                (value) =>
+                  value ??
+                  promptSecretValue(envVar, String(payload?.prompt ?? "")),
+              );
 
       void collect
         .then((answer) => {

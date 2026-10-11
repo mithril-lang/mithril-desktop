@@ -1,4 +1,6 @@
+import { lockKagiVault } from "../kagi-vault-runtime";
 import { localWorkspace } from "../local-workspace-runtime";
+import { registerKagiVaultIpc } from "../kagi-vault-ipc";
 import { recordMithrilClientDay } from "../mithril-client-day";
 import { NativeAccountArchive } from "../cloud-archive";
 import {
@@ -1278,7 +1280,9 @@ export function registerIpcHandlers(context: IpcContext): void {
       app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL,
     );
   };
+  registerKagiVaultIpc(trustedWorkspaceSender, getMainWindow);
   onCloudWorkspaceAccountChanged(() => {
+    lockKagiVault();
     const win = getMainWindow();
     if (win && !win.webContents.isDestroyed())
       win.webContents.send("cloud-workspace-account-changed");
@@ -3346,6 +3350,7 @@ export function registerIpcHandlers(context: IpcContext): void {
     // so without this an SSH session forgot the choice and reset to `default`
     // on every relaunch. Then drop the cached health flag so the next check
     // probes the newly-active profile's gateway, not the previous one's.
+    lockKagiVault();
     setActiveProfile(name);
     cloudWorkspace.reset();
     cloudChat.auth.reset();

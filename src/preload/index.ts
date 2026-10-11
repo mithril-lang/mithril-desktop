@@ -1,3 +1,8 @@
+import type {
+  VaultAction,
+  VaultInput,
+  VaultResult,
+} from "../shared/kagi-vault";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { AppLocale } from "../shared/i18n/types";
 import type { DeviceCareAPI } from "../shared/device-care";
@@ -203,6 +208,8 @@ function historyFilesForOwner(owner: string): CloudChatAPI["historyFiles"] {
 }
 
 const hermesAPI = {
+  vault: (action: VaultAction, input?: VaultInput): Promise<VaultResult> =>
+    ipcRenderer.invoke("kagi-vault", action, input),
   deviceCare: {
     storageSkillStatus: (profile?: string) =>
       ipcRenderer.invoke("device-care-storage-skill-status", profile),

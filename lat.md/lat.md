@@ -62,3 +62,4 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[independent-macos]] — independent Apple package signing, notarization, native launch qualification and release-held receipts.
 
 - [[local-workspace]] — local SQLite metadata, durable offline edits and shared main-process D1 reconciliation.
+- [[e2ee-vault]] — Main-process E2EE secret transport and local key custody preview.

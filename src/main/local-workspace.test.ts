@@ -441,7 +441,7 @@ it("fences late responses after sign-out without committing or replaying edits",
   expect(c.sent).toEqual([]);
 });
 
-// @lat: [[local-workspace#Cached shared Schedules inventory]]
+// @lat: [[cloud-workspace-tests#Local shared schedule list]]
 it("persists validated cloud schedule lists for offline restarts without network reads", async () => {
   const fixture = cloud();
   fixture.remote.getSchedules = vi.fn(async () => ({

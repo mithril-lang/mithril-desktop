@@ -246,6 +246,8 @@ Main-process task chunk requests pin the owner and keep credentials outside the 
 
 Cloud attachment additions, replacements and removals reconcile with the original SQLite task and fixed attachment directory, preserving source files and retained metadata.
 
+The multi-case native attachment integration tests have a bounded 30-second deadline for repeated Python process startup and SQLite/filesystem reconciliation on macOS. Assertions and production timeouts remain unchanged; the suite default stays five seconds.
+
 Default and named boards must match fresh source fingerprints. Corrupt bytes, account changes, source conflicts, symlinks and SQL coercion retain the old rows/files. New inactive tasks restore attached bytes without a dispatcher call; retained receipts recover after later file loss.
 
 ## Historical task reconstruction
